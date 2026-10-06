@@ -57,9 +57,9 @@ describe("purity: the kernel (KR-02)", () => {
 describe("purity: allowed", () => {
   it("ST-04: passes the allowed names of node:crypto, Date with an argument and UTC", () => {
     const code = [
-      'import { createHash, verify } from "node:crypto";',
+      'import { createHash, createPrivateKey, createPublicKey, sign, verify } from "node:crypto";',
       'export const h = createHash("sha256").update("x").digest("hex");',
-      "export const v = verify;",
+      "export const v = [verify, sign, createPublicKey, createPrivateKey];",
       "export const d = new Date(0).toISOString();",
       "export const u = Date.UTC(2026, 9, 6) + new Date(0).getUTCHours();",
       'export const up = "a".toUpperCase();',
