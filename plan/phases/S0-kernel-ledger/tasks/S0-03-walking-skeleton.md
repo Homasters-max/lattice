@@ -83,9 +83,9 @@ run(argv, { out, err, assembled }): Promise<number>                        // cl
 
 ## Сделано иначе, чем в наброске
 
-Решения владельца по ревью — Q-09…Q-19 в `PLAN.md`.
+Решения владельца по ревью — Q-09…Q-26 в `PLAN.md`; объём задачи с добавками ревью — Q-26.
 
-- **Знание в git** (Q-09): кроме `store-memory` есть тонкий `store-jsonl` — одна каноническая строка на коммит в `store/knowledge.jsonl`, чтение с начала при открытии. Landing открывает его на worktree: worktree → `append` → удалить proposal → `push`. Worktree `git-fixture` — временный каталог, `push` фиксирует его содержимое; `prepare` сливает по общему предку и кончается `conflict`. Адаптер store canon не знает: ledger отдаёт строку коммита и сам разбирает строки. Read view в e2e открывается из tail `main`. Проверки цепочки, обрезанной строки, evidence в `store/evidence/` и rows, переданные адаптеру при открытии (LG-02, Q-25), — S0-11; CAS с пересборкой, `awaiting-act`, trailers OB-07, `request` и `git-repo` — S0-20.
+- **Знание в git** (Q-09): кроме `store-memory` есть тонкий `store-jsonl` — одна каноническая строка на коммит в `store/knowledge.jsonl`, чтение с начала при открытии. Landing открывает его на worktree: worktree → `append` → удалить proposal → `push`. Worktree `git-fixture` — временный каталог, `push` фиксирует его содержимое; `prepare` сливает по общему предку и кончается `conflict`. Адаптер store canon не знает: ledger отдаёт строку коммита и сам разбирает строки. Read view в e2e открывается из tail `main`. Проверки цепочки, обрезанной строки, evidence в `store/evidence/` и rows, переданные адаптеру при открытии (LG-02, Q-25), — S0-11; пересборка на сдвинувшемся `main`, `awaiting-act`, trailers OB-07, `request` и `git-repo` — S0-20 (Q-26).
 - **Отказы вместо исключений** (Q-10): KR-10 (не JSON, не UTF-8), LG-09 (форма proposal поверхностно; полная — S0-10), LG-54 (ровно один proposal) — с реестрами и фикстурами trigger/pass. Мягкий `JSON.parse` — только в `parseJson` (G-16, до S0-04).
 - **Аргументы портов** (Q-11): `prepare`, `push` и `append` берут один объект с именами аргументов правил; правило — `CONVENTIONS.md` §1.
 - **`prev` коммита** дописывает landing, `request` — `null` до S0-20 (G-14, Q-12).
