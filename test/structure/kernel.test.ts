@@ -46,7 +46,7 @@ describe("std type names in the kernel (KR-01)", () => {
     ]);
   });
 
-  it("KR-01: refuses an identifier, a type or a property named after a std type", () => {
+  it("KR-01: refuses an identifier, a type or a property named after a std type, alone or as whole words of a compound name", () => {
     const t = tree({
       "src/kernel/index.ts": "export type Requirement = { readonly reviewNote: number };\nexport const NAMESPACE = 1;\nexport const isRequirement = 2;\n",
     });
@@ -54,6 +54,7 @@ describe("std type names in the kernel (KR-01)", () => {
       'KR-01: src/kernel/index.ts:1 names the std type "Requirement"; the kernel knows no std type',
       'KR-01: src/kernel/index.ts:1 names the std type "reviewNote"; the kernel knows no std type',
       'KR-01: src/kernel/index.ts:2 names the std type "NAMESPACE"; the kernel knows no std type',
+      'KR-01: src/kernel/index.ts:3 names the std type "isRequirement"; the kernel knows no std type',
     ]);
   });
 

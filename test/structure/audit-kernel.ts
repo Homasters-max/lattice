@@ -55,7 +55,8 @@ const kebab = (id: string) =>
     .toLowerCase();
 
 function namesIn({ text, identifier }: Text, names: ReadonlySet<string>): string | null {
-  if (identifier) return names.has(kebab(text)) ? text : null;
+  // A std type name as whole words of an identifier: `isRequirement`, `REVIEW_NOTE_COUNT`.
+  if (identifier) return [...names].some((n) => `-${kebab(text)}-`.includes(`-${n}-`)) ? text : null;
   if (text.includes("std/")) return text;
   const bare = /^(?:std\/)?([a-z][a-z0-9-]*)(?:@\d+)?$/.exec(text)?.[1];
   return bare !== undefined && names.has(bare) ? text : null;
