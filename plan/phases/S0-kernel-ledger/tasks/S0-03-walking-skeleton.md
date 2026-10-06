@@ -53,7 +53,7 @@ parseJson(text, path?): Result<JsonValue>; decodeUtf8(bytes, path?): Result<stri
 readProposal(value): Result<Proposal>                                     // LG-09 — поверхностно
 changeRequest(head: string | null): Result<string>                        // LG-54 — change request, которого нет (Q-16)
 proposalPath(files): Result<string>                                       // LG-54
-keptKnowledge(tail: bytes | null, request: bytes | null): Result<bytes | null>   // LG-23 — байты store/knowledge.jsonl как на tail main (Q-19)
+keptKnowledge(tail: bytes | null, request: Held): Result<Held>               // LG-23 — байты store/knowledge.jsonl как на tail main (Q-19); каталог на его месте — отказ
 checkHeader(value, path): Rejection[]                                     // KR-04 — поверхностно
 readCommit(value, path): Result<Commit>; decodeCommit(line: bytes, index) // KR-10 — UTF-8, JSON, канонические байты; LG-06 и KR-04 — поверхностно
 apply(before: View, proposal, acts: LandActs, evidence): Result<Commit | "no-op">   // фаза 1 — KR-06; без intents — no-op (LG-12, LG-54); prev, request, sig — null (G-14)
@@ -97,7 +97,7 @@ run(argv, { out, err, assembled }): Promise<number>                        // cl
 - **KR-01** ловит строковые литералы, называющие `std` или его тип, и идентификаторы, названные по типу `std` (`Requirement`, `reviewNote`, `NAMESPACE`).
 - **`Rejection.expected` и `got`** — `JsonValue`, а не `unknown`: сообщение подставляет их каноническим JSON; набросок `CONVENTIONS.md` §3 поправлен.
 - **Чистота** строже раздела 8 `CONVENTIONS.md`: `import.meta` целиком, `globalThis`, `require`, `Buffer`, глобальный `crypto`, `Date()` как функция — пути к окружению и файлам ST-04; раздел дописан.
-- **`before` — store tail `main`** (LG-14): landing открывает store на worktree самого tail-коммита и складывает `before` оттуда; `append` идёт в store на worktree change request. Change request, который изменил хоть один байт `store/knowledge.jsonl`, отклоняется LG-23: снятый последний перевод строки, пустая строка, байты не UTF-8, лишняя или изменённая строка, удалённый файл. Сверка — по байтам файла в двух worktree (`keptKnowledge`, Q-19), фикстуры `test/fixtures/LG-23/`.
+- **`before` — store tail `main`** (LG-14): landing открывает store на worktree самого tail-коммита и складывает `before` оттуда; `append` идёт в store на worktree change request. Change request, который изменил хоть один байт `store/knowledge.jsonl`, отклоняется LG-23: снятый последний перевод строки, пустая строка, байты не UTF-8, лишняя или изменённая строка, удалённый файл, каталог на месте файла. Сверка — по байтам файла в двух worktree (`keptKnowledge`, Q-19), фикстуры `test/fixtures/LG-23/`.
 - **Строки store — байтами** (Q-19): `commits` и `tail` отдают байты строк; `store-jsonl` режет файл по переводам строки, ничего не декодирует и не выбрасывает, ledger декодирует UTF-8 с отказом KR-10. Обрезанная последняя строка — S0-11 (Q-09). Порядок ключей строк — `sortRows` из порта `store` (Q-18).
 - **No-op** (LG-12, LG-25, LG-54): proposal без intents — `no-op` apply; landing не пишет коммит знания, удаляет файл proposal, оставляет код change request и пушит с trailer `Lattice-Proposal`. No-op отдельных intents (LG-13) и идемпотентность по hash (LG-12) — S0-13.
 - **`got` отказа** — пришедшее значение; описание `"absent"` — только у поля, которого нет; байты — их hash (`CONVENTIONS.md` §3, Q-19).

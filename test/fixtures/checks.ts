@@ -16,6 +16,7 @@ import {
   openLines,
   proposalPath,
   readProposal,
+  type Held,
   type LandActs,
 } from "../../src/ledger/index.js";
 import type { FixtureCheck } from "./run.js";
@@ -80,12 +81,15 @@ const store: FixtureCheck = {
   },
 };
 
-/** `input`: `{ tail, request }` — the bytes of `store/knowledge.jsonl` at the tail of main and in the change request, `null` where there is no file. */
+/**
+ * `input`: `{ tail, request }` — the bytes of `store/knowledge.jsonl` at the tail of main and in the change request,
+ * `null` where there is no file; the request may hold a directory there instead, given as `{ files }`.
+ */
 const knowledge: FixtureCheck = {
   enforces: [LG_23.id],
   run: (input) => {
-    const file = (name: string) => (field(input, name) === null ? null : bytesOf(field(input, name)));
-    return keptKnowledge(file("tail"), file("request"));
+    const held = (v: unknown): Held => (v === null ? null : typeof v === "object" && !Array.isArray(v) ? (v as Held) : bytesOf(v));
+    return keptKnowledge(held(field(input, "tail")) as Uint8Array | null, held(field(input, "request")));
   },
 };
 

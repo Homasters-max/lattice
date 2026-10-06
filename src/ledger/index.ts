@@ -3,7 +3,7 @@
 export { apply, type Applied, type LandActs } from "./apply.js";
 export { commitHash, decodeCommit, encodeCommit, readCommit, type Commit, type Evidence } from "./commit.js";
 export { fold } from "./fold.js";
-export { changeRequest, keptKnowledge, land, proposalPath, tailView, type LandingOutcome, type LandingPorts, type LandOptions } from "./landing.js";
+export { changeRequest, keptKnowledge, land, proposalPath, tailView, type Held, type LandingOutcome, type LandingPorts, type LandOptions } from "./landing.js";
 export type { Act, Acts } from "./ports/acts.js";
 export type { Clock } from "./ports/clock.js";
 export { sortPaths, type Conflict, type Git, type Prepare, type Push, type Trailer, type Worktree } from "./ports/git.js";

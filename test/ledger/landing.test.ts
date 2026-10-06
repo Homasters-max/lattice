@@ -193,6 +193,13 @@ describe("the store a change request brings (LG-14, LG-23)", () => {
     expect(await read(ports.git)).toBe(file);
   });
 
+  it("LG-23: refuses a change request that put a directory in place of store/knowledge.jsonl, never throws", async () => {
+    const { ports, file } = await fromLanded(() => ({ [KNOWLEDGE]: null, [`${KNOWLEDGE}/x`]: "x\n" }));
+    const refusal = { rule: "LG-23", path: "/store/knowledge.jsonl", expected: hashBytes(utf8(file)), got: [`${KNOWLEDGE}/x`] };
+    expect(await land(ports, "cr/x", LAND)).toMatchObject({ outcome: "rejections", rejections: [refusal] });
+    expect(await read(ports.git)).toBe(file);
+  });
+
   it("LG-14, LG-23: lands on a store the change request brings unchanged, with before at the tail of main", async () => {
     const { ports } = await fromLanded(() => ({}));
     const commit = await landed(ports, "cr/x");

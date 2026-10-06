@@ -58,17 +58,29 @@ export function proposalPath(files: readonly string[]): Result<string> {
   return refuse(reject(LG_54, { intent: null, path: "/store/proposals", expected: "one proposal file", got: [...files] }));
 }
 
-const same = (a: Uint8Array | null, b: Uint8Array | null) =>
-  a === null || b === null ? a === b : a.length === b.length && a.every((byte, i) => byte === b[i]);
+/** What a worktree holds at a path: the bytes of a file, the files of a directory, or nothing. */
+export type Held = Uint8Array | { readonly files: readonly string[] } | null;
+
+async function heldAt(worktree: Worktree, path: string): Promise<Held> {
+  const bytes = await worktree.read(path);
+  if (bytes !== null) return bytes;
+  const files = await worktree.list(`${path}/`);
+  return files.length > 0 ? { files } : null;
+}
+
+const same = (a: Uint8Array | null, b: Held) =>
+  a === null || b === null || !(b instanceof Uint8Array) ? a === b : a.length === b.length && a.every((byte, i) => byte === b[i]);
+
+/** Bytes are no JSON value: a refusal names a file by its hash (Q-19), a directory by its files. */
+const named = (held: Held) => (held === null ? null : held instanceof Uint8Array ? hashBytes(held) : [...held.files]);
 
 /**
  * LG-23: only the `jsonl` adapter writes `store/knowledge.jsonl`, and only landing opens it — so a change
- * request brings the file byte for byte as at the tail of `main`, or both lack it. Bytes are no JSON value:
- * the refusal names each file by its hash (Q-19).
+ * request brings the file byte for byte as at the tail of `main`, or both lack it; a directory in its place
+ * changed it too.
  */
-export function keptKnowledge(tail: Uint8Array | null, request: Uint8Array | null): Result<Uint8Array | null> {
+export function keptKnowledge(tail: Uint8Array | null, request: Held): Result<Held> {
   if (same(tail, request)) return { ok: true, value: request };
-  const named = (bytes: Uint8Array | null) => (bytes === null ? null : hashBytes(bytes));
   return refuse(reject(LG_23, { intent: null, path: `/${KNOWLEDGE}`, expected: named(tail), got: named(request) }));
 }
 
@@ -120,7 +132,7 @@ async function check(ports: LandingPorts, request: string): Promise<LandingOutco
   // LG-14: `before` is the read view at the tail — the store of main, never the one the request brings.
   const before = openLines(tail.lines);
   if (!before.ok) return rejected(before);
-  const kept = keptKnowledge(tail.knowledge, await worktree.read(KNOWLEDGE));
+  const kept = keptKnowledge(tail.knowledge, await heldAt(worktree, KNOWLEDGE));
   if (!kept.ok) return rejected(kept);
   return { ...found.value, ...before.value, onto: tail.onto, worktree, store: ports.openStore(worktree) };
 }
