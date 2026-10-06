@@ -6,7 +6,7 @@ export { fold } from "./fold.js";
 export { changeRequest, keptKnowledge, land, proposalPath, tailView, type LandingOutcome, type LandingPorts, type LandOptions } from "./landing.js";
 export type { Act, Acts } from "./ports/acts.js";
 export type { Clock } from "./ports/clock.js";
-export type { Conflict, Git, Prepare, Push, Trailer, Worktree } from "./ports/git.js";
+export { sortPaths, type Conflict, type Git, type Prepare, type Push, type Trailer, type Worktree } from "./ports/git.js";
 export type { Ids } from "./ports/ids.js";
 export type { Append, Store } from "./ports/store.js";
 export { canonicalIntents, proposalHash, readProposal, type Intent, type Proposal, type Session } from "./proposal.js";

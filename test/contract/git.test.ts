@@ -1,12 +1,13 @@
 // ST-07, LG-23: one set of contract tests for the `git` port, run against
 // every adapter of S0-03: `tail`, `prepare` → worktree or conflict, `push` as
-// a compare-and-swap; `tail` of a ref that does not exist is `null`.
+// a compare-and-swap; `tail` of a ref that does not exist is `null`; paths come
+// in the order of `sortPaths`, the one comparator of the port (Q-18).
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { createGitFixture, type GitFixtureOptions } from "../../src/adapters/git-fixture/index.js";
-import type { Git, Worktree } from "../../src/ledger/index.js";
+import { sortPaths, type Git, type Worktree } from "../../src/ledger/index.js";
 
 const dirs: string[] = [];
 afterAll(() => dirs.forEach((d) => rmSync(d, { recursive: true, force: true })));
@@ -16,6 +17,9 @@ const BRANCHES: GitFixtureOptions["branches"] = {
   "cr/add": { from: "main", files: { "src/b.ts": "b\n" } },
   "cr/edit": { from: "main", files: { "README.md": "two\n" } },
   "cr/clash": { from: "main", files: { "README.md": "three\n" } },
+  "cr/names": { from: "main", files: { "src/é.ts": "e\n", "src/B.ts": "B\n", "src/\u{1F600}.ts": "s\n", "src/～.ts": "t\n" } },
+  "cr/file": { from: "main", files: { lib: "file\n" } },
+  "cr/dir": { from: "main", files: { "lib/y.ts": "y\n" } },
 };
 
 const ADAPTERS: readonly { readonly name: string; readonly make: () => Git }[] = [
@@ -75,6 +79,26 @@ describe.each(ADAPTERS)("git port: $name", ({ make }) => {
     const [first, second] = [await worktree(git, "cr/add", onto), await worktree(git, "cr/edit", onto)];
     expect(await push(git, first, onto)).toBe("pushed");
     expect(await push(git, second, onto)).toBe("moved");
+  });
+
+  it("ST-07, Q-18: lists paths in the order of sortPaths — UTF-16 code units, never the locale", async () => {
+    const git = make();
+    const listed = await (await worktree(git, "cr/names", await tailOf(git, "main"))).list("src/");
+    expect(listed).toEqual(sortPaths(listed));
+    expect(listed).toEqual(["src/B.ts", "src/a.ts", "src/é.ts", "src/\u{1F600}.ts", "src/～.ts"]);
+  });
+
+  it("ST-07: read is null where no file is — a path that does not exist, a directory, a path through a file", async () => {
+    const git = make();
+    const w = await worktree(git, "cr/add", await tailOf(git, "main"));
+    expect([await w.read("src/none.ts"), await w.read("src"), await w.read("README.md/x")]).toEqual([null, null, null]);
+  });
+
+  it("ST-07, LG-24: ends conflict where one side put a file and the other a directory at one path", async () => {
+    const git = make();
+    const onto = await tailOf(git, "main");
+    expect(await push(git, await worktree(git, "cr/file", onto), onto)).toBe("pushed");
+    expect(await git.prepare({ request: "cr/dir", onto: await tailOf(git, "main") })).toEqual({ kind: "conflict", paths: ["lib"] });
   });
 
   it("ST-07, LG-24: ends conflict where main and the change request changed a path differently", async () => {

@@ -2,10 +2,11 @@
 // memory; a worktree is a temporary directory under `dir`, and `push` commits
 // what that directory holds, as a compare-and-swap of the ref. `prepare`
 // merges the change request onto `onto` against their merge base and ends
-// `conflict` where both changed a path differently (LG-24).
+// `conflict` where both changed a path differently, or one put a file where the
+// other put a directory (LG-24).
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { Conflict, Git, Prepare, Push, Worktree } from "../../ledger/ports/git.js";
+import { sortPaths, type Conflict, type Git, type Prepare, type Push, type Worktree } from "../../ledger/ports/git.js";
 
 /** A branch: a commit on `from` (or a root) that writes these files; `null` removes one. */
 export type GitFixtureBranch = { readonly from?: string; readonly files: { readonly [path: string]: string | null } };
@@ -29,15 +30,18 @@ function overlay(base: Tree, files: GitFixtureBranch["files"]): Tree {
 /** The three-way merge of `top` onto `onto` from `base`: the merged tree, or the paths that conflict. */
 function merge(base: Tree, onto: Tree, top: Tree): { readonly kind: "tree"; readonly tree: Tree } | Conflict {
   const tree = new Map(onto);
-  const paths = [...new Set([...base.keys(), ...top.keys()])].sort();
+  const paths = new Set([...base.keys(), ...top.keys()]);
   // A path the request changed: taken when `onto` kept the base or made the same change.
-  const changed = paths.filter((p) => !same(top.get(p), base.get(p)) && !same(onto.get(p), top.get(p)));
-  const conflicts = changed.filter((p) => !same(onto.get(p), base.get(p)));
+  const changed = [...paths].filter((p) => !same(top.get(p), base.get(p)) && !same(onto.get(p), top.get(p)));
   for (const p of changed) {
     const bytes = top.get(p);
     if (bytes === undefined) tree.delete(p);
     else tree.set(p, bytes);
   }
+  const files = [...tree.keys()];
+  // A file where the other side put a directory: no tree holds both.
+  const clashes = files.filter((p) => files.some((q) => q.startsWith(`${p}/`)));
+  const conflicts = sortPaths(new Set([...changed.filter((p) => !same(onto.get(p), base.get(p))), ...clashes]));
   return conflicts.length > 0 ? { kind: "conflict", paths: conflicts } : { kind: "tree", tree };
 }
 
@@ -47,6 +51,9 @@ async function filesOf(dir: string): Promise<Tree> {
   const rel = (p: string) => p.slice(dir.length + 1).replaceAll("\\", "/");
   return new Map(await Promise.all(paths.map(async (p) => [rel(p), await readFile(p)] as const)));
 }
+
+// What reading a path where no file is ends with: nothing there, a directory, or a file on the way.
+const NO_FILE: readonly string[] = ["ENOENT", "EISDIR", "ENOTDIR"];
 
 async function worktreeOf(dir: string, onto: string, head: string, tree: Tree): Promise<Worktree> {
   for (const [path, bytes] of tree) {
@@ -58,8 +65,8 @@ async function worktreeOf(dir: string, onto: string, head: string, tree: Tree): 
     onto,
     head,
     dir,
-    list: async (under) => [...(await filesOf(dir)).keys()].filter((p) => p.startsWith(under)).sort(),
-    read: (path) => readFile(join(dir, path)).catch((e: NodeJS.ErrnoException) => (e.code === "ENOENT" ? null : Promise.reject(e))),
+    list: async (under) => sortPaths([...(await filesOf(dir)).keys()].filter((p) => p.startsWith(under))),
+    read: (path) => readFile(join(dir, path)).catch((e: NodeJS.ErrnoException) => (NO_FILE.includes(e.code ?? "") ? null : Promise.reject(e))),
     remove: (path) => rm(join(dir, path), { force: true }),
   };
 }
