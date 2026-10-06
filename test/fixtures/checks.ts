@@ -2,6 +2,7 @@
 // fixture gives in `check` → the rule IDs the check enforces and a function
 // that feeds it the fixture's `input`. A task that adds a hard check adds its
 // row here; the input is built only through public functions (CONVENTIONS.md).
+import { fileOf } from "../../src/adapters/store-jsonl/index.js";
 import { decodeUtf8, KR_04, KR_06, KR_10, parseJson, type JsonValue } from "../../src/kernel/index.js";
 import {
   apply,
@@ -57,11 +58,11 @@ const applyCheck: FixtureCheck = {
 };
 
 /** The line of the commit apply forms for a proposal on an empty ledger. */
-function lineOf(value: JsonValue): Uint8Array {
+function lineOf(value: JsonValue): string {
   const read = readProposal(value);
   const applied = read.ok ? apply(createView(0, []), read.value, LAND, []) : read;
   if (!applied.ok || applied.value === "no-op") throw new Error("bug: the pass proposal of a store fixture applies to a commit");
-  return new TextEncoder().encode(encodeCommit(applied.value));
+  return encodeCommit(applied.value);
 }
 
 /** Bytes given in a fixture: a string, as UTF-8, or the numbers of the bytes, for bytes that are not UTF-8. */
@@ -76,14 +77,14 @@ const store: FixtureCheck = {
   enforces: [KR_10.id, LG_06.id, KR_04.id],
   run: (input) => {
     const raw = field(input, "lines");
-    return openLines(raw === undefined ? [lineOf(field(input, "proposal") as JsonValue)] : (raw as unknown[]).map(bytesOf));
+    return openLines(raw === undefined ? [new TextEncoder().encode(lineOf(field(input, "proposal") as JsonValue))] : (raw as unknown[]).map(bytesOf));
   },
 };
 
 /**
  * `input`: `{ tail, request }` — what `store/knowledge.jsonl` is at the tail of main and in the change request:
- * `{ proposal }`, the file of the one line apply forms for it, as landing writes it; raw bytes a trigger needs and
- * no landing writes (Q-23); a directory, as `{ files }`; or `null`, no file.
+ * `{ proposal }`, the file of the one line apply forms for it, framed by `fileOf` of `store-jsonl` as landing writes it;
+ * raw bytes a trigger needs and no landing writes (Q-23); a directory, as `{ files }`; or `null`, no file.
  */
 const knowledge: FixtureCheck = {
   enforces: [LG_23.id],
@@ -92,7 +93,7 @@ const knowledge: FixtureCheck = {
     type Held = Parameters<typeof keptKnowledge>[1];
     const held = (v: unknown): Held => {
       if (v === null || typeof v !== "object" || Array.isArray(v)) return v === null ? null : bytesOf(v);
-      return "proposal" in v ? Uint8Array.from([...lineOf(v.proposal as JsonValue), 0x0a]) : (v as Held);
+      return "proposal" in v ? fileOf([lineOf(v.proposal as JsonValue)]) : (v as Held);
     };
     return keptKnowledge(held(field(input, "tail")), held(field(input, "request")));
   },
