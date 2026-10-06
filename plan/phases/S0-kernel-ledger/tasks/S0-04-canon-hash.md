@@ -5,7 +5,7 @@ phase: S0
 stage: C
 size: M
 modules: [kernel]
-depends: [S0-03]
+depends: [S0-33, S0-34]
 rules: [KR-10, KR-11, KR-12, KR-13]
 ---
 

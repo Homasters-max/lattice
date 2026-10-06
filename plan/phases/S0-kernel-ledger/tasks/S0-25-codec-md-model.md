@@ -5,7 +5,7 @@ phase: S0
 stage: H
 size: M
 modules: [codec]
-depends: [S0-03]
+depends: [S0-33, S0-34]
 rules: [RM-01, RM-02, RM-07, LG-42]
 ---
 
