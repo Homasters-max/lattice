@@ -2,8 +2,8 @@
 // other module (KR-02). Every file it reaches is listed in
 // test/structure/kernel-files.txt (ST-05).
 export { hash, hashBytes, hashRecord } from "./hash.js";
-export { canon, compareText, gotOf, isJsonObject, type JsonObject, type JsonValue } from "./json.js";
-export { decodeUtf8, parseJson } from "./parse.js";
+export { canon, compareText, gotOf, isJsonObject, misfits, STRING_FIELD, type Field, type JsonObject, type JsonValue } from "./json.js";
+export { decodeUtf8, parseJson, parseJsonBytes } from "./parse.js";
 export { checkHeader, checkId, isEntityId, isUlid, type Kind, type Record } from "./record.js";
 export {
   refuse,

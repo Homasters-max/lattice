@@ -29,3 +29,9 @@ export function parseJson(text: string, path = ""): Result<JsonValue> {
     return refuse(reject(KR_10, { intent: null, path, expected: "a JSON text", got: text }));
   }
 }
+
+/** KR-10: the value of JSON in UTF-8 bytes, refused at `path` as `decodeUtf8` and `parseJson` refuse. */
+export function parseJsonBytes(bytes: Uint8Array, path = ""): Result<JsonValue> {
+  const text = decodeUtf8(bytes, path);
+  return text.ok ? parseJson(text.value, path) : text;
+}

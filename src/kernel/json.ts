@@ -12,6 +12,19 @@ export const isJsonObject = (v: JsonValue | undefined): v is JsonObject => typeo
 /** `got` of a check of a form (CONVENTIONS.md §3): the value that came, or the description "absent" for a field that has none. */
 export const gotOf = (v: JsonValue | undefined): JsonValue => (v === undefined ? "absent" : v);
 
+/** A field of a form (CONVENTIONS.md §3): what a refusal names as `expected`, and whether a value fits. */
+export type Field = { readonly expected: string; readonly fits: (v: JsonValue | undefined) => boolean };
+
+export const STRING_FIELD: Field = { expected: "a string", fits: (v) => typeof v === "string" };
+
+/** A field of an object that does not fit its form: its name, `expected` and `got`. */
+type Misfit = { readonly name: string; readonly expected: string; readonly got: JsonValue };
+
+/** The fields of an object that do not fit the form, in the order of the form. */
+export function misfits(form: { readonly [name: string]: Field }, value: JsonObject): Misfit[] {
+  return Object.entries(form).flatMap(([name, field]) => (field.fits(value[name]) ? [] : [{ name, expected: field.expected, got: gotOf(value[name]) }]));
+}
+
 /** Compares strings by UTF-16 code units, as canon sorts keys (CONVENTIONS.md §5). */
 export const compareText = (a: string, b: string): number => (a === b ? 0 : a < b ? -1 : 1);
 

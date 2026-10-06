@@ -7,7 +7,7 @@
 // proposal and pushes. Rebuilds on a moved `main`, `awaiting-act`, the land
 // session event, acts as events, the trailers of OB-07 and `request` arrive
 // with S0-19 and S0-20.
-import { decodeUtf8, hashBytes, parseJson, refuse, reject, type Rejections, type Result } from "../kernel/index.js";
+import { hashBytes, parseJsonBytes, refuse, reject, type Rejections, type Result } from "../kernel/index.js";
 import { apply, type LandActs } from "./apply.js";
 import { commitHash, encodeCommit, type Commit } from "./commit.js";
 import { fold } from "./fold.js";
@@ -100,8 +100,7 @@ async function proposalOf(worktree: Worktree): Promise<Result<Found>> {
   if (!path.ok) return path;
   const bytes = await worktree.read(path.value);
   if (bytes === null) throw new Error(`bug: git listed ${path.value} and cannot read it`);
-  const text = decodeUtf8(bytes, `/${path.value}`);
-  const value = text.ok ? parseJson(text.value, `/${path.value}`) : text;
+  const value = parseJsonBytes(bytes, `/${path.value}`);
   const proposal = value.ok ? readProposal(value.value) : value;
   return proposal.ok ? { ok: true, value: { path: path.value, proposal: proposal.value } } : proposal;
 }

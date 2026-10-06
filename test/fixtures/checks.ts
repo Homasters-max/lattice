@@ -3,7 +3,7 @@
 // that feeds it the fixture's `input`. A task that adds a hard check adds its
 // row here; the input is built only through public functions (CONVENTIONS.md).
 import { fileOf } from "../../src/adapters/store-jsonl/index.js";
-import { decodeUtf8, KR_04, KR_06, KR_10, parseJson, type JsonValue } from "../../src/kernel/index.js";
+import { KR_04, KR_06, KR_10, parseJson, parseJsonBytes, type JsonValue } from "../../src/kernel/index.js";
 import {
   apply,
   changeRequest,
@@ -31,8 +31,7 @@ const json: FixtureCheck = {
   enforces: [KR_10.id],
   run: (input) => {
     const bytes = field(input, "bytes");
-    const text = Array.isArray(bytes) ? decodeUtf8(Uint8Array.from(bytes as number[])) : { ok: true as const, value: String(field(input, "text")) };
-    return text.ok ? parseJson(text.value) : text;
+    return Array.isArray(bytes) ? parseJsonBytes(Uint8Array.from(bytes as number[])) : parseJson(String(field(input, "text")));
   },
 };
 
