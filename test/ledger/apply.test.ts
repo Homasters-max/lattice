@@ -4,7 +4,18 @@
 // its records in canonical order (LG-06, LG-10).
 import { describe, expect, it } from "vitest";
 import { hashRecord, KERNEL_VERSION, type JsonValue } from "../../src/kernel/index.js";
-import { apply, createView, fold, proposalHash, readProposal, type Commit, type LandActs, type Proposal } from "../../src/ledger/index.js";
+import {
+  apply,
+  createView,
+  encodeCommit,
+  fold,
+  openLines,
+  proposalHash,
+  readProposal,
+  type Commit,
+  type LandActs,
+  type Proposal,
+} from "../../src/ledger/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
 const AT = "2026-10-06T12:00:00.000000Z";
@@ -24,6 +35,13 @@ function landed(before: ReturnType<typeof createView>, p: Proposal): Commit {
 }
 
 const empty = () => deepFreeze(createView(0, []));
+
+/** The read view of a store of these commits, opened from genesis (LG-02): fold reads its rows. */
+function opened(commits: readonly Commit[]) {
+  const out = openLines(commits.map((c) => new TextEncoder().encode(encodeCommit(c))));
+  if (!out.ok) throw new Error("bug: the commits of apply open as a store");
+  return deepFreeze(out.value.view);
+}
 
 describe("apply, phase 1 (KR-06)", () => {
   it("KR-06: collects every rejection of the phase, sorted by intent", () => {
@@ -52,7 +70,7 @@ describe("apply, the candidate commit", () => {
 
   it("LG-11, LG-35: gives an entity the rev after its current one, and fold closes the old row", () => {
     const first = landed(empty(), proposal(intent("demo/a")));
-    const view = deepFreeze(createView(1, fold(empty(), first, [])));
+    const view = opened([first]);
     const second = landed(view, proposal(intent("demo/a", { text: "again" })));
     expect(second.records.map((r) => [r.id, r.rev])).toEqual([["demo/a", 2]]);
     expect(fold(view, second, []).map((r) => [r.key, r.from, r.to])).toEqual([

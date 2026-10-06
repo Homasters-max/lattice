@@ -24,9 +24,9 @@ rules: [LG-09, LG-17, LG-23, LG-24, LG-54, KR-10, ST-17]
 Входит:
 - **Конфликт на файле store — отказ LG-23** (Q-28). Если среди путей `conflict` из `prepare` есть `store/knowledge.jsonl` или путь под ним, landing отклоняет change request LG-23, а не кончается `conflict`. Порт `git` не меняется.
 - **Один корень `path`** у отказов landing (Q-29): от корня дерева change request. Файл — путь в дереве, дальше JSON Pointer внутри него: `/store/proposals/cr-x.json/intents/0/op`. Строка store — номер строки с 1: `/store/knowledge.jsonl/1/seq`. То же — при открытии store на tail (`openTail`, S0-32).
-- **Проверка change request до apply — один модуль.** `changeRequest`, `proposalPath` и `keptKnowledge` уходят внутрь и пропадают из входа `src/ledger/index.ts`.
+- **Проверка change request до apply — один модуль.** `changeRequest`, `proposalPath` и `keptKnowledge` уходят внутрь и пропадают из входа `src/ledger/index.ts`; с ними — `fileOnMain` из `src/ledger/tail.ts` (S0-32), когда её строка `tail` в `checks.ts` переходит на `land`.
 - **Фикстуры через `land`** (`CONVENTIONS.md` §4 дописывается):
-  - строка `checks.ts` для LG-54, LG-23 и KR-10/LG-09 proposal прогоняет `land(…, {dryRun: true})` на `git-fixture`, собранном из `input.branches`;
+  - строки `checks.ts` для LG-54, LG-23 (`knowledge` и `tail`) и KR-10/LG-09 proposal прогоняют `land(…, {dryRun: true})` на `git-fixture`, собранном из `input.branches`;
   - раннер `test/fixtures/run.ts` становится асинхронным;
   - сырые деревья trigger разрешены решением Q-23;
   - строки `json`, `proposal` и `store` для KR-10, LG-06 и KR-04 остаются чистыми: склейки там нет.
@@ -63,7 +63,7 @@ rules: [LG-09, LG-17, LG-23, LG-24, LG-54, KR-10, ST-17]
 
 - [ ] change request, который правит файл store, получает отказ LG-23 при любом положении `main`
 - [ ] у всех отказов landing один корень `path`; строки store нумеруются с 1
-- [ ] фикстуры LG-54, LG-23 и KR-10 proposal идут через `land`; `changeRequest`, `proposalPath`, `keptKnowledge` вне входа `ledger`
+- [ ] фикстуры LG-54, LG-23 и KR-10 proposal идут через `land`; `changeRequest`, `proposalPath`, `keptKnowledge`, `fileOnMain` вне входа `ledger`
 - [ ] тест показывает `ids` и `clock` в коммите
 - [ ] `npm run verify` зелёный
 

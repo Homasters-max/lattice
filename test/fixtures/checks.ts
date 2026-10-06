@@ -9,6 +9,7 @@ import {
   changeRequest,
   createView,
   encodeCommit,
+  fileOnMain,
   keptKnowledge,
   LG_06,
   LG_09,
@@ -82,22 +83,36 @@ const store: FixtureCheck = {
   },
 };
 
+/** What a worktree holds at `store/knowledge.jsonl`: bytes, the files of a directory, or nothing. */
+type Held = Parameters<typeof keptKnowledge>[1];
+
 /**
- * `input`: `{ tail, request }` — what `store/knowledge.jsonl` is at the tail of main and in the change request:
- * `{ proposal }`, the file of the one line apply forms for it, framed by `fileOf` of `store-jsonl` as landing writes it;
- * raw bytes a trigger needs and no landing writes (Q-23); a directory, as `{ files }`; or `null`, no file.
+ * A fixture's `store/knowledge.jsonl`: `{ proposal }`, the file of the one line apply forms for it, framed by `fileOf`
+ * of `store-jsonl` as landing writes it; raw bytes a trigger needs and no landing writes (Q-23); a directory, as
+ * `{ files }`; or `null`, no file.
+ */
+function heldOf(v: unknown): Held {
+  if (v === null) return null;
+  if (typeof v !== "object" || Array.isArray(v)) return bytesOf(v);
+  return "proposal" in v ? fileOf(lineOf(v.proposal as JsonValue)) : (v as Held);
+}
+
+/** `input`: `{ tail }` — what `store/knowledge.jsonl` is at the tail of main, as `heldOf` reads it. */
+const tail: FixtureCheck = {
+  enforces: [LG_23.id],
+  run: (input) => fileOnMain(heldOf(field(input, "tail"))),
+};
+
+/**
+ * `input`: `{ tail, request }` — what `store/knowledge.jsonl` is at the tail of main, a file or `null` as `tail`
+ * passes it, and in the change request, as `heldOf` reads both.
  */
 const knowledge: FixtureCheck = {
   enforces: [LG_23.id],
   run: (input) => {
-    // What a worktree holds at the path: bytes, the files of a directory as `{ files }`, or nothing.
-    type Held = Parameters<typeof keptKnowledge>[1];
-    const held = (v: unknown): Held => {
-      if (v === null) return null;
-      if (typeof v !== "object" || Array.isArray(v)) return bytesOf(v);
-      return "proposal" in v ? fileOf(lineOf(v.proposal as JsonValue)) : (v as Held);
-    };
-    return keptKnowledge(held(field(input, "tail")), held(field(input, "request")));
+    const onMain = fileOnMain(heldOf(field(input, "tail")));
+    if (!onMain.ok) throw new Error("bug: a knowledge fixture holds on main what the tail check refuses; it belongs to tail");
+    return keptKnowledge(onMain.value, heldOf(field(input, "request")));
   },
 };
 
@@ -107,5 +122,6 @@ export const CHECKS: { readonly [check: string]: FixtureCheck } = {
   "change-request": changeRequestCheck,
   apply: applyCheck,
   store,
+  tail,
   knowledge,
 };

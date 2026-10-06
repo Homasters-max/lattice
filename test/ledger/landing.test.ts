@@ -16,9 +16,7 @@ import { hashBytes } from "../../src/kernel/index.js";
 import {
   commitHash,
   land,
-  openLines,
-  tailView,
-  type Commit,
+  openTail,
   type Git,
   type LandingOutcome,
   type LandingPorts,
@@ -73,26 +71,19 @@ function portsOf(over: Partial<LandingPorts> = {}, branches = BRANCHES): Landing
   });
 }
 
-async function mainWorktree(git: Git): Promise<Worktree> {
-  const tail = await git.tail("main");
-  const w = tail === null ? null : await git.prepare({ request: tail, onto: tail });
-  if (w === null || w.kind === "conflict") throw new Error("bug: main of the fixture prepares onto itself");
-  return w;
+/** The store on main, as opening it at the tail reads it (LG-02, LG-38); a store opening refuses fails the test. */
+async function storeOnMain(ports: LandingPorts) {
+  const opened = await openTail(ports);
+  if (!opened.ok) throw new Error(`bug: main holds a store opening refuses: ${JSON.stringify(opened.rejections)}`);
+  return opened.value;
 }
 
-/**
- * The commits of the store on main, as opening it reads them (LG-02, LG-38): the tail of each prefix of its
- * lines, opened by `openLines`. A line opening refuses fails the test — none is dropped.
- */
-async function commitsOnMain(ports: LandingPorts): Promise<Commit[]> {
-  const lines: Uint8Array[] = [];
-  for await (const line of ports.openStore(await mainWorktree(ports.git)).commits(1)) lines.push(line);
-  return lines.map((_, i) => {
-    const opened = openLines(lines.slice(0, i + 1));
-    if (!opened.ok) throw new Error(`bug: main holds a store opening refuses: ${JSON.stringify(opened.rejections)}`);
-    if (opened.value.tail === null) throw new Error("bug: a store of one line or more has a tail");
-    return opened.value.tail;
-  });
+/** The paths of the files under `under` on main: the tree of its tail commit, which no store holds. */
+async function filesOnMain(ports: LandingPorts, under: string): Promise<readonly string[]> {
+  const { onto } = await storeOnMain(ports);
+  const w = await ports.git.prepare({ request: onto, onto });
+  if (w.kind === "conflict") throw new Error("bug: a commit conflicts with itself");
+  return w.list(under);
 }
 
 const landed = async (ports: LandingPorts, request: string) => {
@@ -120,8 +111,9 @@ describe("landing into git (LG-22, LG-23)", () => {
   it("LG-23: the commit is a line of store/knowledge.jsonl on main, and the proposal file is gone", async () => {
     const ports = portsOf();
     const commit = await landed(ports, "cr/a");
-    expect(await commitsOnMain(ports)).toEqual([commit]);
-    expect(await (await mainWorktree(ports.git)).list("store/")).toEqual(["store/knowledge.jsonl"]);
+    const { view, tail } = await storeOnMain(ports);
+    expect([view.seq, tail]).toEqual([1, commit]);
+    expect(await filesOnMain(ports, "store/")).toEqual(["store/knowledge.jsonl"]);
   });
 
   // G-14: landing fills prev.
@@ -130,8 +122,8 @@ describe("landing into git (LG-22, LG-23)", () => {
     const first = await landed(ports, "cr/a");
     const second = await landed(ports, "cr/b");
     expect([first.prev, second.seq, second.base, second.prev]).toEqual([null, 2, 1, commitHash(first)]);
-    const view = await tailView(ports);
-    expect(view.ok ? [view.value.seq, view.value.current("demo/a")?.rev, view.value.current("demo/b")?.rev] : []).toEqual([2, 1, 1]);
+    const { view } = await storeOnMain(ports);
+    expect([view.seq, view.current("demo/a")?.rev, view.current("demo/b")?.rev]).toEqual([2, 1, 1]);
   });
 
   it("LG-02: append carries the delta the commit folds to, into the store on the worktree", async () => {
@@ -146,7 +138,7 @@ describe("landing into git (LG-22, LG-23)", () => {
     const ports = portsOf();
     const tail = await ports.git.tail("main");
     expect((await land(ports, "cr/a", DRY_RUN)).outcome).toBe("commit");
-    expect([await ports.git.tail("main"), await commitsOnMain(ports)]).toEqual([tail, []]);
+    expect([await ports.git.tail("main"), (await storeOnMain(ports)).tail]).toEqual([tail, null]);
   });
 });
 
@@ -170,14 +162,14 @@ describe("the landing commit in git (LG-22)", () => {
 
 describe("the store a change request brings (LG-14, LG-23)", () => {
   const KNOWLEDGE = "store/knowledge.jsonl";
-  const read = async (git: Git) => new TextDecoder().decode((await (await mainWorktree(git)).read(KNOWLEDGE)) ?? new Uint8Array());
+  const read = async (ports: LandingPorts) => new TextDecoder().decode((await storeOnMain(ports)).knowledge ?? new Uint8Array());
 
   /** Main holds the store landing wrote for cr/a; cr/x, a change request from that main, writes `files` of that file. */
   async function fromLanded(files: (file: string) => GitFixtureBranch["files"]) {
     const git = createGitFixture({ dir, branches: BRANCHES });
     const ports = portsOf({ git });
     await landed(ports, "cr/a");
-    const file = await read(git);
+    const file = await read(ports);
     git.branch("cr/x", { from: "main", files: { ...files(file), "store/proposals/x.json": proposal("demo/x") } });
     return { ports, file };
   }
@@ -198,14 +190,14 @@ describe("the store a change request brings (LG-14, LG-23)", () => {
       const out = await land(ports, "cr/x", options);
       expect(out.outcome === "rejections" ? out.rejections : out).toMatchObject([refusal]);
     }
-    expect(await read(ports.git)).toBe(file);
+    expect(await read(ports)).toBe(file);
   });
 
   it("LG-23: refuses a change request that put a directory in place of store/knowledge.jsonl, never throws", async () => {
     const { ports, file } = await fromLanded(() => ({ [KNOWLEDGE]: null, [`${KNOWLEDGE}/x`]: "x\n" }));
     const refusal = { rule: "LG-23", path: "/store/knowledge.jsonl", expected: hashBytes(utf8(file)), got: [`${KNOWLEDGE}/x`] };
     expect(await land(ports, "cr/x", LAND)).toMatchObject({ outcome: "rejections", rejections: [refusal] });
-    expect(await read(ports.git)).toBe(file);
+    expect(await read(ports)).toBe(file);
   });
 
   it("LG-14, LG-23: lands on a store the change request brings unchanged, with before at the tail of main", async () => {
@@ -218,14 +210,14 @@ describe("the store a change request brings (LG-14, LG-23)", () => {
     // A trigger: a raw tree on main that no landing writes, as a broken repository holds it.
     const ports = portsOf({}, { ...BRANCHES, main: { files: { "store/knowledge.jsonl/x": "x\n" } } });
     expect(refusals(await land(ports, "cr/a", DRY_RUN))).toEqual([["LG-23", "/store/knowledge.jsonl"]]);
-    expect(await tailView(ports)).toMatchObject({ ok: false, rejections: [{ rule: "LG-23", got: ["store/knowledge.jsonl/x"] }] });
+    expect(await openTail(ports)).toMatchObject({ ok: false, rejections: [{ rule: "LG-23", got: ["store/knowledge.jsonl/x"] }] });
   });
 
   it("LG-06: a store on main whose line is no commit is refused on opening, never thrown", async () => {
     // A trigger: a raw line on main that no landing writes, as a broken repository holds it.
     const ports = portsOf({}, { ...BRANCHES, main: { files: { "store/knowledge.jsonl": "{}\n" } } });
     expect(refusals(await land(ports, "cr/a", DRY_RUN))).toContainEqual(["LG-06", "/0/seq"]);
-    expect((await tailView(ports)).ok).toBe(false);
+    expect((await openTail(ports)).ok).toBe(false);
   });
 });
 
@@ -239,7 +231,7 @@ describe("a change request that changes no knowledge (LG-25, LG-54)", () => {
     expect(await land(ports, "cr/code", DRY_RUN)).toEqual({ outcome: "no-op", pushed: false });
     expect(pushes).toEqual([]);
     expect(await land(ports, "cr/code", LAND)).toEqual({ outcome: "no-op", pushed: true });
-    expect([await (await mainWorktree(ports.git)).list(""), await commitsOnMain(ports)]).toEqual([["README.md", "src/y.ts"], []]);
+    expect([await filesOnMain(ports, ""), (await storeOnMain(ports)).tail]).toEqual([["README.md", "src/y.ts"], null]);
     expect(pushes.map((p) => [p.message, p.trailers.map((t) => t.key)])).toEqual([["lattice: land no-op", ["Lattice-Proposal"]]]);
   });
 });
@@ -262,7 +254,7 @@ describe("landing outcomes (LG-24, LG-25, LG-54)", () => {
 
   it("LG-24: ends conflict when the code of the change request conflicts with main", async () => {
     const ports = portsOf();
-    const onto = (await mainWorktree(ports.git)).onto;
+    const { onto } = await storeOnMain(ports);
     const w = await ports.git.prepare({ request: "cr/readme", onto });
     if (w.kind === "worktree") await ports.git.push({ worktree: w, ref: "main", expected: onto, message: "m", trailers: [] });
     expect(await land(ports, "cr/clash", LAND)).toEqual({ outcome: "conflict", paths: ["README.md"] });
