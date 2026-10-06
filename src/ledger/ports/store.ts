@@ -11,8 +11,8 @@
 import type { Evidence } from "../commit.js";
 import { held, sortRows, withDelta, type Delta, type Row } from "../rows.js";
 
+// Q-18: the one comparator of the port, for an adapter that orders rows itself.
 export { sortRows };
-export type { Delta, Evidence, Row };
 
 /** What one `append` writes. */
 export type Append = {
@@ -39,21 +39,24 @@ export interface Store {
   evidence(hash: string): Promise<Uint8Array | null>;
 }
 
+/** What `keptRows` gives an adapter: it takes each delta, and answers `row` and `rows` of the port. */
+interface KeptRows extends Pick<Store, "row" | "rows"> {
+  apply(delta: Delta): void;
+}
+
 /**
  * The rows a store keeps, for its adapter (Q-27): `apply` takes the delta of each `append`; `row` and `rows`
  * answer the port. Closing a row it does not keep changes nothing until the ledger hands the rows on opening (S0-11).
  */
-export function keptRows(): { apply(delta: Delta): void } & Pick<Store, "row" | "rows"> {
+export function keptRows(): KeptRows {
   let rows: readonly Row[] = [];
-  let holding = held(rows);
   return {
     apply(delta) {
       rows = withDelta(rows, delta);
-      holding = held(rows);
     },
-    row: (key) => Promise.resolve(holding.get(key) ?? null),
+    row: (key) => Promise.resolve(held(rows).get(key) ?? null),
     async *rows(prefix) {
-      for (const row of sortRows([...holding.values()].filter((r) => r.key.startsWith(prefix)))) yield await Promise.resolve(row);
+      for (const row of sortRows([...held(rows).values()].filter((r) => r.key.startsWith(prefix)))) yield await Promise.resolve(row);
     },
   };
 }
