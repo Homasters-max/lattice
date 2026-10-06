@@ -13,8 +13,8 @@
 
 ## Текущее
 
-- **Фаза:** S0 в работе; S0-01 и S0-02 сданы — репозиторий [Homasters-max/lattice](https://github.com/Homasters-max/lattice), CI на ubuntu и windows, соглашения кода в `CONVENTIONS.md`.
-- **Следующий шаг:** S0-03 «Walking skeleton».
+- **Фаза:** S0 в работе; S0-01…S0-03 сданы — репозиторий [Homasters-max/lattice](https://github.com/Homasters-max/lattice), CI на ubuntu и windows, соглашения кода в `CONVENTIONS.md`, walking skeleton: папки модулей S0, матрица ST-01 в тесте структуры, пять портов ledger, таблица команд, путь `land --dry-run` → `land` → read view, тестовая сборка в `test/support/`.
+- **Следующий шаг:** параллельные дорожки после skeleton — ядро (S0-04, S0-05, S0-06) и codec (S0-25), не больше трёх PR (SL-06).
 - **Сводка по задачам:** `node plan/tools/plan-check.mjs`.
 
 ## Журнал фаз
