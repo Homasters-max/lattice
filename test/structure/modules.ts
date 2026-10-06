@@ -85,13 +85,16 @@ export function placeOf(path: string): Place | null {
 /** The entry a path is — `kernel`, `ledger/ports/store`, `adapters/store-memory` — or `null` for a file inside a module. */
 export function entryOf(path: string): string | null {
   const inner = path.startsWith("src/") ? path.slice(4) : "";
+  const port = PORT_FILE.exec(inner);
+  if (port !== null && port[2] !== "index") return `${port[1]}/ports/${port[2]}`;
+  return indexEntry(inner) ?? PART_ENTRIES.get(inner) ?? null;
+}
+
+function indexEntry(inner: string): string | null {
   const adapter = /^adapters\/([a-z][a-z0-9-]*)\/index\.ts$/.exec(inner)?.[1];
   if (adapter !== undefined) return `adapters/${adapter}`;
   const module = /^([a-z]+)\/index\.ts$/.exec(inner)?.[1];
-  if (module !== undefined) return isModule(module) && module !== "adapters" ? module : null;
-  const port = PORT_FILE.exec(inner);
-  if (port !== null && port[2] !== "index") return `${port[1]}/ports/${port[2]}`;
-  return PART_ENTRIES.get(inner) ?? null;
+  return isModule(module) && module !== "adapters" ? module : null;
 }
 
 /** The port an adapter implements, given the port entries that exist: `store-memory` → `store`. */

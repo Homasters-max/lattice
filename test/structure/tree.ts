@@ -36,7 +36,11 @@ function createProgram(root: string, files: ReadonlyMap<string, ts.SourceFile>):
   const own = new Map([...files.values()].map((sf) => [sf.fileName, sf]));
   const dirs = new Set([...own.keys()].flatMap((f) => f.split("/").map((_, i, parts) => parts.slice(0, i).join("/"))));
   const host = ts.createCompilerHost(options, true);
-  const base = { getSourceFile: host.getSourceFile, fileExists: host.fileExists, directoryExists: host.directoryExists };
+  const base = {
+    getSourceFile: host.getSourceFile.bind(host),
+    fileExists: host.fileExists.bind(host),
+    directoryExists: host.directoryExists?.bind(host),
+  };
   host.getSourceFile = (name, version, onError, fresh) => {
     const sf = own.get(slash(name)) ?? shared.get(name) ?? base.getSourceFile(name, version, onError, fresh);
     if (sf !== undefined && !own.has(slash(name))) shared.set(name, sf);

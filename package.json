@@ -18,7 +18,7 @@
     "lint:eol": "node scripts/check-eol.mjs",
     "plan:check": "node plan/tools/plan-check.mjs",
     "build": "tsc -p tsconfig.build.json",
-    "verify": "npm run lint:ids && npm run plan:check && npm run lint:eol && npm run typecheck && npm run lint && npm run test"
+    "verify": "npm run lint:ids && npm run plan:check && npm run lint:eol && npm run typecheck && npm run lint && npm run build && npm run test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

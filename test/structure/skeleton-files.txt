@@ -1,0 +1,18 @@
+# ST-15: the files the walking skeleton owns (SL-05) — a change of one of them
+# is a trigger of the architecture audit. One path per line, sorted.
+src/cli/commands.ts
+src/cli/main.ts
+src/kernel/version.ts
+src/ledger/ports/acts.ts
+src/ledger/ports/clock.ts
+src/ledger/ports/git.ts
+src/ledger/ports/ids.ts
+src/ledger/ports/store.ts
+test/structure/audit-imports.ts
+test/structure/audit-kernel.ts
+test/structure/audit-purity.ts
+test/structure/imports.ts
+test/structure/modules.ts
+test/structure/repo.test.ts
+test/structure/skeleton-files.txt
+test/structure/tree.ts

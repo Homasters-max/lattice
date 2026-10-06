@@ -18,7 +18,7 @@ Apply — единственный путь в `knowledge` (PR-02, LG-14). Ка�
 ## Объём
 
 Входит:
-- **`apply(before, proposal, acts, evidence) → commit | no-op | rejections`** (LG-14): чистая функция; `acts` — land session и сформированные act-события; время и id коммита приходят от landing;
+- **`apply(before, proposal, acts, evidence) → commit | no-op | rejections`** (LG-14): чистая функция; `acts` — land session и сформированные act-события; время и id коммита приходят от landing; `prev`, `request` и `sig` кандидата — `null`, их дописывает landing (G-14);
 - **кандидат** (LG-15): после фазы 1 — назначить `seq`, `rev` (следующий после latest), `hash`; `after = before ⊕ fold(before, candidate, evidence)` без записи;
 - **фазы** (LG-16): реестр фаз с видом (`before` / `after` / оба); внутри фазы собираются все отказы, стоп после первой отказавшей; фазы 4–6 — пустые места, которые заполнят свои задачи; **фаза 7 в S0** — по Q-05;
 - **фаза 1 Record**: заголовок, канонические байты, форматы (KR-04…KR-13, функции S0-04, S0-05);

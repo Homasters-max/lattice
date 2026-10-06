@@ -69,16 +69,21 @@ export function auditStdNames(tree: Tree, names: ReadonlySet<string>): string[] 
  * and the types of TY-Z05 except the `core` ones.
  */
 export function stdTypeNames(md: string): string[] {
-  const names = new Set<string>();
-  for (const block of ["TY-Z02", "TY-Z03", "TY-Z04", "TY-Z05"]) {
-    const start = md.indexOf(`\n${block}.`);
-    if (start < 0) throw new Error(`03-types.md has no block ${block}`);
-    const rows = md.slice(start).split("\n\n")[1]?.split("\n").slice(2) ?? [];
-    for (const row of rows) {
-      const cells = row.split(" | ");
-      const cell = block === "TY-Z05" ? (cells[1] ?? "").replace(/`[a-z-]+` \(`core`[^)]*\)/g, "") : (cells[0] ?? "");
-      for (const m of cell.matchAll(/`([a-z][a-z0-9-]*)`/g)) if (m[1] !== undefined && m[1] !== "core") names.add(m[1]);
-    }
-  }
-  return [...names].sort();
+  const names = ["TY-Z02", "TY-Z03", "TY-Z04", "TY-Z05"].flatMap((block) =>
+    blockRows(md, block).flatMap((row) => [...typeCell(block, row).matchAll(/`([a-z][a-z0-9-]*)`/g)].map((m) => m[1] ?? "")),
+  );
+  return [...new Set(names.filter((n) => n !== "core"))].sort();
+}
+
+function blockRows(md: string, block: string): string[] {
+  const start = md.indexOf(`\n${block}.`);
+  if (start < 0) throw new Error(`03-types.md has no block ${block}`);
+  return md.slice(start).split("\n\n")[1]?.split("\n").slice(2) ?? [];
+}
+
+/** The cell that names types: the first, or in TY-Z05 the second without its `core` types. */
+function typeCell(block: string, row: string): string {
+  const cells = row.split(" | ");
+  if (block !== "TY-Z05") return cells[0] ?? "";
+  return (cells[1] ?? "").replace(/`[a-z-]+` \(`core`[^)]*\)/g, "");
 }

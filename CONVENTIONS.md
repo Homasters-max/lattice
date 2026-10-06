@@ -5,9 +5,12 @@
 ## 1. Данные
 
 - **Записи — замороженные простые данные и чистые функции** (ST-03). Нет класса на тип записи, нет методов на данных, нет прототипов кроме `Object` и `Array`. Объект записи — то, что даёт `JSON.parse` строгого парсера, плюс `Object.freeze`.
-- **Типы `readonly`**: поля `readonly`, массивы `readonly T[]`, словари `Readonly<Record<K, V>>`. Функция не мутирует вход; новое значение — новый объект.
-- **Заморозка проверяется в тестах**: на границе модуля тест передаёт вход через `deepFreeze` (хелпер `test/support/deep-freeze.ts`, появится со skeleton) — функция, которая мутирует вход, падает в тесте. В рабочем коде глубокая заморозка не обязательна: её гарантирует строгий парсер ядра и `readonly`.
-- **Классы** — только там, где у сущности есть изменяемое состояние внешнего мира: адаптер может быть замыканием или классом. Порт — `interface`, адаптер — фабрика `createX(deps)`, которая возвращает объект этого интерфейса.
+- **Типы `readonly`**: поля `readonly`, массивы `readonly T[]`, словари `{ readonly [key: string]: V }`. Функция не мутирует вход; новое значение — новый объект.
+- **Данные — `type`, поведение — `interface`.** Запись, intent, proposal, commit, строка — псевдонимы `type`: так они присваиваются `JsonValue` и идут в `canon` и `hash` без приведения. Порт, read view, команда — `interface`.
+- **`Record` — запись** (KR-04): так называется тип заголовка в `kernel`. Утилита TypeScript `Record<K, V>` в коде, который импортирует запись, не используется — словарь пишется индексной сигнатурой.
+- **Заморозка проверяется в тестах**: на границе модуля тест передаёт вход через `deepFreeze` (хелпер `test/support/deep-freeze.ts`) — функция, которая мутирует вход, падает в тесте. В рабочем коде глубокая заморозка не обязательна: её гарантирует строгий парсер ядра и `readonly`.
+- **Классы** — только там, где у сущности есть изменяемое состояние внешнего мира: адаптер может быть замыканием или классом. Порт — `interface`, адаптер — фабрика `createX(options)`, которая возвращает объект этого интерфейса.
+- **Адаптер** живёт в `src/adapters/<port>-<variant>/` (`store-memory`, `clock-fixed`): имя начинается с порта, который он реализует, — по нему тест структуры знает, какой интерфейс адаптеру можно импортировать (ST-01). Операция порта с аргументами сверх лимита профиля (`push` из LG-23 — пять) принимает один объект с именами аргументов правила.
 - **Имена — термины LATTICE** из `docs/design/00-glossary.md` (ST-03): `record`, `entity`, `event`, `intent`, `proposal`, `commit`, `apply`, `fold`, `delta`, `row`, `view`, `standing`, `session`, `act`, `store`, `landing`… Слово, которого нет в глоссарии, не становится именем понятия LATTICE: локальная переменная или функция — можно, тип или экспорт с новым смыслом — нет; новый термин входит в дизайн правкой глоссария (GL-Z01).
 - **Аналогии не термины** (ST-Z02): в коде нет `event sourcing`, `aggregate`, `repository`, `middleware`, `plugin`, `manager`, `service` как имён понятий.
 
@@ -24,14 +27,15 @@
   Список отказов не пуст. Значение успеха — то, что задаёт правило: apply — `commit` или `no-op` (LG-14), landing — свой исход (LG-25).
 - **Исключение — только ошибка программы**: нарушенный инвариант, который вход не мог нарушить, если код верен. Сообщение начинается с `bug:`. Сбой внешнего мира в адаптере (диск, сеть, процесс `git`) — тоже исключение: это не нарушение правила. Вход, который правило отклоняет, никогда не приходит исключением и никогда не исправляется молча (KR-10, LG-42).
 - **Нарушения `validate`** (KR-21) — свой тип, не отказ: `{ path, keyword, expected, got }`. Результат `validate` — `{ ok: true } | { ok: false, violations }`. Фаза 2 apply переводит каждое нарушение в отказ с rule ID, который нарушение показывает, и путём `/body` + `path` нарушения.
-- **Чистые модули синхронны.** `Promise` появляется только на порту.
+- **Чистые модули синхронны.** `Promise` появляется только на порту; функция, которая зовёт порты (landing), асинхронна, всё, что она зовёт между портами, — нет.
+- **Пробел тонкого skeleton** (S0-03): пока задача плана не принесла проверку, тонкий код бросает `Error("not in the walking skeleton: refusing … (<rule ID>) arrives with S0-NN")`. Это не отказ и не `bug:`; задача S0-NN заменяет его отказом с rule ID и фикстурами.
 
 ## 3. Отказ
 
 Формат отказа — LG-17:
 
 ```ts
-// src/kernel — набросок для skeleton (S0-03)
+// src/kernel/rejection.ts
 type RulePrefix = "PR" | "KR" | "TY" | "RF" | "LG" | "TR" | "RT" | "DP" | "LN" | "BN" | "OB" | "AG" | "ST" | "SL" | "RM" | "GL";
 type Digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
 type RuleId = `${RulePrefix}-${Digit}${Digit}`;           // ID строки таблицы правил; Z-блоки отказом не называются
@@ -40,7 +44,7 @@ type Lang = "en";                                         // растёт вме
 
 interface Rule {                                          // строка реестра правил модуля
   readonly id: RuleId;
-  readonly message: { readonly en: string } & Readonly<Partial<Record<Lang, string>>>;
+  readonly message: { readonly en: string } & { readonly [lang in Lang]?: string };
 }
 
 interface Rejection {
@@ -48,12 +52,17 @@ interface Rejection {
   readonly rule: RuleId;
   readonly message: string;
   readonly path: string;                                  // JSON Pointer (RFC 6901)
-  readonly expected: unknown;                             // JSON-значение
-  readonly got: unknown;                                  // JSON-значение
+  readonly expected: JsonValue;
+  readonly got: JsonValue;
   readonly id?: string;                                   // дубликат: id, с которым столкнулся (LG-17)
 }
 
+type Rejections = readonly [Rejection, ...Rejection[]];
+type Result<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly rejections: Rejections };
+
 function reject(rule: Rule, at: Omit<Rejection, "rule" | "message">): Rejection;
+function sortRejections(rejections: readonly Rejection[]): Rejection[];   // порядок раздела 5
+function refused<T>(rejections: readonly Rejection[]): Result<T> | null;  // null — отказывать не в чем
 ```
 
 - **`intent` и `path`** (G-13). `intent` — значение `id`, записанное в intent, как есть, даже если оно неверно; так отказ не зависит от порядка intents (LG-11). `path` — JSON Pointer внутри этого intent: `/body/title`, `/expected`. Если у intent нет строкового `id` или отказ не про intent (подпись proposal, сессия, открытие store, загрузка библиотеки), `intent` — `null`, а `path` указывает от корня проверяемого входа: `/intents/3/id`, `/sig`. Корень целиком — `""`.
@@ -141,14 +150,14 @@ test/fixtures/
 
 ## 8. Чистота
 
-Вне `adapters`, `assembly`, `cli` код чистый (ST-04, KR-02): время, id и внешний мир приходят только через порты `clock`, `ids`, `store`, `git`, `acts` (LG-23). Тест структуры (S0-03) запрещает в чистых модулях:
+Вне `adapters`, `assembly`, `cli` код чистый (ST-04, KR-02): время, id и внешний мир приходят только через порты `clock`, `ids`, `store`, `git`, `acts` (LG-23). Тест структуры (`test/structure/audit-purity.ts`) запрещает в чистых модулях; имя, объявленное в самом файле, — не глобальное и не запрещено:
 
 | Что | Запрещено | Разрешено |
 |---|---|---|
 | модули платформы | любой `node:*`, кроме ниже | `node:crypto`: только `createHash`, `verify`, `sign`, `createPublicKey`, `createPrivateKey` |
-| процесс и окружение | `process`, `import.meta.url`, `import.meta.dirname`, `import.meta.filename` | — |
-| время | `Date.now`, `new Date()` без аргумента, `performance`, методы `Date` в локальном времени (`getHours`, `getTimezoneOffset`, `toString`, …) | `new Date(x)` с аргументом, `Date.UTC`, `getUTC*`, `toISOString` |
-| случайность | `Math.random`, `crypto.randomUUID`, `crypto.getRandomValues`, `crypto.randomBytes` | — |
+| процесс и окружение | `process`, `import.meta` целиком, `globalThis`, `global`, `require`, `module`, `exports`, `__dirname`, `__filename`, `Buffer`, `navigator` | `TextEncoder`, `TextDecoder` |
+| время | `Date.now`, `new Date()` без аргумента, `Date()` как функция, `performance`, методы `Date` в локальном времени (`getHours`, `getTimezoneOffset`, `toString`, …) | `new Date(x)` с аргументом, `Date.UTC`, `getUTC*`, `toISOString` |
+| случайность | `Math.random`, глобальный `crypto` целиком (`randomUUID`, `getRandomValues`), `randomBytes` из `node:crypto` | — |
 | сеть | `fetch`, `WebSocket`, `XMLHttpRequest`, `EventSource` | — |
 | планировщик | `setTimeout`, `setInterval`, `setImmediate`, `queueMicrotask` | — |
 | локаль | `Intl`, `localeCompare`, `toLocaleString`, `toLocaleDateString`, `toLocaleUpperCase`, `toLocaleLowerCase` | `toUpperCase`, `toLowerCase` |
@@ -162,8 +171,9 @@ test/fixtures/
 
 ## 9. Файлы и стиль
 
-- **ESM**, импорт с суффиксом `.js` (`nodenext`), только именованные экспорты, без `default`. Файлы — `kebab-case.ts`. Точка входа модуля — `src/<module>/index.ts`; соседние модули импортируют только её (S0-03 проверит направление по ST-01).
-- **Импорты** — по матрице ST-01 (`AGENTS.md`).
+- **ESM**, импорт с суффиксом `.js` (`nodenext`), только именованные экспорты, без `default`. Файлы — `kebab-case.ts`. Точка входа модуля — `src/<module>/index.ts`; соседние модули импортируют только её и названные входы `test/structure/modules.ts` — интерфейс порта `src/ledger/ports/<port>.ts`, read view `src/ledger/view.ts`. Импорт другого файла чужого модуля тест структуры отклоняет (ST-01).
+- **Импорты** — по матрице ST-01 (`AGENTS.md`); матрица как данные — `test/structure/modules.ts`, тест сверяет её с таблицей ST-01 дизайна. Список файлов, достижимых из ядра, — `test/structure/kernel-files.txt` (ST-05): новый файл ядра дописывается туда в той же задаче. Файлы, которыми владеет skeleton (ST-15), — `test/structure/skeleton-files.txt`.
+- **Команды** (RT-32): таблица — `src/cli/commands.ts`, текст — из RT-Z03; команда без обработчика названа в `src/cli/stubs.ts` с задачей, где появится. Задача, которая реализует команду, убирает её строку из `stubs.ts` и добавляет обработчик в `src/cli/run.ts`; таблицу не трогает. Код выхода: `0` — сделано, `1` — отклонено (отказы, `moved`, `conflict`), `2` — не запущено (использование, неизвестная команда, заглушка, нет store).
 - **Идентификаторы, комментарии, строки сообщений** — на английском (PR-14). Комментарий объясняет, почему, и называет rule ID, если код его исполняет.
 - **Профиль качества** до SW — `eslint.config.js` (Q-08): сложность 10, функция 50 строк, вложенность 3, параметров 4, файл 300 строк. Сгенерированное (`gen/`) руками не правится (ST-08).
 - **Тесты** лежат в `test/`, раскладка повторяет `src/`: `test/<module>/…test.ts`; свойства fast-check — там же, рядом с тестами модуля. Название теста, который показывает правило, начинается с его ID: `it("KR-06: refuses …")`. Порты — контракт-тестами в `test/contract/` на всех адаптерах (ST-07).

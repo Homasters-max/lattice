@@ -70,13 +70,19 @@ function memberUse(node: ts.Node, checker: ts.TypeChecker): string | null {
   return LOCAL_TIME.has(name) && isDate(object, checker) ? `${name} of a Date, in local time` : null;
 }
 
+const globalUse = (id: ts.Identifier, checker: ts.TypeChecker) =>
+  GLOBALS.has(id.text) && isReference(id) && isGlobal(id, checker) ? id.text : null;
+
+function dateUse(node: ts.NewExpression | ts.CallExpression, checker: ts.TypeChecker): string | null {
+  if (!globalNamed(node.expression, "Date", checker)) return null;
+  if (ts.isCallExpression(node)) return "Date() as a function";
+  return (node.arguments ?? []).length === 0 ? "new Date() without an argument" : null;
+}
+
 function nodeUse(node: ts.Node, checker: ts.TypeChecker): string | null {
-  if (ts.isIdentifier(node)) return GLOBALS.has(node.text) && isReference(node) && isGlobal(node, checker) ? node.text : null;
-  if (ts.isMetaProperty(node) && node.keywordToken === ts.SyntaxKind.ImportKeyword) return "import.meta";
-  if (ts.isNewExpression(node) && (node.arguments ?? []).length === 0 && globalNamed(node.expression, "Date", checker)) {
-    return "new Date() without an argument";
-  }
-  if (ts.isCallExpression(node) && globalNamed(node.expression, "Date", checker)) return "Date() as a function";
+  if (ts.isIdentifier(node)) return globalUse(node, checker);
+  if (ts.isMetaProperty(node)) return node.keywordToken === ts.SyntaxKind.ImportKeyword ? "import.meta" : null;
+  if (ts.isNewExpression(node) || ts.isCallExpression(node)) return dateUse(node, checker);
   return memberUse(node, checker);
 }
 

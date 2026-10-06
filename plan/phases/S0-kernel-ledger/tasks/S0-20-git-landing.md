@@ -18,7 +18,7 @@ Commit `knowledge` рождается в git через landing (LG-22): git р�
 ## Объём
 
 Входит:
-- **порт `git`** (LG-23): `tail(ref)`; `prepare(request, onto) → worktree | conflict`; `push(worktree, ref, expected, message, trailers) → pushed | moved` — compare-and-swap по `expected`;
+- **порт `git`** (LG-23): `tail(ref)`; `prepare(request, onto) → worktree | conflict`; `push(worktree, ref, expected, message, trailers) → pushed | moved` — compare-and-swap по `expected`; в коде `push` принимает эти аргументы одним объектом (S0-03, лимит параметров); `prev`, `request` и подпись коммита landing дописывает после apply (G-14); store `jsonl` открывается на worktree и получает `append` до `push` — skeleton с `memory` пишет после `push`;
 - **`git-repo`** (D-08): CLI `git`, worktree, merge, локальный CAS `git update-ref`; **`git-fixture`**;
 - **landing** в `machine`-сессии `land` (LG-22): событие land session в коммите (participant `land`, purpose `work`, `for` — reason сессии proposal); acts через порт → `act`-события; apply на tail; один git-коммит — merge change request в tail `main` со вторым родителем — head change request, с append в `store/knowledge.jsonl` через адаптер `jsonl` на worktree, evidence в `store/evidence/`, удалённым файлом proposal; без записи `docs/` до SW (PLAN.md, раздел 2);
 - **trailers**: `Lattice-Session`, `Lattice-Reason` сессии proposal; `Lattice-Step` — id, выданный портом `ids` (сам step записывается с S1, LG-28); `Lattice-Proposal`, `Lattice-Seq`;

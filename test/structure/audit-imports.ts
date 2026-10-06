@@ -32,19 +32,19 @@ const judge: Check = (i, at) => {
   return `ST-04: ${at} imports the judge port; only decide receives it (DP-14)`;
 };
 
-function boundary(from: Place, to: Place, at: string): string | null {
-  if (from.module === "adapters" && to.module === "adapters") {
-    return `ST-04: ${at} imports adapter ${to.adapter ?? ""}; adapters never import each other`;
-  }
-  if (to.module === "adapters" && from.module !== "assembly") {
-    return `ST-06: ${at} imports adapter ${to.adapter ?? ""}; only assembly imports adapters`;
-  }
-  const owned = to.module === "codec" || to.module === "generate";
-  if (owned && from.module !== "assembly" && from.module !== "cli") {
-    return `ST-06: ${at} imports ${to.module}; only assembly and cli import codec and generate`;
-  }
-  return null;
+function adapterBoundary(from: Place, to: Place, at: string): string | null {
+  if (to.module !== "adapters") return null;
+  if (from.module === "adapters") return `ST-04: ${at} imports adapter ${to.adapter ?? ""}; adapters never import each other`;
+  return from.module === "assembly" ? null : `ST-06: ${at} imports adapter ${to.adapter ?? ""}; only assembly imports adapters`;
 }
+
+function ownedBoundary(from: Place, to: Place, at: string): string | null {
+  if (to.module !== "codec" && to.module !== "generate") return null;
+  if (from.module === "assembly" || from.module === "cli") return null;
+  return `ST-06: ${at} imports ${to.module}; only assembly and cli import codec and generate`;
+}
+
+const boundary = (from: Place, to: Place, at: string) => adapterBoundary(from, to, at) ?? ownedBoundary(from, to, at);
 
 const matrix: Check = (i, at, { ports }) => {
   const target = i.target ?? "";
@@ -110,17 +110,21 @@ function cycles(files: readonly string[], edges: ReadonlyMap<string, readonly st
   const low = new Map<string, number>();
   const stack: string[] = [];
   const found: string[][] = [];
+  const at = (m: ReadonlyMap<string, number>, v: string) => m.get(v) ?? 0;
+  const out = (v: string) => edges.get(v) ?? [];
+  const close = (v: string) => {
+    const scc = stack.splice(stack.indexOf(v));
+    if (scc.length > 1 || out(v).includes(v)) found.push(scc.sort());
+  };
   const visit = (v: string) => {
     index.set(v, index.size);
-    low.set(v, index.get(v) ?? 0);
+    low.set(v, at(index, v));
     stack.push(v);
-    for (const w of edges.get(v) ?? []) {
+    for (const w of out(v)) {
       if (!index.has(w)) visit(w);
-      if (stack.includes(w)) low.set(v, Math.min(low.get(v) ?? 0, low.get(w) ?? 0));
+      if (stack.includes(w)) low.set(v, Math.min(at(low, v), at(low, w)));
     }
-    if (low.get(v) !== index.get(v)) return;
-    const scc = stack.splice(stack.indexOf(v));
-    if (scc.length > 1 || (edges.get(v) ?? []).includes(v)) found.push(scc.sort());
+    if (at(low, v) === at(index, v)) close(v);
   };
   for (const f of files) if (!index.has(f)) visit(f);
   return found;

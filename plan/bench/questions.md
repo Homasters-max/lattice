@@ -16,3 +16,8 @@
 | 8 | Over which bytes is the body size limit counted? | — | blank | планирование S0, G-05 (KR-13 задаёт лимит, но не байты) | 2026-10-06 |
 | 9 | What fields does a rejection of apply carry? | lattice/lg-17 | normal | S0-02 | 2026-10-06 |
 | 10 | In what format is the path of a rejection written? | — | blank | S0-02, G-13 (LG-17 называет поле, но не формат) | 2026-10-06 |
+| 11 | Which module may receive the judge port? | lattice/dp-14, lattice/st-04 | normal | S0-03 | 2026-10-06 |
+| 12 | What may an adapter import? | lattice/st-01 | normal | S0-03 | 2026-10-06 |
+| 13 | Who fills the prev hash of a knowledge commit, apply or landing? | — | blank | S0-03, G-14 (LG-06 называет поле, LG-14 и LG-38 не дают apply hash tail) | 2026-10-06 |
+| 14 | May the cli import the codec module directly? | lattice/st-01, lattice/st-06 | normal | S0-03, G-15 (строки расходятся) | 2026-10-06 |
+| 15 | Which kernel version do commits carry before the switch? | lattice/kr-03 | normal | S0-03 | 2026-10-06 |
