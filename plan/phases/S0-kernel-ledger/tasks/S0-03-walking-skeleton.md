@@ -51,6 +51,8 @@ interface Ids   { ulid(): string }
 
 // тонкий путь
 parseJson(text, path?): Result<JsonValue>; decodeUtf8(bytes, path?): Result<string>   // KR-10; мягкий разбор — G-16
+parseJsonBytes(bytes, path?): Result<JsonValue>                         // decodeUtf8 → parseJson, одна цепочка
+misfits(form, value): { name, expected, got }[]                           // поля формы, которые не подходят: KR-04, LG-06, LG-09
 readProposal(value): Result<Proposal>                                     // LG-09 — поверхностно
 changeRequest(head: string | null): Result<string>                        // LG-54 — change request, которого нет (Q-16)
 proposalPath(files): Result<string>                                       // LG-54
@@ -84,7 +86,7 @@ run(argv, { out, err, assembled }): Promise<number>                        // cl
 
 ## Сделано иначе, чем в наброске
 
-Решения владельца по ревью — Q-09…Q-26 в `PLAN.md`; объём задачи с добавками ревью — Q-26; пробелы — G-14…G-18.
+Решения владельца по ревью — Q-09…Q-27 в `PLAN.md`; объём задачи с добавками ревью — Q-26; пробелы — G-14…G-18.
 
 - **Знание в git** (Q-09): кроме `store-memory` есть тонкий `store-jsonl` — одна каноническая строка на коммит в `store/knowledge.jsonl`, чтение с начала при открытии. Landing открывает его на worktree: worktree → `append` → удалить proposal → `push`. Worktree `git-fixture` — временный каталог, `push` фиксирует его содержимое; `prepare` сливает по общему предку и кончается `conflict`. Адаптер store canon не знает: ledger отдаёт строку коммита и сам разбирает строки. Read view в e2e открывается из tail `main`. Проверки цепочки, обрезанной строки, evidence в `store/evidence/` и rows, переданные адаптеру при открытии (LG-02, Q-25), — S0-11; пересборка на сдвинувшемся `main`, `awaiting-act`, trailers OB-07, `request` и `git-repo` — S0-20 (Q-26).
 - **Отказы вместо исключений** (Q-10): KR-10 (не JSON, не UTF-8), LG-09 (форма proposal поверхностно; полная — S0-10), LG-54 (ровно один proposal) — с реестрами и фикстурами trigger/pass. Мягкий `JSON.parse` — только в `parseJson` (G-16, до S0-04).
