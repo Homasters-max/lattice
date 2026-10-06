@@ -4,6 +4,9 @@ import type { Assembly, LandingOutcome, Rejection } from "../assembly/index.js";
 
 type Print = (text: string) => void;
 
+/** What the command reaches: its output streams and the assembled ports, `null` while no store is configured. */
+type Reach = { readonly out: Print; readonly err: Print; readonly assembled: Assembly | null };
+
 const USAGE = "usage: lattice land <request> [--dry-run]\n";
 
 const records = (n: number) => `${n} record${n === 1 ? "" : "s"}`;
@@ -32,7 +35,7 @@ function report(o: LandingOutcome, out: Print): number {
   }
 }
 
-export async function landCommand(args: readonly string[], assembled: Assembly | null, out: Print, err: Print): Promise<number> {
+export async function landCommand(args: readonly string[], { assembled, out, err }: Reach): Promise<number> {
   const dryRun = args.includes("--dry-run");
   const [request, ...extra] = args.filter((a) => a !== "--dry-run");
   if (request === undefined || request.startsWith("-") || extra.length > 0) {

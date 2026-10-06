@@ -1,22 +1,14 @@
 // The CLI (RT-32): thin — it finds the command in the table and runs its
 // handler; a command without one names the plan task where it arrives.
-import type { Assembly } from "../assembly/index.js";
 import { COMMANDS } from "./commands.js";
 import { landCommand } from "./land.js";
 import { STUBS } from "./stubs.js";
 
-/** What a command reaches: its output streams and the assembled ports, `null` while no store is configured. */
-interface Env {
-  readonly out: (text: string) => void;
-  readonly err: (text: string) => void;
-  readonly assembled: Assembly | null;
-}
+/** Every handler has the shape of the first one, `land`: its arguments and what it reaches. */
+type Handler = typeof landCommand;
+type Env = Parameters<Handler>[1];
 
-type Handler = (args: readonly string[], env: Env) => Promise<number>;
-
-const HANDLERS: { readonly [command: string]: Handler } = {
-  land: (args, { assembled, out, err }) => landCommand(args, assembled, out, err),
-};
+const HANDLERS: { readonly [command: string]: Handler } = { land: landCommand };
 
 function help(): string {
   const rows = COMMANDS.map((c) => `  ${c.name.padEnd(14)}${c.does}\n`);
