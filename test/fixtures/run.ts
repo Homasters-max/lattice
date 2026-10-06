@@ -1,5 +1,5 @@
 // Runs one rule fixture through the hard check it names (ST-17, LG-17).
-// Layout and format: CONVENTIONS.md, section «Жёсткие проверки и фикстуры».
+// Layout and format: CONVENTIONS.md §4.
 
 type Refusal = {
   readonly rule: string;

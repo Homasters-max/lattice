@@ -3,7 +3,7 @@
 // `jsonl` adapter (LG-23). The working adapters of `git`, `acts`, `clock` and
 // `ids` and reading `store/lattice.json` arrive with S0-19, S0-20 and S0-23;
 // the adapters for tests are assembled only by tests (test/support/assembly.ts,
-// plan/closure-check.md, «acts и права»).
+// plan/closure-check.md, the bypass class of acts: TR-14…TR-17).
 import { createStoreJsonl } from "../adapters/store-jsonl/index.js";
 import type { Result } from "../kernel/index.js";
 import { land, tailView, type LandingOutcome, type LandingPorts, type LandOptions, type View } from "../ledger/index.js";

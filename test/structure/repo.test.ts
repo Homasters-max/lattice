@@ -29,6 +29,12 @@ describe("structure of this repository", () => {
     expect(auditPurity(repo)).toEqual([]);
   });
 
+  it("PR-14: src/ and test/support/ are written in English — no Cyrillic letter in code or comments", () => {
+    const support = readdirSync(join(repoRoot, "test/support")).map((f) => [`test/support/${f}`, readFileSync(join(repoRoot, "test/support", f), "utf8")] as const);
+    const texts = [...[...repo.files].map(([path, file]) => [path, file.text] as const), ...support];
+    expect(texts.filter(([, text]) => /[Ѐ-ӿ]/u.test(text)).map(([path]) => path)).toEqual([]);
+  });
+
   it("ST-05: the reach of the kernel entry is test/structure/kernel-files.txt", () => {
     expect(auditKernelFiles(repo, lines("test/structure/kernel-files.txt"))).toEqual([]);
   });

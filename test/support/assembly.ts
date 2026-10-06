@@ -1,4 +1,4 @@
-// The test assembly (plan/closure-check.md, «acts и права»): the adapters that
+// The test assembly (plan/closure-check.md, the bypass class of acts): the adapters that
 // exist for tests — `git-fixture`, `acts-fixture`, `clock-fixed`, `ids-counter`
 // (ST-07, TR-14) — reach the working code only from here; no file of `src/`
 // imports them (test/structure, ST-07).
