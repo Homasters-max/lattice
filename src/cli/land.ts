@@ -5,7 +5,11 @@ import type { Assembly, LandingOutcome, Rejection } from "../assembly/index.js";
 type Print = (text: string) => void;
 
 /** What the command reaches: its output streams and the assembled ports, `null` while no store is configured. */
-type Reach = { readonly out: Print; readonly err: Print; readonly assembled: Assembly | null };
+interface Reach {
+  readonly out: Print;
+  readonly err: Print;
+  readonly assembled: Assembly | null;
+}
 
 const USAGE = "usage: lattice land <request> [--dry-run]\n";
 
