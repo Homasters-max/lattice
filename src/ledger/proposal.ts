@@ -2,22 +2,7 @@
 // its form on the surface — the fields and their JSON kinds; the session
 // event with its certificate, the signature and facts in the canonical order
 // arrive with S0-10 and S0-16.
-import {
-  compareText,
-  gotOf,
-  hash,
-  isJsonObject,
-  misfits,
-  reject,
-  refused,
-  STRING_FIELD as STRING,
-  type Field,
-  type JsonObject,
-  type JsonValue,
-  type Kind,
-  type Rejection,
-  type Result,
-} from "../kernel/index.js";
+import { compareText, gotOf, hash, isJsonObject, reject, refused, type JsonObject, type JsonValue, type Kind, type Rejection, type Result } from "../kernel/index.js";
 import { LG_09 } from "./rules.js";
 
 /** The authoring session event (TR-11); its certificate arrives with S0-16. */
@@ -37,6 +22,10 @@ export type Proposal = {
   readonly intents: readonly Intent[];
   readonly sig: string | null;
 };
+
+type Field = { readonly expected: string; readonly fits: (v: JsonValue | undefined) => boolean };
+
+const STRING: Field = { expected: "a string", fits: (v) => typeof v === "string" };
 
 const INTENT: { readonly [field in keyof Intent]: Field } = {
   op: { expected: "entity or event", fits: (v) => v === "entity" || v === "event" },
@@ -60,12 +49,14 @@ const refusal = (intent: string | null, path: string, expected: string, got: Jso
 function intentRejections(v: JsonValue, i: number): Rejection[] {
   if (!isJsonObject(v)) return [refusal(null, `/intents/${i}`, "an intent", v)];
   const id = typeof v.id === "string" ? v.id : null;
-  return misfits(INTENT, v).map((m) => refusal(id, id === null ? `/intents/${i}/${m.name}` : `/${m.name}`, m.expected, m.got));
+  return Object.entries(INTENT).flatMap(([name, field]) =>
+    field.fits(v[name]) ? [] : [refusal(id, id === null ? `/intents/${i}/${name}` : `/${name}`, field.expected, v[name])],
+  );
 }
 
 function proposalRejections(value: JsonValue): Rejection[] {
   if (!isJsonObject(value)) return [refusal(null, "", "a proposal", value)];
-  const own = misfits(PROPOSAL, value).map((m) => refusal(null, `/${m.name}`, m.expected, m.got));
+  const own = Object.entries(PROPOSAL).flatMap(([name, field]) => (field.fits(value[name]) ? [] : [refusal(null, `/${name}`, field.expected, value[name])]));
   const intents = Array.isArray(value.intents) ? (value.intents as readonly JsonValue[]) : [];
   return [...own, ...intents.flatMap(intentRejections)];
 }

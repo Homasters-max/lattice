@@ -3,7 +3,7 @@
 // rejection (LG-17, CONVENTIONS.md §3). Canon, hash and the full header arrive
 // with S0-04 and S0-05. Every input crosses the module boundary frozen.
 import { describe, expect, it } from "vitest";
-import { canon, checkHeader, checkId, decodeUtf8, hashBytes, hashRecord, isEntityId, isUlid, KERNEL_VERSION, parseJson, reject, sortRejections } from "../../src/kernel/index.js";
+import { canon, checkHeader, checkId, hashBytes, hashRecord, isEntityId, isUlid, KERNEL_VERSION, parseJson, parseJsonBytes, reject, sortRejections } from "../../src/kernel/index.js";
 import { KR_04, KR_06, RULES } from "../../src/kernel/rules.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
@@ -94,7 +94,7 @@ describe("reading JSON (KR-10)", () => {
   // Q-19: bytes that are not UTF-8 are named by their hash.
   it("KR-10: refuses bytes that are not UTF-8 — named by their hash — and a text that is not JSON, at the place given", () => {
     const bytes = Uint8Array.from([0x7b, 0xff, 0x7d]);
-    expect(decodeUtf8(bytes, "/store/proposals/a.json")).toMatchObject({ ok: false, rejections: [{ rule: "KR-10", path: "/store/proposals/a.json", got: hashBytes(bytes) }] });
+    expect(parseJsonBytes(bytes, "/store/proposals/a.json")).toMatchObject({ ok: false, rejections: [{ rule: "KR-10", path: "/store/proposals/a.json", got: hashBytes(bytes) }] });
     expect(parseJson("{", "/3")).toMatchObject({ ok: false, rejections: [{ rule: "KR-10", path: "/3", intent: null, got: "{" }] });
     expect(parseJson('{"a":[1,"x"]}')).toEqual({ ok: true, value: { a: [1, "x"] } });
   });

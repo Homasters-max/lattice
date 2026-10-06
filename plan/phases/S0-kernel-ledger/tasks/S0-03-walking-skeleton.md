@@ -50,9 +50,7 @@ interface Clock { now(): string }   // date-time KR-11
 interface Ids   { ulid(): string }
 
 // тонкий путь
-parseJson(text, path?): Result<JsonValue>; decodeUtf8(bytes, path?): Result<string>   // KR-10; мягкий разбор — G-16
-parseJsonBytes(bytes, path?): Result<JsonValue>                         // decodeUtf8 → parseJson, одна цепочка
-misfits(form, value): { name, expected, got }[]                           // поля формы, которые не подходят: KR-04, LG-06, LG-09
+parseJson(text, path?): Result<JsonValue>; parseJsonBytes(bytes, path?): Result<JsonValue>   // KR-10, байты — UTF-8 без BOM; мягкий разбор — G-16
 readProposal(value): Result<Proposal>                                     // LG-09 — поверхностно
 changeRequest(head: string | null): Result<string>                        // LG-54 — change request, которого нет (Q-16)
 proposalPath(files): Result<string>                                       // LG-54

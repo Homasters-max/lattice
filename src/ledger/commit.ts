@@ -5,26 +5,7 @@
 // their JSON kinds and the header of each record (KR-04);
 // the chain and its signatures are verified when a store opens from S0-10 and
 // S0-11 (LG-05).
-import {
-  canon,
-  checkHeader,
-  gotOf,
-  hash,
-  hashBytes,
-  isJsonObject,
-  KR_10,
-  misfits,
-  parseJsonBytes,
-  refuse,
-  refused,
-  reject,
-  STRING_FIELD as STRING,
-  type Field,
-  type JsonValue,
-  type Record,
-  type Rejection,
-  type Result,
-} from "../kernel/index.js";
+import { canon, checkHeader, gotOf, hash, hashBytes, isJsonObject, KR_10, parseJsonBytes, refuse, refused, reject, type JsonValue, type Record, type Rejection, type Result } from "../kernel/index.js";
 import { LG_06 } from "./rules.js";
 
 export type Commit = {
@@ -56,6 +37,9 @@ export function commitHash(c: Commit): string {
 /** The line a store keeps for a commit: its canonical JSON. */
 export const encodeCommit = (c: Commit): string => canon(c);
 
+type Field = { readonly expected: string; readonly fits: (v: JsonValue | undefined) => boolean };
+
+const STRING: Field = { expected: "a string", fits: (v) => typeof v === "string" };
 const NUMBER: Field = { expected: "a number", fits: (v) => typeof v === "number" };
 const STRING_OR_NULL: Field = { expected: "a string or null", fits: (v) => v === null || typeof v === "string" };
 
@@ -75,7 +59,9 @@ const COMMIT: { readonly [field in keyof Commit]: Field } = {
 
 function commitRejections(value: JsonValue, path: string): Rejection[] {
   if (!isJsonObject(value)) return [reject(LG_06, { intent: null, path, expected: "a commit", got: gotOf(value) })];
-  const header = misfits(COMMIT, value).map((m) => reject(LG_06, { intent: null, path: `${path}/${m.name}`, expected: m.expected, got: m.got }));
+  const header = Object.entries(COMMIT).flatMap(([name, field]) =>
+    field.fits(value[name]) ? [] : [reject(LG_06, { intent: null, path: `${path}/${name}`, expected: field.expected, got: gotOf(value[name]) })],
+  );
   const records = Array.isArray(value.records) ? (value.records as readonly JsonValue[]) : [];
   return [...header, ...records.flatMap((r, i) => checkHeader(r, `${path}/records/${i}`))];
 }
