@@ -51,7 +51,7 @@ function portsOf(over: Partial<LandingPorts> = {}, branches = BRANCHES): Landing
     opened.push(store);
     return store;
   };
-  // The spread is a new object around ports already frozen: it is frozen itself, not frozen again.
+  // Landing never changes its ports: the assembly froze them deep, and the object that adds the recording openStore is frozen too.
   return Object.freeze({ ...ports, openStore });
 }
 
