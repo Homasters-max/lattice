@@ -30,6 +30,7 @@ rules: [LG-09, LG-17, LG-23, LG-24, LG-54, KR-10, ST-17]
   - раннер `test/fixtures/run.ts` становится асинхронным;
   - сырые деревья trigger разрешены решением Q-23;
   - строки `json`, `proposal` и `store` для KR-10, LG-06 и KR-04 остаются чистыми: склейки там нет.
+- **Порядок исходов landing** (G-19): change request существует (LG-54) → store на tail открывается (LG-23, LG-06) → `conflict` (LG-24, LG-26; конфликт на файле store — LG-23 по Q-28) → proposal (LG-54, KR-10, LG-09) → байты store в change request (LG-23). Тест в `test/ledger/landing.test.ts` проводит change request, у которого несколько исходов, через каждую ступень, в том числе `conflict` на `main`, где store не открывается; тест S0-32 «conflict on a main whose store does not open» становится его частью.
 - **Тест** в `test/ledger/landing.test.ts`: `id` land session и `at` коммита — из `ids-counter` и `clock-fixed`.
 
 Не входит:
@@ -48,7 +49,7 @@ rules: [LG-09, LG-17, LG-23, LG-24, LG-54, KR-10, ST-17]
 
    Красные.
 2. Отказ LG-23 на конфликте файла store; корни `path` в `proposalOf` и при открытии store; чистые функции уходят внутрь.
-3. Тест `ids` и `clock`.
+3. Тест порядка исходов (G-19) и тест `ids` и `clock`.
 4. `CONVENTIONS.md` §3 (корень `path` в landing) и §4 (фикстуры через `land`, асинхронный раннер).
 
 ## Тесты и фикстуры
@@ -64,6 +65,7 @@ rules: [LG-09, LG-17, LG-23, LG-24, LG-54, KR-10, ST-17]
 - [ ] change request, который правит файл store, получает отказ LG-23 при любом положении `main`
 - [ ] у всех отказов landing один корень `path`; строки store нумеруются с 1
 - [ ] фикстуры LG-54, LG-23 и KR-10 proposal идут через `land`; `changeRequest`, `proposalPath`, `keptKnowledge`, `fileOnMain` вне входа `ledger`
+- [ ] порядок исходов landing задан по G-19 и показан тестом, в том числе `conflict` на `main`, где store не открывается
 - [ ] тест показывает `ids` и `clock` в коммите
 - [ ] `npm run verify` зелёный
 

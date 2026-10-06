@@ -71,5 +71,5 @@ fileOnMain(tail: Held): Result<Uint8Array | null>   // LG-23, чистая; её
 ## Риски и заметки
 
 - **Триггер ST-15:** правка `src/ledger/index.ts` и `src/assembly/index.ts` — файлов skeleton. Отметка в разделе PR «Триггеры ST-15».
-- **Порядок отказов.** Отказ открытия store на tail (LG-23, LG-06) теперь идёт до `prepare` change request и проверки proposal: `onto` берётся из `openTail`. Раньше он шёл после proposal. Change request с испорченным proposal на испорченном `main` получает отказ tail, а не KR-10; порядок проверок задаёт S0-33.
+- **Порядок отказов** (G-19). Отказ открытия store на tail (LG-23, LG-06) теперь идёт до `prepare` change request и проверки proposal: `onto` берётся из `openTail`. Раньше `conflict` и отказ proposal шли раньше него. На `main`, где store не открывается, change request с испорченным proposal получает отказ tail, а не KR-10, а change request, чей код конфликтует с `main`, — отказ tail, а не `conflict` (LG-26). Тест `landing.test.ts` фиксирует второй случай; порядок исходов целиком задаёт и проверяет S0-33.
 - S0-33 и S0-34 зависят от этой задачи: обе правят landing, а PR-17 не даёт менять один контракт параллельно.

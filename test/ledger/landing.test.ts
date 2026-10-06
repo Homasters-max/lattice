@@ -268,6 +268,17 @@ describe("landing outcomes (LG-24, LG-25, LG-54)", () => {
     expect(await land(ports, "cr/clash", LAND)).toEqual({ outcome: "conflict", paths: ["README.md"] });
   });
 
+  // G-19: the order of the outcomes is S0-33's; until then the store at the tail opens before the change request is prepared.
+  it("LG-23, LG-26: on a main whose store does not open, a change request whose code conflicts is refused, not reported as conflict", async () => {
+    // A trigger: a raw tree on main that no landing writes, as a broken repository holds it.
+    const ports = portsOf({}, { ...BRANCHES, main: { files: { "README.md": "one\n", "store/knowledge.jsonl/x": "x\n" } } });
+    const onto = await ports.git.tail("main");
+    const w = onto === null ? null : await ports.git.prepare({ request: "cr/readme", onto });
+    if (onto === null || w?.kind !== "worktree") throw new Error("bug: cr/readme prepares onto main");
+    await ports.git.push({ worktree: w, ref: "main", expected: onto, message: "m", trailers: [] });
+    expect(refusals(await land(ports, "cr/clash", DRY_RUN))).toEqual([["LG-23", "/store/knowledge.jsonl"]]);
+  });
+
   it("LG-54, KR-10: refuses a change request that does not exist, one without a proposal and a proposal that is not JSON", async () => {
     const ports = portsOf();
     expect(refusals(await land(ports, "cr/typo", DRY_RUN))).toEqual([["LG-54", ""]]);
