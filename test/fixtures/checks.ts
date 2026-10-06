@@ -48,21 +48,23 @@ const changeRequestCheck: FixtureCheck = {
   run: (input) => (field(input, "files") === undefined ? changeRequest(field(input, "head") as string | null) : proposalPath(field(input, "files") as string[])),
 };
 
+/** A proposal applied on an empty ledger. */
+function applied(value: JsonValue) {
+  const read = readProposal(value);
+  return read.ok ? apply(createView(0, []), read.value, LAND, []) : read;
+}
+
 /** `input`: `{ proposal }`, applied on an empty ledger. */
 const applyCheck: FixtureCheck = {
   enforces: [KR_06.id],
-  run: (input) => {
-    const read = readProposal(field(input, "proposal") as JsonValue);
-    return read.ok ? apply(createView(0, []), read.value, LAND, []) : read;
-  },
+  run: (input) => applied(field(input, "proposal") as JsonValue),
 };
 
 /** The line of the commit apply forms for a proposal on an empty ledger. */
 function lineOf(value: JsonValue): string {
-  const read = readProposal(value);
-  const applied = read.ok ? apply(createView(0, []), read.value, LAND, []) : read;
-  if (!applied.ok || applied.value === "no-op") throw new Error("bug: the pass proposal of a store fixture applies to a commit");
-  return encodeCommit(applied.value);
+  const commit = applied(value);
+  if (!commit.ok || commit.value === "no-op") throw new Error("bug: the pass proposal of a store fixture applies to a commit");
+  return encodeCommit(commit.value);
 }
 
 /** Bytes given in a fixture: a string, as UTF-8, or the numbers of the bytes, for bytes that are not UTF-8. */
@@ -92,7 +94,8 @@ const knowledge: FixtureCheck = {
     // What a worktree holds at the path: bytes, the files of a directory as `{ files }`, or nothing.
     type Held = Parameters<typeof keptKnowledge>[1];
     const held = (v: unknown): Held => {
-      if (v === null || typeof v !== "object" || Array.isArray(v)) return v === null ? null : bytesOf(v);
+      if (v === null) return null;
+      if (typeof v !== "object" || Array.isArray(v)) return bytesOf(v);
       return "proposal" in v ? fileOf([lineOf(v.proposal as JsonValue)]) : (v as Held);
     };
     return keptKnowledge(held(field(input, "tail")), held(field(input, "request")));
