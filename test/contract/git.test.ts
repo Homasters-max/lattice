@@ -81,6 +81,16 @@ describe.each(ADAPTERS)("git port: $name", ({ make }) => {
     expect(await push(git, second, onto)).toBe("moved");
   });
 
+  it("ST-07, LG-24: ends conflict where main and the change request changed a path differently", async () => {
+    const git = make();
+    const onto = await tailOf(git, "main");
+    expect(await push(git, await worktree(git, "cr/edit", onto), onto)).toBe("pushed");
+    expect(await git.prepare({ request: "cr/clash", onto: await tailOf(git, "main") })).toEqual({ kind: "conflict", paths: ["README.md"] });
+    expect((await git.prepare({ request: "cr/add", onto: await tailOf(git, "main") })).kind).toBe("worktree");
+  });
+});
+
+describe.each(ADAPTERS)("git port: $name — paths and what is no file", ({ make }) => {
   it("ST-07, Q-18: lists paths in the order of sortPaths — UTF-16 code units, never the locale", async () => {
     const git = make();
     const listed = await (await worktree(git, "cr/names", await tailOf(git, "main"))).list("src/");
@@ -99,13 +109,5 @@ describe.each(ADAPTERS)("git port: $name", ({ make }) => {
     const onto = await tailOf(git, "main");
     expect(await push(git, await worktree(git, "cr/file", onto), onto)).toBe("pushed");
     expect(await git.prepare({ request: "cr/dir", onto: await tailOf(git, "main") })).toEqual({ kind: "conflict", paths: ["lib"] });
-  });
-
-  it("ST-07, LG-24: ends conflict where main and the change request changed a path differently", async () => {
-    const git = make();
-    const onto = await tailOf(git, "main");
-    expect(await push(git, await worktree(git, "cr/edit", onto), onto)).toBe("pushed");
-    expect(await git.prepare({ request: "cr/clash", onto: await tailOf(git, "main") })).toEqual({ kind: "conflict", paths: ["README.md"] });
-    expect((await git.prepare({ request: "cr/add", onto: await tailOf(git, "main") })).kind).toBe("worktree");
   });
 });
