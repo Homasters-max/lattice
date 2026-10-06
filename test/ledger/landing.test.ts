@@ -206,6 +206,13 @@ describe("the store a change request brings (LG-14, LG-23)", () => {
     expect([commit.seq, commit.base, commit.records.map((r) => r.id)]).toEqual([2, 1, ["demo/x"]]);
   });
 
+  it("LG-23: a directory in place of store/knowledge.jsonl on main is refused, never thrown", async () => {
+    // A trigger: a raw tree on main that no landing writes, as a broken repository holds it.
+    const ports = portsOf({}, { ...BRANCHES, main: { files: { "store/knowledge.jsonl/x": "x\n" } } });
+    expect(refusals(await land(ports, "cr/a", DRY_RUN))).toEqual([["LG-23", "/store/knowledge.jsonl"]]);
+    expect(await tailView(ports)).toMatchObject({ ok: false, rejections: [{ rule: "LG-23", got: ["store/knowledge.jsonl/x"] }] });
+  });
+
   it("LG-06: a store on main whose line is no commit is refused on opening, never thrown", async () => {
     // A trigger: a raw line on main that no landing writes, as a broken repository holds it.
     const ports = portsOf({}, { ...BRANCHES, main: { files: { "store/knowledge.jsonl": "{}\n" } } });

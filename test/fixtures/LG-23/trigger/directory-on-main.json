@@ -1,0 +1,19 @@
+{
+  "check": "knowledge",
+  "input": {
+    "tail": {
+      "files": [
+        "store/knowledge.jsonl/x"
+      ]
+    },
+    "request": {
+      "files": [
+        "store/knowledge.jsonl/x"
+      ]
+    }
+  },
+  "expect": {
+    "rule": "LG-23",
+    "path": "/store/knowledge.jsonl"
+  }
+}

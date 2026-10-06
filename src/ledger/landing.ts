@@ -74,13 +74,21 @@ const same = (a: Uint8Array | null, b: Held) =>
 /** Bytes are no JSON value: a refusal names a file by its hash (Q-19), a directory by its files. */
 const named = (held: Held) => (held === null ? null : held instanceof Uint8Array ? hashBytes(held) : [...held.files]);
 
+/** LG-23: only the `jsonl` adapter writes `store/knowledge.jsonl`, so main holds it as a file or not at all. */
+function fileOnMain(tail: Held): Result<Uint8Array | null> {
+  if (tail === null || tail instanceof Uint8Array) return { ok: true, value: tail };
+  return refuse(reject(LG_23, { intent: null, path: `/${KNOWLEDGE}`, expected: "a file or none", got: named(tail) }));
+}
+
 /**
- * LG-23: only the `jsonl` adapter writes `store/knowledge.jsonl`, and only landing opens it — so a change
- * request brings the file byte for byte as at the tail of `main`, or both lack it; a directory in its place
- * changed it too.
+ * LG-23: only the `jsonl` adapter writes `store/knowledge.jsonl`, and only landing opens it — so main holds it
+ * as a file or not at all, and a change request brings the file byte for byte as at the tail of `main`, or
+ * both lack it; a directory in its place changed it too.
  */
-export function keptKnowledge(tail: Uint8Array | null, request: Held): Result<Held> {
-  if (same(tail, request)) return { ok: true, value: request };
+export function keptKnowledge(tail: Held, request: Held): Result<Held> {
+  const onMain = fileOnMain(tail);
+  if (!onMain.ok) return onMain;
+  if (same(onMain.value, request)) return { ok: true, value: request };
   return refuse(reject(LG_23, { intent: null, path: `/${KNOWLEDGE}`, expected: named(tail), got: named(request) }));
 }
 
@@ -98,7 +106,7 @@ async function proposalOf(worktree: Worktree): Promise<Result<Found>> {
   return proposal.ok ? { ok: true, value: { path: path.value, proposal: proposal.value } } : proposal;
 }
 
-type Tail = { readonly onto: string; readonly knowledge: Uint8Array | null; readonly lines: readonly Uint8Array[] };
+type Tail = { readonly onto: string; readonly knowledge: Held; readonly lines: readonly Uint8Array[] };
 
 /** The tail of `main` (GL-05): a worktree of that commit alone, the bytes of its `store/knowledge.jsonl` and the lines of its store. */
 async function tailOf(ports: LandingPorts): Promise<Tail> {
@@ -107,7 +115,9 @@ async function tailOf(ports: LandingPorts): Promise<Tail> {
   if (onto === null) throw new Error(`bug: the repository of the store has no ${MAIN}`);
   const worktree = await ports.git.prepare({ request: onto, onto });
   if (worktree.kind === "conflict") throw new Error("bug: a commit conflicts with itself");
-  return { onto, knowledge: await worktree.read(KNOWLEDGE), lines: await linesOf(ports.openStore(worktree)) };
+  const knowledge = await heldAt(worktree, KNOWLEDGE);
+  // The store opens only on a file: `keptKnowledge` and `tailView` refuse a directory in its place (LG-23).
+  return { onto, knowledge, lines: knowledge instanceof Uint8Array ? await linesOf(ports.openStore(worktree)) : [] };
 }
 
 const rejected = (r: { readonly rejections: Rejections }): LandingOutcome => ({ outcome: "rejections", rejections: r.rejections });
@@ -176,6 +186,9 @@ export async function land(ports: LandingPorts, request: string, options: LandOp
 
 /** The read view at the tail of `main`: the store opened on a worktree of that commit alone. */
 export async function tailView(ports: LandingPorts): Promise<Result<View>> {
-  const opened = openLines((await tailOf(ports)).lines);
+  const tail = await tailOf(ports);
+  const file = fileOnMain(tail.knowledge);
+  if (!file.ok) return file;
+  const opened = openLines(tail.lines);
   return opened.ok ? { ok: true, value: opened.value.view } : opened;
 }

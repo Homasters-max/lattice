@@ -82,7 +82,7 @@ const store: FixtureCheck = {
 
 /**
  * `input`: `{ tail, request }` — the bytes of `store/knowledge.jsonl` at the tail of main and in the change request,
- * `null` where there is no file; the request may hold a directory there instead, given as `{ files }`.
+ * `null` where there is no file; either may hold a directory there instead, given as `{ files }`.
  */
 const knowledge: FixtureCheck = {
   enforces: [LG_23.id],
@@ -90,7 +90,7 @@ const knowledge: FixtureCheck = {
     // What a worktree holds at the path: bytes, the files of a directory as `{ files }`, or nothing.
     type Held = Parameters<typeof keptKnowledge>[1];
     const held = (v: unknown): Held => (v === null ? null : typeof v === "object" && !Array.isArray(v) ? (v as Held) : bytesOf(v));
-    return keptKnowledge(held(field(input, "tail")) as Uint8Array | null, held(field(input, "request")));
+    return keptKnowledge(held(field(input, "tail")), held(field(input, "request")));
   },
 };
 
