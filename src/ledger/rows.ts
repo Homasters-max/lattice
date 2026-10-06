@@ -33,3 +33,8 @@ export function withDelta(rows: readonly Row[], delta: Delta): Row[] {
   const kept = rows.map((r) => closed.get(`${r.key}@${r.from}`) ?? r);
   return sortRows([...kept, ...delta.filter((r) => r.to === null)]);
 }
+
+/** The rows that hold at `seq` — `from ≤ seq`, `to` null or greater — by key; without `seq`, the rows that hold now. */
+export function held(rows: readonly Row[], seq = Number.POSITIVE_INFINITY): ReadonlyMap<string, Row> {
+  return new Map(rows.filter((r) => r.from <= seq && (r.to === null || r.to > seq)).map((r) => [r.key, r]));
+}

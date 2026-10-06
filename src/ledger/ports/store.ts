@@ -2,13 +2,15 @@
 // `memory` and `jsonl`. The adapter knows neither canon nor the meaning of a
 // row: the ledger hands it each commit as its canonical line, reads back the
 // bytes of every line as the store keeps them — decoding and refusing them is
-// the ledger's (KR-10) — and folds the rows (LG-35). Key order is part of the
-// contract: one comparator, `sortRows`, for the ledger and every adapter (Q-18).
+// the ledger's (KR-10) — and folds the rows (LG-35). Key order and the rows a
+// delta leaves are part of the contract: one comparator, `sortRows`, and one
+// application of a delta, `withDelta` and `held`, for the ledger and every
+// adapter (Q-18).
 // The exact types arrive with S0-11.
 import type { Evidence } from "../commit.js";
 import type { Delta, Row } from "../rows.js";
 
-export { sortRows } from "../rows.js";
+export { held, sortRows, withDelta } from "../rows.js";
 export type { Delta, Evidence, Row };
 
 /** What one `append` writes. */

@@ -7,7 +7,7 @@
 // handed on opening arrive with S0-11 (Q-09).
 import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { sortRows, type Append, type Row, type Store } from "../../ledger/ports/store.js";
+import { held, sortRows, withDelta, type Append, type Row, type Store } from "../../ledger/ports/store.js";
 
 export type StoreJsonlOptions = { readonly dir: string };
 
@@ -35,24 +35,21 @@ async function linesOf(file: string): Promise<Uint8Array[]> {
 
 export function createStoreJsonl({ dir }: StoreJsonlOptions): Store {
   const file = join(dir, KNOWLEDGE);
-  const holding = new Map<string, Row>();
+  let rows: readonly Row[] = [];
   const evidence = new Map<string, Uint8Array>();
   return {
     async append({ commit, delta, evidence: cited }: Append) {
       await mkdir(dirname(file), { recursive: true });
       await appendFile(file, `${commit}\n`, "utf8");
-      for (const row of delta) {
-        if (row.to === null) holding.set(row.key, row);
-        else if (holding.get(row.key)?.from === row.from) holding.delete(row.key);
-      }
+      rows = withDelta(rows, delta);
       for (const e of cited) evidence.set(e.hash, e.bytes);
     },
     commits: async function* (from) {
       for (const line of (await linesOf(file)).slice(Math.max(from, 1) - 1)) yield line;
     },
     tail: async () => (await linesOf(file)).at(-1) ?? null,
-    row: (key) => Promise.resolve(holding.get(key) ?? null),
-    rows: (prefix) => stream(sortRows([...holding.values()].filter((r) => r.key.startsWith(prefix)))),
+    row: (key) => Promise.resolve(held(rows).get(key) ?? null),
+    rows: (prefix) => stream(sortRows([...held(rows).values()].filter((r) => r.key.startsWith(prefix)))),
     evidence: (hash) => Promise.resolve(evidence.get(hash) ?? null),
   };
 }

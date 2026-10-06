@@ -5,7 +5,7 @@ import { type Record, type Result } from "../kernel/index.js";
 import { decodeCommit, type Commit } from "./commit.js";
 import { fold } from "./fold.js";
 import type { Store } from "./ports/store.js";
-import { currentKey, withDelta, type Row, type Rows } from "./rows.js";
+import { currentKey, held, withDelta, type Row, type Rows } from "./rows.js";
 
 export interface View {
   readonly seq: number;
@@ -15,7 +15,7 @@ export interface View {
 
 /** `view(seq)`: the rows with `from ≤ seq` and `to` null or greater. */
 export function createView(seq: number, rows: readonly Row[]): View & Rows {
-  const holding = new Map(rows.filter((r) => r.from <= seq && (r.to === null || r.to > seq)).map((r) => [r.key, r]));
+  const holding = held(rows, seq);
   const row = (key: string) => holding.get(key) ?? null;
   // A current row holds the record fold wrote for it (fold.ts).
   return { seq, row, current: (id) => (row(currentKey(id))?.value as Record | undefined) ?? null };
