@@ -14,3 +14,5 @@
 | 6 | What entity id does a document section get when it is imported from md? | lattice/rm-z03 | normal | планирование S0, Q-02 → D203 | 2026-10-06 |
 | 7 | Which participant's act admits the types of a library's own namespace when its ledger is initialised? | lattice/lg-18, lattice/lg-47 | normal | планирование S0, Q-03 → D204 | 2026-10-06 |
 | 8 | Over which bytes is the body size limit counted? | — | blank | планирование S0, G-05 (KR-13 задаёт лимит, но не байты) | 2026-10-06 |
+| 9 | What fields does a rejection of apply carry? | lattice/lg-17 | normal | S0-02 | 2026-10-06 |
+| 10 | In what format is the path of a rejection written? | — | blank | S0-02, G-13 (LG-17 называет поле, но не формат) | 2026-10-06 |
