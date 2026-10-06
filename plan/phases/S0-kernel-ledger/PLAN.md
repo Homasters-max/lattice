@@ -150,7 +150,7 @@ S0-31 (вопросы для bench) идёт параллельно всей ф�
 ```text
 lattice/
 ├── .gitattributes          * text=auto eol=lf — без этого round-trip ломается на Windows (D-10)
-├── .gitignore              node_modules/ dist/ gen/ .lattice/ .obsidian/workspace.json
+├── .gitignore              node_modules/ dist/ gen/ .lattice/ .obsidian/
 ├── package.json            один пакет `lattice`, ESM, bin `lattice`
 ├── tsconfig.json  eslint.config.js  vitest.config.ts
 ├── AGENTS.md  CLAUDE.md    правила для агентов-исполнителей; CLAUDE.md — только `@AGENTS.md`
