@@ -7,7 +7,7 @@ import { tree } from "./cases.js";
 const exportOne = "export const x = 1;\n";
 
 describe("imports: the base tree", () => {
-  it("passes", () => {
+  it("ST-01, ST-04, ST-06: passes the base tree, which holds every rule", () => {
     expect(auditImports(tree())).toEqual([]);
   });
 });

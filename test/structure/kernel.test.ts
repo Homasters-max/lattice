@@ -10,7 +10,7 @@ import { repoRoot } from "./tree.js";
 const NAMES = new Set(["requirement", "namespace", "act"]);
 
 describe("kernel perimeter (ST-05)", () => {
-  it("passes a reach equal to its list", () => {
+  it("ST-05: passes a reach equal to its list", () => {
     expect(auditKernelFiles(tree(), BASE_KERNEL)).toEqual([]);
   });
 
@@ -58,7 +58,7 @@ describe("std type names in the kernel (KR-01)", () => {
     ]);
   });
 
-  it("passes words inside a sentence and std names outside the kernel", () => {
+  it("KR-01: passes words inside a sentence and std names outside the kernel", () => {
     const t = tree({
       "src/kernel/index.ts": 'export const m = "an entity id is namespace/slug";\n',
       "src/ledger/index.ts": 'export const t = "std/namespace@1";\n',
@@ -66,7 +66,7 @@ describe("std type names in the kernel (KR-01)", () => {
     expect(auditStdNames(t, NAMES)).toEqual([]);
   });
 
-  it("reads the std type names of TY-Z02…TY-Z05, not the core ones", () => {
+  it("KR-01: reads the std type names of TY-Z02…TY-Z05, not the core ones", () => {
     const names = stdTypeNames(readFileSync(join(repoRoot, "docs/design/03-types.md"), "utf8"));
     for (const n of ["knowledge", "hint", "requirement", "review-note", "namespace", "test-set", "act", "retired", "source-listing", "code-commit"]) {
       expect(names).toContain(n);

@@ -55,7 +55,7 @@ describe("purity: the kernel (KR-02)", () => {
 });
 
 describe("purity: allowed", () => {
-  it("passes the allowed names of node:crypto, Date with an argument and UTC", () => {
+  it("ST-04: passes the allowed names of node:crypto, Date with an argument and UTC", () => {
     const code = [
       'import { createHash, verify } from "node:crypto";',
       'export const h = createHash("sha256").update("x").digest("hex");',
@@ -68,7 +68,7 @@ describe("purity: allowed", () => {
     expect(inTrust(code)).toEqual([]);
   });
 
-  it("passes a local binding or a property that shares a refused name", () => {
+  it("ST-04: passes a local binding or a property that shares a refused name", () => {
     const code = [
       "const process = (n: number) => n + 1;",
       "export const p = process(1);",
@@ -82,7 +82,7 @@ describe("purity: allowed", () => {
     expect(inTrust(code)).toEqual([]);
   });
 
-  it("passes impure modules", () => {
+  it("ST-04: passes impure modules", () => {
     for (const path of ["src/cli/x.ts", "src/assembly/x.ts", "src/adapters/clock-system/index.ts"]) {
       expect(auditPurity(alone(path, "export const t = Date.now() + Math.random();\nconsole.log(process.argv);\n"))).toEqual([]);
     }

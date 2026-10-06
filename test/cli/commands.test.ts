@@ -68,7 +68,7 @@ describe("command table (RT-32)", () => {
 });
 
 describe("land without a store", () => {
-  it("names the task that brings the store configuration", async () => {
+  it("RT-32: names the task that brings the store configuration", async () => {
     expect(await lattice("land", "cr/x")).toEqual({
       code: 2,
       out: "",
@@ -76,7 +76,7 @@ describe("land without a store", () => {
     });
   });
 
-  it("asks for the change request", async () => {
+  it("RT-32: asks for the change request", async () => {
     expect(await lattice("land", "--dry-run")).toEqual({ code: 2, out: "", err: "usage: lattice land <request> [--dry-run]\n" });
   });
 });

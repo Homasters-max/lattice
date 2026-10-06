@@ -9,7 +9,7 @@ const exportOne = "export const x = 1;\n";
 const judge = { "src/runtime/ports/judge.ts": exportOne, "src/runtime/ports/llm.ts": exportOne };
 
 describe("boundaries: the judge port (ST-04, DP-14)", () => {
-  it("lets decide and a judge adapter, which implements the port, import it; assembly wires the adapter without it", () => {
+  it("ST-04, DP-14: lets decide and a judge adapter, which implements the port, import it; assembly wires the adapter without it", () => {
     const t = tree({
       ...judge,
       "src/capabilities/decide/index.ts": 'import { x } from "../../runtime/ports/judge.js";\nexport const decide = (judge: typeof x) => judge;\n',
@@ -52,7 +52,7 @@ describe("boundaries: adapters for tests (ST-07)", () => {
     ]);
   });
 
-  it("lets assembly import a working adapter", () => {
+  it("ST-06, ST-07: lets assembly import a working adapter", () => {
     const t = tree({ ...ports, ...adapter("acts-local", "acts"), "src/assembly/acts.ts": 'import { a } from "../adapters/acts-local/index.js";\nexport const acts = a;\n' });
     expect(auditImports(t)).toEqual([]);
   });
@@ -76,7 +76,7 @@ describe("boundaries: vendor SDKs and other projects (ST-04, PR-13)", () => {
   const sdk = 'import { ulid } from "ulid";\nexport const id = ulid;\n';
   const pinned = { ulid: "3.0.1" };
 
-  it("lets one adapter import a package package.json pins to one version", () => {
+  it("ST-04, PR-13: lets one adapter import a package package.json pins to one version", () => {
     expect(auditImports(tree({ "src/ledger/ports/ids.ts": exportOne, "src/adapters/ids-ulid/index.ts": sdk }, pinned))).toEqual([]);
   });
 
@@ -115,7 +115,7 @@ describe("boundaries: vendor SDKs and other projects (ST-04, PR-13)", () => {
     expect(auditImports(t)).toEqual(["ST-04: src/assembly/load.ts:1 imports a computed specifier, which the structure test cannot check"]);
   });
 
-  it("lets impure modules import node: modules", () => {
+  it("ST-04: lets impure modules import node: modules", () => {
     expect(auditImports(tree({ "src/cli/io.ts": 'import { readFileSync } from "node:fs";\nexport const read = readFileSync;\n' }))).toEqual([]);
   });
 });
