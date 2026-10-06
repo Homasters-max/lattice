@@ -1,0 +1,38 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    name: verify (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: lint-ids (RM-01, RM-02)
+        run: node discussion/tools/lint-ids.mjs
+      - name: plan-check
+        run: node plan/tools/plan-check.mjs
+      - name: line endings of docs/design
+        shell: bash
+        run: |
+          git config --get core.autocrlf || true
+          git ls-files --eol docs/design
+          node scripts/check-eol.mjs
+      - name: typecheck
+        run: npm run typecheck
+      - name: lint
+        run: npm run lint
+      - name: test
+        run: npm test
