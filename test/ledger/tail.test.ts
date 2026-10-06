@@ -7,9 +7,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { GitFixtureOptions } from "../../src/adapters/git-fixture/index.js";
-import { fileOf } from "../../src/adapters/store-jsonl/index.js";
-import { commitHash, createView, encodeCommit, land, openTail, type LandingPorts } from "../../src/ledger/index.js";
-import { landingPorts, proposal } from "../support/landing.js";
+import { commitHash, land, openTail, type LandingPorts } from "../../src/ledger/index.js";
+import { landingPortsForTests } from "../support/assembly.js";
+import { AT, proposal, storeTextOf, text } from "../support/landing.js";
 
 const BRANCHES: GitFixtureOptions["branches"] = {
   main: { files: { "README.md": "one\n" } },
@@ -23,7 +23,7 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-const portsOf = (branches = BRANCHES): LandingPorts => landingPorts({ dir, branches });
+const portsOf = (branches = BRANCHES): LandingPorts => landingPortsForTests({ git: { dir, branches }, acts: { acts: {} }, clock: { at: AT } });
 
 describe("the store at the tail of main (LG-02, LG-38)", () => {
   it("LG-02: main without store/knowledge.jsonl opens as the empty store", async () => {
@@ -51,8 +51,7 @@ describe("the store at the tail of main (LG-02, LG-38)", () => {
     const { onto, view, tail, file } = opened.value;
     expect([onto, view.seq, view.current("demo/a")?.rev, view.current("demo/b")?.rev]).toEqual([await ports.git.tail("main"), 2, 1, 1]);
     expect([tail, tail?.prev]).toEqual([second, first === undefined ? null : commitHash(first)]);
-    const text = (bytes: Uint8Array | null) => (bytes === null ? null : new TextDecoder().decode(bytes));
-    expect(text(file)).toBe(text(fileOf(commits.map(encodeCommit).join("\n"))));
+    expect(text(file)).toBe(storeTextOf(commits));
   });
 });
 
@@ -71,12 +70,5 @@ describe("a broken store on main (LG-23, LG-06)", () => {
     const ports = portsOf({ ...BRANCHES, main: { files: { "store/knowledge.jsonl": "{}\n" } } });
     const opened = await openTail(ports);
     expect(opened.ok ? [] : opened.rejections.map((r) => [r.rule, r.path])).toContainEqual(["LG-06", "/0/seq"]);
-  });
-});
-
-describe("the read view runtime and capabilities get (LG-38)", () => {
-  it("LG-38: createView answers the questions of View and holds no row at run time", () => {
-    const view = createView(0, []);
-    expect(["row" in view, view.seq, view.current("demo/a")]).toEqual([false, 0, null]);
   });
 });

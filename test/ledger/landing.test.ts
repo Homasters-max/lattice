@@ -8,14 +8,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createGitFixture, type GitFixtureBranch, type GitFixtureOptions } from "../../src/adapters/git-fixture/index.js";
-import { createStoreJsonl, fileOf } from "../../src/adapters/store-jsonl/index.js";
+import { createStoreJsonl } from "../../src/adapters/store-jsonl/index.js";
 import { hashBytes } from "../../src/kernel/index.js";
 import {
   commitHash,
-  encodeCommit,
   land,
   openTail,
-  type Commit,
   type Git,
   type LandingOutcome,
   type LandingPorts,
@@ -23,8 +21,9 @@ import {
   type Store,
   type Worktree,
 } from "../../src/ledger/index.js";
+import { landingPortsForTests } from "../support/assembly.js";
 import { deepFreeze } from "../support/deep-freeze.js";
-import { landingPorts, proposal } from "../support/landing.js";
+import { AT, proposal, storeTextOf, text } from "../support/landing.js";
 
 const BRANCHES: GitFixtureOptions["branches"] = {
   main: { files: { "README.md": "one\n" } },
@@ -54,7 +53,7 @@ function portsOf(over: Partial<LandingPorts> = {}, branches = BRANCHES): Landing
     opened.push(store);
     return store;
   };
-  return landingPorts({ dir, branches }, { openStore, ...over });
+  return landingPortsForTests({ git: { dir, branches }, acts: { acts: {} }, clock: { at: AT } }, { openStore, ...over });
 }
 
 /** The store on main, as opening it at the tail reads it (LG-02, LG-38); a store opening refuses fails the test. */
@@ -64,20 +63,24 @@ async function storeOnMain(ports: LandingPorts) {
   return opened.value;
 }
 
-const text = (bytes: Uint8Array | null) => (bytes === null ? "" : new TextDecoder().decode(bytes));
-
 /** The store on main as text: `store/knowledge.jsonl` as `openTail` read it, `""` where main has none. */
 const storeTextOnMain = async (ports: LandingPorts) => text((await storeOnMain(ports)).file);
 
-/** The text of a store of exactly these commits, in order: the lines landing writes, framed by `fileOf` of `store-jsonl`. */
-const storeTextOf = (commits: readonly Commit[]) => commits.map((c) => text(fileOf(encodeCommit(c)))).join("");
+/** The tail of main and a worktree of `request` prepared onto it; without `request`, of the tail commit alone. */
+async function onMain(git: Git, request?: string) {
+  const onto = await git.tail("main");
+  const worktree = onto === null ? null : await git.prepare({ request: request ?? onto, onto });
+  if (onto === null || worktree?.kind !== "worktree") throw new Error(`bug: ${request ?? "main"} of the fixture prepares onto main`);
+  return { onto, worktree };
+}
 
 /** The paths of the files under `under` on main: the tree of its tail commit, code and proposals, which the store does not answer. */
-async function filesOnMain(git: Git, under: string): Promise<readonly string[]> {
-  const onto = await git.tail("main");
-  const w = onto === null ? null : await git.prepare({ request: onto, onto });
-  if (w?.kind !== "worktree") throw new Error("bug: main of the fixture prepares onto itself");
-  return w.list(under);
+const filesOnMain = async (git: Git, under: string) => (await onMain(git)).worktree.list(under);
+
+/** Someone else moves main: the code of `request` pushed onto its tail, with its own message and no trailers of landing. */
+async function moveMain(git: Git, request: string): Promise<void> {
+  const { onto, worktree } = await onMain(git, request);
+  await git.push({ worktree, ref: "main", expected: onto, message: "m", trailers: [] });
 }
 
 const landed = async (ports: LandingPorts, request: string) => {
@@ -246,20 +249,19 @@ describe("landing outcomes (LG-24, LG-25, LG-54)", () => {
 
   it("LG-24: ends conflict when the code of the change request conflicts with main", async () => {
     const ports = portsOf();
-    const { onto } = await storeOnMain(ports);
-    const w = await ports.git.prepare({ request: "cr/readme", onto });
-    if (w.kind === "worktree") await ports.git.push({ worktree: w, ref: "main", expected: onto, message: "m", trailers: [] });
+    await moveMain(ports.git, "cr/readme");
     expect(await land(ports, "cr/clash", LAND)).toEqual({ outcome: "conflict", paths: ["README.md"] });
   });
 
-  // G-19: the order of the outcomes is S0-33's; until then the store at the tail opens before the change request is prepared.
-  it("LG-23, LG-26: on a main whose store does not open, a change request whose code conflicts is refused, not reported as conflict", async () => {
+  // G-19, accepted by the owner: the store at the tail of main opens before the change request is prepared;
+  // the whole order of the outcomes is S0-33's.
+  it("LG-23: refuses a main whose store does not open before it prepares the change request, even one whose code conflicts with main", async () => {
     // A trigger: a raw tree on main that no landing writes, as a broken repository holds it.
     const ports = portsOf({}, { ...BRANCHES, main: { files: { "README.md": "one\n", "store/knowledge.jsonl/x": "x\n" } } });
+    await moveMain(ports.git, "cr/readme");
     const onto = await ports.git.tail("main");
-    const w = onto === null ? null : await ports.git.prepare({ request: "cr/readme", onto });
-    if (onto === null || w?.kind !== "worktree") throw new Error("bug: cr/readme prepares onto main");
-    await ports.git.push({ worktree: w, ref: "main", expected: onto, message: "m", trailers: [] });
+    // The code of cr/clash does conflict with main: on a main whose store opens, landing ends conflict.
+    expect(onto === null ? null : await ports.git.prepare({ request: "cr/clash", onto })).toMatchObject({ kind: "conflict", paths: ["README.md"] });
     expect(refusals(await land(ports, "cr/clash", DRY_RUN))).toEqual([["LG-23", "/store/knowledge.jsonl"]]);
   });
 

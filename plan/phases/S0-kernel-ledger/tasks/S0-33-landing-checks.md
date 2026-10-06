@@ -30,7 +30,7 @@ rules: [LG-09, LG-17, LG-23, LG-24, LG-54, KR-10, ST-17]
   - раннер `test/fixtures/run.ts` становится асинхронным;
   - сырые деревья trigger разрешены решением Q-23;
   - строки `json`, `proposal` и `store` для KR-10, LG-06 и KR-04 остаются чистыми: склейки там нет.
-- **Порядок исходов landing** (G-19): change request существует (LG-54) → store на tail открывается (LG-23, LG-06) → `conflict` (LG-24, LG-26; конфликт на файле store — LG-23 по Q-28) → proposal (LG-54, KR-10, LG-09) → байты store в change request (LG-23). Тест в `test/ledger/landing.test.ts` проводит change request, у которого несколько исходов, через каждую ступень, в том числе `conflict` на `main`, где store не открывается; тест S0-32 «conflict on a main whose store does not open» становится его частью.
+- **Порядок исходов landing** (G-19): change request существует (LG-54) → store на tail открывается (LG-23, LG-06) → `conflict` (LG-24, LG-26; конфликт на файле store — LG-23 по Q-28) → proposal (LG-54, KR-10, LG-09) → байты store в change request (LG-23). Тест в `test/ledger/landing.test.ts` проводит change request, у которого несколько исходов, через каждую ступень, в том числе `conflict` на `main`, где store не открывается; тест S0-32 «LG-23: refuses a main whose store does not open before it prepares the change request, even one whose code conflicts with main» становится его частью.
 - **Тест** в `test/ledger/landing.test.ts`: `id` land session и `at` коммита — из `ids-counter` и `clock-fixed`.
 
 Не входит:

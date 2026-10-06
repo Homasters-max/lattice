@@ -27,7 +27,7 @@ rules: [LG-02, LG-14, LG-23, LG-38, ST-01]
 - **`tailView` удаляется**: `assembly.view` берёт read view из `openTail`.
 - **`landing.check`** берёт `before`, tail-коммит и байты `store/knowledge.jsonl` на `main` из `openTail`.
 - **Вход `ledger/view`** отдаёт только `View` и `createView`, который возвращает `View`. `Rows`, `linesOf` и `openLines` уходят из него внутрь `ledger`: read view со строками для fold — `viewOf` во внутреннем `src/ledger/rows-view.ts`, там же интерфейс `View`. `openLines` остаётся в `src/ledger/index.ts`: им пользуются фикстуры строк store (KR-10, LG-06, KR-04) и `test/ledger/apply.test.ts`, которому fold нужен view со строками.
-- **Хелперы теста.** `commitsOnMain` и чтение `store/knowledge.jsonl` через `mainWorktree` в `landing.test.ts` заменяются `storeOnMain` — вызовом `openTail`; ожидание — по-прежнему весь список строк store на `main` (`storeTextOnMain` против `storeTextOf([commit])`). Список файлов дерева `main` (proposal удалён, код сохранён) store не отвечает и через `openTail` не читается: `mainWorktree` сужается до `filesOnMain` — git, а не store. Порты landing для тестов и proposal одной сущности — общий `test/support/landing.ts`.
+- **Хелперы теста.** `commitsOnMain` и чтение `store/knowledge.jsonl` через `mainWorktree` в `landing.test.ts` заменяются `storeOnMain` — вызовом `openTail`; ожидание — по-прежнему весь список строк store на `main` (`storeTextOnMain` против `storeTextOf([commit])`). Список файлов дерева `main` (proposal удалён, код сохранён) store не отвечает и через `openTail` не читается: `mainWorktree` сужается до `filesOnMain` — git, а не store; сужение принял владелец 2026-10-07 (ревью PR #8, второй круг). Порты landing для тестов собирает тестовая сборка (`landingPortsForTests` в `test/support/assembly.ts`, CONVENTIONS.md §1); proposal одной сущности и текст store из коммитов — `test/support/landing.ts`.
 
 Не входит:
 - закрытие worktree — S0-34;
@@ -52,7 +52,7 @@ fileOnMain(tail: AtPath): Result<Uint8Array | null>   // LG-23, чистая; е
 1. Тест `openTail` через порты на `git-fixture`: пустой `main`, store из двух коммитов, каталог на месте файла (LG-23), `{}\n` на `main` (LG-06). Тест красный.
 2. `tail.ts`; `landing.check` и `assembly` переходят на него; `tailView` удаляется.
 3. Сужение входа `ledger/view`; тест структуры (`test/structure/`) показывает, что `runtime` и `capabilities` через `ledger/view` не достают `openLines` и `Rows`.
-4. Хелперы `landing.test.ts` заменяются `openTail`.
+4. Чтение store в хелперах `landing.test.ts` заменяется `openTail`; список файлов дерева `main` остаётся за `filesOnMain`.
 
 ## Тесты и фикстуры
 
@@ -71,5 +71,5 @@ fileOnMain(tail: AtPath): Result<Uint8Array | null>   // LG-23, чистая; е
 ## Риски и заметки
 
 - **Триггер ST-15:** правка `src/ledger/index.ts` и `src/assembly/index.ts` — файлов skeleton. Отметка в разделе PR «Триггеры ST-15».
-- **Порядок отказов** (G-19). Отказ открытия store на tail (LG-23, LG-06) теперь идёт до `prepare` change request и проверки proposal: `onto` берётся из `openTail`. Раньше `conflict` и отказ proposal шли раньше него. На `main`, где store не открывается, change request с испорченным proposal получает отказ tail, а не KR-10, а change request, чей код конфликтует с `main`, — отказ tail, а не `conflict` (LG-26). Тест `landing.test.ts` фиксирует второй случай; порядок исходов целиком задаёт и проверяет S0-33.
+- **Порядок отказов** (G-19). Отказ открытия store на tail (LG-23, LG-06) теперь идёт до `prepare` change request и проверки proposal: `onto` берётся из `openTail`. Раньше `conflict` и отказ proposal шли раньше него. На `main`, где store не открывается, change request с испорченным proposal получает отказ tail, а не KR-10, а change request, чей код конфликтует с `main`, — отказ tail, а не `conflict` (LG-26). Владелец принял это как пробел G-19, а не расхождение с LG-26 (2026-10-07). Тест `landing.test.ts` фиксирует второй случай и проверяет, что код change request действительно конфликтует с `main`; порядок исходов целиком задаёт и проверяет S0-33.
 - S0-33 и S0-34 зависят от этой задачи: обе правят landing, а PR-17 не даёт менять один контракт параллельно.

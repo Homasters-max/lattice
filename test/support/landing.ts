@@ -1,16 +1,10 @@
-// The ports of landing for its tests (test/ledger): the adapters that exist for
-// tests — `git-fixture`, `acts-fixture`, `clock-fixed`, `ids-counter` (ST-07,
-// TR-14) — and `store-jsonl` on every worktree (LG-23), frozen; and the
-// proposal file a change request brings to create one entity.
-import { createActsFixture } from "../../src/adapters/acts-fixture/index.js";
-import { createClockFixed } from "../../src/adapters/clock-fixed/index.js";
-import { createGitFixture, type GitFixtureOptions } from "../../src/adapters/git-fixture/index.js";
-import { createIdsCounter } from "../../src/adapters/ids-counter/index.js";
-import { createStoreJsonl } from "../../src/adapters/store-jsonl/index.js";
-import type { LandingPorts, Worktree } from "../../src/ledger/index.js";
-import { deepFreeze } from "./deep-freeze.js";
+// What the tests of landing (test/ledger) give and expect: the proposal file a
+// change request brings to create one entity, and the text of a store of given
+// commits. The ports of landing come from the test assembly (assembly.ts).
+import { fileOf } from "../../src/adapters/store-jsonl/index.js";
+import { encodeCommit, type Commit } from "../../src/ledger/index.js";
 
-/** The time of `clock-fixed`, and the `at` of every intent of `proposal`. */
+/** The time of `clock-fixed` in the tests of landing, and the `at` of every intent of `proposal`. */
 export const AT = "2026-10-06T12:00:00.000000Z";
 
 /** The proposal file of a change request that creates the entity `id`. */
@@ -21,14 +15,8 @@ export const proposal = (id: string): string =>
     sig: null,
   });
 
-/** The ports of landing on a git fixture; `over` replaces some of them. */
-export function landingPorts(git: GitFixtureOptions, over: Partial<LandingPorts> = {}): LandingPorts {
-  return deepFreeze({
-    git: createGitFixture(git),
-    acts: createActsFixture({ acts: {} }),
-    openStore: (w: Worktree) => createStoreJsonl({ dir: w.dir }),
-    clock: createClockFixed({ at: AT }),
-    ids: createIdsCounter(),
-    ...over,
-  });
-}
+/** The bytes of `store/knowledge.jsonl` as text; `""` where there is no file, the empty store. */
+export const text = (bytes: Uint8Array | null): string => (bytes === null ? "" : new TextDecoder().decode(bytes));
+
+/** The text of a store of exactly these commits, in order: the lines landing writes, framed by `fileOf` of `store-jsonl`. */
+export const storeTextOf = (commits: readonly Commit[]): string => commits.map((c) => text(fileOf(encodeCommit(c)))).join("");
