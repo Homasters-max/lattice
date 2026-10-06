@@ -67,7 +67,7 @@ function commitRejections(value: JsonValue, path: string): Rejection[] {
 }
 
 /** LG-06, KR-04: the commit a JSON value holds, refused at `path` — where it sits in its input — when it has not the form of one. */
-export function readCommit(value: JsonValue, path: string): Result<Commit> {
+function readCommit(value: JsonValue, path: string): Result<Commit> {
   // Every field was checked against its kind above, so the value has the shape of Commit.
   return refused<Commit>(commitRejections(value, path)) ?? { ok: true, value: value as Commit };
 }
