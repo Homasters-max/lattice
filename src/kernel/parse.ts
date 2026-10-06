@@ -14,7 +14,8 @@ import { KR_10 } from "./rules.js";
  */
 export function decodeUtf8(bytes: Uint8Array, path = ""): Result<string> {
   try {
-    return { ok: true, value: new TextDecoder("utf-8", { fatal: true }).decode(bytes) };
+    // `ignoreBOM` keeps a byte order mark in the text, where the parse refuses it: by default the decoder drops it — a repair.
+    return { ok: true, value: new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes) };
   } catch {
     return refuse(reject(KR_10, { intent: null, path, expected: "UTF-8", got: hashBytes(bytes) }));
   }
