@@ -277,6 +277,8 @@ Q-01…Q-08 закрыты 2026-10-06: приняты рекомендации. 
 | G-11 | где проверяется «aliases form a star, never a chain» (TR-29) | фаза 4, правило TR-29 | S0-15 |
 | G-12 | грамматика `n` в `id@n` | целое ≥ 1 без ведущих нулей | S0-05 |
 | G-13 | формат `path` и значение `intent` в отказе (LG-17) и `path` в нарушении (KR-21) не заданы | `path` — JSON Pointer (RFC 6901); `intent` — `id`, записанный в intent, как есть, и тогда `path` — внутри этого intent; без строкового `id` или вне intent — `null` и `path` от корня входа. Так отказы не зависят от порядка intents (LG-11) | S0-02 |
+| G-14 | кто заполняет `prev` и `request` заголовка коммита (LG-06): apply (LG-14) получает `before`, proposal, acts и evidence, но ни hash tail, ни `uri` change request; закрытый список вопросов read view (LG-38) hash tail не содержит | apply возвращает кандидат с `prev`, `request` и `sig` — `null`; landing дописывает `prev` (hash tail store), `request` и подпись. На проекции эти поля не влияют, поэтому `after` apply остаётся тем, что покажет store (LG-15) | S0-03, S0-13, S0-20 |
+| G-15 | ST-06 «only `assembly` and `cli` import `codec` and `generate`» и ST-01 «`cli` may import `assembly`» расходятся для `cli` | строгое чтение: ST-06 — ограничение, ST-01 — разрешение; `cli` импортирует только `assembly`, а `export` идёт `cli` → `assembly` → `codec`. Тест структуры проверяет обе строки; формулировку ST-06 уточнить при ближайшей правке дизайна | S0-03 |
 
 ## 13. Решения по умолчанию
 

@@ -1,0 +1,84 @@
+// The perimeter of the kernel (ST-05, KR-01): every file reachable from the
+// kernel entry is on an explicit list, and no `std` type name appears in the
+// code of those files.
+import ts from "typescript";
+import { importsOf } from "./imports.js";
+import type { Tree } from "./tree.js";
+
+export const KERNEL_ENTRY = "src/kernel/index.ts";
+
+/** Files reachable from the kernel entry through relative imports, sorted. */
+export function kernelReach(tree: Tree): string[] {
+  const seen = new Set<string>();
+  const visit = (path: string) => {
+    const sf = tree.files.get(path);
+    if (sf === undefined || seen.has(path)) return;
+    seen.add(path);
+    for (const i of importsOf(path, sf)) if (i.target !== null) visit(i.target);
+  };
+  visit(KERNEL_ENTRY);
+  return [...seen].sort();
+}
+
+/** ST-05: the reach of the kernel entry equals the list, in both directions. */
+export function auditKernelFiles(tree: Tree, listed: readonly string[]): string[] {
+  if (!tree.files.has(KERNEL_ENTRY)) return [`ST-05: no kernel entry ${KERNEL_ENTRY}`];
+  const reach = kernelReach(tree);
+  const list = new Set(listed);
+  return [
+    ...reach.filter((f) => !list.has(f)).map((f) => `ST-05: ${f} is reachable from the kernel entry but not listed in test/structure/kernel-files.txt`),
+    ...listed.filter((f) => !reach.includes(f)).map((f) => `ST-05: ${f} is listed in test/structure/kernel-files.txt but not reachable from the kernel entry`),
+  ].sort();
+}
+
+function texts(sf: ts.SourceFile): { readonly text: string; readonly line: number }[] {
+  const out: { text: string; line: number }[] = [];
+  const visit = (node: ts.Node) => {
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateLiteralToken(node)) {
+      out.push({ text: node.text, line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1 });
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return out;
+}
+
+function namesIn(text: string, names: ReadonlySet<string>): string | null {
+  if (text.includes("std/")) return text;
+  const bare = /^(?:std\/)?([a-z][a-z0-9-]*)(?:@\d+)?$/.exec(text)?.[1];
+  return bare !== undefined && names.has(bare) ? text : null;
+}
+
+/** KR-01: string literals of kernel code that name `std` or one of its types. */
+export function auditStdNames(tree: Tree, names: ReadonlySet<string>): string[] {
+  return kernelReach(tree)
+    .flatMap((path) => {
+      const sf = tree.files.get(path);
+      if (sf === undefined) return [];
+      return texts(sf).flatMap(({ text, line }) => {
+        const hit = namesIn(text, names);
+        return hit === null ? [] : [`KR-01: ${path}:${line} names the std type ${JSON.stringify(hit)}; the kernel knows no std type`];
+      });
+    })
+    .sort();
+}
+
+/**
+ * The `std` type names of TY-Z02…TY-Z05 in docs/design/03-types.md — the
+ * source until S0-08 writes `std` itself: the first column of TY-Z02…TY-Z04,
+ * and the types of TY-Z05 except the `core` ones.
+ */
+export function stdTypeNames(md: string): string[] {
+  const names = new Set<string>();
+  for (const block of ["TY-Z02", "TY-Z03", "TY-Z04", "TY-Z05"]) {
+    const start = md.indexOf(`\n${block}.`);
+    if (start < 0) throw new Error(`03-types.md has no block ${block}`);
+    const rows = md.slice(start).split("\n\n")[1]?.split("\n").slice(2) ?? [];
+    for (const row of rows) {
+      const cells = row.split(" | ");
+      const cell = block === "TY-Z05" ? (cells[1] ?? "").replace(/`[a-z-]+` \(`core`[^)]*\)/g, "") : (cells[0] ?? "");
+      for (const m of cell.matchAll(/`([a-z][a-z0-9-]*)`/g)) if (m[1] !== undefined && m[1] !== "core") names.add(m[1]);
+    }
+  }
+  return [...names].sort();
+}
