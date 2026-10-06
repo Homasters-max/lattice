@@ -11,7 +11,7 @@ import { createClockFixed } from "../../src/adapters/clock-fixed/index.js";
 import { createGitFixture, type GitFixtureOptions } from "../../src/adapters/git-fixture/index.js";
 import { createIdsCounter } from "../../src/adapters/ids-counter/index.js";
 import { createStoreJsonl, fileOf } from "../../src/adapters/store-jsonl/index.js";
-import { commitHash, encodeCommit, land, openTail, type LandingPorts, type Worktree } from "../../src/ledger/index.js";
+import { commitHash, createView, encodeCommit, land, openTail, type LandingPorts, type Worktree } from "../../src/ledger/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
 const AT = "2026-10-06T12:00:00.000000Z";
@@ -90,5 +90,12 @@ describe("a broken store on main (LG-23, LG-06)", () => {
     const ports = portsOf({ ...BRANCHES, main: { files: { "store/knowledge.jsonl": "{}\n" } } });
     const opened = await openTail(ports);
     expect(opened.ok ? [] : opened.rejections.map((r) => [r.rule, r.path])).toContainEqual(["LG-06", "/0/seq"]);
+  });
+});
+
+describe("the read view runtime and capabilities get (LG-38)", () => {
+  it("LG-38: createView answers the questions of View and holds no row at run time", () => {
+    const view = createView(0, []);
+    expect(["row" in view, view.seq, view.current("demo/a")]).toEqual([false, 0, null]);
   });
 });

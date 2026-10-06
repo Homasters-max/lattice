@@ -6,5 +6,8 @@ import { viewOf, type View } from "./rows-view.js";
 
 export type { View };
 
-/** `view(seq)`: the rows with `from ≤ seq` and `to` null or greater, as the questions of View. */
-export const createView = (seq: number, rows: readonly Row[]): View => viewOf(seq, rows);
+/** `view(seq)`: the rows with `from ≤ seq` and `to` null or greater, as the questions of View and nothing else. */
+export function createView(seq: number, rows: readonly Row[]): View {
+  const view = viewOf(seq, rows);
+  return { seq: view.seq, current: (id) => view.current(id) };
+}

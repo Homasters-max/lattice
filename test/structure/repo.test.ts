@@ -77,6 +77,7 @@ describe("structure of this repository", () => {
     const entry = exportsOf(repo, "src/ledger/view.ts");
     expect(entry.names).toEqual(["View", "createView"]);
     expect(entry.returns("createView")).toEqual(entry.type("View"));
+    expect(entry.type("View")).not.toContain("row");
   });
 
   it("LG-23: the ledger has the ports store, acts, git, clock and ids", () => {
