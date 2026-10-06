@@ -53,7 +53,7 @@ parseJson(text, path?): Result<JsonValue>; decodeUtf8(bytes, path?): Result<stri
 readProposal(value): Result<Proposal>                                     // LG-09 — поверхностно
 changeRequest(head: string | null): Result<string>                        // LG-54 — change request, которого нет (Q-16)
 proposalPath(files): Result<string>                                       // LG-54
-keptKnowledge(tail: bytes | null, request: Held): Result<Held>               // LG-23 — байты store/knowledge.jsonl как на tail main (Q-19); каталог на его месте — отказ
+keptKnowledge(tail: bytes | null, request: bytes | { files } | null)         // LG-23 — байты store/knowledge.jsonl как на tail main (Q-19); каталог на его месте — отказ
 checkHeader(value, path): Rejection[]                                     // KR-04 — поверхностно
 readCommit(value, path): Result<Commit>; decodeCommit(line: bytes, index) // KR-10 — UTF-8, JSON, канонические байты; LG-06 и KR-04 — поверхностно
 apply(before: View, proposal, acts: LandActs, evidence): Result<Commit | "no-op">   // фаза 1 — KR-06; без intents — no-op (LG-12, LG-54); prev, request, sig — null (G-14)

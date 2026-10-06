@@ -16,7 +16,6 @@ import {
   openLines,
   proposalPath,
   readProposal,
-  type Held,
   type LandActs,
 } from "../../src/ledger/index.js";
 import type { FixtureCheck } from "./run.js";
@@ -88,6 +87,8 @@ const store: FixtureCheck = {
 const knowledge: FixtureCheck = {
   enforces: [LG_23.id],
   run: (input) => {
+    // What a worktree holds at the path: bytes, the files of a directory as `{ files }`, or nothing.
+    type Held = Parameters<typeof keptKnowledge>[1];
     const held = (v: unknown): Held => (v === null ? null : typeof v === "object" && !Array.isArray(v) ? (v as Held) : bytesOf(v));
     return keptKnowledge(held(field(input, "tail")) as Uint8Array | null, held(field(input, "request")));
   },

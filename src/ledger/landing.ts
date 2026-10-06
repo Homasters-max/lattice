@@ -59,7 +59,7 @@ export function proposalPath(files: readonly string[]): Result<string> {
 }
 
 /** What a worktree holds at a path: the bytes of a file, the files of a directory, or nothing. */
-export type Held = Uint8Array | { readonly files: readonly string[] } | null;
+type Held = Uint8Array | { readonly files: readonly string[] } | null;
 
 async function heldAt(worktree: Worktree, path: string): Promise<Held> {
   const bytes = await worktree.read(path);
