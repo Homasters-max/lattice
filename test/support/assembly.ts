@@ -11,7 +11,6 @@ import { createIdsCounter, type IdsCounterOptions } from "../../src/adapters/ids
 import { assemble, landingPortsOf, type Assembly } from "../../src/assembly/index.js";
 import type { LandingPorts } from "../../src/ledger/index.js";
 import { deepFreeze } from "./deep-freeze.js";
-import { AT } from "./landing.js";
 
 export type { GitFixtureBranch, GitFixtureOptions } from "../../src/adapters/git-fixture/index.js";
 
@@ -21,6 +20,9 @@ export type FixtureConfig = {
   readonly clock: ClockFixedOptions;
   readonly ids?: IdsCounterOptions;
 };
+
+/** The time of `clock-fixed` in the ports of landing for tests. */
+export const AT = "2026-10-06T12:00:00.000000Z";
 
 /** The git of the tests: the port of `git-fixture` and `branch`, which adds a branch at any moment. */
 export const gitForTests = (options: GitFixtureOptions) => createGitFixture(options);
@@ -39,8 +41,8 @@ export function assembleForTests(config: FixtureConfig): Assembly {
 
 /**
  * The ports of landing for the tests of the ledger, wired as `assemble` wires them (`landingPortsOf`), frozen:
- * the git of `git`, no acts, the clock at `AT`; `over` replaces some of them.
+ * the git fixture of `repository`, no acts, the clock at `AT`; `over` replaces some of them.
  */
-export function landingPortsForTests(git: GitFixtureOptions, over: Partial<LandingPorts> = {}): LandingPorts {
-  return deepFreeze({ ...landingPortsOf(fixturePorts({ git, acts: { acts: {} }, clock: { at: AT } })), ...over });
+export function landingPortsForTests(repository: GitFixtureOptions, over: Partial<LandingPorts> = {}): LandingPorts {
+  return deepFreeze({ ...landingPortsOf(fixturePorts({ git: repository, acts: { acts: {} }, clock: { at: AT } })), ...over });
 }

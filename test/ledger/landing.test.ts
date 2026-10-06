@@ -43,7 +43,7 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-/** The ports of landing, frozen; every store landing opens is kept in `opened`, in order. */
+/** The ports of landing, frozen by the test assembly; every store landing opens is kept in `opened`, in order. */
 function portsOf(over: Partial<LandingPorts> = {}, branches = BRANCHES): LandingPorts {
   const ports = landingPortsForTests({ dir, branches }, over);
   const openStore: LandingPorts["openStore"] = (w) => {
@@ -51,7 +51,8 @@ function portsOf(over: Partial<LandingPorts> = {}, branches = BRANCHES): Landing
     opened.push(store);
     return store;
   };
-  return deepFreeze({ ...ports, openStore });
+  // The spread is a new object around ports already frozen: it is frozen itself, not frozen again.
+  return Object.freeze({ ...ports, openStore });
 }
 
 /** The store on main, as opening it at the tail reads it (LG-02, LG-38); a store opening refuses fails the test. */

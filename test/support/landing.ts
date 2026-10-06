@@ -3,11 +3,9 @@
 // commits. The ports of landing come from the test assembly (assembly.ts).
 import { fileOf } from "../../src/adapters/store-jsonl/index.js";
 import { encodeCommit, type Commit } from "../../src/ledger/index.js";
+import { AT } from "./assembly.js";
 
-/** The time of `clock-fixed` in the tests of landing, and the `at` of every intent of `proposal`. */
-export const AT = "2026-10-06T12:00:00.000000Z";
-
-/** The proposal file of a change request that creates the entity `id`. */
+/** The proposal file of a change request that creates the entity `id`; every intent is `at` the time of the clock of the tests. */
 export const proposal = (id: string): string =>
   JSON.stringify({
     session: { id: "01JB2X00000000000000000SES" },
