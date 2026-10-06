@@ -7,8 +7,6 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createGitFixture, type GitFixtureBranch, type GitFixtureOptions } from "../../src/adapters/git-fixture/index.js";
-import { createStoreJsonl } from "../../src/adapters/store-jsonl/index.js";
 import { hashBytes } from "../../src/kernel/index.js";
 import {
   commitHash,
@@ -19,11 +17,10 @@ import {
   type LandingPorts,
   type Push,
   type Store,
-  type Worktree,
 } from "../../src/ledger/index.js";
-import { landingPortsForTests } from "../support/assembly.js";
+import { gitForTests, landingPortsForTests, type GitFixtureBranch, type GitFixtureOptions } from "../support/assembly.js";
 import { deepFreeze } from "../support/deep-freeze.js";
-import { AT, proposal, storeTextOf, text } from "../support/landing.js";
+import { proposal, storeTextOf, text } from "../support/landing.js";
 
 const BRANCHES: GitFixtureOptions["branches"] = {
   main: { files: { "README.md": "one\n" } },
@@ -48,12 +45,13 @@ afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 /** The ports of landing, frozen; every store landing opens is kept in `opened`, in order. */
 function portsOf(over: Partial<LandingPorts> = {}, branches = BRANCHES): LandingPorts {
-  const openStore = (w: Worktree) => {
-    const store = createStoreJsonl({ dir: w.dir });
+  const ports = landingPortsForTests({ dir, branches }, over);
+  const openStore: LandingPorts["openStore"] = (w) => {
+    const store = ports.openStore(w);
     opened.push(store);
     return store;
   };
-  return landingPortsForTests({ git: { dir, branches }, acts: { acts: {} }, clock: { at: AT } }, { openStore, ...over });
+  return deepFreeze({ ...ports, openStore });
 }
 
 /** The store on main, as opening it at the tail reads it (LG-02, LG-38); a store opening refuses fails the test. */
@@ -161,7 +159,7 @@ describe("the store a change request brings (LG-14, LG-23)", () => {
 
   /** Main holds the store landing wrote for cr/a; cr/x, a change request from that main, writes `files` of that file. */
   async function fromLanded(files: (file: string) => GitFixtureBranch["files"]) {
-    const git = createGitFixture({ dir, branches: BRANCHES });
+    const git = gitForTests({ dir, branches: BRANCHES });
     const ports = portsOf({ git });
     await landed(ports, "cr/a");
     const file = await storeTextOnMain(ports);
@@ -238,9 +236,7 @@ describe("landing outcomes (LG-24, LG-25, LG-54)", () => {
       tail: (ref) => inner.tail(ref),
       prepare: (p) => inner.prepare(p),
       push: async (p) => {
-        // Someone else moves main first: a commit of code, with its own message and no trailers of landing.
-        const w = await inner.prepare({ request: "cr/readme", onto: p.expected });
-        if (w.kind === "worktree") await inner.push({ worktree: w, ref: "main", expected: p.expected, message: "m", trailers: [] });
+        await moveMain(inner, "cr/readme");
         return inner.push(p);
       },
     };

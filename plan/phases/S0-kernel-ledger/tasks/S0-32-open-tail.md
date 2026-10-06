@@ -27,7 +27,7 @@ rules: [LG-02, LG-14, LG-23, LG-38, ST-01]
 - **`tailView` удаляется**: `assembly.view` берёт read view из `openTail`.
 - **`landing.check`** берёт `before`, tail-коммит и байты `store/knowledge.jsonl` на `main` из `openTail`.
 - **Вход `ledger/view`** отдаёт только `View` и `createView`, который возвращает `View`. `Rows`, `linesOf` и `openLines` уходят из него внутрь `ledger`: read view со строками для fold — `viewOf` во внутреннем `src/ledger/rows-view.ts`, там же интерфейс `View`. `openLines` остаётся в `src/ledger/index.ts`: им пользуются фикстуры строк store (KR-10, LG-06, KR-04) и `test/ledger/apply.test.ts`, которому fold нужен view со строками.
-- **Хелперы теста.** `commitsOnMain` и чтение `store/knowledge.jsonl` через `mainWorktree` в `landing.test.ts` заменяются `storeOnMain` — вызовом `openTail`; ожидание — по-прежнему весь список строк store на `main` (`storeTextOnMain` против `storeTextOf([commit])`). Список файлов дерева `main` (proposal удалён, код сохранён) store не отвечает и через `openTail` не читается: `mainWorktree` сужается до `filesOnMain` — git, а не store; сужение принял владелец 2026-10-07 (ревью PR #8, второй круг). Порты landing для тестов собирает тестовая сборка (`landingPortsForTests` в `test/support/assembly.ts`, CONVENTIONS.md §1); proposal одной сущности и текст store из коммитов — `test/support/landing.ts`.
+- **Хелперы теста.** `commitsOnMain` и чтение `store/knowledge.jsonl` через `mainWorktree` в `landing.test.ts` заменяются `storeOnMain` — вызовом `openTail`; ожидание — по-прежнему весь список строк store на `main` (`storeTextOnMain` против `storeTextOf([commit])`). Список файлов дерева `main` (proposal удалён, код сохранён) store не отвечает и через `openTail` не читается: `mainWorktree` сужается до `filesOnMain` — git, а не store; сужение принял владелец 2026-10-07 (ревью PR #8, второй круг). Порты landing для тестов собирает тестовая сборка (CONVENTIONS.md §1): `landingPortsForTests` в `test/support/assembly.ts` проводит их, как `assemble` (`landingPortsOf` из `src/assembly`), git тестов — `gitForTests` там же; proposal одной сущности и текст store из коммитов — `test/support/landing.ts`.
 
 Не входит:
 - закрытие worktree — S0-34;
@@ -58,7 +58,8 @@ fileOnMain(tail: AtPath): Result<Uint8Array | null>   // LG-23, чистая; е
 
 - Новых rule ID нет. Фикстура `LG-23/trigger/directory-on-main` переходит со строки `knowledge` таблицы `checks.ts` на новую чистую строку `tail` — `fileOnMain`, которую зовёт `openTail`: раннер фикстур синхронный до S0-33. К ней — `LG-23/pass/file-on-main`. Строка `knowledge`, как landing, сперва проводит `main` через `fileOnMain` и возвращает его отказ как есть (CONVENTIONS.md §2), но фикстура каталога на `main` живёт в строке `tail`.
 - `test/ledger/tail.test.ts` — `openTail` на `git-fixture`: пустой `main`, store двух landing, каталог на месте файла (LG-23), `{}\n` (LG-06).
-- Тест структуры в `test/structure/repo.test.ts`: экспорт `src/ledger/view.ts` — ровно `View` и `createView`, а `createView` возвращает свойства `View`, без `row`.
+- Тест структуры в `test/structure/repo.test.ts`: экспорт `src/ledger/view.ts` — ровно `View` и `createView`, а `createView` возвращает свойства `View`, в `View` нет `row`.
+- `test/ledger/view.test.ts` — у объекта `createView` нет `row` во время выполнения (LG-38).
 - Тесты `landing.test.ts` и e2e остаются зелёными без правки ожиданий: список коммитов на `main` (`[commit]`, `[]`) сверяется с текстом `store/knowledge.jsonl`, который прочёл `openTail`.
 
 ## Готово, когда

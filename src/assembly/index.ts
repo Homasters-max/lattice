@@ -25,8 +25,11 @@ export interface Assembly {
   readonly view: () => Promise<Result<View>>;
 }
 
+/** The ports of landing: those given and the `jsonl` store on every worktree (LG-23). */
+export const landingPortsOf = (ports: Ports): LandingPorts => ({ ...ports, openStore: (worktree) => createStoreJsonl({ dir: worktree.dir }) });
+
 export function assemble(ports: Ports): Assembly {
-  const all: LandingPorts = { ...ports, openStore: (worktree) => createStoreJsonl({ dir: worktree.dir }) };
+  const all = landingPortsOf(ports);
   const view = async (): Promise<Result<View>> => {
     const opened = await openTail(all);
     return opened.ok ? { ok: true, value: opened.value.view } : opened;

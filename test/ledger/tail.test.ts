@@ -6,10 +6,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { GitFixtureOptions } from "../../src/adapters/git-fixture/index.js";
 import { commitHash, land, openTail, type LandingPorts } from "../../src/ledger/index.js";
-import { landingPortsForTests } from "../support/assembly.js";
-import { AT, proposal, storeTextOf, text } from "../support/landing.js";
+import { landingPortsForTests, type GitFixtureOptions } from "../support/assembly.js";
+import { proposal, storeTextOf, text } from "../support/landing.js";
 
 const BRANCHES: GitFixtureOptions["branches"] = {
   main: { files: { "README.md": "one\n" } },
@@ -23,7 +22,7 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-const portsOf = (branches = BRANCHES): LandingPorts => landingPortsForTests({ git: { dir, branches }, acts: { acts: {} }, clock: { at: AT } });
+const portsOf = (branches = BRANCHES): LandingPorts => landingPortsForTests({ dir, branches });
 
 describe("the store at the tail of main (LG-02, LG-38)", () => {
   it("LG-02: main without store/knowledge.jsonl opens as the empty store", async () => {
