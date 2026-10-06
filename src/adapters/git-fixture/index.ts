@@ -3,7 +3,8 @@
 // what that directory holds, as a compare-and-swap of the ref. `prepare`
 // merges the change request onto `onto` against their merge base and ends
 // `conflict` where both changed a path differently, or one put a file where the
-// other put a directory (LG-24).
+// other put a directory (LG-24). A test adds a branch from where a ref is now
+// with `branch`, as a developer does in git.
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { sortPaths, type Conflict, type Git, type Prepare, type Push, type Worktree } from "../../ledger/ports/git.js";
@@ -11,6 +12,8 @@ import { sortPaths, type Conflict, type Git, type Prepare, type Push, type Workt
 /** A branch: a commit on `from` (or a root) that writes these files; `null` removes one. */
 export type GitFixtureBranch = { readonly from?: string; readonly files: { readonly [path: string]: string | null } };
 export type GitFixtureOptions = { readonly dir: string; readonly branches: { readonly [name: string]: GitFixtureBranch } };
+/** The git of tests: the port, and a branch added at any moment from where its `from` is then. */
+export type GitFixture = Git & { branch(name: string, branch: GitFixtureBranch): void };
 
 type Tree = ReadonlyMap<string, Uint8Array>;
 type FixtureCommit = { readonly parents: readonly string[]; readonly tree: Tree; readonly message: string };
@@ -71,7 +74,7 @@ async function worktreeOf(dir: string, onto: string, head: string, tree: Tree): 
   };
 }
 
-export function createGitFixture({ dir, branches }: GitFixtureOptions): Git {
+export function createGitFixture({ dir, branches }: GitFixtureOptions): GitFixture {
   const commits = new Map<string, FixtureCommit>();
   const refs = new Map<string, string>();
   const add = (c: FixtureCommit) => {
@@ -91,11 +94,13 @@ export function createGitFixture({ dir, branches }: GitFixtureOptions): Git {
   };
   const treeOf = (id: string): Tree => commits.get(id)?.tree ?? new Map();
   const ancestors = (id: string): string[] => [id, ...(commits.get(id)?.parents ?? []).flatMap(ancestors)];
-  for (const [name, { from, files }] of Object.entries(branches)) {
+  const branch = (name: string, { from, files }: GitFixtureBranch) => {
     const parent = from === undefined ? null : commitOf(from);
     refs.set(name, add({ parents: parent === null ? [] : [parent], tree: overlay(parent === null ? new Map() : treeOf(parent), files), message: name }));
-  }
+  };
+  for (const [name, b] of Object.entries(branches)) branch(name, b);
   return {
+    branch,
     tail: (ref) => Promise.resolve(find(ref)),
     async prepare({ request, onto }: Prepare) {
       const [head, base] = [commitOf(request), commitOf(onto)];

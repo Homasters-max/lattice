@@ -9,18 +9,14 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createActsFixture } from "../../src/adapters/acts-fixture/index.js";
 import { createClockFixed } from "../../src/adapters/clock-fixed/index.js";
-import { createGitFixture, type GitFixtureOptions } from "../../src/adapters/git-fixture/index.js";
+import { createGitFixture, type GitFixtureBranch, type GitFixtureOptions } from "../../src/adapters/git-fixture/index.js";
 import { createIdsCounter } from "../../src/adapters/ids-counter/index.js";
 import { createStoreJsonl } from "../../src/adapters/store-jsonl/index.js";
-import { hashBytes, type JsonValue } from "../../src/kernel/index.js";
+import { hashBytes } from "../../src/kernel/index.js";
 import {
-  apply,
   commitHash,
-  createView,
   decodeCommit,
-  encodeCommit,
   land,
-  readProposal,
   tailView,
   type Commit,
   type Git,
@@ -114,14 +110,6 @@ function recording(branches = BRANCHES): { readonly git: Git; readonly pushes: P
 
 const utf8 = (text: string) => new TextEncoder().encode(text);
 
-/** The line landing writes for a proposal on an empty store: its commit, as apply forms it (G-14: `prev` null on genesis). */
-function lineOf(text: string): string {
-  const read = readProposal(JSON.parse(text) as JsonValue);
-  const applied = read.ok ? apply(createView(0, []), read.value, { session: { id: "01JB2X00000000000000000LND", at: AT }, events: [] }, []) : read;
-  if (!applied.ok || applied.value === "no-op") throw new Error("bug: the test proposal applies to a commit");
-  return encodeCommit(applied.value);
-}
-
 describe("landing into git (LG-22, LG-23)", () => {
   it("LG-23: the commit is a line of store/knowledge.jsonl on main, and the proposal file is gone", async () => {
     const ports = portsOf();
@@ -173,36 +161,46 @@ describe("the landing commit in git (LG-22)", () => {
 });
 
 describe("the store a change request brings (LG-14, LG-23)", () => {
-  // main holds the line landing wrote for cr/a; a change request from it brings the file in the form given.
-  const file = `${lineOf(proposal("demo/a"))}\n`;
-  const fromMain = (brought: string | null) => ({
-    main: { files: { "store/knowledge.jsonl": file } },
-    "cr/x": { from: "main", files: { "store/knowledge.jsonl": brought, "store/proposals/x.json": proposal("demo/x") } },
-  });
-  const BROUGHT: readonly (readonly [string, string | null])[] = [
-    ["the last line feed removed", file.slice(0, -1)],
-    ["an empty line added", `${file}\n`],
-    ["a line appended", `${file}{"seq":2,"records":[]}\n`],
-    ["the file removed", null],
+  const KNOWLEDGE = "store/knowledge.jsonl";
+  const read = async (git: Git) => new TextDecoder().decode((await (await mainWorktree(git)).read(KNOWLEDGE)) ?? new Uint8Array());
+
+  /** Main holds the store landing wrote for cr/a; cr/x, a change request from that main, writes `files` of that file. */
+  async function fromLanded(files: (file: string) => GitFixtureBranch["files"]) {
+    const git = createGitFixture({ dir, branches: BRANCHES });
+    const ports = portsOf({ git });
+    await landed(ports, "cr/a");
+    const file = await read(git);
+    git.branch("cr/x", { from: "main", files: { ...files(file), "store/proposals/x.json": proposal("demo/x") } });
+    return { ports, file };
+  }
+
+  // A trigger brings bytes no landing writes (plan/closure-check.md: raw store lines only for a trigger).
+  const BROUGHT: readonly (readonly [string, (file: string) => string | null])[] = [
+    ["the last line feed removed", (file) => file.slice(0, -1)],
+    ["an empty line added", (file) => `${file}\n`],
+    ["a line appended", (file) => `${file}{"seq":2,"records":[]}\n`],
+    ["the file removed", () => null],
   ];
 
-  it.each(BROUGHT)("LG-23: refuses a change request that changed the bytes of store/knowledge.jsonl — %s — dry run or not, and lands nothing", async (_, brought) => {
-    const ports = portsOf({}, fromMain(brought));
+  it.each(BROUGHT)("LG-23: refuses a change request that changed the bytes of store/knowledge.jsonl — %s — dry run or not, and lands nothing", async (_, bring) => {
+    const { ports, file } = await fromLanded((f) => ({ [KNOWLEDGE]: bring(f) }));
+    const brought = bring(file);
     const refusal = { rule: "LG-23", path: "/store/knowledge.jsonl", expected: hashBytes(utf8(file)), got: brought === null ? null : hashBytes(utf8(brought)) };
     for (const options of [DRY_RUN, LAND]) {
       const out = await land(ports, "cr/x", options);
       expect(out.outcome === "rejections" ? out.rejections : out).toMatchObject([refusal]);
     }
-    const onMain = await (await mainWorktree(ports.git)).read("store/knowledge.jsonl");
-    expect(new TextDecoder().decode(onMain ?? new Uint8Array())).toBe(file);
+    expect(await read(ports.git)).toBe(file);
   });
 
   it("LG-14, LG-23: lands on a store the change request brings unchanged, with before at the tail of main", async () => {
-    const commit = await landed(portsOf({}, fromMain(file)), "cr/x");
+    const { ports } = await fromLanded(() => ({}));
+    const commit = await landed(ports, "cr/x");
     expect([commit.seq, commit.base, commit.records.map((r) => r.id)]).toEqual([2, 1, ["demo/x"]]);
   });
 
   it("LG-06: a store on main whose line is no commit is refused on opening, never thrown", async () => {
+    // A trigger: a raw line on main that no landing writes, as a broken repository holds it.
     const ports = portsOf({}, { ...BRANCHES, main: { files: { "store/knowledge.jsonl": "{}\n" } } });
     expect(refusals(await land(ports, "cr/a", DRY_RUN))).toContainEqual(["LG-06", "/0/seq"]);
     expect((await tailView(ports)).ok).toBe(false);
