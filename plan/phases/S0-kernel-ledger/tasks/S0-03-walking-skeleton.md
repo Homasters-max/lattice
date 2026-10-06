@@ -56,7 +56,8 @@ interface Ids   { ulid(): string }
 
 ## Тесты и фикстуры
 
-- `test/fixtures/KR-06/trigger` и `.../pass` — первая пара фикстур, на ней проверяется fitness-тест покрытия из S0-02.
+- `test/fixtures/KR-06/trigger` и `.../pass` — первая пара фикстур и первая строка `test/fixtures/checks.ts`; на них проверяются fitness-тесты покрытия и прогона фикстур из S0-02.
+- Типы `RuleId`, `Rule`, `Rejection`, `Result`, конструктор `reject` и реестр `src/kernel/rules.ts` — по наброскам `CONVENTIONS.md`, разделы 2–3, 6; запреты чистоты — его раздел 8.
 - Тест структуры падает на: импорте `ledger` из `kernel`; адаптере, импортирующем адаптер; `Date.now()` в `trust`; файле вне списка периметра ядра.
 
 ## Готово, когда
