@@ -1,9 +1,11 @@
 // The thin kernel of the walking skeleton: the kernel version (KR-03), the
-// grammar of ids (KR-06) and the form of a rejection (LG-17, CONVENTIONS.md §3).
-// Canon, hash and the full header arrive with S0-04 and S0-05.
+// grammar of ids (KR-06), the header on the surface (KR-04) and the form of a
+// rejection (LG-17, CONVENTIONS.md §3). Canon, hash and the full header arrive
+// with S0-04 and S0-05. Every input crosses the module boundary frozen.
 import { describe, expect, it } from "vitest";
-import { canon, checkId, decodeUtf8, hashRecord, isEntityId, isUlid, KERNEL_VERSION, parseJson, reject, sortRejections } from "../../src/kernel/index.js";
-import { KR_06, RULES } from "../../src/kernel/rules.js";
+import { canon, checkHeader, checkId, decodeUtf8, hashRecord, isEntityId, isUlid, KERNEL_VERSION, parseJson, reject, sortRejections } from "../../src/kernel/index.js";
+import { KR_04, KR_06, RULES } from "../../src/kernel/rules.js";
+import { deepFreeze } from "../support/deep-freeze.js";
 
 describe("kernel version (KR-03)", () => {
   it("KR-03: is 0 before the switch", () => {
@@ -25,16 +27,34 @@ describe("ids (KR-06)", () => {
   });
 
   it("KR-06: checkId refuses with KR-06 at the place it is given", () => {
-    expect(checkId("entity", "demo/hello", { intent: "demo/hello", path: "/id" })).toEqual([]);
-    expect(checkId("event", "demo/hello", { intent: "demo/hello", path: "/id" })).toEqual([
-      reject(KR_06, { intent: "demo/hello", path: "/id", expected: "a ULID", got: "demo/hello" }),
+    const place = deepFreeze({ intent: "demo/hello", path: "/id" });
+    expect(checkId("entity", "demo/hello", place)).toEqual([]);
+    expect(checkId("event", "demo/hello", place)).toEqual([reject(KR_06, { ...place, expected: "a ULID", got: "demo/hello" })]);
+  });
+});
+
+describe("the header of a record (KR-04)", () => {
+  const record = deepFreeze({ id: "demo/a", rev: 1, type: "demo/note@1", hash: "sha256:00", by: "01JB2X00000000000000000SES", at: "2026-10-06T12:00:00.000000Z", body: {} });
+
+  it("KR-04: takes a header with every field of its kind, rev absent for an event", () => {
+    const { rev, ...event } = record;
+    expect([rev, checkHeader(record, "/records/0"), checkHeader(deepFreeze(event), "/records/1")]).toEqual([1, [], []]);
+  });
+
+  it("KR-04: refuses a field of the wrong kind or absent, and a record that is no object, at the path given", () => {
+    const { hash, ...noHash } = record;
+    expect([hash, ...checkHeader(deepFreeze({ ...noHash, rev: "1" }), "/0").map((r) => [r.rule, r.path, r.got])]).toEqual([
+      "sha256:00",
+      ["KR-04", "/0/rev", "string"],
+      ["KR-04", "/0/hash", "absent"],
     ]);
+    expect(checkHeader(null, "/0")).toEqual([reject(KR_04, { intent: null, path: "/0", expected: "a record", got: "null" })]);
   });
 });
 
 describe("rejections (LG-17)", () => {
   it("LG-17: fills the message template of its rule with canonical JSON", () => {
-    expect(reject(KR_06, { intent: null, path: "/intents/0/id", expected: "namespace/slug", got: "A/b" })).toEqual({
+    expect(reject(KR_06, deepFreeze({ intent: null, path: "/intents/0/id", expected: "namespace/slug", got: "A/b" }))).toEqual({
       intent: null,
       rule: "KR-06",
       message: 'an entity id is namespace/slug and an event id is a ULID; got "A/b"',
@@ -47,19 +67,20 @@ describe("rejections (LG-17)", () => {
   it("LG-17: sorts by intent (null first), path, rule, then expected and got", () => {
     const at = (intent: string | null, path: string, got: string) => reject(KR_06, { intent, path, expected: "x", got });
     const sorted = [at(null, "/a", "1"), at("a", "/id", "1"), at("a", "/id", "2"), at("b", "/at", "1")];
-    expect(sortRejections([sorted[3], sorted[2], sorted[0], sorted[1]].filter((r) => r !== undefined))).toEqual(sorted);
+    expect(sortRejections(deepFreeze([sorted[3], sorted[2], sorted[0], sorted[1]].filter((r) => r !== undefined)))).toEqual(sorted);
   });
 
   it("ST-17: registers every rule the kernel enforces once", () => {
-    expect(RULES.map((r) => r.id)).toEqual(["KR-06", "KR-10"]);
+    expect(RULES.map((r) => r.id)).toEqual(["KR-04", "KR-06", "KR-10"]);
   });
 });
 
 describe("thin canon and hash", () => {
   it("KR-12: sorts keys by UTF-16 code units and hashes canon({type, body})", () => {
-    expect(canon({ b: [1, "x"], a: null, "é": true, Z: {} })).toBe('{"Z":{},"a":null,"b":[1,"x"],"é":true}');
-    expect(hashRecord("demo/note@1", { text: "hello" })).toMatch(/^sha256:[0-9a-f]{64}$/);
-    expect(hashRecord("demo/note@1", { text: "hello" })).not.toBe(hashRecord("demo/note@2", { text: "hello" }));
+    expect(canon(deepFreeze({ b: [1, "x"], a: null, "é": true, Z: {} }))).toBe('{"Z":{},"a":null,"b":[1,"x"],"é":true}');
+    const body = deepFreeze({ text: "hello" });
+    expect(hashRecord("demo/note@1", body)).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(hashRecord("demo/note@1", body)).not.toBe(hashRecord("demo/note@2", body));
   });
 });
 

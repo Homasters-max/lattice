@@ -6,11 +6,12 @@
 
 - **Записи — замороженные простые данные и чистые функции** (ST-03). Нет класса на тип записи, нет методов на данных, нет прототипов кроме `Object` и `Array`. Объект записи — то, что даёт `JSON.parse` строгого парсера, плюс `Object.freeze`.
 - **Типы `readonly`**: поля `readonly`, массивы `readonly T[]`, словари `{ readonly [key: string]: V }`. Функция не мутирует вход; новое значение — новый объект.
-- **Данные — `type`, поведение — `interface`.** Запись, intent, proposal, commit, строка — псевдонимы `type`: так они присваиваются `JsonValue` и идут в `canon` и `hash` без приведения. Порт, read view, команда — `interface`.
-- **`Record` — запись** (KR-04): так называется тип заголовка в `kernel`. Утилита TypeScript `Record<K, V>` в коде, который импортирует запись, не используется — словарь пишется индексной сигнатурой.
+- **Данные — `type`, поведение — `interface`.** Запись, intent, proposal, commit, строка, отказ и строка реестра правил — псевдонимы `type`: так они присваиваются `JsonValue` и идут в `canon` и `hash` без приведения. Порт, read view, команда — `interface`.
+- **`Record` — запись** (KR-04, ST-03; решение владельца Q-15): так называется тип записи в `kernel`. Утилита TypeScript `Record<K, V>` в коде не используется — словарь пишется индексной сигнатурой (пункт «Типы `readonly`»).
 - **Заморозка проверяется в тестах**: на границе модуля тест передаёт вход через `deepFreeze` (хелпер `test/support/deep-freeze.ts`) — функция, которая мутирует вход, падает в тесте. В рабочем коде глубокая заморозка не обязательна: её гарантирует строгий парсер ядра и `readonly`.
 - **Классы** — только там, где у сущности есть изменяемое состояние внешнего мира: адаптер может быть замыканием или классом. Порт — `interface`, адаптер — фабрика `createX(options)`, которая возвращает объект этого интерфейса.
 - **Адаптер** живёт в `src/adapters/<port>-<variant>/` (`store-memory`, `clock-fixed`): имя начинается с порта, который он реализует, — по нему тест структуры знает, какой интерфейс адаптеру можно импортировать (ST-01).
+- **Адаптеры для тестов** — каждый `*-fixture` (TR-14, LG-23), `clock-fixed` и `ids-counter` (ST-07) — собирает только тестовая сборка `test/support/assembly.ts`; ни один файл `src/`, `assembly` тоже, их не импортирует — это проверяет тест структуры (решение владельца Q-13, `plan/closure-check.md`, «acts и права»).
 - **Аргументы порта** (решение владельца по ревью S0-03): операция порта с несколькими аргументами принимает один объект с именами аргументов из правила — у всех портов, без порога: `prepare({request, onto})`, `push({worktree, ref, expected, message, trailers})` (LG-23), `append({commit, delta, evidence})` (LG-02). Операция с одним аргументом берёт его как есть.
 - **Адаптер store не знает canon** (решение владельца по ревью S0-03): ledger отдаёт в `append` коммит его канонической строкой и сам разбирает строки, которые store отдаёт из `commits` и `tail`; адаптер строк не разбирает, а строкам delta смысла не придаёт (LG-35).
 - **Имена — термины LATTICE** из `docs/design/00-glossary.md` (ST-03): `record`, `entity`, `event`, `intent`, `proposal`, `commit`, `apply`, `fold`, `delta`, `row`, `view`, `standing`, `session`, `act`, `store`, `landing`… Слово, которого нет в глоссарии, не становится именем понятия LATTICE: локальная переменная или функция — можно, тип или экспорт с новым смыслом — нет; новый термин входит в дизайн правкой глоссария (GL-Z01).
@@ -43,12 +44,12 @@ type RuleId = `${RulePrefix}-${Digit}${Digit}`;           // ID строки т�
 
 type Lang = "en";                                         // растёт вместе с шаблонами (раздел 6)
 
-interface Rule {                                          // строка реестра правил модуля
+type Rule = {                                             // строка реестра правил модуля
   readonly id: RuleId;
   readonly message: { readonly en: string } & { readonly [lang in Lang]?: string };
-}
+};
 
-interface Rejection {
+type Rejection = {
   readonly intent: string | null;                         // `id`, записанный в intent; null — отказ не про intent
   readonly rule: RuleId;
   readonly message: string;
@@ -56,12 +57,12 @@ interface Rejection {
   readonly expected: JsonValue;
   readonly got: JsonValue;
   readonly id?: string;                                   // дубликат: id, с которым столкнулся (LG-17)
-}
+};
 
 type Rejections = readonly [Rejection, ...Rejection[]];
 type Result<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly rejections: Rejections };
 
-function reject(rule: Rule, at: Omit<Rejection, "rule" | "message">): Rejection;
+function reject(rule: Rule, place: Omit<Rejection, "rule" | "message">): Rejection;
 function sortRejections(rejections: readonly Rejection[]): Rejection[];   // порядок раздела 5
 function refused<T>(rejections: readonly Rejection[]): Result<T> | null;  // null — отказывать не в чем
 ```

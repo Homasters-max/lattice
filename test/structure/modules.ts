@@ -59,18 +59,24 @@ const PART_ENTRIES: ReadonlyMap<string, string> = new Map([
 
 const PORT_FILE = /^(ledger|runtime)\/ports\/([a-z][a-z0-9-]*)\.ts$/;
 
-/** ST-04, DP-14: the `judge` port reaches only `decide`, its own adapters and the assembly that wires them. */
+/**
+ * ST-04, DP-14: only `decide` receives the `judge` port. A judge adapter implements it and imports its
+ * interface, as every adapter does (ST-01); assembly hands the adapter to `decide` without importing the port (Q-14).
+ */
 export const JUDGE_ENTRY = "runtime/ports/judge";
-export const JUDGE_HOLDERS: readonly RegExp[] = [/^src\/capabilities\/decide\//, /^src\/adapters\/judge-[^/]+\//, /^src\/assembly\//];
+export const JUDGE_HOLDERS: readonly RegExp[] = [/^src\/capabilities\/decide\//, /^src\/adapters\/judge-[^/]+\//];
+
+/** Adapters that exist for tests — every `fixture` adapter (TR-14, LG-23) and the deterministic ones (ST-07): only the test assembly in `test/` uses them (Q-13). */
+export const TEST_ADAPTERS = /^(?:[a-z][a-z0-9]*-fixture|clock-fixed|ids-counter)$/;
 
 /** ST-04, KR-02: `node:crypto` names pure code may use; every other `node:*` module is refused. */
 export const PURE_CRYPTO: ReadonlySet<string> = new Set(["createHash", "verify", "sign", "createPublicKey", "createPrivateKey"]);
 
 /** Where a file of `src/` lives: its module and, under `adapters`, its adapter. */
-export interface Place {
+export type Place = {
   readonly module: Module;
   readonly adapter: string | null;
-}
+};
 
 const isModule = (name: string | undefined): name is Module => (MODULES as readonly string[]).includes(name ?? "");
 

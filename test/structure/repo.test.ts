@@ -56,4 +56,23 @@ describe("lists of the structure test", () => {
       expect(list.filter((f) => !existsSync(join(repoRoot, f)))).toEqual([]);
     });
   }
+
+  /** R9 of the plan: the entries of the modules, the port interfaces, the command table and its stubs, the bin, the kernel version and the structure test — kernel-files.txt aside, which every task of the kernel adds to (ST-05). */
+  function skeletonFiles(): string[] {
+    const under = (dir: string) => readdirSync(join(repoRoot, dir)).map((f) => `${dir}/${f}`);
+    // `adapters` has a folder per adapter, and the entry of `cli` is the bin.
+    return [
+      ...SLICE_MODULES.filter((m) => m !== "adapters" && m !== "cli").map((m) => `src/${m}/index.ts`),
+      ...under("src/ledger/ports"),
+      "src/cli/commands.ts",
+      "src/cli/main.ts",
+      "src/cli/stubs.ts",
+      "src/kernel/version.ts",
+      ...under("test/structure").filter((f) => f !== "test/structure/kernel-files.txt"),
+    ].sort();
+  }
+
+  it("ST-15, SL-05: test/structure/skeleton-files.txt lists exactly the files the walking skeleton owns", () => {
+    expect(lines("test/structure/skeleton-files.txt")).toEqual(skeletonFiles());
+  });
 });

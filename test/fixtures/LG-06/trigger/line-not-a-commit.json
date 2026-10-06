@@ -1,0 +1,12 @@
+{
+  "check": "store",
+  "input": {
+    "lines": [
+      "[]"
+    ]
+  },
+  "expect": {
+    "rule": "LG-06",
+    "path": "/0"
+  }
+}

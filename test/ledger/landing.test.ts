@@ -1,6 +1,8 @@
 // Thin landing (LG-22…LG-26, LG-54) on the adapters `git-fixture`,
-// `store-jsonl`, `acts-fixture`, `clock-fixed`, `ids-counter`: the commit is
-// appended to the store on the worktree and pushed with it, chained to the tail.
+// `store-jsonl`, `acts-fixture`, `clock-fixed`, `ids-counter`: `before` is the
+// store at the tail of main (LG-14), the commit is appended to the store on the
+// worktree and pushed with it, chained to the tail; a change request never
+// writes the store itself (LG-23).
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,7 +12,20 @@ import { createClockFixed } from "../../src/adapters/clock-fixed/index.js";
 import { createGitFixture, type GitFixtureOptions } from "../../src/adapters/git-fixture/index.js";
 import { createIdsCounter } from "../../src/adapters/ids-counter/index.js";
 import { createStoreJsonl } from "../../src/adapters/store-jsonl/index.js";
-import { commitHash, decodeCommit, land, tailView, type Commit, type Git, type LandingPorts, type Store, type Worktree } from "../../src/ledger/index.js";
+import {
+  commitHash,
+  decodeCommit,
+  land,
+  tailView,
+  type Commit,
+  type Git,
+  type LandingOutcome,
+  type LandingPorts,
+  type Push,
+  type Store,
+  type Worktree,
+} from "../../src/ledger/index.js";
+import { deepFreeze } from "../support/deep-freeze.js";
 
 const AT = "2026-10-06T12:00:00.000000Z";
 const proposal = (id: string) =>
@@ -30,16 +45,21 @@ const BRANCHES: GitFixtureOptions["branches"] = {
   "cr/broken": { from: "main", files: { "store/proposals/cr-x.json": "{" } },
 };
 
+const LAND = deepFreeze({ dryRun: false });
+const DRY_RUN = deepFreeze({ dryRun: true });
+
 let dir = "";
+let opened: Store[] = [];
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "lattice-landing-"));
+  opened = [];
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-function portsOf(over: Partial<LandingPorts> = {}): LandingPorts & { readonly opened: Store[] } {
-  const opened: Store[] = [];
-  return {
-    git: createGitFixture({ dir, branches: BRANCHES }),
+/** The ports of landing, frozen; every store landing opens is kept in `opened`, in order. */
+function portsOf(over: Partial<LandingPorts> = {}, branches = BRANCHES): LandingPorts {
+  return deepFreeze({
+    git: createGitFixture({ dir, branches }),
     acts: createActsFixture({ acts: {} }),
     openStore: (w: Worktree) => {
       const store = createStoreJsonl({ dir: w.dir });
@@ -48,16 +68,20 @@ function portsOf(over: Partial<LandingPorts> = {}): LandingPorts & { readonly op
     },
     clock: createClockFixed({ at: AT }),
     ids: createIdsCounter(),
-    opened,
     ...over,
-  };
+  });
+}
+
+async function mainWorktree(git: Git): Promise<Worktree> {
+  const tail = await git.tail("main");
+  const w = tail === null ? null : await git.prepare({ request: tail, onto: tail });
+  if (w === null || w.kind === "conflict") throw new Error("bug: main of the fixture prepares onto itself");
+  return w;
 }
 
 async function commitsOnMain(ports: LandingPorts): Promise<Commit[]> {
-  const w = await ports.git.prepare({ request: "main", onto: await ports.git.tail("main") });
-  if (w.kind === "conflict") throw new Error("bug: main conflicts with itself");
   const out: Commit[] = [];
-  for await (const line of ports.openStore(w).commits(1)) {
+  for await (const line of ports.openStore(await mainWorktree(ports.git)).commits(1)) {
     const c = decodeCommit(line, out.length);
     if (c.ok) out.push(c.value);
   }
@@ -65,18 +89,19 @@ async function commitsOnMain(ports: LandingPorts): Promise<Commit[]> {
 }
 
 const landed = async (ports: LandingPorts, request: string) => {
-  const out = await land(ports, request, { dryRun: false });
+  const out = await land(ports, request, LAND);
   if (out.outcome !== "commit") throw new Error(`bug: ${request} ended ${out.outcome}`);
   return out.commit;
 };
+
+const refusals = (out: LandingOutcome) => (out.outcome === "rejections" ? out.rejections.map((r) => [r.rule, r.path]) : out.outcome);
 
 describe("landing into git (LG-22, LG-23)", () => {
   it("LG-23: the commit is a line of store/knowledge.jsonl on main, and the proposal file is gone", async () => {
     const ports = portsOf();
     const commit = await landed(ports, "cr/a");
     expect(await commitsOnMain(ports)).toEqual([commit]);
-    const main = await ports.git.prepare({ request: "main", onto: await ports.git.tail("main") });
-    expect(main.kind === "worktree" ? await main.list("store/") : []).toEqual(["store/knowledge.jsonl"]);
+    expect(await (await mainWorktree(ports.git)).list("store/")).toEqual(["store/knowledge.jsonl"]);
   });
 
   it("LG-06, G-14: the next commit is chained to the tail: its prev is the hash of the one before", async () => {
@@ -88,23 +113,69 @@ describe("landing into git (LG-22, LG-23)", () => {
     expect(view.ok ? [view.value.seq, view.value.current("demo/a")?.rev, view.value.current("demo/b")?.rev] : []).toEqual([2, 1, 1]);
   });
 
-  it("LG-02: append carries the delta the commit folds to", async () => {
+  it("LG-02: append carries the delta the commit folds to, into the store on the worktree", async () => {
     const ports = portsOf();
     await landed(ports, "cr/a");
     const rows: string[] = [];
-    for await (const r of ports.opened[0]?.rows("") ?? []) rows.push(`${r.key}@${r.from}`);
+    for await (const r of opened.at(-1)?.rows("") ?? []) rows.push(`${r.key}@${r.from}`);
     expect(rows).toEqual(["current:demo/a@1"]);
   });
 
   it("LG-26: a dry run pushes nothing", async () => {
     const ports = portsOf();
     const tail = await ports.git.tail("main");
-    expect((await land(ports, "cr/a", { dryRun: true })).outcome).toBe("commit");
+    expect((await land(ports, "cr/a", DRY_RUN)).outcome).toBe("commit");
     expect([await ports.git.tail("main"), await commitsOnMain(ports)]).toEqual([tail, []]);
   });
 });
 
-describe("landing outcomes (LG-24, LG-25)", () => {
+describe("the landing commit in git (LG-22)", () => {
+  it("LG-22: carries the trailers Lattice-Proposal and Lattice-Seq; those of OB-07 arrive with S0-20", async () => {
+    const pushes: Push[] = [];
+    const inner = portsOf().git;
+    const git: Git = {
+      tail: (ref) => inner.tail(ref),
+      prepare: (p) => inner.prepare(p),
+      push: (p) => {
+        pushes.push(p);
+        return inner.push(p);
+      },
+    };
+    const commit = await landed(portsOf({ git }), "cr/a");
+    expect(pushes.map((p) => [p.ref, p.message, p.trailers])).toEqual([
+      [
+        "main",
+        "lattice: land commit 1",
+        [
+          { key: "Lattice-Proposal", value: commit.proposal },
+          { key: "Lattice-Seq", value: "1" },
+        ],
+      ],
+    ]);
+  });
+});
+
+describe("the store a change request brings (LG-14, LG-23)", () => {
+  const line = '{"seq":1,"records":[]}';
+  const forged = { ...BRANCHES, "cr/forged": { from: "main", files: { "store/knowledge.jsonl": `${line}\n`, "store/proposals/f.json": proposal("demo/f") } } };
+
+  it("LG-23: refuses a change request that wrote store/knowledge.jsonl itself, dry run or not, and lands nothing", async () => {
+    const ports = portsOf({}, forged);
+    for (const options of [DRY_RUN, LAND]) {
+      const out = await land(ports, "cr/forged", options);
+      expect(out.outcome === "rejections" ? out.rejections : out).toMatchObject([{ rule: "LG-23", path: "/0", expected: null, got: line }]);
+    }
+    expect(await commitsOnMain(ports)).toEqual([]);
+  });
+
+  it("LG-06: a store on main whose line is no commit is refused on opening, never thrown", async () => {
+    const ports = portsOf({}, { ...BRANCHES, main: { files: { "store/knowledge.jsonl": "{}\n" } } });
+    expect(refusals(await land(ports, "cr/a", DRY_RUN))).toContainEqual(["LG-06", "/0/seq"]);
+    expect((await tailView(ports)).ok).toBe(false);
+  });
+});
+
+describe("landing outcomes (LG-24, LG-25, LG-54)", () => {
   it("LG-24: ends moved when main moves before the push", async () => {
     const inner = portsOf().git;
     const git: Git = {
@@ -116,24 +187,21 @@ describe("landing outcomes (LG-24, LG-25)", () => {
         return inner.push(p);
       },
     };
-    expect(await land(portsOf({ git }), "cr/a", { dryRun: false })).toEqual({ outcome: "moved" });
+    expect(await land(portsOf({ git }), "cr/a", LAND)).toEqual({ outcome: "moved" });
   });
 
   it("LG-24: ends conflict when the code of the change request conflicts with main", async () => {
     const ports = portsOf();
-    const onto = await ports.git.tail("main");
+    const onto = (await mainWorktree(ports.git)).onto;
     const w = await ports.git.prepare({ request: "cr/readme", onto });
     if (w.kind === "worktree") await ports.git.push({ worktree: w, ref: "main", expected: onto, message: "m", trailers: [] });
-    expect(await land(ports, "cr/clash", { dryRun: false })).toEqual({ outcome: "conflict", paths: ["README.md"] });
+    expect(await land(ports, "cr/clash", LAND)).toEqual({ outcome: "conflict", paths: ["README.md"] });
   });
 
-  it("LG-54, KR-10: refuses a change request without a proposal and a proposal that is not JSON", async () => {
+  it("LG-54, KR-10: refuses a change request that does not exist, one without a proposal and a proposal that is not JSON", async () => {
     const ports = portsOf();
-    const rule = async (request: string) => {
-      const out = await land(ports, request, { dryRun: true });
-      return out.outcome === "rejections" ? out.rejections.map((r) => [r.rule, r.path]) : out.outcome;
-    };
-    expect(await rule("cr/none")).toEqual([["LG-54", "/store/proposals"]]);
-    expect(await rule("cr/broken")).toEqual([["KR-10", "/store/proposals/cr-x.json"]]);
+    expect(refusals(await land(ports, "cr/typo", DRY_RUN))).toEqual([["LG-54", ""]]);
+    expect(refusals(await land(ports, "cr/none", DRY_RUN))).toEqual([["LG-54", "/store/proposals"]]);
+    expect(refusals(await land(ports, "cr/broken", DRY_RUN))).toEqual([["KR-10", "/store/proposals/cr-x.json"]]);
   });
 });

@@ -18,7 +18,7 @@ export const BASE: { readonly [path: string]: string } = {
 export const BASE_KERNEL: readonly string[] = ["src/kernel/index.ts"];
 
 /** BASE with some files replaced or added; a file given as `null` is removed. */
-export function tree(over: { readonly [path: string]: string | null } = {}, dependencies: readonly string[] = []): Tree {
+export function tree(over: { readonly [path: string]: string | null } = {}, dependencies: { readonly [name: string]: string } = {}): Tree {
   const files: { [path: string]: string } = { ...BASE };
   for (const [path, text] of Object.entries(over)) {
     if (text === null) delete files[path];

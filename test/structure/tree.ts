@@ -10,8 +10,8 @@ export interface Tree {
   readonly root: string;
   /** Every `.ts` file under `src/`, by its path relative to the root. */
   readonly files: ReadonlyMap<string, ts.SourceFile>;
-  /** `dependencies` of package.json. */
-  readonly dependencies: ReadonlySet<string>;
+  /** `dependencies` of package.json: name → version as declared. */
+  readonly dependencies: ReadonlyMap<string, string>;
   /** The program over `files`, built on first use. */
   readonly program: () => ts.Program;
 }
@@ -52,12 +52,12 @@ function createProgram(root: string, files: ReadonlyMap<string, ts.SourceFile>):
   return ts.createProgram({ rootNames: [...own.keys()], options, host });
 }
 
-function makeTree(root: string, texts: ReadonlyMap<string, string>, dependencies: Iterable<string>): Tree {
+function makeTree(root: string, texts: ReadonlyMap<string, string>, dependencies: { readonly [name: string]: string }): Tree {
   const files = new Map(
     [...texts].map(([path, text]) => [path, ts.createSourceFile(`${root}/${path}`, text, ts.ScriptTarget.ES2023, true)]),
   );
   let program: ts.Program | undefined;
-  return { root, files, dependencies: new Set(dependencies), program: () => (program ??= createProgram(root, files)) };
+  return { root, files, dependencies: new Map(Object.entries(dependencies)), program: () => (program ??= createProgram(root, files)) };
 }
 
 /** The tree of this repository. */
@@ -68,12 +68,12 @@ export function repoTree(): Tree {
     .filter((p) => p.endsWith(".ts"))
     .sort();
   const texts = new Map(paths.map((p) => [p, readFileSync(join(repoRoot, p), "utf8")]));
-  const pkg = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8")) as { dependencies?: object };
-  return makeTree(repoRoot, texts, Object.keys(pkg.dependencies ?? {}));
+  const pkg = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8")) as { dependencies?: { readonly [name: string]: string } };
+  return makeTree(repoRoot, texts, pkg.dependencies ?? {});
 }
 
 /** A tree of the given files, rooted where no real file lives. */
-export function virtualTree(files: { readonly [path: string]: string }, dependencies: readonly string[] = []): Tree {
+export function virtualTree(files: { readonly [path: string]: string }, dependencies: { readonly [name: string]: string } = {}): Tree {
   const paths = Object.keys(files).sort();
   return makeTree(`${repoRoot}/.virtual-tree`, new Map(paths.map((p) => [p, files[p] ?? ""])), dependencies);
 }

@@ -1,0 +1,10 @@
+{
+  "check": "change-request",
+  "input": {
+    "head": null
+  },
+  "expect": {
+    "rule": "LG-54",
+    "path": ""
+  }
+}

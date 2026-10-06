@@ -22,22 +22,33 @@ export function createView(seq: number, rows: readonly Row[]): View & Rows {
 }
 
 /** A store opened: the view at its tail and the tail commit. */
-export type Opened = { readonly view: View & Rows; readonly tail: Commit | null };
+type Opened = { readonly view: View & Rows; readonly tail: Commit | null };
+
+/** The lines of a store's commits from genesis, as the store gives them. */
+export async function linesOf(store: Store): Promise<string[]> {
+  const lines: string[] = [];
+  for await (const line of store.commits(1)) lines.push(line);
+  return lines;
+}
 
 /**
- * LG-02: opening a store folds its commits from genesis. The walking skeleton
- * keeps the rows in the view; verifying the chain and handing the rows to the
- * adapter arrive with S0-11.
+ * LG-02: opening a store folds its commits from genesis; a line that is not a commit is refused
+ * at its index (KR-10, LG-06, KR-04). The walking skeleton keeps the rows in the view; verifying
+ * the chain and handing the rows to the adapter arrive with S0-11.
  */
-export async function openView(store: Store): Promise<Result<Opened>> {
+export function openLines(lines: readonly string[]): Result<Opened> {
   let rows: Row[] = [];
   let opened: Opened = { view: createView(0, []), tail: null };
-  let index = 0;
-  for await (const line of store.commits(1)) {
-    const commit = decodeCommit(line, index++);
+  for (const [index, line] of lines.entries()) {
+    const commit = decodeCommit(line, index);
     if (!commit.ok) return commit;
     rows = withDelta(rows, fold(opened.view, commit.value, []));
     opened = { view: createView(commit.value.seq, rows), tail: commit.value };
   }
   return { ok: true, value: opened };
+}
+
+/** LG-02: the store opened — its lines read and folded from genesis. */
+export async function openView(store: Store): Promise<Result<Opened>> {
+  return openLines(await linesOf(store));
 }

@@ -44,8 +44,9 @@ export type Push = {
 };
 
 export interface Git {
-  /** The commit `ref` points to. */
-  tail(ref: string): Promise<string>;
+  /** The commit `ref` points to; `null` when there is no such ref — a change request that does not exist (LG-54). */
+  tail(ref: string): Promise<string | null>;
+  /** `request` and `onto` exist: landing asks `tail` first. */
   prepare(prepare: Prepare): Promise<Worktree | Conflict>;
   /** A compare-and-swap on `expected`. */
   push(push: Push): Promise<"pushed" | "moved">;

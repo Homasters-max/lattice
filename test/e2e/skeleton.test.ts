@@ -5,10 +5,11 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { assemble, type Assembled, type Config, type View } from "../../src/assembly/index.js";
+import type { Assembly, View } from "../../src/assembly/index.js";
 import { run } from "../../src/cli/run.js";
 import { hashRecord, type JsonValue } from "../../src/kernel/index.js";
 import { proposalHash, readProposal } from "../../src/ledger/index.js";
+import { assembleForTests, type FixtureConfig } from "../support/assembly.js";
 
 const fixtures = join(import.meta.dirname, "../fixtures/KR-06");
 const proposalOf = (file: string) => (JSON.parse(readFileSync(join(fixtures, file), "utf8")) as { input: { proposal: JsonValue } }).input.proposal;
@@ -22,10 +23,8 @@ function approve(proposal: JsonValue, request: string) {
   return { verb: "approve" as const, target: proposalHash(read.value), identity: "owner", uri: `fixture:${request}`, at: AT, verified: true };
 }
 
-const configIn = (dir: string): Config => ({
-  store: { adapter: "jsonl" },
+const configIn = (dir: string): FixtureConfig => ({
   git: {
-    adapter: "fixture",
     dir,
     branches: {
       main: { files: { "README.md": "demo\n" } },
@@ -33,19 +32,18 @@ const configIn = (dir: string): Config => ({
       "cr/good": { from: "main", files: { "store/proposals/cr-good.json": JSON.stringify(good) } },
     },
   },
-  acts: { adapter: "fixture", acts: { "cr/bad": [approve(bad, "cr/bad")], "cr/good": [approve(good, "cr/good")] } },
-  clock: { adapter: "fixed", at: AT },
-  ids: { adapter: "counter" },
+  acts: { acts: { "cr/bad": [approve(bad, "cr/bad")], "cr/good": [approve(good, "cr/good")] } },
+  clock: { at: AT },
 });
 
-async function lattice(assembled: Assembled, ...argv: string[]) {
+async function lattice(assembled: Assembly, ...argv: string[]) {
   const out: string[] = [];
   const err: string[] = [];
   const code = await run(argv, { out: (t) => out.push(t), err: (t) => err.push(t), assembled });
   return { code, out: out.join(""), err: err.join("") };
 }
 
-async function viewOf(assembled: Assembled): Promise<View> {
+async function viewOf(assembled: Assembly): Promise<View> {
   const view = await assembled.view();
   if (!view.ok) throw new Error(`bug: the store at the tail of main does not open: ${JSON.stringify(view.rejections)}`);
   return view.value;
@@ -59,7 +57,7 @@ afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 describe("walking skeleton (SL-05)", () => {
   it("SL-05: dry run refuses with KR-06, the fixed proposal lands in git, and the read view answers", async () => {
-    const assembled = assemble(configIn(dir));
+    const assembled = assembleForTests(configIn(dir));
 
     const refused = await lattice(assembled, "land", "cr/bad", "--dry-run");
     expect(refused.code).toBe(1);

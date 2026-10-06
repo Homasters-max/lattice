@@ -1,15 +1,16 @@
 // The imports of `src/` against ST-01: direction, entries, no cycles, adapters
 // apart, vendor SDKs only in their adapter, the `judge` port only in `decide`
-// (ST-04), the owners of adapters, `codec` and `generate` (ST-06), and no code
-// of another project (PR-13). Every problem starts with the rule ID it breaks.
+// (ST-04), the owners of adapters, `codec` and `generate` (ST-06), the adapters
+// for tests outside `src/` (ST-07), and no code of another project but a pinned
+// package (PR-13). Every problem starts with the rule ID it breaks.
 import { importsOf, packageOf, type Import } from "./imports.js";
-import { entryOf, grants, JUDGE_ENTRY, JUDGE_HOLDERS, MATRIX, placeOf, portOf, type Place } from "./modules.js";
+import { entryOf, grants, JUDGE_ENTRY, JUDGE_HOLDERS, MATRIX, placeOf, portOf, TEST_ADAPTERS, type Place } from "./modules.js";
 import type { Tree } from "./tree.js";
 
-interface Context {
+type Context = {
   readonly tree: Tree;
   readonly ports: readonly string[];
-}
+};
 
 type Check = (i: Import, at: string, cx: Context) => string | null;
 
@@ -34,8 +35,10 @@ const judge: Check = (i, at) => {
 
 function adapterBoundary(from: Place, to: Place, at: string): string | null {
   if (to.module !== "adapters") return null;
-  if (from.module === "adapters") return `ST-04: ${at} imports adapter ${to.adapter ?? ""}; adapters never import each other`;
-  return from.module === "assembly" ? null : `ST-06: ${at} imports adapter ${to.adapter ?? ""}; only assembly imports adapters`;
+  const adapter = to.adapter ?? "";
+  if (from.module === "adapters") return `ST-04: ${at} imports adapter ${adapter}; adapters never import each other`;
+  if (from.module !== "assembly") return `ST-06: ${at} imports adapter ${adapter}; only assembly imports adapters`;
+  return TEST_ADAPTERS.test(adapter) ? `ST-07: ${at} imports adapter ${adapter}, which exists for tests; only the test assembly in test/ uses it` : null;
 }
 
 function ownedBoundary(from: Place, to: Place, at: string): string | null {
@@ -60,10 +63,15 @@ const matrix: Check = (i, at, { ports }) => {
 
 const RELATIVE: readonly Check[] = [outside, judge, matrix];
 
+/** One exact version (semver), no range or tag: the code of another project is pinned (PR-13); its hash is pinned by package-lock.json and `npm ci`. */
+const PINNED = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+
 function packageProblem(i: Import, at: string, { tree }: Context): string | null {
   const name = packageOf(i.specifier);
   if (placeOf(i.file)?.module !== "adapters") return `ST-04: ${at} imports ${name}; a vendor SDK lives only inside its adapter`;
-  return tree.dependencies.has(name) ? null : `PR-13: ${at} imports ${name}, which package.json does not declare in dependencies`;
+  const version = tree.dependencies.get(name);
+  if (version === undefined) return `PR-13: ${at} imports ${name}, which package.json does not declare in dependencies`;
+  return PINNED.test(version) ? null : `PR-13: ${at} imports ${name}, which package.json declares as ${version}, not one pinned version`;
 }
 
 function importProblem(i: Import, cx: Context): string | null {

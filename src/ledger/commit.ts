@@ -1,8 +1,11 @@
 // A `knowledge` commit (LG-06) and the evidence it cites (LG-30). The store
 // keeps a commit as its canonical line (KR-10): the ledger encodes and decodes
-// it, the adapter never parses it. The chain, its signatures and the form of
-// a stored commit are verified when a store opens — S0-10, S0-11.
-import { canon, hash, parseJson, type Record, type Result } from "../kernel/index.js";
+// it, the adapter never parses it. A line is read as a commit on the surface —
+// the header fields, their JSON kinds and the header of each record (KR-04);
+// the chain and its signatures are verified when a store opens from S0-10 and
+// S0-11 (LG-05).
+import { canon, checkHeader, hash, isJsonObject, kindOf, parseJson, reject, refused, type JsonValue, type Record, type Rejection, type Result } from "../kernel/index.js";
+import { LG_06 } from "./rules.js";
 
 export type Commit = {
   readonly seq: number;
@@ -33,9 +36,43 @@ export function commitHash(c: Commit): string {
 /** The line a store keeps for a commit: its canonical JSON. */
 export const encodeCommit = (c: Commit): string => canon(c);
 
-/** The commit of the `index`-th line of a store; a line that is not JSON is refused with KR-10 at `/<index>`. */
+type Field = { readonly expected: string; readonly fits: (v: JsonValue | undefined) => boolean };
+
+const STRING: Field = { expected: "a string", fits: (v) => typeof v === "string" };
+const NUMBER: Field = { expected: "a number", fits: (v) => typeof v === "number" };
+const STRING_OR_NULL: Field = { expected: "a string or null", fits: (v) => v === null || typeof v === "string" };
+
+const COMMIT: { readonly [field in keyof Commit]: Field } = {
+  seq: NUMBER,
+  prev: STRING_OR_NULL,
+  kernel: STRING,
+  base: NUMBER,
+  proposal: STRING,
+  proposal_sig: STRING_OR_NULL,
+  by: STRING,
+  at: STRING,
+  request: STRING_OR_NULL,
+  sig: STRING_OR_NULL,
+  records: { expected: "a list of records", fits: (v) => Array.isArray(v) },
+};
+
+function commitRejections(value: JsonValue, path: string): Rejection[] {
+  if (!isJsonObject(value)) return [reject(LG_06, { intent: null, path, expected: "a commit", got: kindOf(value) })];
+  const header = Object.entries(COMMIT).flatMap(([name, field]) =>
+    field.fits(value[name]) ? [] : [reject(LG_06, { intent: null, path: `${path}/${name}`, expected: field.expected, got: kindOf(value[name]) })],
+  );
+  const records = Array.isArray(value.records) ? (value.records as readonly JsonValue[]) : [];
+  return [...header, ...records.flatMap((r, i) => checkHeader(r, `${path}/records/${i}`))];
+}
+
+/** LG-06, KR-04: the commit a JSON value holds, refused at `path` — where it sits in its input — when it has not the form of one. */
+export function readCommit(value: JsonValue, path: string): Result<Commit> {
+  // Every field was checked against its kind above, so the value has the shape of Commit.
+  return refused<Commit>(commitRejections(value, path)) ?? { ok: true, value: value as Commit };
+}
+
+/** The commit of the `index`-th line of a store, refused at `/<index>`: KR-10 for a line that is not JSON, LG-06 and KR-04 for its form. */
 export function decodeCommit(line: string, index: number): Result<Commit> {
   const parsed = parseJson(line, `/${index}`);
-  // The ledger wrote the line from a Commit; its form is verified on opening from S0-11 (LG-05).
-  return parsed.ok ? { ok: true, value: parsed.value as Commit } : parsed;
+  return parsed.ok ? readCommit(parsed.value, `/${index}`) : parsed;
 }

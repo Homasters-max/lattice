@@ -12,12 +12,12 @@ export type RuleId = `${RulePrefix}-${Digit}${Digit}`;
 export type Lang = "en";
 
 /** A row of a module's rule registry. */
-export interface Rule {
+export type Rule = {
   readonly id: RuleId;
   readonly message: { readonly en: string } & { readonly [lang in Lang]?: string };
-}
+};
 
-export interface Rejection {
+export type Rejection = {
   /** The `id` written in the intent, as written; `null` when the rejection is not about an intent (G-13). */
   readonly intent: string | null;
   readonly rule: RuleId;
@@ -28,7 +28,7 @@ export interface Rejection {
   readonly got: JsonValue;
   /** For a duplicate: the `id` it collided with (LG-17). */
   readonly id?: string;
-}
+};
 
 export type Rejections = readonly [Rejection, ...Rejection[]];
 
@@ -37,18 +37,18 @@ export type Result<T> = { readonly ok: true; readonly value: T } | { readonly ok
 const PLACEHOLDER = /\{(intent|path|expected|got|id)\}/g;
 
 /** The rejection of a rule at a place; the message is the rule's template filled with canonical JSON. */
-export function reject(rule: Rule, at: Omit<Rejection, "rule" | "message">): Rejection {
-  const fields: { readonly [k: string]: JsonValue | undefined } = at;
+export function reject(rule: Rule, place: Omit<Rejection, "rule" | "message">): Rejection {
+  const fields: { readonly [k: string]: JsonValue | undefined } = place;
   const message = rule.message.en.replace(PLACEHOLDER, (_, name: string) => canon(fields[name] ?? null));
-  return { intent: at.intent, rule: rule.id, message, path: at.path, expected: at.expected, got: at.got, ...(at.id === undefined ? {} : { id: at.id }) };
+  return { intent: place.intent, rule: rule.id, message, path: place.path, expected: place.expected, got: place.got, ...(place.id === undefined ? {} : { id: place.id }) };
 }
 
 const keyOf = (r: Rejection): readonly string[] => [r.intent === null ? "" : `~${r.intent}`, r.path, r.rule, r.id ?? "", canon(r.expected), canon(r.got)];
 
 function compare(a: Rejection, b: Rejection): number {
   const [ka, kb] = [keyOf(a), keyOf(b)];
-  const at = ka.findIndex((x, i) => x !== kb[i]);
-  return at < 0 ? 0 : compareText(ka[at] ?? "", kb[at] ?? "");
+  const first = ka.findIndex((x, i) => x !== kb[i]);
+  return first < 0 ? 0 : compareText(ka[first] ?? "", kb[first] ?? "");
 }
 
 /** CONVENTIONS.md §5: by intent (null first), path, rule, id, then canonical expected and got. */

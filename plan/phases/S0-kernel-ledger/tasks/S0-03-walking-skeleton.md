@@ -39,7 +39,8 @@ SL-05: срез начинается с одной тонкой change unit че
 interface Store { append({ commit, delta, evidence }): Promise<void>;   // commit — каноническая строка от ledger (Q-09)
                   commits(from: number): AsyncIterable<string>; tail(): Promise<string | null>;
                   row(key): Promise<Row | null>; rows(prefix): AsyncIterable<Row>; evidence(hash): Promise<Uint8Array | null> }
-interface Git   { tail(ref): Promise<string>; prepare({ request, onto }): Promise<Worktree | Conflict>;
+interface Git   { tail(ref): Promise<string | null>;                // null — нет такого ref (Q-16)
+                  prepare({ request, onto }): Promise<Worktree | Conflict>;
                   push({ worktree, ref, expected, message, trailers }): Promise<"pushed" | "moved"> }
 interface Worktree { kind: "worktree"; onto; head; dir; list(dir); read(path): Promise<Uint8Array | null>; remove(path) }
 interface Acts  { read(request): Promise<readonly Act[]> }   // Act: verb, target, identity, uri, at, verified
@@ -49,13 +50,17 @@ interface Ids   { ulid(): string }
 // тонкий путь
 parseJson(text, path?): Result<JsonValue>; decodeUtf8(bytes, path?): Result<string>   // KR-10; мягкий разбор — G-16
 readProposal(value): Result<Proposal>                                     // LG-09 — поверхностно
+changeRequest(head: string | null): Result<string>                        // LG-54 — change request, которого нет (Q-16)
 proposalPath(files): Result<string>                                       // LG-54
+keptKnowledge(tail: lines, request: lines): Result<lines>                 // LG-23 — change request не пишет store
+checkHeader(value, path): Rejection[]                                     // KR-04 — поверхностно
+readCommit(value, path): Result<Commit>; decodeCommit(line, index)        // LG-06 и KR-04 — поверхностно
 apply(before: View, proposal, acts: LandActs, evidence): Result<Commit>   // фаза 1 — KR-06; prev, request, sig — null (G-14)
 fold(view: Rows, commit, evidence): Delta                                 // строка current:<id>
-openView(store): Promise<Result<{ view, tail }>>                          // fold с начала при открытии
-land(ports, request, { dryRun }): Promise<LandingOutcome>                 // worktree → append jsonl → удалить proposal → push
-assemble(config): { land(request, options), view() }                      // config называет тестовые адаптеры и jsonl
-run(argv, { out, err, assembled }): Promise<number>                        // cli; bin передаёт assembled: null до S0-23
+openLines(lines): Result<{ view, tail }>; openView(store)                 // fold с начала при открытии; отказ KR-10, LG-06, KR-04
+land(ports, request, { dryRun }): Promise<LandingOutcome>                 // before — store tail main (LG-14); worktree → LG-23 → append jsonl → удалить proposal → push
+assemble(ports: { git, acts, clock, ids }): Assembly                      // store на worktree — jsonl (LG-23); тестовая сборка — test/support/assembly.ts (Q-13)
+run(argv, { out, err, assembled }): Promise<number>                        // cli; bin передаёт assembled: null до S0-23 (Q-13)
 ```
 
 ## Шаги
@@ -63,7 +68,7 @@ run(argv, { out, err, assembled }): Promise<number>                        // cl
 1. Папки и точки входа модулей; тест структуры с матрицей и правилами чистоты — сначала красный на намеренно плохом импорте в фикстуре теста.
 2. Интерфейсы портов и детерминированные адаптеры.
 3. Тонкие canon, hash, проверка `id`, apply с фазой 1, fold с текущей ревизией, `view.current`.
-4. `assembly` из объекта конфигурации; `cli` с таблицей команд.
+4. `assembly`, которая соединяет порты, и тестовая сборка в `test/support/` (Q-13); `cli` с таблицей команд.
 5. E2E-тест сквозного пути через `cli`.
 6. Записать в `test/structure/skeleton-files.txt` файлы, которыми владеет skeleton, — их правка дальше триггер аудита (ST-15).
 
@@ -73,11 +78,11 @@ run(argv, { out, err, assembled }): Promise<number>                        // cl
 - Типы `RuleId`, `Rule`, `Rejection`, `Result`, конструктор `reject` и реестр `src/kernel/rules.ts` — по наброскам `CONVENTIONS.md`, разделы 2–3, 6; запреты чистоты — его раздел 8.
 - Тест структуры падает на: импорте `ledger` из `kernel`; адаптере, импортирующем адаптер; `Date.now()` в `trust`; файле вне списка периметра ядра.
 
-Раскладка, как сделано: тест структуры — `test/structure/`: матрица как данные `modules.ts`, разбор `tree.ts` и `imports.ts`, аудиты `audit-imports.ts`, `audit-purity.ts`, `audit-kernel.ts`; кейсы на виртуальных деревьях — `matrix.test.ts` (сверка с таблицей ST-01 и все пары модулей), `imports.test.ts`, `boundaries.test.ts`, `purity.test.ts`, `kernel.test.ts`; репозиторий — `repo.test.ts`. Фикстуры — `test/fixtures/{KR-06,KR-10,LG-09,LG-54}/`. Порты — `test/contract/{clock,ids,store,git,acts}.test.ts`; landing — `test/ledger/landing.test.ts`; e2e — `test/e2e/skeleton.test.ts`; команды — `test/cli/commands.test.ts`.
+Раскладка, как сделано: тест структуры — `test/structure/`: матрица как данные `modules.ts`, разбор `tree.ts` и `imports.ts`, аудиты `audit-imports.ts`, `audit-purity.ts`, `audit-kernel.ts`; кейсы на виртуальных деревьях — `matrix.test.ts` (сверка с таблицей ST-01 и все пары модулей), `imports.test.ts`, `boundaries.test.ts`, `purity.test.ts`, `kernel.test.ts`; репозиторий — `repo.test.ts`, в нём и сверка `skeleton-files.txt` с R9. Фикстуры — `test/fixtures/{KR-04,KR-06,KR-10,LG-06,LG-09,LG-23,LG-54}/`. Порты — `test/contract/{clock,ids,store,git,acts}.test.ts`; landing — `test/ledger/landing.test.ts`; e2e — `test/e2e/skeleton.test.ts` на тестовой сборке `test/support/assembly.ts`; команды — `test/cli/commands.test.ts`; собранный bin — `test/cli/bin.test.ts`.
 
 ## Сделано иначе, чем в наброске
 
-Решения владельца по ревью — Q-09…Q-12 в `PLAN.md`.
+Решения владельца по ревью — Q-09…Q-16 в `PLAN.md`.
 
 - **Знание в git** (Q-09): кроме `store-memory` есть тонкий `store-jsonl` — одна каноническая строка на коммит в `store/knowledge.jsonl`, чтение с начала при открытии. Landing открывает его на worktree: worktree → `append` → удалить proposal → `push`. Worktree `git-fixture` — временный каталог, `push` фиксирует его содержимое; `prepare` сливает по общему предку и кончается `conflict`. Адаптер store canon не знает: ledger отдаёт строку коммита и сам разбирает строки. Read view в e2e открывается из tail `main`. Проверки цепочки, обрезанной строки, evidence в `store/evidence/` и строки, переданные адаптеру при открытии, — S0-11; CAS с пересборкой, `awaiting-act`, trailers OB-07, `request` и `git-repo` — S0-20.
 - **Отказы вместо исключений** (Q-10): KR-10 (не JSON, не UTF-8), LG-09 (форма proposal поверхностно; полная — S0-10), LG-54 (ровно один proposal) — с реестрами и фикстурами trigger/pass. Мягкий `JSON.parse` — только в `parseJson` (G-16, до S0-04).
@@ -91,6 +96,14 @@ run(argv, { out, err, assembled }): Promise<number>                        // cl
 - **KR-01** ловит строковые литералы, называющие `std` или его тип, и идентификаторы, названные по типу `std` (`Requirement`, `reviewNote`, `NAMESPACE`).
 - **`Rejection.expected` и `got`** — `JsonValue`, а не `unknown`: сообщение подставляет их каноническим JSON; набросок `CONVENTIONS.md` §3 поправлен.
 - **Чистота** строже раздела 8 `CONVENTIONS.md`: `import.meta` целиком, `globalThis`, `require`, `Buffer`, глобальный `crypto`, `Date()` как функция — пути к окружению и файлам ST-04; раздел дописан.
+- **`before` — store tail `main`** (LG-14): landing открывает store на worktree самого tail-коммита и складывает `before` оттуда. Store на worktree change request только сверяется с ним построчно, и `append` идёт в него. Change request, который сам изменил `store/knowledge.jsonl`, отклоняется LG-23 — `keptKnowledge`, фикстуры `test/fixtures/LG-23/`.
+- **Форма коммита при открытии store** — по образцу Q-10. Строка, которая не коммит, отклоняется поверхностно, с путём от строки: LG-06 — заголовок, KR-04 — заголовок записи (`readCommit`, `checkHeader`, фикстуры `test/fixtures/{LG-06,KR-04}/`). Полные проверки — S0-10 и S0-05.
+- **Сборка** (Q-13): `assemble(ports)` вместо `assemble(config)`. `src/assembly` соединяет порты `git`, `acts`, `clock`, `ids` и сама открывает `store-jsonl` на worktree (LG-23). Адаптеры для тестов собирает `test/support/assembly.ts`; их импорт из `src/` тест структуры отклоняет (ST-07). Bin передаёт `assembled: null` до S0-23 — это показывает `test/cli/bin.test.ts`.
+- **Порт `judge`** (Q-14): к нему пускают только `decide` и адаптеры `judge-*`, `assembly` — нет.
+- **Change request, которого нет** (Q-16): `tail(ref)` — `null`, landing отклоняет такой request LG-54 с путём `""`.
+- **PR-13**: пакет из `dependencies` закреплён одной точной версией; диапазон, тег или источник тест структуры отклоняет. Hash закрепляют `package-lock.json` и `npm ci`.
+- **Список файлов skeleton** тест `repo.test.ts` сверяет с R9.
+- **Trailers** `Lattice-Proposal` и `Lattice-Seq` — из LG-22, не из OB-07; их показывает тест landing. Trailers OB-07 — S0-20.
 
 ## Готово, когда
 

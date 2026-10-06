@@ -22,3 +22,6 @@
 | 14 | May the cli import the codec module directly? | lattice/st-01, lattice/st-06 | normal | S0-03, G-15 (строки расходятся) | 2026-10-06 |
 | 15 | Which kernel version do commits carry before the switch? | lattice/kr-03 | normal | S0-03 | 2026-10-06 |
 | 16 | Does a store adapter compute the canonical bytes of the commits it writes? | — | blank | S0-03, Q-09 (LG-02 и LG-23 молчат; решено в CONVENTIONS.md: ledger отдаёт строку) | 2026-10-06 |
+| 17 | Which store does landing read the before of apply from — the tail of main or the change request merged into it? | lattice/lg-14, lattice/lg-23 | normal | S0-03, ревью волна 2 | 2026-10-06 |
+| 18 | How does landing end for a change request that does not exist? | — | blank | S0-03, Q-16 (LG-25 и LG-54 молчат; решено: отказ LG-54) | 2026-10-06 |
+| 19 | Must the code of another project that LATTICE imports be pinned to one version? | lattice/st-04, lattice/pr-13, lattice/lg-44 | normal | S0-03, ревью волна 2 | 2026-10-06 |

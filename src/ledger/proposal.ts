@@ -2,7 +2,7 @@
 // its form on the surface — the fields and their JSON kinds; the session
 // event with its certificate, the signature and facts in the canonical order
 // arrive with S0-10 and S0-16.
-import { compareText, hash, isJsonObject, reject, refused, type JsonObject, type JsonValue, type Kind, type Rejection, type Result } from "../kernel/index.js";
+import { compareText, hash, isJsonObject, kindOf, reject, refused, type JsonObject, type JsonValue, type Kind, type Rejection, type Result } from "../kernel/index.js";
 import { LG_09 } from "./rules.js";
 
 /** The authoring session event (TR-11); its certificate arrives with S0-16. */
@@ -23,9 +23,6 @@ export type Proposal = {
   readonly sig: string | null;
 };
 
-const kindOf = (v: JsonValue | undefined): string =>
-  v === undefined ? "absent" : v === null ? "null" : Array.isArray(v) ? "array" : typeof v;
-
 type Field = { readonly expected: string; readonly fits: (v: JsonValue | undefined) => boolean };
 
 const STRING: Field = { expected: "a string", fits: (v) => typeof v === "string" };
@@ -39,27 +36,27 @@ const INTENT: { readonly [field in keyof Intent]: Field } = {
   body: { expected: "a JSON value", fits: (v) => v !== undefined },
 };
 
-const PROPOSAL: { readonly [field: string]: Field } = {
+const PROPOSAL: { readonly [field in keyof Proposal]: Field } = {
   session: { expected: "a session event", fits: (v) => isJsonObject(v) && typeof v.id === "string" },
   intents: { expected: "a list of intents", fits: (v) => Array.isArray(v) },
   sig: { expected: "a signature or null", fits: (v) => v === null || typeof v === "string" },
 };
 
-const at = (intent: string | null, path: string, field: Field, got: JsonValue | undefined) =>
-  reject(LG_09, { intent, path, expected: field.expected, got: kindOf(got) });
+const refusal = (intent: string | null, path: string, expected: string, got: JsonValue | undefined) =>
+  reject(LG_09, { intent, path, expected, got: kindOf(got) });
 
 /** G-13: inside an intent with a string `id` the path is the intent's own; otherwise from the root. */
 function intentRejections(v: JsonValue, i: number): Rejection[] {
-  if (!isJsonObject(v)) return [at(null, `/intents/${i}`, { expected: "an intent", fits: () => false }, v)];
+  if (!isJsonObject(v)) return [refusal(null, `/intents/${i}`, "an intent", v)];
   const id = typeof v.id === "string" ? v.id : null;
   return Object.entries(INTENT).flatMap(([name, field]) =>
-    field.fits(v[name]) ? [] : [at(id, id === null ? `/intents/${i}/${name}` : `/${name}`, field, v[name])],
+    field.fits(v[name]) ? [] : [refusal(id, id === null ? `/intents/${i}/${name}` : `/${name}`, field.expected, v[name])],
   );
 }
 
 function proposalRejections(value: JsonValue): Rejection[] {
-  if (!isJsonObject(value)) return [at(null, "", { expected: "a proposal", fits: () => false }, value)];
-  const own = Object.entries(PROPOSAL).flatMap(([name, field]) => (field.fits(value[name]) ? [] : [at(null, `/${name}`, field, value[name])]));
+  if (!isJsonObject(value)) return [refusal(null, "", "a proposal", value)];
+  const own = Object.entries(PROPOSAL).flatMap(([name, field]) => (field.fits(value[name]) ? [] : [refusal(null, `/${name}`, field.expected, value[name])]));
   const intents = Array.isArray(value.intents) ? (value.intents as readonly JsonValue[]) : [];
   return [...own, ...intents.flatMap(intentRejections)];
 }

@@ -4,7 +4,7 @@ import { builtinModules } from "node:module";
 import { posix } from "node:path";
 import ts from "typescript";
 
-export interface Import {
+export type Import = {
   /** The importing file, relative to the root. */
   readonly file: string;
   readonly line: number;
@@ -17,7 +17,7 @@ export interface Import {
   readonly names: readonly string[] | null;
   readonly typeOnly: boolean;
   readonly dynamic: boolean;
-}
+};
 
 const BUILTINS: ReadonlySet<string> = new Set(builtinModules);
 
@@ -38,13 +38,13 @@ function resolve(file: string, specifier: string): string {
   return posix.normalize(posix.join(posix.dirname(file), specifier)).replace(/\.js$/, ".ts");
 }
 
-interface Found {
+type Found = {
   readonly node: ts.Node;
   readonly specifier: string;
   readonly names: readonly string[] | null;
   readonly typeOnly: boolean;
   readonly dynamic?: boolean;
-}
+};
 
 const literal = (n: ts.Node | undefined) => (n !== undefined && ts.isStringLiteral(n) ? n.text : "");
 

@@ -2,8 +2,22 @@
 // fixture gives in `check` → the rule IDs the check enforces and a function
 // that feeds it the fixture's `input`. A task that adds a hard check adds its
 // row here; the input is built only through public functions (CONVENTIONS.md).
-import { decodeUtf8, KR_06, KR_10, parseJson, type JsonValue } from "../../src/kernel/index.js";
-import { apply, createView, LG_09, LG_54, proposalPath, readProposal, type LandActs } from "../../src/ledger/index.js";
+import { decodeUtf8, KR_04, KR_06, KR_10, parseJson, type JsonValue } from "../../src/kernel/index.js";
+import {
+  apply,
+  changeRequest,
+  createView,
+  encodeCommit,
+  keptKnowledge,
+  LG_06,
+  LG_09,
+  LG_23,
+  LG_54,
+  openLines,
+  proposalPath,
+  readProposal,
+  type LandActs,
+} from "../../src/ledger/index.js";
 import type { FixtureCheck } from "./run.js";
 
 /** The land session of every fixture: apply takes the commit's `by` and `at` from it (LG-22). */
@@ -27,10 +41,10 @@ const proposal: FixtureCheck = {
   run: (input) => readProposal(field(input, "proposal") as JsonValue),
 };
 
-/** `input`: `{ files }` — the paths under `store/proposals/` of a change request. */
-const changeRequest: FixtureCheck = {
+/** `input`: `{ files }` — the paths under `store/proposals/` of a change request — or `{ head: null }` for one that does not exist. */
+const changeRequestCheck: FixtureCheck = {
   enforces: [LG_54.id],
-  run: (input) => proposalPath(field(input, "files") as string[]),
+  run: (input) => (field(input, "files") === undefined ? changeRequest(field(input, "head") as string | null) : proposalPath(field(input, "files") as string[])),
 };
 
 /** `input`: `{ proposal }`, applied on an empty ledger. */
@@ -42,4 +56,37 @@ const applyCheck: FixtureCheck = {
   },
 };
 
-export const CHECKS: { readonly [check: string]: FixtureCheck } = { json, proposal, "change-request": changeRequest, apply: applyCheck };
+/** The line of the commit apply forms for a proposal on an empty ledger. */
+function lineOf(value: JsonValue): string {
+  const read = readProposal(value);
+  const applied = read.ok ? apply(createView(0, []), read.value, LAND, []) : read;
+  if (!applied.ok) throw new Error("bug: the pass proposal of a store fixture applies");
+  return encodeCommit(applied.value);
+}
+
+/**
+ * `input`: `{ lines }` — the raw lines of `store/knowledge.jsonl`, as a change request or a broken file can
+ * hold them; a trigger needs lines apply never forms — or `{ proposal }`, whose line apply forms.
+ */
+const store: FixtureCheck = {
+  enforces: [KR_10.id, LG_06.id, KR_04.id],
+  run: (input) => {
+    const raw = field(input, "lines");
+    return openLines(raw === undefined ? [lineOf(field(input, "proposal") as JsonValue)] : (raw as string[]));
+  },
+};
+
+/** `input`: `{ tail, request }` — the lines of `store/knowledge.jsonl` at the tail of main and in the change request. */
+const knowledge: FixtureCheck = {
+  enforces: [LG_23.id],
+  run: (input) => keptKnowledge(field(input, "tail") as string[], field(input, "request") as string[]),
+};
+
+export const CHECKS: { readonly [check: string]: FixtureCheck } = {
+  json,
+  proposal,
+  "change-request": changeRequestCheck,
+  apply: applyCheck,
+  store,
+  knowledge,
+};

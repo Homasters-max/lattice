@@ -42,3 +42,4 @@ rules: [LG-47, LG-18, LG-50, TY-01, SL-04, KR-03, RT-32]
 ## Риски и заметки
 
 - Задача на четыре модуля — триггер аудита ST-15.
+- От S0-03 (Q-13): `assemble(ports)` в `src/assembly` соединяет порты `git`, `acts`, `clock`, `ids` и сама открывает `store-jsonl` на worktree; тестовая сборка — `test/support/assembly.ts`, и тест структуры отклоняет импорт адаптеров для тестов из `src/` (ST-07). Задача добавляет чтение `store/lattice.json` в рабочие адаптеры и передаёт их в `assemble`; `test/cli/bin.test.ts` тогда меняет ожидание «no store» на путь `land` из bin.

@@ -72,9 +72,14 @@ export function createGitFixture({ dir, branches }: GitFixtureOptions): Git {
     commits.set(id, c);
     return id;
   };
-  const commitOf = (ref: string): string => {
+  const find = (ref: string): string | null => {
     const id = refs.get(ref) ?? ref;
-    if (!commits.has(id)) throw new Error(`bug: git-fixture has no branch or commit ${ref}`);
+    return commits.has(id) ? id : null;
+  };
+  // `prepare` takes refs `tail` found (the port's contract), and a branch starts from one defined before it.
+  const commitOf = (ref: string): string => {
+    const id = find(ref);
+    if (id === null) throw new Error(`bug: git-fixture has no ${ref}: prepare takes refs tail found, a branch starts from one defined before it`);
     return id;
   };
   const treeOf = (id: string): Tree => commits.get(id)?.tree ?? new Map();
@@ -84,7 +89,7 @@ export function createGitFixture({ dir, branches }: GitFixtureOptions): Git {
     refs.set(name, add({ parents: parent === null ? [] : [parent], tree: overlay(parent === null ? new Map() : treeOf(parent), files), message: name }));
   }
   return {
-    tail: (ref) => Promise.resolve(commitOf(ref)),
+    tail: (ref) => Promise.resolve(find(ref)),
     async prepare({ request, onto }: Prepare) {
       const [head, base] = [commitOf(request), commitOf(onto)];
       const shared = new Set(ancestors(base));

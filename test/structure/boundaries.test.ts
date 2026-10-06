@@ -1,5 +1,6 @@
-// ST-04, DP-14, PR-13: the judge port, vendor SDKs, code of another project
-// and cycles — trigger cases on a tree that holds every rule.
+// ST-04, DP-14, PR-13, ST-07: the judge port, vendor SDKs, code of another
+// project, adapters for tests and cycles — trigger cases on a tree that holds
+// every rule.
 import { describe, expect, it } from "vitest";
 import { auditImports } from "./audit-imports.js";
 import { tree } from "./cases.js";
@@ -8,44 +9,71 @@ const exportOne = "export const x = 1;\n";
 const judge = { "src/runtime/ports/judge.ts": exportOne, "src/runtime/ports/llm.ts": exportOne };
 
 describe("boundaries: the judge port (ST-04, DP-14)", () => {
-  it("lets decide, the judge adapters and assembly import the judge port", () => {
+  it("lets decide and a judge adapter, which implements the port, import it; assembly wires the adapter without it", () => {
     const t = tree({
       ...judge,
-      "src/capabilities/decide/index.ts": 'import { x } from "../../runtime/ports/judge.js";\nexport const y = x;\n',
-      "src/adapters/judge-fixture/index.ts": 'import { x } from "../../runtime/ports/judge.js";\nexport const y = x;\n',
-      "src/assembly/judge.ts": 'import { x } from "../runtime/ports/judge.js";\nexport const y = x;\n',
+      "src/capabilities/decide/index.ts": 'import { x } from "../../runtime/ports/judge.js";\nexport const decide = (judge: typeof x) => judge;\n',
+      "src/capabilities/index.ts": 'export { decide } from "./decide/index.js";\n',
+      "src/adapters/judge-claude/index.ts": 'import { x } from "../../runtime/ports/judge.js";\nexport const y = x;\n',
+      "src/assembly/judge.ts": 'import { y } from "../adapters/judge-claude/index.js";\nimport { decide } from "../capabilities/index.js";\nexport const wired = decide(y);\n',
     });
     expect(auditImports(t)).toEqual([]);
   });
 
-  it("ST-04: refuses the judge port anywhere else, its own module included", () => {
+  it("ST-04: refuses the judge port anywhere else — assembly and the port's own module included", () => {
     const t = tree({
       ...judge,
       "src/capabilities/index.ts": 'import { x } from "../runtime/ports/judge.js";\nimport { x as l } from "../runtime/ports/llm.js";\nexport const y = [x, l];\n',
       "src/runtime/index.ts": 'import { x } from "./ports/judge.js";\nexport const y = x;\n',
+      "src/assembly/judge.ts": 'import { x } from "../runtime/ports/judge.js";\nexport const y = x;\n',
     });
     expect(auditImports(t)).toEqual([
+      "ST-04: src/assembly/judge.ts:1 imports the judge port; only decide receives it (DP-14)",
       "ST-04: src/capabilities/index.ts:1 imports the judge port; only decide receives it (DP-14)",
       "ST-04: src/runtime/index.ts:1 imports the judge port; only decide receives it (DP-14)",
     ]);
   });
 });
 
+describe("boundaries: adapters for tests (ST-07)", () => {
+  const ports = { "src/ledger/ports/acts.ts": exportOne, "src/ledger/ports/clock.ts": exportOne };
+  const adapter = (name: string, port: string) => ({ [`src/adapters/${name}/index.ts`]: `import { x } from "../../ledger/ports/${port}.js";\nexport const a = x;\n` });
+
+  it("ST-07: refuses a fixture or a deterministic adapter in src/, assembly included — only the test assembly in test/ uses one", () => {
+    const t = tree({
+      ...ports,
+      ...adapter("acts-fixture", "acts"),
+      ...adapter("clock-fixed", "clock"),
+      "src/assembly/tests.ts": 'import { a } from "../adapters/acts-fixture/index.js";\nimport { a as c } from "../adapters/clock-fixed/index.js";\nexport const wired = [a, c];\n',
+    });
+    expect(auditImports(t)).toEqual([
+      "ST-07: src/assembly/tests.ts:1 imports adapter acts-fixture, which exists for tests; only the test assembly in test/ uses it",
+      "ST-07: src/assembly/tests.ts:2 imports adapter clock-fixed, which exists for tests; only the test assembly in test/ uses it",
+    ]);
+  });
+
+  it("lets assembly import a working adapter", () => {
+    const t = tree({ ...ports, ...adapter("acts-local", "acts"), "src/assembly/acts.ts": 'import { a } from "../adapters/acts-local/index.js";\nexport const acts = a;\n' });
+    expect(auditImports(t)).toEqual([]);
+  });
+});
+
 describe("boundaries: vendor SDKs and other projects (ST-04, PR-13)", () => {
   const sdk = 'import { ulid } from "ulid";\nexport const id = ulid;\n';
+  const pinned = { ulid: "3.0.1" };
 
-  it("lets one adapter import a declared package", () => {
-    expect(auditImports(tree({ "src/ledger/ports/ids.ts": exportOne, "src/adapters/ids-ulid/index.ts": sdk }, ["ulid"]))).toEqual([]);
+  it("lets one adapter import a package package.json pins to one version", () => {
+    expect(auditImports(tree({ "src/ledger/ports/ids.ts": exportOne, "src/adapters/ids-ulid/index.ts": sdk }, pinned))).toEqual([]);
   });
 
   it("ST-04: refuses a package outside adapters", () => {
-    expect(auditImports(tree({ "src/ledger/ids.ts": sdk }, ["ulid"]))).toEqual([
+    expect(auditImports(tree({ "src/ledger/ids.ts": sdk }, pinned))).toEqual([
       "ST-04: src/ledger/ids.ts:1 imports ulid; a vendor SDK lives only inside its adapter",
     ]);
   });
 
   it("ST-04: refuses one package in two adapters", () => {
-    const t = tree({ "src/ledger/ports/ids.ts": exportOne, "src/adapters/ids-ulid/index.ts": sdk, "src/adapters/store-memory/ulid.ts": sdk }, ["ulid"]);
+    const t = tree({ "src/ledger/ports/ids.ts": exportOne, "src/adapters/ids-ulid/index.ts": sdk, "src/adapters/store-memory/ulid.ts": sdk }, pinned);
     expect(auditImports(t)).toEqual(["ST-04: ulid is imported by adapters ids-ulid, store-memory; a vendor SDK lives inside one adapter"]);
   });
 
@@ -59,6 +87,13 @@ describe("boundaries: vendor SDKs and other projects (ST-04, PR-13)", () => {
       "PR-13: src/adapters/ids-ulid/index.ts:1 imports @acme/ulid, which package.json does not declare in dependencies",
       "PR-13: src/trust/index.ts:1 imports ../../../other-project/src/x.js outside src/; another project's code comes only as a pinned library",
     ]);
+  });
+
+  it("PR-13: refuses a package package.json declares by a range, a tag or a source, not one pinned version", () => {
+    for (const version of ["^3.0.1", "~3.0.1", "3.x", "latest", ">=3.0.0", "github:ulid/javascript"]) {
+      const t = tree({ "src/ledger/ports/ids.ts": exportOne, "src/adapters/ids-ulid/index.ts": sdk }, { ulid: version });
+      expect(auditImports(t)).toEqual([`PR-13: src/adapters/ids-ulid/index.ts:1 imports ulid, which package.json declares as ${version}, not one pinned version`]);
+    }
   });
 
   it("ST-04: refuses an import() of a computed specifier, which nothing can check", () => {

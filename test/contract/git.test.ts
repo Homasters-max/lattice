@@ -1,6 +1,6 @@
 // ST-07, LG-23: one set of contract tests for the `git` port, run against
 // every adapter of S0-03: `tail`, `prepare` → worktree or conflict, `push` as
-// a compare-and-swap.
+// a compare-and-swap; `tail` of a ref that does not exist is `null`.
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -37,29 +37,41 @@ async function worktree(git: Git, request: string, onto: string): Promise<Worktr
   return prepared;
 }
 
+async function tailOf(git: Git, ref: string): Promise<string> {
+  const tail = await git.tail(ref);
+  if (tail === null) throw new Error(`bug: the fixture has ${ref}`);
+  return tail;
+}
+
 const push = (git: Git, w: Worktree, expected: string) => git.push({ worktree: w, ref: "main", expected, message: "m", trailers: [] });
 
 describe.each(ADAPTERS)("git port: $name", ({ make }) => {
+  it("ST-07, LG-54: tail names the commit of a branch, and is null for a ref that does not exist", async () => {
+    const git = make();
+    const main = await git.tail("main");
+    expect([typeof main, await git.tail(main ?? ""), await git.tail("cr/none")]).toEqual(["string", main, null]);
+  });
+
   it("ST-07: prepares a change request onto a commit, as files of a worktree", async () => {
     const git = make();
-    const onto = await git.tail("main");
+    const onto = await tailOf(git, "main");
     const w = await worktree(git, "cr/add", onto);
     expect([w.onto, await w.list("src/"), await text(w, "src/b.ts")]).toEqual([onto, ["src/a.ts", "src/b.ts"], "b\n"]);
   });
 
   it("ST-07: pushes the worktree as the new commit of the ref, without what it removed", async () => {
     const git = make();
-    const onto = await git.tail("main");
+    const onto = await tailOf(git, "main");
     const w = await worktree(git, "cr/add", onto);
     await w.remove("src/a.ts");
     expect(await push(git, w, onto)).toBe("pushed");
-    const after = await worktree(git, "main", await git.tail("main"));
+    const after = await worktree(git, "main", await tailOf(git, "main"));
     expect(await after.list("")).toEqual(["README.md", "src/b.ts"]);
   });
 
   it("ST-07, LG-24: ends moved when the ref is no longer the expected commit", async () => {
     const git = make();
-    const onto = await git.tail("main");
+    const onto = await tailOf(git, "main");
     const [first, second] = [await worktree(git, "cr/add", onto), await worktree(git, "cr/edit", onto)];
     expect(await push(git, first, onto)).toBe("pushed");
     expect(await push(git, second, onto)).toBe("moved");
@@ -67,9 +79,9 @@ describe.each(ADAPTERS)("git port: $name", ({ make }) => {
 
   it("ST-07, LG-24: ends conflict where main and the change request changed a path differently", async () => {
     const git = make();
-    const onto = await git.tail("main");
+    const onto = await tailOf(git, "main");
     expect(await push(git, await worktree(git, "cr/edit", onto), onto)).toBe("pushed");
-    expect(await git.prepare({ request: "cr/clash", onto: await git.tail("main") })).toEqual({ kind: "conflict", paths: ["README.md"] });
-    expect((await git.prepare({ request: "cr/add", onto: await git.tail("main") })).kind).toBe("worktree");
+    expect(await git.prepare({ request: "cr/clash", onto: await tailOf(git, "main") })).toEqual({ kind: "conflict", paths: ["README.md"] });
+    expect((await git.prepare({ request: "cr/add", onto: await tailOf(git, "main") })).kind).toBe("worktree");
   });
 });

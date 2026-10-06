@@ -2,25 +2,25 @@
 // that triggers it and one that passes it. Layout and format: CONVENTIONS.md.
 
 /** One `<case>.json` under `trigger/` or `pass/`; `data` is the parsed JSON, or `undefined` if it did not parse. */
-export interface FixtureCase {
+export type FixtureCase = {
   readonly name: string;
   readonly data: unknown;
-}
+};
 
 /** The folder `test/fixtures/<RULE-ID>/`; `null` for a missing `trigger/` or `pass/`. */
-export interface FixtureFolder {
+export type FixtureFolder = {
   readonly name: string;
   readonly trigger: readonly FixtureCase[] | null;
   readonly pass: readonly FixtureCase[] | null;
-}
+};
 
-export interface CoverageInput {
+export type CoverageInput = {
   /** Rule IDs from the registries `src/**\/rules.ts`. */
   readonly registered: ReadonlySet<string>;
   readonly folders: readonly FixtureFolder[];
   /** Rule IDs defined in `docs/design`. */
   readonly design: ReadonlySet<string>;
-}
+};
 
 const undefinedId = (id: string) => `${id}: not a rule ID defined in docs/design`;
 
