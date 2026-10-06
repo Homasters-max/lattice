@@ -16,8 +16,8 @@ const KNOWLEDGE = "store/knowledge.jsonl";
 
 const LF = 0x0a;
 
-/** The bytes of `store/knowledge.jsonl` that hold these commit lines, as `append` writes them: each line, then a line feed. */
-export const fileOf = (commits: readonly string[]): Uint8Array => new TextEncoder().encode(commits.map((c) => `${c}\n`).join(""));
+/** The bytes `append` adds to `store/knowledge.jsonl` for the line of a commit: the line, then a line feed. */
+export const fileOf = (commit: string): Uint8Array => new TextEncoder().encode(`${commit}\n`);
 
 /** The lines of the file: the bytes before each line feed, then the bytes after the last one if there are any — a cut last line, refused from S0-11. */
 async function linesOf(file: string): Promise<Uint8Array[]> {
@@ -39,7 +39,7 @@ export function createStoreJsonl({ dir }: StoreJsonlOptions): Store {
   return {
     async append({ commit, delta, evidence: cited }: Append) {
       await mkdir(dirname(file), { recursive: true });
-      await appendFile(file, fileOf([commit]));
+      await appendFile(file, fileOf(commit));
       rows.apply(delta);
       for (const e of cited) evidence.set(e.hash, e.bytes);
     },

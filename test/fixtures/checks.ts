@@ -95,7 +95,7 @@ const knowledge: FixtureCheck = {
     const held = (v: unknown): Held => {
       if (v === null) return null;
       if (typeof v !== "object" || Array.isArray(v)) return bytesOf(v);
-      return "proposal" in v ? fileOf([lineOf(v.proposal as JsonValue)]) : (v as Held);
+      return "proposal" in v ? fileOf(lineOf(v.proposal as JsonValue)) : (v as Held);
     };
     return keptKnowledge(held(field(input, "tail")), held(field(input, "request")));
   },
