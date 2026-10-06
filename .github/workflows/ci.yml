@@ -36,7 +36,5 @@ jobs:
         run: npm run lint
       - name: build
         run: npm run build
-      - name: lattice --help (RT-32)
-        run: node dist/cli/main.js --help
       - name: test
         run: npm test

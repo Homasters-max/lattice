@@ -1,0 +1,14 @@
+{
+  "check": "proposal",
+  "input": {
+    "proposal": {
+      "session": {},
+      "intents": [],
+      "sig": null
+    }
+  },
+  "expect": {
+    "rule": "LG-09",
+    "path": "/session"
+  }
+}

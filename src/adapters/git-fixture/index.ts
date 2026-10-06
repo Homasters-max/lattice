@@ -1,62 +1,105 @@
-// `git-fixture` (LG-23): git in memory for tests. Branches are commits of
-// whole trees; `prepare` lays the change request over `onto`, and `push` is a
-// compare-and-swap of the ref. Conflicts and the merge of S0-20 come with it.
-import type { Conflict, Git, Push, Worktree } from "../../ledger/ports/git.js";
+// `git-fixture` (LG-23): git for tests. Commits are whole trees kept in
+// memory; a worktree is a temporary directory under `dir`, and `push` commits
+// what that directory holds, as a compare-and-swap of the ref. `prepare`
+// merges the change request onto `onto` against their merge base and ends
+// `conflict` where both changed a path differently (LG-24).
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import type { Conflict, Git, Prepare, Push, Worktree } from "../../ledger/ports/git.js";
 
-/** The files of a branch, as UTF-8 text. */
-export type GitFixtureFiles = { readonly [path: string]: string };
-export type GitFixtureOptions = { readonly branches: { readonly [name: string]: GitFixtureFiles } };
+/** A branch: a commit on `from` (or a root) that writes these files; `null` removes one. */
+export type GitFixtureBranch = { readonly from?: string; readonly files: { readonly [path: string]: string | null } };
+export type GitFixtureOptions = { readonly dir: string; readonly branches: { readonly [name: string]: GitFixtureBranch } };
 
 type Tree = ReadonlyMap<string, Uint8Array>;
+type FixtureCommit = { readonly parents: readonly string[]; readonly tree: Tree; readonly message: string };
 
-interface FixtureCommit {
-  readonly parents: readonly string[];
-  readonly tree: Tree;
-  readonly message: string;
+const same = (a: Uint8Array | undefined, b: Uint8Array | undefined) =>
+  a === b || (a !== undefined && b !== undefined && Buffer.compare(a, b) === 0);
+
+function overlay(base: Tree, files: GitFixtureBranch["files"]): Tree {
+  const tree = new Map(base);
+  for (const [path, text] of Object.entries(files)) {
+    if (text === null) tree.delete(path);
+    else tree.set(path, new TextEncoder().encode(text));
+  }
+  return tree;
 }
 
-const encode = (text: string) => new TextEncoder().encode(text);
+/** The three-way merge of `top` onto `onto` from `base`: the merged tree, or the paths that conflict. */
+function merge(base: Tree, onto: Tree, top: Tree): { readonly kind: "tree"; readonly tree: Tree } | Conflict {
+  const tree = new Map(onto);
+  const paths = [...new Set([...base.keys(), ...top.keys()])].sort();
+  // A path the request changed: taken when `onto` kept the base or made the same change.
+  const changed = paths.filter((p) => !same(top.get(p), base.get(p)) && !same(onto.get(p), top.get(p)));
+  const conflicts = changed.filter((p) => !same(onto.get(p), base.get(p)));
+  for (const p of changed) {
+    const bytes = top.get(p);
+    if (bytes === undefined) tree.delete(p);
+    else tree.set(p, bytes);
+  }
+  return conflicts.length > 0 ? { kind: "conflict", paths: conflicts } : { kind: "tree", tree };
+}
 
-function worktreeOf(onto: string, head: string, files: Map<string, Uint8Array>): Worktree {
+async function filesOf(dir: string): Promise<Tree> {
+  const entries = await readdir(dir, { recursive: true, withFileTypes: true });
+  const paths = entries.filter((e) => e.isFile()).map((e) => join(e.parentPath, e.name));
+  const rel = (p: string) => p.slice(dir.length + 1).replaceAll("\\", "/");
+  return new Map(await Promise.all(paths.map(async (p) => [rel(p), await readFile(p)] as const)));
+}
+
+async function worktreeOf(dir: string, onto: string, head: string, tree: Tree): Promise<Worktree> {
+  for (const [path, bytes] of tree) {
+    await mkdir(dirname(join(dir, path)), { recursive: true });
+    await writeFile(join(dir, path), bytes);
+  }
   return {
     kind: "worktree",
     onto,
     head,
-    list: (dir) => Promise.resolve([...files.keys()].filter((p) => p.startsWith(dir)).sort()),
-    read: (path) => Promise.resolve(files.get(path) ?? null),
-    write: (path, bytes) => Promise.resolve(void files.set(path, bytes)),
-    remove: (path) => Promise.resolve(void files.delete(path)),
+    dir,
+    list: async (under) => [...(await filesOf(dir)).keys()].filter((p) => p.startsWith(under)).sort(),
+    read: (path) => readFile(join(dir, path)).catch((e: NodeJS.ErrnoException) => (e.code === "ENOENT" ? null : Promise.reject(e))),
+    remove: (path) => rm(join(dir, path), { force: true }),
   };
 }
 
-export function createGitFixture({ branches }: GitFixtureOptions): Git {
+export function createGitFixture({ dir, branches }: GitFixtureOptions): Git {
   const commits = new Map<string, FixtureCommit>();
   const refs = new Map<string, string>();
-  const trees = new Map<Worktree, Map<string, Uint8Array>>();
-  const commit = (c: FixtureCommit) => {
+  const add = (c: FixtureCommit) => {
     const id = `fixture-${commits.size + 1}`;
     commits.set(id, c);
     return id;
   };
-  for (const [name, files] of Object.entries(branches)) {
-    refs.set(name, commit({ parents: [], tree: new Map(Object.entries(files).map(([p, t]) => [p, encode(t)])), message: name }));
+  const commitOf = (ref: string): string => {
+    const id = refs.get(ref) ?? ref;
+    if (!commits.has(id)) throw new Error(`bug: git-fixture has no branch or commit ${ref}`);
+    return id;
+  };
+  const treeOf = (id: string): Tree => commits.get(id)?.tree ?? new Map();
+  const ancestors = (id: string): string[] => [id, ...(commits.get(id)?.parents ?? []).flatMap(ancestors)];
+  for (const [name, { from, files }] of Object.entries(branches)) {
+    const parent = from === undefined ? null : commitOf(from);
+    refs.set(name, add({ parents: parent === null ? [] : [parent], tree: overlay(parent === null ? new Map() : treeOf(parent), files), message: name }));
   }
-  const treeOf = (ref: string): Tree | undefined => commits.get(refs.get(ref) ?? ref)?.tree;
   return {
-    tail: (ref) => Promise.resolve(refs.get(ref) ?? ""),
-    prepare(request, onto): Promise<Worktree | Conflict> {
-      const [base, top] = [treeOf(onto), treeOf(request)];
-      if (base === undefined || top === undefined) return Promise.reject(new Error(`git-fixture: no commit ${onto} or ${request}`));
-      const files = new Map([...base, ...top]);
-      const worktree = worktreeOf(onto, refs.get(request) ?? request, files);
-      trees.set(worktree, files);
-      return Promise.resolve(worktree);
+    tail: (ref) => Promise.resolve(commitOf(ref)),
+    async prepare({ request, onto }: Prepare) {
+      const [head, base] = [commitOf(request), commitOf(onto)];
+      const shared = new Set(ancestors(base));
+      const mergeBase = ancestors(head).find((id) => shared.has(id));
+      const merged = merge(mergeBase === undefined ? new Map() : treeOf(mergeBase), treeOf(base), treeOf(head));
+      if (merged.kind === "conflict") return merged;
+      await mkdir(dir, { recursive: true });
+      return worktreeOf(await mkdtemp(join(dir, "worktree-")), base, head, merged.tree);
     },
-    push({ worktree, ref, expected, message, trailers }: Push) {
-      if (refs.get(ref) !== expected) return Promise.resolve("moved" as const);
+    async push({ worktree, ref, expected, message, trailers }: Push) {
+      if (refs.get(ref) !== expected) return "moved";
       const text = [message, "", ...trailers.map((t) => `${t.key}: ${t.value}`)].join("\n");
-      refs.set(ref, commit({ parents: [expected, worktree.head], tree: new Map(trees.get(worktree)), message: text }));
-      return Promise.resolve("pushed" as const);
+      refs.set(ref, add({ parents: [expected, worktree.head], tree: await filesOf(worktree.dir), message: text }));
+      await rm(worktree.dir, { recursive: true, force: true });
+      return "pushed";
     },
   };
 }

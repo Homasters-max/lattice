@@ -1,0 +1,10 @@
+{
+  "check": "change-request",
+  "input": {
+    "files": []
+  },
+  "expect": {
+    "rule": "LG-54",
+    "path": "/store/proposals"
+  }
+}

@@ -3,7 +3,7 @@
 import { COMMANDS } from "./commands.js";
 import type { CliEnv } from "./env.js";
 import { landCommand } from "./land.js";
-import { ARRIVES } from "./stubs.js";
+import { STUBS } from "./stubs.js";
 
 export type { CliEnv };
 
@@ -25,7 +25,7 @@ export async function run(argv: readonly string[], env: CliEnv): Promise<number>
   }
   const handler = HANDLERS[name];
   if (handler !== undefined) return handler(args, env);
-  const task = COMMANDS.some((c) => c.name === name) ? ARRIVES[name] : undefined;
+  const task = COMMANDS.some((c) => c.name === name) ? STUBS[name] : undefined;
   env.err(task === undefined ? `lattice: unknown command ${name}; see lattice --help\n` : `lattice ${name}: not yet — arrives with plan task ${task}\n`);
   return 2;
 }

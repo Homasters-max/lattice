@@ -1,0 +1,49 @@
+// `store-jsonl` (LG-02, LG-23): the git copy of `knowledge` — one canonical
+// line per commit in `store/knowledge.jsonl` of a directory, read from the
+// start when the store opens. It never parses a line: the ledger hands it each
+// commit as its line and folds the rows, which it keeps in memory. Refusing a
+// cut last line, writing `store/evidence/` and the rows handed on opening
+// arrive with S0-11.
+import { appendFile, mkdir, readFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import type { Append, Row, Store } from "../../ledger/ports/store.js";
+
+export type StoreJsonlOptions = { readonly dir: string };
+
+/** LG-50: the only path this adapter writes. */
+const KNOWLEDGE = "store/knowledge.jsonl";
+
+const byKey = (a: Row, b: Row) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
+
+async function* stream<T>(items: readonly T[]): AsyncIterable<T> {
+  for (const item of items) yield await Promise.resolve(item);
+}
+
+async function linesOf(file: string): Promise<string[]> {
+  const text = await readFile(file, "utf8").catch((e: NodeJS.ErrnoException) => (e.code === "ENOENT" ? "" : Promise.reject(e)));
+  return text.split("\n").filter((line) => line !== "");
+}
+
+export function createStoreJsonl({ dir }: StoreJsonlOptions): Store {
+  const file = join(dir, KNOWLEDGE);
+  const holding = new Map<string, Row>();
+  const evidence = new Map<string, Uint8Array>();
+  return {
+    async append({ commit, delta, evidence: cited }: Append) {
+      await mkdir(dirname(file), { recursive: true });
+      await appendFile(file, `${commit}\n`, "utf8");
+      for (const row of delta) {
+        if (row.to === null) holding.set(row.key, row);
+        else if (holding.get(row.key)?.from === row.from) holding.delete(row.key);
+      }
+      for (const e of cited) evidence.set(e.hash, e.bytes);
+    },
+    commits: async function* (from) {
+      for (const line of (await linesOf(file)).slice(Math.max(from, 1) - 1)) yield line;
+    },
+    tail: async () => (await linesOf(file)).at(-1) ?? null,
+    row: (key) => Promise.resolve(holding.get(key) ?? null),
+    rows: (prefix) => stream([...holding.values()].filter((r) => r.key.startsWith(prefix)).sort(byKey)),
+    evidence: (hash) => Promise.resolve(evidence.get(hash) ?? null),
+  };
+}

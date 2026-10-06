@@ -18,7 +18,7 @@ Commit `knowledge` рождается в git через landing (LG-22): git р�
 ## Объём
 
 Входит:
-- **порт `git`** (LG-23): `tail(ref)`; `prepare(request, onto) → worktree | conflict`; `push(worktree, ref, expected, message, trailers) → pushed | moved` — compare-and-swap по `expected`; в коде `push` принимает эти аргументы одним объектом (S0-03, лимит параметров); `prev`, `request` и подпись коммита landing дописывает после apply (G-14); store `jsonl` открывается на worktree и получает `append` до `push` — skeleton с `memory` пишет после `push`;
+- **порт `git`** (LG-23): `tail(ref)`; `prepare(request, onto) → worktree | conflict`; `push(worktree, ref, expected, message, trailers) → pushed | moved` — compare-and-swap по `expected`; в коде `prepare` и `push` берут аргументы одним объектом (`CONVENTIONS.md` §1, Q-11);
 - **`git-repo`** (D-08): CLI `git`, worktree, merge, локальный CAS `git update-ref`; **`git-fixture`**;
 - **landing** в `machine`-сессии `land` (LG-22): событие land session в коммите (participant `land`, purpose `work`, `for` — reason сессии proposal); acts через порт → `act`-события; apply на tail; один git-коммит — merge change request в tail `main` со вторым родителем — head change request, с append в `store/knowledge.jsonl` через адаптер `jsonl` на worktree, evidence в `store/evidence/`, удалённым файлом proposal; без записи `docs/` до SW (PLAN.md, раздел 2);
 - **trailers**: `Lattice-Session`, `Lattice-Reason` сессии proposal; `Lattice-Step` — id, выданный портом `ids` (сам step записывается с S1, LG-28); `Lattice-Proposal`, `Lattice-Seq`;
@@ -44,3 +44,4 @@ LG-29 на `git-fixture` и `acts-fixture`: dry-run без acts → `awaiting-ac
 ## Риски и заметки
 
 - Задача на четыре модуля — триггер аудита ST-15; кандидат на деление: «порт `git` и адаптеры» отдельно от «landing и `--dry-run`».
+- От S0-03 (Q-09, Q-12): тонкий landing уже есть — worktree → `append` через `jsonl` → удалить proposal → `push`; worktree `git-fixture` — временный каталог, `prepare` сливает по общему предку и кончается `conflict`; `prev` дописывает landing (G-14), `request` — `null`. Задача добавляет пересборку на сдвинутом `main` (CAS, LG-24), `awaiting-act` и отчёт dry-run (LG-26), land session и `act`-события, trailers OB-07, `request` — `uri` change request, `git-repo`; LG-54 уже отказывает (`proposalPath`, `test/fixtures/LG-54/`).

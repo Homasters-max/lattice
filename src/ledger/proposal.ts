@@ -1,7 +1,9 @@
-// A proposal (LG-09): `{session, intents, sig}`. The walking skeleton reads
-// only a well-formed proposal; refusing a malformed one with its rule ID, the
-// canonical order of intents and the signature arrive with S0-10.
-import { hash, type JsonObject, type JsonValue, type Kind } from "../kernel/index.js";
+// A proposal (LG-09): `{session, intents, sig}`. The walking skeleton checks
+// its form on the surface — the fields and their JSON kinds; the session
+// event with its certificate, the signature and facts in the canonical order
+// arrive with S0-10 and S0-16.
+import { compareText, hash, isJsonObject, reject, refused, type JsonObject, type JsonValue, type Kind, type Rejection, type Result } from "../kernel/index.js";
+import { LG_09 } from "./rules.js";
 
 /** The authoring session event (TR-11); its certificate arrives with S0-16. */
 export type Session = JsonObject & { readonly id: string };
@@ -21,37 +23,59 @@ export type Proposal = {
   readonly sig: string | null;
 };
 
-const isObject = (v: JsonValue | undefined): v is JsonObject => typeof v === "object" && v !== null && !Array.isArray(v);
-const isString = (v: JsonValue | undefined) => typeof v === "string";
+const kindOf = (v: JsonValue | undefined): string =>
+  v === undefined ? "absent" : v === null ? "null" : Array.isArray(v) ? "array" : typeof v;
 
-const INTENT: { readonly [field in keyof Intent]: (v: JsonValue | undefined) => boolean } = {
-  op: (v) => v === "entity" || v === "event",
-  id: isString,
-  type: isString,
-  expected: (v) => v === null || typeof v === "number",
-  at: isString,
-  body: (v) => v !== undefined,
+type Field = { readonly expected: string; readonly fits: (v: JsonValue | undefined) => boolean };
+
+const STRING: Field = { expected: "a string", fits: (v) => typeof v === "string" };
+
+const INTENT: { readonly [field in keyof Intent]: Field } = {
+  op: { expected: "entity or event", fits: (v) => v === "entity" || v === "event" },
+  id: STRING,
+  type: STRING,
+  expected: { expected: "a revision or null", fits: (v) => v === null || typeof v === "number" },
+  at: STRING,
+  body: { expected: "a JSON value", fits: (v) => v !== undefined },
 };
 
-function unreadable(what: string): never {
-  throw new Error(`not in the walking skeleton: refusing ${what} (LG-09) arrives with S0-10`);
+const PROPOSAL: { readonly [field: string]: Field } = {
+  session: { expected: "a session event", fits: (v) => isJsonObject(v) && typeof v.id === "string" },
+  intents: { expected: "a list of intents", fits: (v) => Array.isArray(v) },
+  sig: { expected: "a signature or null", fits: (v) => v === null || typeof v === "string" },
+};
+
+const at = (intent: string | null, path: string, field: Field, got: JsonValue | undefined) =>
+  reject(LG_09, { intent, path, expected: field.expected, got: kindOf(got) });
+
+/** G-13: inside an intent with a string `id` the path is the intent's own; otherwise from the root. */
+function intentRejections(v: JsonValue, i: number): Rejection[] {
+  if (!isJsonObject(v)) return [at(null, `/intents/${i}`, { expected: "an intent", fits: () => false }, v)];
+  const id = typeof v.id === "string" ? v.id : null;
+  return Object.entries(INTENT).flatMap(([name, field]) =>
+    field.fits(v[name]) ? [] : [at(id, id === null ? `/intents/${i}/${name}` : `/${name}`, field, v[name])],
+  );
 }
 
-function readIntent(v: JsonValue): Intent {
-  if (!isObject(v) || !Object.entries(INTENT).every(([field, fits]) => fits(v[field]))) unreadable("a malformed intent");
-  return v as Intent;
+function proposalRejections(value: JsonValue): Rejection[] {
+  if (!isJsonObject(value)) return [at(null, "", { expected: "a proposal", fits: () => false }, value)];
+  const own = Object.entries(PROPOSAL).flatMap(([name, field]) => (field.fits(value[name]) ? [] : [at(null, `/${name}`, field, value[name])]));
+  const intents = Array.isArray(value.intents) ? (value.intents as readonly JsonValue[]) : [];
+  return [...own, ...intents.flatMap(intentRejections)];
 }
 
-/** The proposal a JSON value holds. */
-export function readProposal(value: JsonValue): Proposal {
-  if (!isObject(value) || !Array.isArray(value.intents)) return unreadable("a proposal without intents");
-  const { session, intents, sig } = value;
-  if (!isObject(session) || !isString(session.id)) return unreadable("a proposal without a session id");
-  if (sig !== null && !isString(sig)) return unreadable("a malformed sig");
-  return { session: session as Session, intents: (intents as readonly JsonValue[]).map(readIntent), sig };
+/** LG-09: the proposal a JSON value holds, or the rejections of its form. */
+export function readProposal(value: JsonValue): Result<Proposal> {
+  // Every field was checked against its kind above, so the value has the shape of Proposal.
+  return refused<Proposal>(proposalRejections(value)) ?? { ok: true, value: value as Proposal };
 }
 
-/** LG-10: the hash of a proposal without `sig`. */
+const order = (a: Intent, b: Intent) => (a.op === b.op ? compareText(a.id, b.id) : a.op === "entity" ? -1 : 1);
+
+/** LG-06, G-03: entities by `id`, then events by `id`; the group of facts by key arrives with S0-10. */
+export const canonicalIntents = (intents: readonly Intent[]): Intent[] => [...intents].sort(order);
+
+/** LG-10: the hash of a proposal without `sig`, with intents in canonical order. */
 export function proposalHash(p: Proposal): string {
-  return hash({ session: p.session, intents: p.intents });
+  return hash({ session: p.session, intents: canonicalIntents(p.intents) });
 }

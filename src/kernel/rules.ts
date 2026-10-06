@@ -7,4 +7,9 @@ export const KR_06 = {
   message: { en: "an entity id is namespace/slug and an event id is a ULID; got {got}" },
 } as const satisfies Rule;
 
-export const RULES: readonly Rule[] = [KR_06];
+export const KR_10 = {
+  id: "KR-10",
+  message: { en: "input is I-JSON in UTF-8 and is refused, never repaired; expected {expected}, got {got}" },
+} as const satisfies Rule;
+
+export const RULES: readonly Rule[] = [KR_06, KR_10];

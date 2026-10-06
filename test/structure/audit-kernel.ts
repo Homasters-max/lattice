@@ -31,11 +31,15 @@ export function auditKernelFiles(tree: Tree, listed: readonly string[]): string[
   ].sort();
 }
 
-function texts(sf: ts.SourceFile): { readonly text: string; readonly line: number }[] {
-  const out: { text: string; line: number }[] = [];
+type Text = { readonly text: string; readonly line: number; readonly identifier: boolean };
+
+/** The string literals and identifiers of a file — names, types, properties; comments are not code. */
+function texts(sf: ts.SourceFile): Text[] {
+  const out: Text[] = [];
   const visit = (node: ts.Node) => {
-    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateLiteralToken(node)) {
-      out.push({ text: node.text, line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1 });
+    const literal = ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateLiteralToken(node);
+    if (literal || ts.isIdentifier(node)) {
+      out.push({ text: node.text, line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1, identifier: !literal });
     }
     ts.forEachChild(node, visit);
   };
@@ -43,21 +47,29 @@ function texts(sf: ts.SourceFile): { readonly text: string; readonly line: numbe
   return out;
 }
 
-function namesIn(text: string, names: ReadonlySet<string>): string | null {
+/** An identifier in kebab case: `reviewNote`, `ReviewNote`, `REVIEW_NOTE` → `review-note`. */
+const kebab = (id: string) =>
+  id
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .replaceAll("_", "-")
+    .toLowerCase();
+
+function namesIn({ text, identifier }: Text, names: ReadonlySet<string>): string | null {
+  if (identifier) return names.has(kebab(text)) ? text : null;
   if (text.includes("std/")) return text;
   const bare = /^(?:std\/)?([a-z][a-z0-9-]*)(?:@\d+)?$/.exec(text)?.[1];
   return bare !== undefined && names.has(bare) ? text : null;
 }
 
-/** KR-01: string literals of kernel code that name `std` or one of its types. */
+/** KR-01: string literals that name `std` or one of its types, and identifiers named after a `std` type, in kernel code. */
 export function auditStdNames(tree: Tree, names: ReadonlySet<string>): string[] {
   return kernelReach(tree)
     .flatMap((path) => {
       const sf = tree.files.get(path);
       if (sf === undefined) return [];
-      return texts(sf).flatMap(({ text, line }) => {
-        const hit = namesIn(text, names);
-        return hit === null ? [] : [`KR-01: ${path}:${line} names the std type ${JSON.stringify(hit)}; the kernel knows no std type`];
+      return texts(sf).flatMap((t) => {
+        const hit = namesIn(t, names);
+        return hit === null ? [] : [`KR-01: ${path}:${t.line} names the std type ${JSON.stringify(hit)}; the kernel knows no std type`];
       });
     })
     .sort();

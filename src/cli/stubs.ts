@@ -2,7 +2,7 @@
 // where each arrives. A task that implements a command removes its line here
 // and adds its handler to run.ts.
 
-export const ARRIVES: { readonly [command: string]: string } = {
+export const STUBS: { readonly [command: string]: string } = {
   init: "S0-23",
   draft: "S0-21",
   "verify-store": "S0-12",

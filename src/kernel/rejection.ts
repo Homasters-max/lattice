@@ -1,7 +1,7 @@
 // The form of a refusal (LG-17, CONVENTIONS.md §2–3, §5–6): a hard check
 // returns a Result; a rejection names its rule ID and is made only by
 // `reject` from a row of a rule registry.
-import { canon, type JsonValue } from "./json.js";
+import { canon, compareText, type JsonValue } from "./json.js";
 
 export type RulePrefix = "PR" | "KR" | "TY" | "RF" | "LG" | "TR" | "RT" | "DP" | "LN" | "BN" | "OB" | "AG" | "ST" | "SL" | "RM" | "GL";
 type Digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
@@ -47,11 +47,8 @@ const keyOf = (r: Rejection): readonly string[] => [r.intent === null ? "" : `~$
 
 function compare(a: Rejection, b: Rejection): number {
   const [ka, kb] = [keyOf(a), keyOf(b)];
-  for (let i = 0; i < ka.length; i++) {
-    const [x, y] = [ka[i] ?? "", kb[i] ?? ""];
-    if (x !== y) return x < y ? -1 : 1;
-  }
-  return 0;
+  const at = ka.findIndex((x, i) => x !== kb[i]);
+  return at < 0 ? 0 : compareText(ka[at] ?? "", kb[at] ?? "");
 }
 
 /** CONVENTIONS.md §5: by intent (null first), path, rule, id, then canonical expected and got. */
@@ -59,8 +56,14 @@ export function sortRejections(rejections: readonly Rejection[]): Rejection[] {
   return [...rejections].sort(compare);
 }
 
+/** A refused Result with these rejections, sorted. */
+export function refuse<T>(first: Rejection, ...rest: readonly Rejection[]): Result<T> {
+  const [head = first, ...tail] = sortRejections([first, ...rest]);
+  return { ok: false, rejections: [head, ...tail] };
+}
+
 /** A refused Result, or `null` when there is nothing to refuse. */
 export function refused<T>(rejections: readonly Rejection[]): Result<T> | null {
-  const [first, ...rest] = sortRejections(rejections);
-  return first === undefined ? null : { ok: false, rejections: [first, ...rest] };
+  const [first, ...rest] = rejections;
+  return first === undefined ? null : refuse<T>(first, ...rest);
 }

@@ -4,14 +4,14 @@
 // commit (LG-15); the phases of LG-16 arrive with S0-13…S0-18.
 import { checkId, hashRecord, KERNEL_VERSION, refused, type Record, type Result } from "../kernel/index.js";
 import type { Commit, Evidence } from "./commit.js";
-import type { ActSource } from "./ports/acts.js";
-import { proposalHash, type Intent, type Proposal } from "./proposal.js";
+import type { Act } from "./ports/acts.js";
+import { canonicalIntents, proposalHash, type Intent, type Proposal } from "./proposal.js";
 import type { View } from "./view.js";
 
 /** The land session and the acts landing formed (LG-22); the session's `at` is the time of landing. */
 export type LandActs = {
   readonly session: { readonly id: string; readonly at: string };
-  readonly events: readonly ActSource[];
+  readonly events: readonly Act[];
 };
 
 function recordOf(before: View, proposal: Proposal, i: Intent): Record {
@@ -19,7 +19,11 @@ function recordOf(before: View, proposal: Proposal, i: Intent): Record {
   return i.op === "entity" ? { ...head, rev: (before.current(i.id)?.rev ?? 0) + 1 } : head;
 }
 
-/** LG-15: assigns `seq`, `rev` and `hash`; landing fills `prev`, `request` and `sig` (G-14). */
+/**
+ * LG-15: assigns `seq`, `rev` and `hash`; records follow the canonical order of LG-06. Apply knows
+ * neither the tail commit nor the change request, so `prev`, `request` and `sig` stay `null`:
+ * landing fills `prev` and `request` (G-14), the signature arrives with S0-10 and S0-20.
+ */
 function candidate(before: View, proposal: Proposal, acts: LandActs): Commit {
   return {
     seq: before.seq + 1,
@@ -32,7 +36,7 @@ function candidate(before: View, proposal: Proposal, acts: LandActs): Commit {
     at: acts.session.at,
     request: null,
     sig: null,
-    records: proposal.intents.map((i) => recordOf(before, proposal, i)),
+    records: canonicalIntents(proposal.intents).map((i) => recordOf(before, proposal, i)),
   };
 }
 

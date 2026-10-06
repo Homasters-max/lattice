@@ -46,6 +46,17 @@ describe("std type names in the kernel (KR-01)", () => {
     ]);
   });
 
+  it("KR-01: refuses an identifier, a type or a property named after a std type", () => {
+    const t = tree({
+      "src/kernel/index.ts": "export type Requirement = { readonly reviewNote: number };\nexport const NAMESPACE = 1;\nexport const isRequirement = 2;\n",
+    });
+    expect(auditStdNames(t, new Set([...NAMES, "review-note"]))).toEqual([
+      'KR-01: src/kernel/index.ts:1 names the std type "Requirement"; the kernel knows no std type',
+      'KR-01: src/kernel/index.ts:1 names the std type "reviewNote"; the kernel knows no std type',
+      'KR-01: src/kernel/index.ts:2 names the std type "NAMESPACE"; the kernel knows no std type',
+    ]);
+  });
+
   it("passes words inside a sentence and std names outside the kernel", () => {
     const t = tree({
       "src/kernel/index.ts": 'export const m = "an entity id is namespace/slug";\n',

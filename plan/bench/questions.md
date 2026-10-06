@@ -21,3 +21,4 @@
 | 13 | Who fills the prev hash of a knowledge commit, apply or landing? | — | blank | S0-03, G-14 (LG-06 называет поле, LG-14 и LG-38 не дают apply hash tail) | 2026-10-06 |
 | 14 | May the cli import the codec module directly? | lattice/st-01, lattice/st-06 | normal | S0-03, G-15 (строки расходятся) | 2026-10-06 |
 | 15 | Which kernel version do commits carry before the switch? | lattice/kr-03 | normal | S0-03 | 2026-10-06 |
+| 16 | Does a store adapter compute the canonical bytes of the commits it writes? | — | blank | S0-03, Q-09 (LG-02 и LG-23 молчат; решено в CONVENTIONS.md: ledger отдаёт строку) | 2026-10-06 |

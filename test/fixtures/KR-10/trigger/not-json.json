@@ -1,0 +1,10 @@
+{
+  "check": "json",
+  "input": {
+    "text": "{\"text\": \"hello\""
+  },
+  "expect": {
+    "rule": "KR-10",
+    "path": ""
+  }
+}

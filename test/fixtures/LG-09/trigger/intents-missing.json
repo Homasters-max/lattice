@@ -1,0 +1,15 @@
+{
+  "check": "proposal",
+  "input": {
+    "proposal": {
+      "session": {
+        "id": "01JB2X00000000000000000SES"
+      },
+      "sig": null
+    }
+  },
+  "expect": {
+    "rule": "LG-09",
+    "path": "/intents"
+  }
+}

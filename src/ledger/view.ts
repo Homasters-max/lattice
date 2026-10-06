@@ -1,9 +1,11 @@
 // The read view (LG-38): the questions apply, the runtime, capabilities and
 // checks ask at one `seq`. The walking skeleton answers `seq` and `current`;
 // the other questions arrive with S0-12.
-import type { Record } from "../kernel/index.js";
+import { type Record, type Result } from "../kernel/index.js";
+import { decodeCommit, type Commit } from "./commit.js";
+import { fold } from "./fold.js";
 import type { Store } from "./ports/store.js";
-import type { Row } from "./rows.js";
+import { currentKey, withDelta, type Row, type Rows } from "./rows.js";
 
 export interface View {
   readonly seq: number;
@@ -11,26 +13,31 @@ export interface View {
   current(id: string): Record | null;
 }
 
-/** A view with the rows behind it: fold reads rows, every other reader asks the questions of View. */
-export interface RowView extends View {
-  /** The row that holds at `seq` for a key. */
-  row(key: string): Row | null;
-}
-
-/** The key of the current revision of an entity. */
-export const currentKey = (id: string): string => `current:${id}`;
-
 /** `view(seq)`: the rows with `from ≤ seq` and `to` null or greater. */
-export function createView(seq: number, rows: readonly Row[]): RowView {
+export function createView(seq: number, rows: readonly Row[]): View & Rows {
   const holding = new Map(rows.filter((r) => r.from <= seq && (r.to === null || r.to > seq)).map((r) => [r.key, r]));
   const row = (key: string) => holding.get(key) ?? null;
   // A current row holds the record fold wrote for it (fold.ts).
   return { seq, row, current: (id) => (row(currentKey(id))?.value as Record | undefined) ?? null };
 }
 
-/** The view at the tail of a store. */
-export async function readView(store: Store): Promise<RowView> {
-  const rows: Row[] = [];
-  for await (const r of store.rows("")) rows.push(r);
-  return createView((await store.tail())?.seq ?? 0, rows);
+/** A store opened: the view at its tail and the tail commit. */
+export type Opened = { readonly view: View & Rows; readonly tail: Commit | null };
+
+/**
+ * LG-02: opening a store folds its commits from genesis. The walking skeleton
+ * keeps the rows in the view; verifying the chain and handing the rows to the
+ * adapter arrive with S0-11.
+ */
+export async function openView(store: Store): Promise<Result<Opened>> {
+  let rows: Row[] = [];
+  let opened: Opened = { view: createView(0, []), tail: null };
+  let index = 0;
+  for await (const line of store.commits(1)) {
+    const commit = decodeCommit(line, index++);
+    if (!commit.ok) return commit;
+    rows = withDelta(rows, fold(opened.view, commit.value, []));
+    opened = { view: createView(commit.value.seq, rows), tail: commit.value };
+  }
+  return { ok: true, value: opened };
 }
