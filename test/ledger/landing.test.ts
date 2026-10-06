@@ -249,8 +249,9 @@ describe("landing outcomes (LG-24, LG-25, LG-54)", () => {
       tail: (ref) => inner.tail(ref),
       prepare: (p) => inner.prepare(p),
       push: async (p) => {
+        // Someone else moves main first: a commit of code, with its own message and no trailers of landing.
         const w = await inner.prepare({ request: "cr/readme", onto: p.expected });
-        if (w.kind === "worktree") await inner.push({ ...p, worktree: w });
+        if (w.kind === "worktree") await inner.push({ worktree: w, ref: "main", expected: p.expected, message: "m", trailers: [] });
         return inner.push(p);
       },
     };
