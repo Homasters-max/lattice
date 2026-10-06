@@ -10,12 +10,10 @@ export {
   refused,
   reject,
   sortRejections,
-  type Lang,
   type Rejection,
   type Rejections,
   type Result,
   type Rule,
-  type RuleId,
 } from "./rejection.js";
 export { KR_04, KR_06, KR_10, RULES } from "./rules.js";
 export { KERNEL_VERSION } from "./version.js";
