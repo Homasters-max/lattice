@@ -15,8 +15,8 @@ import { createStoreJsonl } from "../../src/adapters/store-jsonl/index.js";
 import { hashBytes } from "../../src/kernel/index.js";
 import {
   commitHash,
-  decodeCommit,
   land,
+  openLines,
   tailView,
   type Commit,
   type Git,
@@ -80,13 +80,19 @@ async function mainWorktree(git: Git): Promise<Worktree> {
   return w;
 }
 
+/**
+ * The commits of the store on main, as opening it reads them (LG-02, LG-38): the tail of each prefix of its
+ * lines, opened by `openLines`. A line opening refuses fails the test — none is dropped.
+ */
 async function commitsOnMain(ports: LandingPorts): Promise<Commit[]> {
-  const out: Commit[] = [];
-  for await (const line of ports.openStore(await mainWorktree(ports.git)).commits(1)) {
-    const c = decodeCommit(line, out.length);
-    if (c.ok) out.push(c.value);
-  }
-  return out;
+  const lines: Uint8Array[] = [];
+  for await (const line of ports.openStore(await mainWorktree(ports.git)).commits(1)) lines.push(line);
+  return lines.map((_, i) => {
+    const opened = openLines(lines.slice(0, i + 1));
+    if (!opened.ok) throw new Error(`bug: main holds a store opening refuses: ${JSON.stringify(opened.rejections)}`);
+    if (opened.value.tail === null) throw new Error("bug: a store of one line or more has a tail");
+    return opened.value.tail;
+  });
 }
 
 const landed = async (ports: LandingPorts, request: string) => {
