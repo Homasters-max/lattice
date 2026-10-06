@@ -11,12 +11,14 @@ import { createActsFixture } from "../../src/adapters/acts-fixture/index.js";
 import { createClockFixed } from "../../src/adapters/clock-fixed/index.js";
 import { createGitFixture, type GitFixtureBranch, type GitFixtureOptions } from "../../src/adapters/git-fixture/index.js";
 import { createIdsCounter } from "../../src/adapters/ids-counter/index.js";
-import { createStoreJsonl } from "../../src/adapters/store-jsonl/index.js";
+import { createStoreJsonl, fileOf } from "../../src/adapters/store-jsonl/index.js";
 import { hashBytes } from "../../src/kernel/index.js";
 import {
   commitHash,
+  encodeCommit,
   land,
   openTail,
+  type Commit,
   type Git,
   type LandingOutcome,
   type LandingPorts,
@@ -78,6 +80,14 @@ async function storeOnMain(ports: LandingPorts) {
   return opened.value;
 }
 
+const text = (bytes: Uint8Array | null) => (bytes === null ? "" : new TextDecoder().decode(bytes));
+
+/** The store on main as text: `store/knowledge.jsonl` as `openTail` read it, `""` where main has none. */
+const storeTextOnMain = async (ports: LandingPorts) => text((await storeOnMain(ports)).knowledge);
+
+/** The text of a store of exactly these commits, in order: the lines landing writes, framed by `fileOf` of `store-jsonl`. */
+const storeTextOf = (commits: readonly Commit[]) => commits.map((c) => text(fileOf(encodeCommit(c)))).join("");
+
 /** The paths of the files under `under` on main: the tree of its tail commit, which no store holds. */
 async function filesOnMain(ports: LandingPorts, under: string): Promise<readonly string[]> {
   const { onto } = await storeOnMain(ports);
@@ -111,8 +121,7 @@ describe("landing into git (LG-22, LG-23)", () => {
   it("LG-23: the commit is a line of store/knowledge.jsonl on main, and the proposal file is gone", async () => {
     const ports = portsOf();
     const commit = await landed(ports, "cr/a");
-    const { view, tail } = await storeOnMain(ports);
-    expect([view.seq, tail]).toEqual([1, commit]);
+    expect(await storeTextOnMain(ports)).toBe(storeTextOf([commit]));
     expect(await filesOnMain(ports, "store/")).toEqual(["store/knowledge.jsonl"]);
   });
 
@@ -138,7 +147,7 @@ describe("landing into git (LG-22, LG-23)", () => {
     const ports = portsOf();
     const tail = await ports.git.tail("main");
     expect((await land(ports, "cr/a", DRY_RUN)).outcome).toBe("commit");
-    expect([await ports.git.tail("main"), (await storeOnMain(ports)).tail]).toEqual([tail, null]);
+    expect([await ports.git.tail("main"), await storeTextOnMain(ports)]).toEqual([tail, storeTextOf([])]);
   });
 });
 
@@ -162,14 +171,13 @@ describe("the landing commit in git (LG-22)", () => {
 
 describe("the store a change request brings (LG-14, LG-23)", () => {
   const KNOWLEDGE = "store/knowledge.jsonl";
-  const read = async (ports: LandingPorts) => new TextDecoder().decode((await storeOnMain(ports)).knowledge ?? new Uint8Array());
 
   /** Main holds the store landing wrote for cr/a; cr/x, a change request from that main, writes `files` of that file. */
   async function fromLanded(files: (file: string) => GitFixtureBranch["files"]) {
     const git = createGitFixture({ dir, branches: BRANCHES });
     const ports = portsOf({ git });
     await landed(ports, "cr/a");
-    const file = await read(ports);
+    const file = await storeTextOnMain(ports);
     git.branch("cr/x", { from: "main", files: { ...files(file), "store/proposals/x.json": proposal("demo/x") } });
     return { ports, file };
   }
@@ -190,14 +198,14 @@ describe("the store a change request brings (LG-14, LG-23)", () => {
       const out = await land(ports, "cr/x", options);
       expect(out.outcome === "rejections" ? out.rejections : out).toMatchObject([refusal]);
     }
-    expect(await read(ports)).toBe(file);
+    expect(await storeTextOnMain(ports)).toBe(file);
   });
 
   it("LG-23: refuses a change request that put a directory in place of store/knowledge.jsonl, never throws", async () => {
     const { ports, file } = await fromLanded(() => ({ [KNOWLEDGE]: null, [`${KNOWLEDGE}/x`]: "x\n" }));
     const refusal = { rule: "LG-23", path: "/store/knowledge.jsonl", expected: hashBytes(utf8(file)), got: [`${KNOWLEDGE}/x`] };
     expect(await land(ports, "cr/x", LAND)).toMatchObject({ outcome: "rejections", rejections: [refusal] });
-    expect(await read(ports)).toBe(file);
+    expect(await storeTextOnMain(ports)).toBe(file);
   });
 
   it("LG-14, LG-23: lands on a store the change request brings unchanged, with before at the tail of main", async () => {
@@ -231,7 +239,7 @@ describe("a change request that changes no knowledge (LG-25, LG-54)", () => {
     expect(await land(ports, "cr/code", DRY_RUN)).toEqual({ outcome: "no-op", pushed: false });
     expect(pushes).toEqual([]);
     expect(await land(ports, "cr/code", LAND)).toEqual({ outcome: "no-op", pushed: true });
-    expect([await filesOnMain(ports, ""), (await storeOnMain(ports)).tail]).toEqual([["README.md", "src/y.ts"], null]);
+    expect([await filesOnMain(ports, ""), await storeTextOnMain(ports)]).toEqual([["README.md", "src/y.ts"], storeTextOf([])]);
     expect(pushes.map((p) => [p.message, p.trailers.map((t) => t.key)])).toEqual([["lattice: land no-op", ["Lattice-Proposal"]]]);
   });
 });
