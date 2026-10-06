@@ -9,7 +9,7 @@
 - **Данные — `type`, поведение — `interface`.** Запись, intent, proposal, commit, строка, отказ и строка реестра правил — псевдонимы `type`: так они присваиваются `JsonValue` и идут в `canon` и `hash` без приведения. Порт, read view, команда — `interface`.
 - **`Record` — запись** (KR-04, ST-03; решение владельца Q-15): так называется тип записи в `kernel`. Утилита TypeScript `Record<K, V>` в коде не используется — словарь пишется индексной сигнатурой (пункт «Типы `readonly`»).
 - **Заморозка проверяется в тестах**: на границе модуля тест передаёт вход через `deepFreeze` (хелпер `test/support/deep-freeze.ts`) — функция, которая мутирует вход, падает в тесте. В рабочем коде глубокая заморозка не обязательна: её гарантирует строгий парсер ядра и `readonly`.
-- **Классы** — только там, где у сущности есть изменяемое состояние внешнего мира: адаптер может быть замыканием или классом. Порт — `interface`, адаптер — фабрика `createX(options)`, которая возвращает объект этого интерфейса.
+- **Классы** — только там, где у сущности есть изменяемое состояние внешнего мира: адаптер может быть замыканием или классом. Порт — `interface`, адаптер — фабрика `createX(options)` от своих настроек, которая возвращает объект этого интерфейса (решение владельца Q-22).
 - **Адаптер** живёт в `src/adapters/<port>-<variant>/` (`store-memory`, `clock-fixed`): имя начинается с порта, который он реализует, — по нему тест структуры знает, какой интерфейс адаптеру можно импортировать (ST-01).
 - **Адаптеры для тестов** — каждый `*-fixture` (TR-14, LG-23), `clock-fixed` и `ids-counter` (ST-07) — собирает только тестовая сборка `test/support/assembly.ts`; ни один файл `src/`, `assembly` тоже, их не импортирует — это проверяет тест структуры (решение владельца Q-13, `plan/closure-check.md`, «acts и права»).
 - **Аргументы порта** (решение владельца по ревью S0-03): операция порта с несколькими аргументами принимает один объект с именами аргументов из правила — у всех портов, без порога: `prepare({request, onto})`, `push({worktree, ref, expected, message, trailers})` (LG-23), `append({commit, delta, evidence})` (LG-02). Операция с одним аргументом берёт его как есть.
@@ -62,7 +62,7 @@ type Rejection = {
 type Rejections = readonly [Rejection, ...Rejection[]];
 type Result<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly rejections: Rejections };
 
-function reject(rule: Rule, place: Omit<Rejection, "rule" | "message">): Rejection;
+function reject(rule: Rule, place: Omit<Rejection, "rule" | "message">): Rejection;  // place, не at: at — время (Q-22)
 function sortRejections(rejections: readonly Rejection[]): Rejection[];   // порядок раздела 5
 function refuse<T>(first: Rejection, ...rest: readonly Rejection[]): Result<T>;  // отказ, отсортированный
 function refused<T>(rejections: readonly Rejection[]): Result<T> | null;  // null — отказывать не в чем
