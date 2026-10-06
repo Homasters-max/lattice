@@ -23,6 +23,7 @@ SL-05: срез начинается с одной тонкой change unit че
 - **Чистота** (ST-04, KR-02): вне `adapters`, `assembly`, `cli` запрещены `node:fs`, `node:net`, `node:http(s)`, `node:child_process`, `node:os`, `process`, `Date.now`, `new Date()` без аргумента, `Math.random`, `crypto.randomUUID`, `crypto.randomBytes`, `performance.now`. Из `node:crypto` в чистом коде — только `createHash`, `verify`, `sign`, `createPublicKey`, `createPrivateKey`.
 - **Периметр ядра** (ST-05, KR-01): `test/structure/kernel-files.txt` — всё, что достижимо из точки входа ядра; лишний файл валит тест. Тест на имена типов `std` в коде ядра — список имён берётся из исходников `std` (до S0-08 — из TY-Z02…TY-Z05).
 - **Версия ядра** `0` — константа (KR-03).
+- **Сборка**: `src/cli/main.ts` — вход `npm run build` и `bin.lattice` (`dist/cli/main.js`); с ним `build` входит в `npm run verify` и в CI (из S0-01).
 - **Интерфейсы портов** `store`, `acts`, `git`, `clock`, `ids` (LG-02 — часть `knowledge`, LG-23).
 - **Детерминированные адаптеры** `clock-fixed`, `ids-counter` (ST-07), плюс тонкие `store-memory`, `git-fixture`, `acts-fixture`.
 - **Таблица команд** RT-32 / RT-Z03: `init`, `draft`, `land`, `verify-store`, `export`, `migrate`, `session` — заглушки, которые называют задачу, где команда появится; команды поздних срезов отсутствуют.

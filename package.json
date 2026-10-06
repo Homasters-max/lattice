@@ -1,0 +1,32 @@
+{
+  "name": "lattice",
+  "version": "0.0.0",
+  "private": true,
+  "description": "LATTICE — governance substrate",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "bin": {
+    "lattice": "./dist/cli/main.js"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "eslint",
+    "lint:ids": "node discussion/tools/lint-ids.mjs",
+    "lint:eol": "node scripts/check-eol.mjs",
+    "plan:check": "node plan/tools/plan-check.mjs",
+    "build": "tsc -p tsconfig.build.json",
+    "verify": "npm run lint:ids && npm run plan:check && npm run lint:eol && npm run typecheck && npm run lint && npm run test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.5",
+    "eslint": "^10.12.0",
+    "fast-check": "^4.10.2",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^5.0.3"
+  }
+}
