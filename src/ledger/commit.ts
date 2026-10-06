@@ -81,8 +81,8 @@ function canonical(line: Uint8Array, commit: Commit, path: string): Result<Commi
 /**
  * The commit of the `index`-th line of a store — its bytes, as the store keeps them — refused at `/<index>`:
  * KR-10 for bytes that are not UTF-8, a text that is not JSON (an empty line too) and a line that is not the
- * canonical bytes of its commit (a byte order mark, `
-`, spaces), LG-06 and KR-04 for its form.
+ * canonical bytes of its commit (a byte order mark, a carriage return,
+ * spaces), LG-06 and KR-04 for its form.
  */
 export function decodeCommit(line: Uint8Array, index: number): Result<Commit> {
   const path = `/${index}`;
