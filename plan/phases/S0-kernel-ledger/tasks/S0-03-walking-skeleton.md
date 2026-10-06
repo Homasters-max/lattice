@@ -29,7 +29,7 @@ SL-05: срез начинается с одной тонкой change unit че
 - **Таблица команд** RT-32 / RT-Z03: `init`, `draft`, `land`, `verify-store`, `export`, `migrate`, `session` — заглушки, которые называют задачу, где команда появится; команды поздних срезов отсутствуют.
 - **Сквозной путь**: proposal из фикстуры (тип `demo/note` через мета-тип и блок `demo/hello` в одном коммите, LG-11) → `lattice land --dry-run` → отказ с rule ID и его фикстурой (например, KR-06 на неверный `id`) → исправленный proposal → `lattice land` на `git-fixture` → `store.append(commit, delta)` → `view.current("demo/hello")` возвращает запись.
 
-Не входит: полные canon, schema, apply, fold — только тонкие версии, достаточные для пути; authority и acts — `acts-fixture` всегда «approve».
+Не входит: полные canon, schema, apply, fold — только тонкие версии, достаточные для пути; authority и acts — `acts-fixture` отдаёт acts из тестовых данных по change request, без разрешающего умолчания (Q-20).
 
 ## Интерфейс
 
