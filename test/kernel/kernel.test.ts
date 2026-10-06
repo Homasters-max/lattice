@@ -99,8 +99,8 @@ describe("reading JSON (KR-10)", () => {
     expect(parseJson('{"a":[1,"x"]}')).toEqual({ ok: true, value: { a: [1, "x"] } });
   });
 
-  // G-16: S0-04 replaces parseJson with the strict parser (D-04).
-  it("KR-10: the parse still takes duplicate keys — the limit is known, not hidden", () => {
+  // G-16: KR-10 does not hold here yet; S0-04 replaces parseJson with the strict parser (D-04).
+  it("the parse still takes duplicate keys — a known limit, not hidden", () => {
     expect(parseJson('{"a":1,"a":2}')).toEqual({ ok: true, value: { a: 2 } });
   });
 });
