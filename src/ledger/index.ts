@@ -12,4 +12,4 @@ export type { Append, Store } from "./ports/store.js";
 export { canonicalIntents, proposalHash, readProposal, type Intent, type Proposal, type Session } from "./proposal.js";
 export { currentKey, sortRows, withDelta, type Delta, type Row, type Rows } from "./rows.js";
 export { LG_06, LG_09, LG_23, LG_54, RULES } from "./rules.js";
-export { createView, linesOf, openLines, openView, type View } from "./view.js";
+export { createView, linesOf, openLines, type View } from "./view.js";

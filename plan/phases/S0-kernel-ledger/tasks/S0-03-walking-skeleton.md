@@ -55,10 +55,10 @@ changeRequest(head: string | null): Result<string>                        // LG-
 proposalPath(files): Result<string>                                       // LG-54
 keptKnowledge(tail: bytes | null, request: bytes | null): Result<bytes | null>   // LG-23 — байты store/knowledge.jsonl как на tail main (Q-19)
 checkHeader(value, path): Rejection[]                                     // KR-04 — поверхностно
-readCommit(value, path): Result<Commit>; decodeCommit(line: bytes, index) // KR-10 — UTF-8 и JSON; LG-06 и KR-04 — поверхностно
+readCommit(value, path): Result<Commit>; decodeCommit(line: bytes, index) // KR-10 — UTF-8, JSON, канонические байты; LG-06 и KR-04 — поверхностно
 apply(before: View, proposal, acts: LandActs, evidence): Result<Commit | "no-op">   // фаза 1 — KR-06; без intents — no-op (LG-12, LG-54); prev, request, sig — null (G-14)
 fold(view: Rows, commit, evidence): Delta                                 // строка current:<id>
-openLines(lines): Result<{ view, tail }>; openView(store)                 // fold с начала при открытии; отказ KR-10, LG-06, KR-04
+openLines(lines): Result<{ view, tail }>                                 // fold с начала при открытии; отказ KR-10, LG-06, KR-04
 land(ports, request, { dryRun }): Promise<LandingOutcome>                 // before — store tail main (LG-14); worktree → LG-23 → append jsonl (не для no-op, LG-25) → удалить proposal → push
 assemble(ports: { git, acts, clock, ids }): Assembly                      // store на worktree — jsonl (LG-23); тестовая сборка — test/support/assembly.ts (Q-13)
 run(argv, { out, err, assembled }): Promise<number>                        // cli; bin передаёт assembled: null до S0-23 (Q-13)

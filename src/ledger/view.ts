@@ -47,8 +47,3 @@ export function openLines(lines: readonly Uint8Array[]): Result<Opened> {
   }
   return { ok: true, value: opened };
 }
-
-/** LG-02: the store opened — its lines read and folded from genesis. */
-export async function openView(store: Store): Promise<Result<Opened>> {
-  return openLines(await linesOf(store));
-}
