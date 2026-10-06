@@ -2,15 +2,16 @@
 // `memory` and `jsonl`. The adapter knows neither canon nor the meaning of a
 // row: the ledger hands it each commit as its canonical line, reads back the
 // bytes of every line as the store keeps them — decoding and refusing them is
-// the ledger's (KR-10) — and folds the rows (LG-35). Key order and the rows a
-// delta leaves are part of the contract: one comparator, `sortRows`, and one
-// application of a delta, `withDelta` and `held`, for the ledger and every
-// adapter (Q-18).
+// the ledger's (KR-10) — and folds the rows (LG-35). Key order is part of the
+// contract: one comparator, `sortRows`, for the ledger and every adapter
+// (Q-18). So are the rows a delta leaves: an adapter keeps them in `keptRows`,
+// which applies a delta the way the ledger does and answers `row` and `rows`
+// (Q-27).
 // The exact types arrive with S0-11.
 import type { Evidence } from "../commit.js";
-import type { Delta, Row } from "../rows.js";
+import { held, sortRows, withDelta, type Delta, type Row } from "../rows.js";
 
-export { held, sortRows, withDelta } from "../rows.js";
+export { sortRows };
 export type { Delta, Evidence, Row };
 
 /** What one `append` writes. */
@@ -36,4 +37,23 @@ export interface Store {
   rows(prefix: string): AsyncIterable<Row>;
   /** The bytes of a cited evidence file, opaque in S0. */
   evidence(hash: string): Promise<Uint8Array | null>;
+}
+
+/**
+ * The rows a store keeps, for its adapter (Q-27): `apply` takes the delta of each `append`; `row` and `rows`
+ * answer the port. Closing a row it does not keep changes nothing until the ledger hands the rows on opening (S0-11).
+ */
+export function keptRows(): { apply(delta: Delta): void } & Pick<Store, "row" | "rows"> {
+  let rows: readonly Row[] = [];
+  let holding = held(rows);
+  return {
+    apply(delta) {
+      rows = withDelta(rows, delta);
+      holding = held(rows);
+    },
+    row: (key) => Promise.resolve(holding.get(key) ?? null),
+    async *rows(prefix) {
+      for (const row of sortRows([...holding.values()].filter((r) => r.key.startsWith(prefix)))) yield await Promise.resolve(row);
+    },
+  };
 }

@@ -7,7 +7,7 @@
 // handed on opening arrive with S0-11 (Q-09).
 import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { held, sortRows, withDelta, type Append, type Row, type Store } from "../../ledger/ports/store.js";
+import { keptRows, type Append, type Store } from "../../ledger/ports/store.js";
 
 export type StoreJsonlOptions = { readonly dir: string };
 
@@ -15,10 +15,6 @@ export type StoreJsonlOptions = { readonly dir: string };
 const KNOWLEDGE = "store/knowledge.jsonl";
 
 const LF = 0x0a;
-
-async function* stream<T>(items: readonly T[]): AsyncIterable<T> {
-  for (const item of items) yield await Promise.resolve(item);
-}
 
 /** The lines of the file: the bytes before each line feed, then the bytes after the last one if there are any — a cut last line, refused from S0-11. */
 async function linesOf(file: string): Promise<Uint8Array[]> {
@@ -35,21 +31,21 @@ async function linesOf(file: string): Promise<Uint8Array[]> {
 
 export function createStoreJsonl({ dir }: StoreJsonlOptions): Store {
   const file = join(dir, KNOWLEDGE);
-  let rows: readonly Row[] = [];
+  const rows = keptRows();
   const evidence = new Map<string, Uint8Array>();
   return {
     async append({ commit, delta, evidence: cited }: Append) {
       await mkdir(dirname(file), { recursive: true });
       await appendFile(file, `${commit}\n`, "utf8");
-      rows = withDelta(rows, delta);
+      rows.apply(delta);
       for (const e of cited) evidence.set(e.hash, e.bytes);
     },
     commits: async function* (from) {
       for (const line of (await linesOf(file)).slice(Math.max(from, 1) - 1)) yield line;
     },
     tail: async () => (await linesOf(file)).at(-1) ?? null,
-    row: (key) => Promise.resolve(held(rows).get(key) ?? null),
-    rows: (prefix) => stream(sortRows([...held(rows).values()].filter((r) => r.key.startsWith(prefix)))),
+    row: rows.row,
+    rows: rows.rows,
     evidence: (hash) => Promise.resolve(evidence.get(hash) ?? null),
   };
 }
