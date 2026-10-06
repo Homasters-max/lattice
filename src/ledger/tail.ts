@@ -25,9 +25,9 @@ export const MAIN = "main";
 export const KNOWLEDGE = "store/knowledge.jsonl";
 
 /** What a worktree holds at a path: the bytes of a file, the files of a directory, or nothing. */
-export type Held = Uint8Array | { readonly files: readonly string[] } | null;
+export type AtPath = Uint8Array | { readonly files: readonly string[] } | null;
 
-export async function heldAt(worktree: Worktree, path: string): Promise<Held> {
+export async function atPath(worktree: Worktree, path: string): Promise<AtPath> {
   const bytes = await worktree.read(path);
   if (bytes !== null) return bytes;
   const files = await worktree.list(`${path}/`);
@@ -35,12 +35,12 @@ export async function heldAt(worktree: Worktree, path: string): Promise<Held> {
 }
 
 /** Bytes are no JSON value: a refusal names a file by its hash (Q-19), a directory by its files. */
-export const named = (held: Held) => (held === null ? null : held instanceof Uint8Array ? hashBytes(held) : [...held.files]);
+export const nameOf = (at: AtPath) => (at === null ? null : at instanceof Uint8Array ? hashBytes(at) : [...at.files]);
 
 /** LG-23: only the `jsonl` adapter writes `store/knowledge.jsonl`, so main holds it as a file or not at all. */
-export function fileOnMain(tail: Held): Result<Uint8Array | null> {
+export function fileOnMain(tail: AtPath): Result<Uint8Array | null> {
   if (tail === null || tail instanceof Uint8Array) return { ok: true, value: tail };
-  return refuse(reject(LG_23, { intent: null, path: `/${KNOWLEDGE}`, expected: "a file or none", got: named(tail) }));
+  return refuse(reject(LG_23, { intent: null, path: `/${KNOWLEDGE}`, expected: "a file or none", got: nameOf(tail) }));
 }
 
 /** A store opened: the view at its tail and the tail commit. */
@@ -73,7 +73,7 @@ async function linesOf(store: Store): Promise<Uint8Array[]> {
  * The store at the tail of `main`: the commit `onto`, the read view at it and its commit, and the bytes of
  * `store/knowledge.jsonl` there — `null` where main has none, the empty store.
  */
-export type OpenedTail = Opened & { readonly onto: string; readonly knowledge: Uint8Array | null };
+export type OpenedTail = Opened & { readonly onto: string; readonly file: Uint8Array | null };
 
 /** Opens the store at the tail of `main` (GL-05) on a worktree of that commit alone. */
 export async function openTail(ports: TailPorts): Promise<Result<OpenedTail>> {
@@ -82,9 +82,9 @@ export async function openTail(ports: TailPorts): Promise<Result<OpenedTail>> {
   if (onto === null) throw new Error(`bug: the repository of the store has no ${MAIN}`);
   const worktree = await ports.git.prepare({ request: onto, onto });
   if (worktree.kind === "conflict") throw new Error("bug: a commit conflicts with itself");
-  const knowledge = fileOnMain(await heldAt(worktree, KNOWLEDGE));
-  if (!knowledge.ok) return knowledge;
+  const file = fileOnMain(await atPath(worktree, KNOWLEDGE));
+  if (!file.ok) return file;
   // The store opens only on a file; main without one holds the empty store.
-  const opened = openLines(knowledge.value === null ? [] : await linesOf(ports.openStore(worktree)));
-  return opened.ok ? { ok: true, value: { ...opened.value, onto, knowledge: knowledge.value } } : opened;
+  const opened = openLines(file.value === null ? [] : await linesOf(ports.openStore(worktree)));
+  return opened.ok ? { ok: true, value: { ...opened.value, onto, file: file.value } } : opened;
 }

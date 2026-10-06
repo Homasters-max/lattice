@@ -20,7 +20,7 @@ import { proposalHash, readProposal, type Proposal } from "./proposal.js";
 import type { Rows } from "./rows.js";
 import type { View } from "./rows-view.js";
 import { LG_23, LG_54 } from "./rules.js";
-import { heldAt, KNOWLEDGE, MAIN, named, openTail, type Held, type TailPorts } from "./tail.js";
+import { atPath, KNOWLEDGE, MAIN, nameOf, openTail, type AtPath, type TailPorts } from "./tail.js";
 
 export interface LandingPorts extends TailPorts {
   readonly acts: Acts;
@@ -54,7 +54,7 @@ export function proposalPath(files: readonly string[]): Result<string> {
   return refuse(reject(LG_54, { intent: null, path: "/store/proposals", expected: "one proposal file", got: [...files] }));
 }
 
-const same = (a: Uint8Array | null, b: Held) =>
+const same = (a: Uint8Array | null, b: AtPath) =>
   a === null || b === null || !(b instanceof Uint8Array) ? a === b : a.length === b.length && a.every((byte, i) => byte === b[i]);
 
 /**
@@ -62,9 +62,9 @@ const same = (a: Uint8Array | null, b: Held) =>
  * request brings the file byte for byte as at the tail of `main`, or both lack it; a directory in its place
  * changed it too. What main holds there `openTail` has checked.
  */
-export function keptKnowledge(tail: Uint8Array | null, request: Held): Result<Held> {
+export function keptKnowledge(tail: Uint8Array | null, request: AtPath): Result<AtPath> {
   if (same(tail, request)) return { ok: true, value: request };
-  return refuse(reject(LG_23, { intent: null, path: `/${KNOWLEDGE}`, expected: named(tail), got: named(request) }));
+  return refuse(reject(LG_23, { intent: null, path: `/${KNOWLEDGE}`, expected: nameOf(tail), got: nameOf(request) }));
 }
 
 type Found = { readonly path: string; readonly proposal: Proposal };
@@ -97,12 +97,12 @@ async function check(ports: LandingPorts, request: string): Promise<LandingOutco
   // LG-14: `before` is the read view at the tail — the store of main, never the one the request brings.
   const before = await openTail(ports);
   if (!before.ok) return rejected(before);
-  const { onto, view, tail, knowledge } = before.value;
+  const { onto, view, tail, file } = before.value;
   const worktree = await ports.git.prepare({ request, onto });
   if (worktree.kind === "conflict") return { outcome: "conflict", paths: worktree.paths };
   const found = await proposalOf(worktree);
   if (!found.ok) return rejected(found);
-  const kept = keptKnowledge(knowledge, await heldAt(worktree, KNOWLEDGE));
+  const kept = keptKnowledge(file, await atPath(worktree, KNOWLEDGE));
   if (!kept.ok) return rejected(kept);
   return { ...found.value, onto, view, tail, worktree, store: ports.openStore(worktree) };
 }

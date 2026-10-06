@@ -6,21 +6,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createActsFixture } from "../../src/adapters/acts-fixture/index.js";
-import { createClockFixed } from "../../src/adapters/clock-fixed/index.js";
-import { createGitFixture, type GitFixtureOptions } from "../../src/adapters/git-fixture/index.js";
-import { createIdsCounter } from "../../src/adapters/ids-counter/index.js";
-import { createStoreJsonl, fileOf } from "../../src/adapters/store-jsonl/index.js";
-import { commitHash, createView, encodeCommit, land, openTail, type LandingPorts, type Worktree } from "../../src/ledger/index.js";
-import { deepFreeze } from "../support/deep-freeze.js";
-
-const AT = "2026-10-06T12:00:00.000000Z";
-const proposal = (id: string) =>
-  JSON.stringify({
-    session: { id: "01JB2X00000000000000000SES" },
-    intents: [{ op: "entity", id, type: "demo/note@1", expected: null, at: AT, body: { text: id } }],
-    sig: null,
-  });
+import type { GitFixtureOptions } from "../../src/adapters/git-fixture/index.js";
+import { fileOf } from "../../src/adapters/store-jsonl/index.js";
+import { commitHash, createView, encodeCommit, land, openTail, type LandingPorts } from "../../src/ledger/index.js";
+import { landingPorts, proposal } from "../support/landing.js";
 
 const BRANCHES: GitFixtureOptions["branches"] = {
   main: { files: { "README.md": "one\n" } },
@@ -34,21 +23,13 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-function portsOf(branches = BRANCHES): LandingPorts {
-  return deepFreeze({
-    git: createGitFixture({ dir, branches }),
-    acts: createActsFixture({ acts: {} }),
-    openStore: (w: Worktree) => createStoreJsonl({ dir: w.dir }),
-    clock: createClockFixed({ at: AT }),
-    ids: createIdsCounter(),
-  });
-}
+const portsOf = (branches = BRANCHES): LandingPorts => landingPorts({ dir, branches });
 
 describe("the store at the tail of main (LG-02, LG-38)", () => {
   it("LG-02: main without store/knowledge.jsonl opens as the empty store", async () => {
     const ports = portsOf();
     const opened = await openTail(ports);
-    expect(opened.ok ? [opened.value.onto, opened.value.view.seq, opened.value.tail, opened.value.knowledge] : opened).toEqual([
+    expect(opened.ok ? [opened.value.onto, opened.value.view.seq, opened.value.tail, opened.value.file] : opened).toEqual([
       await ports.git.tail("main"),
       0,
       null,
@@ -67,11 +48,11 @@ describe("the store at the tail of main (LG-02, LG-38)", () => {
     const [first, second] = commits;
     const opened = await openTail(ports);
     if (!opened.ok) throw new Error(`bug: the store landing wrote does not open: ${JSON.stringify(opened.rejections)}`);
-    const { onto, view, tail, knowledge } = opened.value;
+    const { onto, view, tail, file } = opened.value;
     expect([onto, view.seq, view.current("demo/a")?.rev, view.current("demo/b")?.rev]).toEqual([await ports.git.tail("main"), 2, 1, 1]);
     expect([tail, tail?.prev]).toEqual([second, first === undefined ? null : commitHash(first)]);
     const text = (bytes: Uint8Array | null) => (bytes === null ? null : new TextDecoder().decode(bytes));
-    expect(text(knowledge)).toBe(text(fileOf(commits.map(encodeCommit).join("\n"))));
+    expect(text(file)).toBe(text(fileOf(commits.map(encodeCommit).join("\n"))));
   });
 });
 

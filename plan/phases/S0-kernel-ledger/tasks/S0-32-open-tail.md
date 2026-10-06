@@ -23,11 +23,11 @@ rules: [LG-02, LG-14, LG-23, LG-38, ST-01]
 ## Объём
 
 Входит:
-- **`src/ledger/tail.ts`** — одна операция `openTail(ports)`. Внутрь неё уходят `tailOf`, `heldAt`, `fileOnMain`, `linesOf` и складывание view из строк (`openLines`). Отказ LG-23 «на `main` каталог на месте файла» выдаёт она сама, а не проверка change request: `keptKnowledge` берёт с `main` только файл или `null`.
+- **`src/ledger/tail.ts`** — одна операция `openTail(ports)`. Внутрь неё уходят `tailOf`, `heldAt` (теперь `atPath`), `fileOnMain`, `linesOf` и складывание view из строк (`openLines`). Отказ LG-23 «на `main` каталог на месте файла» выдаёт она сама, а не проверка change request: `keptKnowledge` берёт с `main` только файл или `null`.
 - **`tailView` удаляется**: `assembly.view` берёт read view из `openTail`.
 - **`landing.check`** берёт `before`, tail-коммит и байты `store/knowledge.jsonl` на `main` из `openTail`.
 - **Вход `ledger/view`** отдаёт только `View` и `createView`, который возвращает `View`. `Rows`, `linesOf` и `openLines` уходят из него внутрь `ledger`: read view со строками для fold — `viewOf` во внутреннем `src/ledger/rows-view.ts`, там же интерфейс `View`. `openLines` остаётся в `src/ledger/index.ts`: им пользуются фикстуры строк store (KR-10, LG-06, KR-04) и `test/ledger/apply.test.ts`, которому fold нужен view со строками.
-- **Хелперы теста.** `commitsOnMain` и чтение `store/knowledge.jsonl` через `mainWorktree` в `landing.test.ts` заменяются `storeOnMain` — вызовом `openTail`. Список файлов дерева `main` (proposal удалён, код сохранён) store не отвечает: `mainWorktree` сужается до `filesOnMain`, который берёт `onto` из `openTail`.
+- **Хелперы теста.** `commitsOnMain` и чтение `store/knowledge.jsonl` через `mainWorktree` в `landing.test.ts` заменяются `storeOnMain` — вызовом `openTail`; ожидание — по-прежнему весь список строк store на `main` (`storeTextOnMain` против `storeTextOf([commit])`). Список файлов дерева `main` (proposal удалён, код сохранён) store не отвечает и через `openTail` не читается: `mainWorktree` сужается до `filesOnMain` — git, а не store. Порты landing для тестов и proposal одной сущности — общий `test/support/landing.ts`.
 
 Не входит:
 - закрытие worktree — S0-34;
@@ -40,9 +40,9 @@ rules: [LG-02, LG-14, LG-23, LG-38, ST-01]
 // src/ledger/tail.ts
 interface TailPorts { git: Git; openStore: (worktree: Worktree) => Store }  // LandingPorts extends TailPorts
 openTail(ports: TailPorts): Promise<Result<OpenedTail>>
-type OpenedTail = { onto: string; view: View & Rows; tail: Commit | null; knowledge: Uint8Array | null }
-// knowledge — байты store/knowledge.jsonl на tail main; каталог на его месте — отказ LG-23
-fileOnMain(tail: Held): Result<Uint8Array | null>   // LG-23, чистая; её зовёт openTail, строка tail в checks.ts
+type OpenedTail = { onto: string; view: View & Rows; tail: Commit | null; file: Uint8Array | null }
+// file — байты store/knowledge.jsonl на tail main; каталог на его месте — отказ LG-23
+fileOnMain(tail: AtPath): Result<Uint8Array | null>   // LG-23, чистая; её зовёт openTail, строка tail в checks.ts
 ```
 
 `view` — `View & Rows`: landing складывает delta коммита fold по строкам `before` (LG-35). `assembly.view` отдаёт командам `View`. Имя `LandingPorts.openStore` остаётся: это фабрика адаптера `jsonl` на worktree (LG-23). `LandingPorts` наследует `TailPorts`, чтобы `tail.ts` не импортировал `landing.ts`.
@@ -59,7 +59,7 @@ fileOnMain(tail: Held): Result<Uint8Array | null>   // LG-23, чистая; её
 - Новых rule ID нет. Фикстура `LG-23/trigger/directory-on-main` переходит со строки `knowledge` таблицы `checks.ts` на новую чистую строку `tail` — `fileOnMain`, которую зовёт `openTail`: раннер фикстур синхронный до S0-33. К ней — `LG-23/pass/file-on-main`. Строка `knowledge`, как landing, сперва проводит `main` через `fileOnMain` и возвращает его отказ как есть (CONVENTIONS.md §2), но фикстура каталога на `main` живёт в строке `tail`.
 - `test/ledger/tail.test.ts` — `openTail` на `git-fixture`: пустой `main`, store двух landing, каталог на месте файла (LG-23), `{}\n` (LG-06).
 - Тест структуры в `test/structure/repo.test.ts`: экспорт `src/ledger/view.ts` — ровно `View` и `createView`, а `createView` возвращает свойства `View`, без `row`.
-- Тесты `landing.test.ts` и e2e остаются зелёными без правки ожиданий. В `landing.test.ts` меняется только форма: где был список коммитов на `main`, сверяются `seq` и tail-коммит из `openTail` (`[commit]` → `[1, commit]`, `[]` → `null`).
+- Тесты `landing.test.ts` и e2e остаются зелёными без правки ожиданий: список коммитов на `main` (`[commit]`, `[]`) сверяется с текстом `store/knowledge.jsonl`, который прочёл `openTail`.
 
 ## Готово, когда
 

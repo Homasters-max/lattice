@@ -7,10 +7,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createActsFixture } from "../../src/adapters/acts-fixture/index.js";
-import { createClockFixed } from "../../src/adapters/clock-fixed/index.js";
 import { createGitFixture, type GitFixtureBranch, type GitFixtureOptions } from "../../src/adapters/git-fixture/index.js";
-import { createIdsCounter } from "../../src/adapters/ids-counter/index.js";
 import { createStoreJsonl, fileOf } from "../../src/adapters/store-jsonl/index.js";
 import { hashBytes } from "../../src/kernel/index.js";
 import {
@@ -27,14 +24,7 @@ import {
   type Worktree,
 } from "../../src/ledger/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
-
-const AT = "2026-10-06T12:00:00.000000Z";
-const proposal = (id: string) =>
-  JSON.stringify({
-    session: { id: "01JB2X00000000000000000SES" },
-    intents: [{ op: "entity", id, type: "demo/note@1", expected: null, at: AT, body: { text: id } }],
-    sig: null,
-  });
+import { landingPorts, proposal } from "../support/landing.js";
 
 const BRANCHES: GitFixtureOptions["branches"] = {
   main: { files: { "README.md": "one\n" } },
@@ -59,18 +49,12 @@ afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 /** The ports of landing, frozen; every store landing opens is kept in `opened`, in order. */
 function portsOf(over: Partial<LandingPorts> = {}, branches = BRANCHES): LandingPorts {
-  return deepFreeze({
-    git: createGitFixture({ dir, branches }),
-    acts: createActsFixture({ acts: {} }),
-    openStore: (w: Worktree) => {
-      const store = createStoreJsonl({ dir: w.dir });
-      opened.push(store);
-      return store;
-    },
-    clock: createClockFixed({ at: AT }),
-    ids: createIdsCounter(),
-    ...over,
-  });
+  const openStore = (w: Worktree) => {
+    const store = createStoreJsonl({ dir: w.dir });
+    opened.push(store);
+    return store;
+  };
+  return landingPorts({ dir, branches }, { openStore, ...over });
 }
 
 /** The store on main, as opening it at the tail reads it (LG-02, LG-38); a store opening refuses fails the test. */
@@ -83,16 +67,16 @@ async function storeOnMain(ports: LandingPorts) {
 const text = (bytes: Uint8Array | null) => (bytes === null ? "" : new TextDecoder().decode(bytes));
 
 /** The store on main as text: `store/knowledge.jsonl` as `openTail` read it, `""` where main has none. */
-const storeTextOnMain = async (ports: LandingPorts) => text((await storeOnMain(ports)).knowledge);
+const storeTextOnMain = async (ports: LandingPorts) => text((await storeOnMain(ports)).file);
 
 /** The text of a store of exactly these commits, in order: the lines landing writes, framed by `fileOf` of `store-jsonl`. */
 const storeTextOf = (commits: readonly Commit[]) => commits.map((c) => text(fileOf(encodeCommit(c)))).join("");
 
-/** The paths of the files under `under` on main: the tree of its tail commit, which no store holds. */
-async function filesOnMain(ports: LandingPorts, under: string): Promise<readonly string[]> {
-  const { onto } = await storeOnMain(ports);
-  const w = await ports.git.prepare({ request: onto, onto });
-  if (w.kind === "conflict") throw new Error("bug: a commit conflicts with itself");
+/** The paths of the files under `under` on main: the tree of its tail commit, code and proposals, which the store does not answer. */
+async function filesOnMain(git: Git, under: string): Promise<readonly string[]> {
+  const onto = await git.tail("main");
+  const w = onto === null ? null : await git.prepare({ request: onto, onto });
+  if (w?.kind !== "worktree") throw new Error("bug: main of the fixture prepares onto itself");
   return w.list(under);
 }
 
@@ -122,7 +106,7 @@ describe("landing into git (LG-22, LG-23)", () => {
     const ports = portsOf();
     const commit = await landed(ports, "cr/a");
     expect(await storeTextOnMain(ports)).toBe(storeTextOf([commit]));
-    expect(await filesOnMain(ports, "store/")).toEqual(["store/knowledge.jsonl"]);
+    expect(await filesOnMain(ports.git, "store/")).toEqual(["store/knowledge.jsonl"]);
   });
 
   // G-14: landing fills prev.
@@ -239,7 +223,7 @@ describe("a change request that changes no knowledge (LG-25, LG-54)", () => {
     expect(await land(ports, "cr/code", DRY_RUN)).toEqual({ outcome: "no-op", pushed: false });
     expect(pushes).toEqual([]);
     expect(await land(ports, "cr/code", LAND)).toEqual({ outcome: "no-op", pushed: true });
-    expect([await filesOnMain(ports, ""), await storeTextOnMain(ports)]).toEqual([["README.md", "src/y.ts"], storeTextOf([])]);
+    expect([await filesOnMain(ports.git, ""), await storeTextOnMain(ports)]).toEqual([["README.md", "src/y.ts"], storeTextOf([])]);
     expect(pushes.map((p) => [p.message, p.trailers.map((t) => t.key)])).toEqual([["lattice: land no-op", ["Lattice-Proposal"]]]);
   });
 });
