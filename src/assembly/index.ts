@@ -6,7 +6,7 @@
 // plan/closure-check.md, the bypass class of acts: TR-14…TR-17).
 import { createStoreJsonl } from "../adapters/store-jsonl/index.js";
 import type { Result } from "../kernel/index.js";
-import { land, tailView, type LandingOutcome, type LandingPorts, type LandOptions, type View } from "../ledger/index.js";
+import { land, openTail, type LandingOutcome, type LandingPorts, type LandOptions, type View } from "../ledger/index.js";
 
 export type { Rejection, Result } from "../kernel/index.js";
 export type { LandingOutcome, LandOptions, View };
@@ -25,7 +25,14 @@ export interface Assembly {
   readonly view: () => Promise<Result<View>>;
 }
 
+/** The ports of landing: those given and the `jsonl` store on every worktree (LG-23). */
+export const landingPortsOf = (ports: Ports): LandingPorts => ({ ...ports, openStore: (worktree) => createStoreJsonl({ dir: worktree.dir }) });
+
 export function assemble(ports: Ports): Assembly {
-  const all: LandingPorts = { ...ports, openStore: (worktree) => createStoreJsonl({ dir: worktree.dir }) };
-  return { land: (request, options) => land(all, request, options), view: () => tailView(all) };
+  const all = landingPortsOf(ports);
+  const view = async (): Promise<Result<View>> => {
+    const opened = await openTail(all);
+    return opened.ok ? { ok: true, value: opened.value.view } : opened;
+  };
+  return { land: (request, options) => land(all, request, options), view };
 }

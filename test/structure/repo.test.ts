@@ -3,6 +3,7 @@
 // slice, the ledger has the ports of S0, and the lists are well-formed.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import ts from "typescript";
 import { beforeAll, describe, expect, it } from "vitest";
 import { auditImports, portEntries } from "./audit-imports.js";
 import { auditKernelFiles, auditStdNames, stdTypeNames } from "./audit-kernel.js";
@@ -14,6 +15,29 @@ const lines = (file: string) =>
   readFileSync(join(repoRoot, file), "utf8")
     .split("\n")
     .filter((l) => l !== "" && !l.startsWith("#"));
+
+/** What a file of `src/` exports, as the checker sees it: the names, sorted, and the properties of a type by name. */
+function exportsOf(tree: Tree, path: string) {
+  const program = tree.program();
+  const checker = program.getTypeChecker();
+  const sf = program.getSourceFile(tree.files.get(path)?.fileName ?? "");
+  const module = sf === undefined ? undefined : checker.getSymbolAtLocation(sf);
+  if (sf === undefined || module === undefined) throw new Error(`bug: ${path} is no module of the program`);
+  const exported = checker.getExportsOfModule(module);
+  const named = (name: string) => {
+    const symbol = exported.find((s) => s.name === name);
+    if (symbol === undefined) throw new Error(`bug: ${path} exports no ${name}`);
+    return symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
+  };
+  const names = (types: readonly ts.Type[]) => [...new Set(types.flatMap((t) => t.getProperties().map((p) => p.name)))].sort();
+  return {
+    names: exported.map((s) => s.name).sort(),
+    /** The properties of an exported type. */
+    type: (name: string) => names([checker.getDeclaredTypeOfSymbol(named(name))]),
+    /** The properties of what an exported function returns. */
+    returns: (name: string) => names(checker.getTypeOfSymbolAtLocation(named(name), sf).getCallSignatures().map((c) => c.getReturnType())),
+  };
+}
 
 let repo: Tree;
 beforeAll(() => {
@@ -47,6 +71,13 @@ describe("structure of this repository", () => {
   it("SL-05: src/ has exactly the module folders of the slice", () => {
     const dirs = readdirSync(join(repoRoot, "src")).filter((d) => statSync(join(repoRoot, "src", d)).isDirectory());
     expect(dirs.sort()).toEqual([...SLICE_MODULES].sort());
+  });
+
+  it("ST-01, LG-38: the read view entry gives runtime and capabilities View and createView, which returns a View — no rows, no opening a store", () => {
+    const entry = exportsOf(repo, "src/ledger/view.ts");
+    expect(entry.names).toEqual(["View", "createView"]);
+    expect(entry.returns("createView")).toEqual(entry.type("View"));
+    expect(entry.type("View")).not.toContain("row");
   });
 
   it("LG-23: the ledger has the ports store, acts, git, clock and ids", () => {

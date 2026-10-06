@@ -9,6 +9,7 @@ import {
   changeRequest,
   createView,
   encodeCommit,
+  fileOnMain,
   keptKnowledge,
   LG_06,
   LG_09,
@@ -17,6 +18,7 @@ import {
   openLines,
   proposalPath,
   readProposal,
+  type AtPath,
   type LandActs,
 } from "../../src/ledger/index.js";
 import type { FixtureCheck } from "./run.js";
@@ -83,21 +85,31 @@ const store: FixtureCheck = {
 };
 
 /**
- * `input`: `{ tail, request }` — what `store/knowledge.jsonl` is at the tail of main and in the change request:
- * `{ proposal }`, the file of the one line apply forms for it, framed by `fileOf` of `store-jsonl` as landing writes it;
- * raw bytes a trigger needs and no landing writes (Q-23); a directory, as `{ files }`; or `null`, no file.
+ * A fixture's `store/knowledge.jsonl`: `{ proposal }`, the file of the one line apply forms for it, framed by `fileOf`
+ * of `store-jsonl` as landing writes it; raw bytes a trigger needs and no landing writes (Q-23); a directory, as
+ * `{ files }`; or `null`, no file.
+ */
+function atPathOf(v: unknown): AtPath {
+  if (v === null) return null;
+  if (typeof v !== "object" || Array.isArray(v)) return bytesOf(v);
+  return "proposal" in v ? fileOf(lineOf(v.proposal as JsonValue)) : (v as AtPath);
+}
+
+/** `input`: `{ tail }` — what `store/knowledge.jsonl` is at the tail of main, as `atPathOf` reads it. */
+const tail: FixtureCheck = {
+  enforces: [LG_23.id],
+  run: (input) => fileOnMain(atPathOf(field(input, "tail"))),
+};
+
+/**
+ * `input`: `{ tail, request }` — what `store/knowledge.jsonl` is at the tail of main and in the change request,
+ * as `atPathOf` reads both. As in landing, main passes `fileOnMain` first; its refusal comes back as it is.
  */
 const knowledge: FixtureCheck = {
   enforces: [LG_23.id],
   run: (input) => {
-    // What a worktree holds at the path: bytes, the files of a directory as `{ files }`, or nothing.
-    type Held = Parameters<typeof keptKnowledge>[1];
-    const held = (v: unknown): Held => {
-      if (v === null) return null;
-      if (typeof v !== "object" || Array.isArray(v)) return bytesOf(v);
-      return "proposal" in v ? fileOf(lineOf(v.proposal as JsonValue)) : (v as Held);
-    };
-    return keptKnowledge(held(field(input, "tail")), held(field(input, "request")));
+    const onMain = fileOnMain(atPathOf(field(input, "tail")));
+    return onMain.ok ? keptKnowledge(onMain.value, atPathOf(field(input, "request"))) : onMain;
   },
 };
 
@@ -107,5 +119,6 @@ export const CHECKS: { readonly [check: string]: FixtureCheck } = {
   "change-request": changeRequestCheck,
   apply: applyCheck,
   store,
+  tail,
   knowledge,
 };

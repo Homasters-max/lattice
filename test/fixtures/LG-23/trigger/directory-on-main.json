@@ -1,12 +1,7 @@
 {
-  "check": "knowledge",
+  "check": "tail",
   "input": {
     "tail": {
-      "files": [
-        "store/knowledge.jsonl/x"
-      ]
-    },
-    "request": {
       "files": [
         "store/knowledge.jsonl/x"
       ]
