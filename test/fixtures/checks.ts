@@ -81,15 +81,19 @@ const store: FixtureCheck = {
 };
 
 /**
- * `input`: `{ tail, request }` — the bytes of `store/knowledge.jsonl` at the tail of main and in the change request,
- * `null` where there is no file; either may hold a directory there instead, given as `{ files }`.
+ * `input`: `{ tail, request }` — what `store/knowledge.jsonl` is at the tail of main and in the change request:
+ * `{ proposal }`, the file of the one line apply forms for it, as landing writes it; raw bytes a trigger needs and
+ * no landing writes (Q-23); a directory, as `{ files }`; or `null`, no file.
  */
 const knowledge: FixtureCheck = {
   enforces: [LG_23.id],
   run: (input) => {
     // What a worktree holds at the path: bytes, the files of a directory as `{ files }`, or nothing.
     type Held = Parameters<typeof keptKnowledge>[1];
-    const held = (v: unknown): Held => (v === null ? null : typeof v === "object" && !Array.isArray(v) ? (v as Held) : bytesOf(v));
+    const held = (v: unknown): Held => {
+      if (v === null || typeof v !== "object" || Array.isArray(v)) return v === null ? null : bytesOf(v);
+      return "proposal" in v ? Uint8Array.from([...lineOf(v.proposal as JsonValue), 0x0a]) : (v as Held);
+    };
     return keptKnowledge(held(field(input, "tail")), held(field(input, "request")));
   },
 };
