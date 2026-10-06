@@ -1,0 +1,8 @@
+node_modules/
+dist/
+coverage/
+gen/
+.lattice/
+.obsidian/workspace.json
+.claude/*.lock
+.claude/settings.local.json

@@ -1,0 +1,5 @@
+# Byte-exact round-trip of docs/design depends on LF everywhere (D-10, LG-42).
+* text=auto eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.jsonl text eol=lf
