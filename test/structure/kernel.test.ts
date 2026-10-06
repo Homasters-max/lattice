@@ -48,19 +48,25 @@ describe("std type names in the kernel (KR-01)", () => {
 
   it("KR-01: refuses an identifier, a type or a property named after a std type, alone or as whole words of a compound name", () => {
     const t = tree({
-      "src/kernel/index.ts": "export type Requirement = { readonly reviewNote: number };\nexport const NAMESPACE = 1;\nexport const isRequirement = 2;\n",
+      "src/kernel/index.ts":
+        "export type Requirement = { readonly reviewNote: number };\nexport const NAMESPACE = 1;\nexport const isRequirement = 2;\n" +
+        "export const REVIEW_NOTE_COUNT = 3;\nexport type HTTPRequirement = 4;\nexport const toACTRecord = 5;\n",
     });
     expect(auditStdNames(t, new Set([...NAMES, "review-note"]))).toEqual([
       'KR-01: src/kernel/index.ts:1 names the std type "Requirement"; the kernel knows no std type',
       'KR-01: src/kernel/index.ts:1 names the std type "reviewNote"; the kernel knows no std type',
       'KR-01: src/kernel/index.ts:2 names the std type "NAMESPACE"; the kernel knows no std type',
       'KR-01: src/kernel/index.ts:3 names the std type "isRequirement"; the kernel knows no std type',
+      'KR-01: src/kernel/index.ts:4 names the std type "REVIEW_NOTE_COUNT"; the kernel knows no std type',
+      'KR-01: src/kernel/index.ts:5 names the std type "HTTPRequirement"; the kernel knows no std type',
+      'KR-01: src/kernel/index.ts:6 names the std type "toACTRecord"; the kernel knows no std type',
     ]);
   });
 
-  it("KR-01: passes words inside a sentence and std names outside the kernel", () => {
+  it("KR-01: passes words inside a sentence, a std name inside a longer word and std names outside the kernel", () => {
     const t = tree({
-      "src/kernel/index.ts": 'export const m = "an entity id is namespace/slug";\n',
+      "src/kernel/index.ts":
+        'export const m = "an entity id is namespace/slug";\nexport const ACTION = 1;\nexport const namespacedId = 2;\nexport type HTTPActor = 3;\n',
       "src/ledger/index.ts": 'export const t = "std/namespace@1";\n',
     });
     expect(auditStdNames(t, NAMES)).toEqual([]);

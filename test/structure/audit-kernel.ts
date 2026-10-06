@@ -47,9 +47,10 @@ function texts(sf: ts.SourceFile): Text[] {
   return out;
 }
 
-/** An identifier in kebab case: `reviewNote`, `ReviewNote`, `REVIEW_NOTE` → `review-note`. */
+/** An identifier in kebab case: `reviewNote`, `ReviewNote`, `REVIEW_NOTE` → `review-note`; an abbreviation is a word, `HTTPRequirement` → `http-requirement`. */
 const kebab = (id: string) =>
   id
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1-$2")
     .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
     .replaceAll("_", "-")
     .toLowerCase();
