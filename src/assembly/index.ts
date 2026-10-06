@@ -12,7 +12,12 @@ export type { Rejection, Result } from "../kernel/index.js";
 export type { LandingOutcome, LandOptions, View };
 
 /** The ports assembly is given; it opens the store itself. */
-export type Ports = Omit<LandingPorts, "openStore">;
+export interface Ports {
+  readonly git: LandingPorts["git"];
+  readonly acts: LandingPorts["acts"];
+  readonly clock: LandingPorts["clock"];
+  readonly ids: LandingPorts["ids"];
+}
 
 /** What the commands reach: landing and the read view at the tail of `main`. */
 export interface Assembly {

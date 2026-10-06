@@ -13,7 +13,9 @@ import { sortPaths, type Conflict, type Git, type Prepare, type Push, type Workt
 export type GitFixtureBranch = { readonly from?: string; readonly files: { readonly [path: string]: string | null } };
 export type GitFixtureOptions = { readonly dir: string; readonly branches: { readonly [name: string]: GitFixtureBranch } };
 /** The git of tests: the port, and a branch added at any moment from where its `from` is then. */
-export type GitFixture = Git & { branch(name: string, branch: GitFixtureBranch): void };
+interface GitFixture extends Git {
+  branch(name: string, branch: GitFixtureBranch): void;
+}
 
 type Tree = ReadonlyMap<string, Uint8Array>;
 type FixtureCommit = { readonly parents: readonly string[]; readonly tree: Tree; readonly message: string };
