@@ -14,7 +14,7 @@ export const LG_09 = {
 
 export const LG_23 = {
   id: "LG-23",
-  message: { en: "only landing appends to the store of knowledge: a change request keeps its lines as at the tail of main; line {path} differs" },
+  message: { en: "only landing writes store/knowledge.jsonl: a change request brings it byte for byte as at the tail of main; expected {expected}, got {got}" },
 } as const satisfies Rule;
 
 export const LG_54 = {

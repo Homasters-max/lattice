@@ -1,0 +1,16 @@
+{
+  "check": "store",
+  "input": {
+    "lines": [
+      [
+        123,
+        255,
+        125
+      ]
+    ]
+  },
+  "expect": {
+    "rule": "KR-10",
+    "path": "/0"
+  }
+}

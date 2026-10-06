@@ -30,6 +30,7 @@ const configIn = (dir: string): FixtureConfig => ({
       main: { files: { "README.md": "demo\n" } },
       "cr/bad": { from: "main", files: { "store/proposals/cr-bad.json": JSON.stringify(bad) } },
       "cr/good": { from: "main", files: { "store/proposals/cr-good.json": JSON.stringify(good) } },
+      "cr/code": { from: "main", files: { "src/y.ts": "y\n", "store/proposals/cr-code.json": JSON.stringify({ session: { id: "01JB2X00000000000000000SES" }, intents: [], sig: null }) } },
     },
   },
   acts: { acts: { "cr/bad": [approve(bad, "cr/bad")], "cr/good": [approve(good, "cr/good")] } },
@@ -84,5 +85,12 @@ describe("walking skeleton (SL-05)", () => {
       body: { text: "hello" },
     });
     expect(view.current("demo/note")?.type).toBe("core/type@1");
+  });
+
+  it("LG-25, LG-54: a change request that changes no knowledge lands as a no-op and the view stays where it was", async () => {
+    const assembled = assembleForTests(configIn(dir));
+    expect(Object.values(await lattice(assembled, "land", "cr/code", "--dry-run"))).toEqual([0, "dry run: no-op — the proposal changes no knowledge\n", ""]);
+    expect(Object.values(await lattice(assembled, "land", "cr/code"))).toEqual([0, "landed: no-op — no knowledge commit, the proposal file is removed\n", ""]);
+    expect((await viewOf(assembled)).seq).toBe(0);
   });
 });

@@ -19,7 +19,7 @@ function proposal(...intents: JsonValue[]): Proposal {
 
 function landed(before: ReturnType<typeof createView>, p: Proposal): Commit {
   const out = apply(before, p, LAND, []);
-  if (!out.ok) throw new Error("bug: refused");
+  if (!out.ok || out.value === "no-op") throw new Error("bug: the test proposal applies to a commit");
   return deepFreeze(out.value);
 }
 
@@ -32,6 +32,12 @@ describe("apply, phase 1 (KR-06)", () => {
       ["KR-06", "B/b", "/id"],
       ["KR-06", "Z/z", "/id"],
     ]);
+  });
+});
+
+describe("apply, no-op (LG-12, LG-54)", () => {
+  it("LG-12, LG-54: a proposal without intents is a no-op — an empty commit is never written", () => {
+    expect(apply(empty(), proposal(), LAND, [])).toEqual({ ok: true, value: "no-op" });
   });
 });
 

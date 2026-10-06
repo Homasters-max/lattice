@@ -9,8 +9,8 @@ export type JsonObject = { readonly [key: string]: JsonValue };
 
 export const isJsonObject = (v: JsonValue | undefined): v is JsonObject => typeof v === "object" && v !== null && !Array.isArray(v);
 
-/** The JSON kind of a value, as a check of a form reports it in `got`: absent, null, array, object, string, number or boolean. */
-export const kindOf = (v: JsonValue | undefined): string => (v === undefined ? "absent" : v === null ? "null" : Array.isArray(v) ? "array" : typeof v);
+/** `got` of a check of a form (CONVENTIONS.md §3): the value that came, or the description "absent" for a field that has none. */
+export const gotOf = (v: JsonValue | undefined): JsonValue => (v === undefined ? "absent" : v);
 
 /** Compares strings by UTF-16 code units, as canon sorts keys (CONVENTIONS.md §5). */
 export const compareText = (a: string, b: string): number => (a === b ? 0 : a < b ? -1 : 1);

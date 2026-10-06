@@ -2,7 +2,7 @@
 // (KR-06) and the header on the surface — its fields and their JSON kinds — as
 // a store opens (KR-04); exactly these fields, the formats and `rev` against
 // the kind of the type arrive with S0-04, S0-05 and S0-13.
-import { isJsonObject, kindOf, type JsonValue } from "./json.js";
+import { gotOf, isJsonObject, type JsonValue } from "./json.js";
 import { reject, type Rejection } from "./rejection.js";
 import { KR_04, KR_06 } from "./rules.js";
 
@@ -39,9 +39,9 @@ const HEADER: { readonly [field in keyof Record]-?: Field } = {
 
 /** KR-04: the header of a record, refused field by field at `path` — where the record sits in its input. */
 export function checkHeader(value: JsonValue, path: string): Rejection[] {
-  if (!isJsonObject(value)) return [reject(KR_04, { intent: null, path, expected: "a record", got: kindOf(value) })];
+  if (!isJsonObject(value)) return [reject(KR_04, { intent: null, path, expected: "a record", got: gotOf(value) })];
   return Object.entries(HEADER).flatMap(([name, field]) =>
-    field.fits(value[name]) ? [] : [reject(KR_04, { intent: null, path: `${path}/${name}`, expected: field.expected, got: kindOf(value[name]) })],
+    field.fits(value[name]) ? [] : [reject(KR_04, { intent: null, path: `${path}/${name}`, expected: field.expected, got: gotOf(value[name]) })],
   );
 }
 

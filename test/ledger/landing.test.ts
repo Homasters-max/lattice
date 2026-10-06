@@ -12,10 +12,15 @@ import { createClockFixed } from "../../src/adapters/clock-fixed/index.js";
 import { createGitFixture, type GitFixtureOptions } from "../../src/adapters/git-fixture/index.js";
 import { createIdsCounter } from "../../src/adapters/ids-counter/index.js";
 import { createStoreJsonl } from "../../src/adapters/store-jsonl/index.js";
+import { hashBytes, type JsonValue } from "../../src/kernel/index.js";
 import {
+  apply,
   commitHash,
+  createView,
   decodeCommit,
+  encodeCommit,
   land,
+  readProposal,
   tailView,
   type Commit,
   type Git,
@@ -96,6 +101,27 @@ const landed = async (ports: LandingPorts, request: string) => {
 
 const refusals = (out: LandingOutcome) => (out.outcome === "rejections" ? out.rejections.map((r) => [r.rule, r.path]) : out.outcome);
 
+/** The git of the fixture, every push it was given kept in `pushes`. */
+function recording(branches = BRANCHES): { readonly git: Git; readonly pushes: Push[] } {
+  const inner = portsOf({}, branches).git;
+  const pushes: Push[] = [];
+  const push = (p: Push) => {
+    pushes.push(p);
+    return inner.push(p);
+  };
+  return { git: { tail: (ref) => inner.tail(ref), prepare: (p) => inner.prepare(p), push }, pushes };
+}
+
+const utf8 = (text: string) => new TextEncoder().encode(text);
+
+/** The line landing writes for a proposal on an empty store: its commit, as apply forms it (G-14: `prev` null on genesis). */
+function lineOf(text: string): string {
+  const read = readProposal(JSON.parse(text) as JsonValue);
+  const applied = read.ok ? apply(createView(0, []), read.value, { session: { id: "01JB2X00000000000000000LND", at: AT }, events: [] }, []) : read;
+  if (!applied.ok || applied.value === "no-op") throw new Error("bug: the test proposal applies to a commit");
+  return encodeCommit(applied.value);
+}
+
 describe("landing into git (LG-22, LG-23)", () => {
   it("LG-23: the commit is a line of store/knowledge.jsonl on main, and the proposal file is gone", async () => {
     const ports = portsOf();
@@ -131,16 +157,7 @@ describe("landing into git (LG-22, LG-23)", () => {
 
 describe("the landing commit in git (LG-22)", () => {
   it("LG-22: carries the trailers Lattice-Proposal and Lattice-Seq; those of OB-07 arrive with S0-20", async () => {
-    const pushes: Push[] = [];
-    const inner = portsOf().git;
-    const git: Git = {
-      tail: (ref) => inner.tail(ref),
-      prepare: (p) => inner.prepare(p),
-      push: (p) => {
-        pushes.push(p);
-        return inner.push(p);
-      },
-    };
+    const { git, pushes } = recording();
     const commit = await landed(portsOf({ git }), "cr/a");
     expect(pushes.map((p) => [p.ref, p.message, p.trailers])).toEqual([
       [
@@ -156,22 +173,54 @@ describe("the landing commit in git (LG-22)", () => {
 });
 
 describe("the store a change request brings (LG-14, LG-23)", () => {
-  const line = '{"seq":1,"records":[]}';
-  const forged = { ...BRANCHES, "cr/forged": { from: "main", files: { "store/knowledge.jsonl": `${line}\n`, "store/proposals/f.json": proposal("demo/f") } } };
+  // main holds the line landing wrote for cr/a; a change request from it brings the file in the form given.
+  const file = `${lineOf(proposal("demo/a"))}\n`;
+  const fromMain = (brought: string | null) => ({
+    main: { files: { "store/knowledge.jsonl": file } },
+    "cr/x": { from: "main", files: { "store/knowledge.jsonl": brought, "store/proposals/x.json": proposal("demo/x") } },
+  });
+  const BROUGHT: readonly (readonly [string, string | null])[] = [
+    ["the last line feed removed", file.slice(0, -1)],
+    ["an empty line added", `${file}\n`],
+    ["a line appended", `${file}{"seq":2,"records":[]}\n`],
+    ["the file removed", null],
+  ];
 
-  it("LG-23: refuses a change request that wrote store/knowledge.jsonl itself, dry run or not, and lands nothing", async () => {
-    const ports = portsOf({}, forged);
+  it.each(BROUGHT)("LG-23: refuses a change request that changed the bytes of store/knowledge.jsonl — %s — dry run or not, and lands nothing", async (_, brought) => {
+    const ports = portsOf({}, fromMain(brought));
+    const refusal = { rule: "LG-23", path: "/store/knowledge.jsonl", expected: hashBytes(utf8(file)), got: brought === null ? null : hashBytes(utf8(brought)) };
     for (const options of [DRY_RUN, LAND]) {
-      const out = await land(ports, "cr/forged", options);
-      expect(out.outcome === "rejections" ? out.rejections : out).toMatchObject([{ rule: "LG-23", path: "/0", expected: null, got: line }]);
+      const out = await land(ports, "cr/x", options);
+      expect(out.outcome === "rejections" ? out.rejections : out).toMatchObject([refusal]);
     }
-    expect(await commitsOnMain(ports)).toEqual([]);
+    const onMain = await (await mainWorktree(ports.git)).read("store/knowledge.jsonl");
+    expect(new TextDecoder().decode(onMain ?? new Uint8Array())).toBe(file);
+  });
+
+  it("LG-14, LG-23: lands on a store the change request brings unchanged, with before at the tail of main", async () => {
+    const commit = await landed(portsOf({}, fromMain(file)), "cr/x");
+    expect([commit.seq, commit.base, commit.records.map((r) => r.id)]).toEqual([2, 1, ["demo/x"]]);
   });
 
   it("LG-06: a store on main whose line is no commit is refused on opening, never thrown", async () => {
     const ports = portsOf({}, { ...BRANCHES, main: { files: { "store/knowledge.jsonl": "{}\n" } } });
     expect(refusals(await land(ports, "cr/a", DRY_RUN))).toContainEqual(["LG-06", "/0/seq"]);
     expect((await tailView(ports)).ok).toBe(false);
+  });
+});
+
+describe("a change request that changes no knowledge (LG-25, LG-54)", () => {
+  const empty = JSON.stringify({ session: { id: "01JB2X00000000000000000SES" }, intents: [], sig: null });
+  const branches = { ...BRANCHES, "cr/code": { from: "main", files: { "src/y.ts": "y\n", "store/proposals/code.json": empty } } };
+
+  it("LG-25, LG-54: a proposal without intents lands as a no-op: no knowledge commit, the proposal file removed, the code kept", async () => {
+    const { git, pushes } = recording(branches);
+    const ports = portsOf({ git }, branches);
+    expect(await land(ports, "cr/code", DRY_RUN)).toEqual({ outcome: "no-op", pushed: false });
+    expect(pushes).toEqual([]);
+    expect(await land(ports, "cr/code", LAND)).toEqual({ outcome: "no-op", pushed: true });
+    expect([await (await mainWorktree(ports.git)).list(""), await commitsOnMain(ports)]).toEqual([["README.md", "src/y.ts"], []]);
+    expect(pushes.map((p) => [p.message, p.trailers.map((t) => t.key)])).toEqual([["lattice: land no-op", ["Lattice-Proposal"]]]);
   });
 });
 

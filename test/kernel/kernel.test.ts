@@ -3,7 +3,7 @@
 // rejection (LG-17, CONVENTIONS.md §3). Canon, hash and the full header arrive
 // with S0-04 and S0-05. Every input crosses the module boundary frozen.
 import { describe, expect, it } from "vitest";
-import { canon, checkHeader, checkId, decodeUtf8, hashRecord, isEntityId, isUlid, KERNEL_VERSION, parseJson, reject, sortRejections } from "../../src/kernel/index.js";
+import { canon, checkHeader, checkId, decodeUtf8, hashBytes, hashRecord, isEntityId, isUlid, KERNEL_VERSION, parseJson, reject, sortRejections } from "../../src/kernel/index.js";
 import { KR_04, KR_06, RULES } from "../../src/kernel/rules.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
@@ -41,14 +41,15 @@ describe("the header of a record (KR-04)", () => {
     expect([rev, checkHeader(record, "/records/0"), checkHeader(deepFreeze(event), "/records/1")]).toEqual([1, [], []]);
   });
 
-  it("KR-04: refuses a field of the wrong kind or absent, and a record that is no object, at the path given", () => {
+  it("KR-04: refuses a field of the wrong kind or absent, and a record that is no object, at the path given, with the value that came", () => {
     const { hash, ...noHash } = record;
     expect([hash, ...checkHeader(deepFreeze({ ...noHash, rev: "1" }), "/0").map((r) => [r.rule, r.path, r.got])]).toEqual([
       "sha256:00",
-      ["KR-04", "/0/rev", "string"],
+      ["KR-04", "/0/rev", "1"],
       ["KR-04", "/0/hash", "absent"],
     ]);
-    expect(checkHeader(null, "/0")).toEqual([reject(KR_04, { intent: null, path: "/0", expected: "a record", got: "null" })]);
+    expect(checkHeader(null, "/0")).toEqual([reject(KR_04, { intent: null, path: "/0", expected: "a record", got: null })]);
+    expect(checkHeader(deepFreeze([1]), "/0").map((r) => r.got)).toEqual([[1]]);
   });
 });
 
@@ -82,12 +83,17 @@ describe("thin canon and hash", () => {
     expect(hashRecord("demo/note@1", body)).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(hashRecord("demo/note@1", body)).not.toBe(hashRecord("demo/note@2", body));
   });
+
+  it("LG-30: hashes raw bytes in the form of KR-12", () => {
+    expect(hashBytes(new TextEncoder().encode("abc"))).toBe("sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    expect(hashBytes(Uint8Array.from([0xff]))).not.toBe(hashBytes(Uint8Array.from([0xfe])));
+  });
 });
 
 describe("reading JSON (KR-10)", () => {
   it("KR-10: refuses bytes that are not UTF-8 and a text that is not JSON, at the place given", () => {
     expect(decodeUtf8(Uint8Array.from([0x7b, 0xff, 0x7d]), "/store/proposals/a.json")).toMatchObject({ ok: false, rejections: [{ rule: "KR-10", path: "/store/proposals/a.json" }] });
-    expect(parseJson("{", "/3")).toMatchObject({ ok: false, rejections: [{ rule: "KR-10", path: "/3", intent: null }] });
+    expect(parseJson("{", "/3")).toMatchObject({ ok: false, rejections: [{ rule: "KR-10", path: "/3", intent: null, got: "{" }] });
     expect(parseJson('{"a":[1,"x"]}')).toEqual({ ok: true, value: { a: [1, "x"] } });
   });
 

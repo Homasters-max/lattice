@@ -1,0 +1,20 @@
+{
+  "check": "knowledge",
+  "input": {
+    "tail": [
+      123,
+      125,
+      10
+    ],
+    "request": [
+      123,
+      255,
+      125,
+      10
+    ]
+  },
+  "expect": {
+    "rule": "LG-23",
+    "path": "/store/knowledge.jsonl"
+  }
+}

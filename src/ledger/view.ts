@@ -24,9 +24,9 @@ export function createView(seq: number, rows: readonly Row[]): View & Rows {
 /** A store opened: the view at its tail and the tail commit. */
 type Opened = { readonly view: View & Rows; readonly tail: Commit | null };
 
-/** The lines of a store's commits from genesis, as the store gives them. */
-export async function linesOf(store: Store): Promise<string[]> {
-  const lines: string[] = [];
+/** The bytes of the lines of a store from genesis, as the store keeps them. */
+export async function linesOf(store: Store): Promise<Uint8Array[]> {
+  const lines: Uint8Array[] = [];
   for await (const line of store.commits(1)) lines.push(line);
   return lines;
 }
@@ -36,7 +36,7 @@ export async function linesOf(store: Store): Promise<string[]> {
  * at its index (KR-10, LG-06, KR-04). The walking skeleton keeps the rows in the view; verifying
  * the chain and handing the rows to the adapter arrive with S0-11.
  */
-export function openLines(lines: readonly string[]): Result<Opened> {
+export function openLines(lines: readonly Uint8Array[]): Result<Opened> {
   let rows: Row[] = [];
   let opened: Opened = { view: createView(0, []), tail: null };
   for (const [index, line] of lines.entries()) {

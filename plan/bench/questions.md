@@ -25,3 +25,4 @@
 | 17 | Which store does landing read the before of apply from — the tail of main or the change request merged into it? | lattice/lg-14, lattice/lg-23 | normal | S0-03, ревью волна 2 | 2026-10-06 |
 | 18 | How does landing end for a change request that does not exist? | — | blank | S0-03, Q-16 (LG-25 и LG-54 молчат; решено: отказ LG-54) | 2026-10-06 |
 | 19 | Must the code of another project that LATTICE imports be pinned to one version? | lattice/st-04, lattice/pr-13, lattice/lg-44 | normal | S0-03, ревью волна 2 | 2026-10-06 |
+| 20 | How does landing end for a change request whose proposal has no intents? | lattice/lg-54, lattice/lg-25, lattice/lg-12 | normal | S0-03, ревью волна 3 | 2026-10-06 |

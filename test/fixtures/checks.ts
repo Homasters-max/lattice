@@ -57,29 +57,36 @@ const applyCheck: FixtureCheck = {
 };
 
 /** The line of the commit apply forms for a proposal on an empty ledger. */
-function lineOf(value: JsonValue): string {
+function lineOf(value: JsonValue): Uint8Array {
   const read = readProposal(value);
   const applied = read.ok ? apply(createView(0, []), read.value, LAND, []) : read;
-  if (!applied.ok) throw new Error("bug: the pass proposal of a store fixture applies");
-  return encodeCommit(applied.value);
+  if (!applied.ok || applied.value === "no-op") throw new Error("bug: the pass proposal of a store fixture applies to a commit");
+  return new TextEncoder().encode(encodeCommit(applied.value));
 }
 
+/** Bytes given in a fixture: a string, as UTF-8, or the numbers of the bytes, for bytes that are not UTF-8. */
+const bytesOf = (v: unknown): Uint8Array => (Array.isArray(v) ? Uint8Array.from(v as number[]) : new TextEncoder().encode(String(v)));
+
 /**
- * `input`: `{ lines }` — the raw lines of `store/knowledge.jsonl`, as a change request or a broken file can
- * hold them; a trigger needs lines apply never forms — or `{ proposal }`, whose line apply forms.
+ * `input`: `{ lines }` — the raw lines of `store/knowledge.jsonl`, each a string or the numbers of its bytes, as a
+ * change request or a broken file can hold them; a trigger needs lines apply never forms — or `{ proposal }`,
+ * whose line apply forms.
  */
 const store: FixtureCheck = {
   enforces: [KR_10.id, LG_06.id, KR_04.id],
   run: (input) => {
     const raw = field(input, "lines");
-    return openLines(raw === undefined ? [lineOf(field(input, "proposal") as JsonValue)] : (raw as string[]));
+    return openLines(raw === undefined ? [lineOf(field(input, "proposal") as JsonValue)] : (raw as unknown[]).map(bytesOf));
   },
 };
 
-/** `input`: `{ tail, request }` — the lines of `store/knowledge.jsonl` at the tail of main and in the change request. */
+/** `input`: `{ tail, request }` — the bytes of `store/knowledge.jsonl` at the tail of main and in the change request, `null` where there is no file. */
 const knowledge: FixtureCheck = {
   enforces: [LG_23.id],
-  run: (input) => keptKnowledge(field(input, "tail") as string[], field(input, "request") as string[]),
+  run: (input) => {
+    const file = (name: string) => (field(input, name) === null ? null : bytesOf(field(input, name)));
+    return keptKnowledge(file("tail"), file("request"));
+  },
 };
 
 export const CHECKS: { readonly [check: string]: FixtureCheck } = {

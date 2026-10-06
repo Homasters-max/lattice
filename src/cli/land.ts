@@ -16,6 +16,9 @@ function report(o: LandingOutcome, env: CliEnv): number {
       env.out(o.pushed ? `landed: commit ${o.commit.seq} with ${n}\n` : `dry run: commit ${o.commit.seq} would land ${n}\n`);
       return 0;
     }
+    case "no-op":
+      env.out(o.pushed ? "landed: no-op — no knowledge commit, the proposal file is removed\n" : "dry run: no-op — the proposal changes no knowledge\n");
+      return 0;
     case "rejections":
       env.out(`rejections: ${o.rejections.length}\n${o.rejections.map(lineOf).join("")}`);
       return 1;

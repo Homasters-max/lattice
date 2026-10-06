@@ -21,6 +21,6 @@ export function parseJson(text: string, path = ""): Result<JsonValue> {
   try {
     return { ok: true, value: JSON.parse(text) as JsonValue };
   } catch {
-    return refuse(reject(KR_10, { intent: null, path, expected: "a JSON text", got: "a text that is not JSON" }));
+    return refuse(reject(KR_10, { intent: null, path, expected: "a JSON text", got: text }));
   }
 }

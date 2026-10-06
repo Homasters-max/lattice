@@ -1,12 +1,13 @@
 // Landing (LG-22…LG-26): a `knowledge` commit is born in git. It reaches git,
 // acts, the store, time and ids only through ports (LG-23, ST-04). The walking
 // skeleton opens the store at the tail of `main` for `before` (LG-14),
-// prepares the change request onto that tail, refuses one that wrote the store
-// itself (LG-23), appends the commit to the `jsonl` store on the worktree,
-// removes the proposal and pushes. Rebuilds on a moved `main`, `awaiting-act`,
-// the land session event, acts as events, the trailers of OB-07 and `request`
-// arrive with S0-19 and S0-20.
-import { decodeUtf8, parseJson, refuse, reject, type Rejections, type Result } from "../kernel/index.js";
+// prepares the change request onto that tail, refuses one that changed the
+// bytes of `store/knowledge.jsonl` itself (LG-23), appends the commit to the
+// `jsonl` store on the worktree — nothing for a no-op (LG-25) — removes the
+// proposal and pushes. Rebuilds on a moved `main`, `awaiting-act`, the land
+// session event, acts as events, the trailers of OB-07 and `request` arrive
+// with S0-19 and S0-20.
+import { decodeUtf8, hashBytes, parseJson, refuse, reject, type Rejections, type Result } from "../kernel/index.js";
 import { apply, type LandActs } from "./apply.js";
 import { commitHash, encodeCommit, type Commit } from "./commit.js";
 import { fold } from "./fold.js";
@@ -15,7 +16,7 @@ import type { Clock } from "./ports/clock.js";
 import type { Git, Trailer, Worktree } from "./ports/git.js";
 import type { Ids } from "./ports/ids.js";
 import type { Store } from "./ports/store.js";
-import { readProposal, type Proposal } from "./proposal.js";
+import { proposalHash, readProposal, type Proposal } from "./proposal.js";
 import type { Rows } from "./rows.js";
 import { LG_23, LG_54 } from "./rules.js";
 import { linesOf, openLines, type View } from "./view.js";
@@ -31,15 +32,18 @@ export interface LandingPorts {
 
 export type LandOptions = { readonly dryRun: boolean };
 
-/** LG-25, LG-26: how landing ends; a dry run ends `commit` with `pushed: false`. */
+/** LG-25, LG-26: how landing ends; a dry run ends `commit` or `no-op` with `pushed: false`. */
 export type LandingOutcome =
   | { readonly outcome: "commit"; readonly commit: Commit; readonly pushed: boolean }
+  | { readonly outcome: "no-op"; readonly pushed: boolean }
   | { readonly outcome: "rejections"; readonly rejections: Rejections }
   | { readonly outcome: "moved" }
   | { readonly outcome: "conflict"; readonly paths: readonly string[] };
 
 const MAIN = "main";
+// LG-50: the paths of a store in the tree of a change request.
 const PROPOSALS = "store/proposals/";
+const KNOWLEDGE = "store/knowledge.jsonl";
 
 /** LG-54: the head of the change request named; one that does not exist carries no proposal. */
 export function changeRequest(head: string | null): Result<string> {
@@ -54,16 +58,18 @@ export function proposalPath(files: readonly string[]): Result<string> {
   return refuse(reject(LG_54, { intent: null, path: "/store/proposals", expected: "one proposal file", got: [...files] }));
 }
 
+const same = (a: Uint8Array | null, b: Uint8Array | null) =>
+  a === null || b === null ? a === b : a.length === b.length && a.every((byte, i) => byte === b[i]);
+
 /**
- * LG-23: only the `jsonl` adapter writes the store of knowledge, and only landing opens it — so a change
- * request brings the lines of the tail of `main` unchanged; the first line that differs is refused.
+ * LG-23: only the `jsonl` adapter writes `store/knowledge.jsonl`, and only landing opens it — so a change
+ * request brings the file byte for byte as at the tail of `main`, or both lack it. Bytes are no JSON value:
+ * the refusal names each file by its hash (Q-19).
  */
-export function keptKnowledge(tail: readonly string[], request: readonly string[]): Result<readonly string[]> {
-  const length = Math.max(tail.length, request.length);
-  for (let i = 0; i < length; i++) {
-    if (tail[i] !== request[i]) return refuse(reject(LG_23, { intent: null, path: `/${i}`, expected: tail[i] ?? null, got: request[i] ?? null }));
-  }
-  return { ok: true, value: request };
+export function keptKnowledge(tail: Uint8Array | null, request: Uint8Array | null): Result<Uint8Array | null> {
+  if (same(tail, request)) return { ok: true, value: request };
+  const named = (bytes: Uint8Array | null) => (bytes === null ? null : hashBytes(bytes));
+  return refuse(reject(LG_23, { intent: null, path: `/${KNOWLEDGE}`, expected: named(tail), got: named(request) }));
 }
 
 type Found = { readonly path: string; readonly proposal: Proposal };
@@ -80,14 +86,16 @@ async function proposalOf(worktree: Worktree): Promise<Result<Found>> {
   return proposal.ok ? { ok: true, value: { path: path.value, proposal: proposal.value } } : proposal;
 }
 
-/** The tail of `main` (GL-05) and the lines of the store there: a worktree of that commit alone. */
-async function tailOf(ports: LandingPorts): Promise<{ readonly onto: string; readonly lines: readonly string[] }> {
+type Tail = { readonly onto: string; readonly knowledge: Uint8Array | null; readonly lines: readonly Uint8Array[] };
+
+/** The tail of `main` (GL-05): a worktree of that commit alone, the bytes of its `store/knowledge.jsonl` and the lines of its store. */
+async function tailOf(ports: LandingPorts): Promise<Tail> {
   const onto = await ports.git.tail(MAIN);
   // A store lives on main from its init (LG-47, S0-23).
   if (onto === null) throw new Error(`bug: the repository of the store has no ${MAIN}`);
   const worktree = await ports.git.prepare({ request: onto, onto });
   if (worktree.kind === "conflict") throw new Error("bug: a commit conflicts with itself");
-  return { onto, lines: await linesOf(ports.openStore(worktree)) };
+  return { onto, knowledge: await worktree.read(KNOWLEDGE), lines: await linesOf(ports.openStore(worktree)) };
 }
 
 const rejected = (r: { readonly rejections: Rejections }): LandingOutcome => ({ outcome: "rejections", rejections: r.rejections });
@@ -104,44 +112,54 @@ type Checked = Found & {
 async function check(ports: LandingPorts, request: string): Promise<LandingOutcome | Checked> {
   const head = changeRequest(await ports.git.tail(request));
   if (!head.ok) return rejected(head);
-  const { onto, lines } = await tailOf(ports);
-  const worktree = await ports.git.prepare({ request, onto });
+  const tail = await tailOf(ports);
+  const worktree = await ports.git.prepare({ request, onto: tail.onto });
   if (worktree.kind === "conflict") return { outcome: "conflict", paths: worktree.paths };
   const found = await proposalOf(worktree);
   if (!found.ok) return rejected(found);
   // LG-14: `before` is the read view at the tail — the store of main, never the one the request brings.
-  const before = openLines(lines);
+  const before = openLines(tail.lines);
   if (!before.ok) return rejected(before);
-  const store = ports.openStore(worktree);
-  const kept = keptKnowledge(lines, await linesOf(store));
+  const kept = keptKnowledge(tail.knowledge, await worktree.read(KNOWLEDGE));
   if (!kept.ok) return rejected(kept);
-  return { ...found.value, ...before.value, onto, worktree, store };
+  return { ...found.value, ...before.value, onto: tail.onto, worktree, store: ports.openStore(worktree) };
 }
 
 /** G-14: apply knows neither the tail nor the change request; landing chains the commit to the tail. */
 const onTail = (candidate: Commit, tail: Commit | null): Commit => ({ ...candidate, prev: tail === null ? null : commitHash(tail) });
 
 /** LG-22: the trailers of the landing commit that name the proposal and the `seq`; those of OB-07 arrive with S0-20. */
-const trailersOf = (c: Commit): readonly Trailer[] => [
-  { key: "Lattice-Proposal", value: c.proposal },
-  { key: "Lattice-Seq", value: String(c.seq) },
+const trailersOf = (proposal: string, seq: number | null): readonly Trailer[] => [
+  { key: "Lattice-Proposal", value: proposal },
+  ...(seq === null ? [] : [{ key: "Lattice-Seq", value: String(seq) }]),
 ];
+
+/** LG-25: `commit`, or `no-op` where apply wrote no knowledge commit. */
+const ended = (commit: Commit | null, pushed: boolean): LandingOutcome => (commit === null ? { outcome: "no-op", pushed } : { outcome: "commit", commit, pushed });
+
+/**
+ * LG-22, LG-25: the git commit of landing — the knowledge commit appended to the store on the worktree, none
+ * for a no-op, the proposal file removed, the code of the change request kept — pushed onto `main`.
+ */
+async function pushed(ports: LandingPorts, checked: Checked, commit: Commit | null): Promise<LandingOutcome> {
+  const { onto, worktree, store, path, proposal, view } = checked;
+  if (commit !== null) await store.append({ commit: encodeCommit(commit), delta: fold(view, commit, []), evidence: [] });
+  await worktree.remove(path);
+  const message = commit === null ? "lattice: land no-op" : `lattice: land commit ${commit.seq}`;
+  const trailers = trailersOf(proposalHash(proposal), commit?.seq ?? null);
+  const done = await ports.git.push({ worktree, ref: MAIN, expected: onto, message, trailers });
+  return done === "moved" ? { outcome: "moved" } : ended(commit, true);
+}
 
 /** Lands the proposal of a change request on the tail of `main`, or only checks it with `dryRun` (LG-26). */
 export async function land(ports: LandingPorts, request: string, options: LandOptions): Promise<LandingOutcome> {
   const checked = await check(ports, request);
   if ("outcome" in checked) return checked;
-  const { onto, worktree, store, path, proposal, view, tail } = checked;
   const acts: LandActs = { session: { id: ports.ids.ulid(), at: ports.clock.now() }, events: await ports.acts.read(request) };
-  const applied = apply(view, proposal, acts, []);
+  const applied = apply(checked.view, checked.proposal, acts, []);
   if (!applied.ok) return rejected(applied);
-  const commit = onTail(applied.value, tail);
-  if (options.dryRun) return { outcome: "commit", commit, pushed: false };
-  await store.append({ commit: encodeCommit(commit), delta: fold(view, commit, []), evidence: [] });
-  await worktree.remove(path);
-  const message = `lattice: land commit ${commit.seq}`;
-  const pushed = await ports.git.push({ worktree, ref: MAIN, expected: onto, message, trailers: trailersOf(commit) });
-  return pushed === "moved" ? { outcome: "moved" } : { outcome: "commit", commit, pushed: true };
+  const commit = applied.value === "no-op" ? null : onTail(applied.value, checked.tail);
+  return options.dryRun ? ended(commit, false) : pushed(ports, checked, commit);
 }
 
 /** The read view at the tail of `main`: the store opened on a worktree of that commit alone. */

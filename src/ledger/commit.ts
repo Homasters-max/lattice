@@ -4,7 +4,7 @@
 // the header fields, their JSON kinds and the header of each record (KR-04);
 // the chain and its signatures are verified when a store opens from S0-10 and
 // S0-11 (LG-05).
-import { canon, checkHeader, hash, isJsonObject, kindOf, parseJson, reject, refused, type JsonValue, type Record, type Rejection, type Result } from "../kernel/index.js";
+import { canon, checkHeader, decodeUtf8, gotOf, hash, isJsonObject, parseJson, reject, refused, type JsonValue, type Record, type Rejection, type Result } from "../kernel/index.js";
 import { LG_06 } from "./rules.js";
 
 export type Commit = {
@@ -57,9 +57,9 @@ const COMMIT: { readonly [field in keyof Commit]: Field } = {
 };
 
 function commitRejections(value: JsonValue, path: string): Rejection[] {
-  if (!isJsonObject(value)) return [reject(LG_06, { intent: null, path, expected: "a commit", got: kindOf(value) })];
+  if (!isJsonObject(value)) return [reject(LG_06, { intent: null, path, expected: "a commit", got: gotOf(value) })];
   const header = Object.entries(COMMIT).flatMap(([name, field]) =>
-    field.fits(value[name]) ? [] : [reject(LG_06, { intent: null, path: `${path}/${name}`, expected: field.expected, got: kindOf(value[name]) })],
+    field.fits(value[name]) ? [] : [reject(LG_06, { intent: null, path: `${path}/${name}`, expected: field.expected, got: gotOf(value[name]) })],
   );
   const records = Array.isArray(value.records) ? (value.records as readonly JsonValue[]) : [];
   return [...header, ...records.flatMap((r, i) => checkHeader(r, `${path}/records/${i}`))];
@@ -71,8 +71,12 @@ export function readCommit(value: JsonValue, path: string): Result<Commit> {
   return refused<Commit>(commitRejections(value, path)) ?? { ok: true, value: value as Commit };
 }
 
-/** The commit of the `index`-th line of a store, refused at `/<index>`: KR-10 for a line that is not JSON, LG-06 and KR-04 for its form. */
-export function decodeCommit(line: string, index: number): Result<Commit> {
-  const parsed = parseJson(line, `/${index}`);
+/**
+ * The commit of the `index`-th line of a store — its bytes, as the store keeps them — refused at `/<index>`:
+ * KR-10 for bytes that are not UTF-8 or a text that is not JSON (an empty line too), LG-06 and KR-04 for its form.
+ */
+export function decodeCommit(line: Uint8Array, index: number): Result<Commit> {
+  const text = decodeUtf8(line, `/${index}`);
+  const parsed = text.ok ? parseJson(text.value, `/${index}`) : text;
   return parsed.ok ? readCommit(parsed.value, `/${index}`) : parsed;
 }

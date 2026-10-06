@@ -1,27 +1,36 @@
 // `store-jsonl` (LG-02, LG-23): the git copy of `knowledge` — one canonical
 // line per commit in `store/knowledge.jsonl` of a directory, read from the
-// start when the store opens. It never parses a line: the ledger hands it each
-// commit as its line and folds the rows, which it keeps in memory. Refusing a
-// cut last line, writing `store/evidence/` and the rows handed on opening
-// arrive with S0-11.
+// start when the store opens. It never decodes or parses a line and drops none:
+// it gives the bytes between line feeds as they are, an empty line too, and the
+// ledger refuses what is no commit (KR-10). The rows the ledger folds are kept
+// in memory. Refusing a cut last line, writing `store/evidence/` and the rows
+// handed on opening arrive with S0-11 (Q-09).
 import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { Append, Row, Store } from "../../ledger/ports/store.js";
+import { sortRows, type Append, type Row, type Store } from "../../ledger/ports/store.js";
 
 export type StoreJsonlOptions = { readonly dir: string };
 
 /** LG-50: the only path this adapter writes. */
 const KNOWLEDGE = "store/knowledge.jsonl";
 
-const byKey = (a: Row, b: Row) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
+const LF = 0x0a;
 
 async function* stream<T>(items: readonly T[]): AsyncIterable<T> {
   for (const item of items) yield await Promise.resolve(item);
 }
 
-async function linesOf(file: string): Promise<string[]> {
-  const text = await readFile(file, "utf8").catch((e: NodeJS.ErrnoException) => (e.code === "ENOENT" ? "" : Promise.reject(e)));
-  return text.split("\n").filter((line) => line !== "");
+/** The lines of the file: the bytes before each line feed, then the bytes after the last one if there are any — a cut last line, refused from S0-11. */
+async function linesOf(file: string): Promise<Uint8Array[]> {
+  const read = await readFile(file).catch((e: NodeJS.ErrnoException) => (e.code === "ENOENT" ? null : Promise.reject(e)));
+  const bytes = read === null ? new Uint8Array() : new Uint8Array(read);
+  const lines: Uint8Array[] = [];
+  let start = 0;
+  for (let i = bytes.indexOf(LF); i !== -1; i = bytes.indexOf(LF, start)) {
+    lines.push(bytes.subarray(start, i));
+    start = i + 1;
+  }
+  return start < bytes.length ? [...lines, bytes.subarray(start)] : lines;
 }
 
 export function createStoreJsonl({ dir }: StoreJsonlOptions): Store {
@@ -43,7 +52,7 @@ export function createStoreJsonl({ dir }: StoreJsonlOptions): Store {
     },
     tail: async () => (await linesOf(file)).at(-1) ?? null,
     row: (key) => Promise.resolve(holding.get(key) ?? null),
-    rows: (prefix) => stream([...holding.values()].filter((r) => r.key.startsWith(prefix)).sort(byKey)),
+    rows: (prefix) => stream(sortRows([...holding.values()].filter((r) => r.key.startsWith(prefix)))),
     evidence: (hash) => Promise.resolve(evidence.get(hash) ?? null),
   };
 }

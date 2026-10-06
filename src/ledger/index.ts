@@ -1,6 +1,6 @@
 // The ledger (ST-01): commits, apply, fold and read views, landing; the
 // interfaces of the ports `store`, `acts`, `git`, `clock` and `ids` (LG-23).
-export { apply, type LandActs } from "./apply.js";
+export { apply, type Applied, type LandActs } from "./apply.js";
 export { commitHash, decodeCommit, encodeCommit, readCommit, type Commit, type Evidence } from "./commit.js";
 export { fold } from "./fold.js";
 export { changeRequest, keptKnowledge, land, proposalPath, tailView, type LandingOutcome, type LandingPorts, type LandOptions } from "./landing.js";

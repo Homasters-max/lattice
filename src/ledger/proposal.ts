@@ -2,7 +2,7 @@
 // its form on the surface — the fields and their JSON kinds; the session
 // event with its certificate, the signature and facts in the canonical order
 // arrive with S0-10 and S0-16.
-import { compareText, hash, isJsonObject, kindOf, reject, refused, type JsonObject, type JsonValue, type Kind, type Rejection, type Result } from "../kernel/index.js";
+import { compareText, gotOf, hash, isJsonObject, reject, refused, type JsonObject, type JsonValue, type Kind, type Rejection, type Result } from "../kernel/index.js";
 import { LG_09 } from "./rules.js";
 
 /** The authoring session event (TR-11); its certificate arrives with S0-16. */
@@ -43,7 +43,7 @@ const PROPOSAL: { readonly [field in keyof Proposal]: Field } = {
 };
 
 const refusal = (intent: string | null, path: string, expected: string, got: JsonValue | undefined) =>
-  reject(LG_09, { intent, path, expected, got: kindOf(got) });
+  reject(LG_09, { intent, path, expected, got: gotOf(got) });
 
 /** G-13: inside an intent with a string `id` the path is the intent's own; otherwise from the root. */
 function intentRejections(v: JsonValue, i: number): Rejection[] {

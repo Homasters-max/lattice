@@ -37,8 +37,9 @@ SL-05: срез начинается с одной тонкой change unit че
 // src/ledger/ports/*.ts — как сделано; точные типы — в задачах портов (S0-11, S0-19, S0-20).
 // Операция с несколькими аргументами берёт один объект с именами аргументов правила (CONVENTIONS.md §1, Q-11).
 interface Store { append({ commit, delta, evidence }): Promise<void>;   // commit — каноническая строка от ledger (Q-09)
-                  commits(from: number): AsyncIterable<string>; tail(): Promise<string | null>;
+                  commits(from: number): AsyncIterable<Uint8Array>; tail(): Promise<Uint8Array | null>;   // байты строк, пустая тоже (Q-19)
                   row(key): Promise<Row | null>; rows(prefix): AsyncIterable<Row>; evidence(hash): Promise<Uint8Array | null> }
+                  // порт store отдаёт и sortRows — порядок ключей контракта (Q-18)
 interface Git   { tail(ref): Promise<string | null>;                // null — нет такого ref (Q-16)
                   prepare({ request, onto }): Promise<Worktree | Conflict>;
                   push({ worktree, ref, expected, message, trailers }): Promise<"pushed" | "moved"> }
@@ -52,13 +53,13 @@ parseJson(text, path?): Result<JsonValue>; decodeUtf8(bytes, path?): Result<stri
 readProposal(value): Result<Proposal>                                     // LG-09 — поверхностно
 changeRequest(head: string | null): Result<string>                        // LG-54 — change request, которого нет (Q-16)
 proposalPath(files): Result<string>                                       // LG-54
-keptKnowledge(tail: lines, request: lines): Result<lines>                 // LG-23 — change request не пишет store
+keptKnowledge(tail: bytes | null, request: bytes | null): Result<bytes | null>   // LG-23 — байты store/knowledge.jsonl как на tail main (Q-19)
 checkHeader(value, path): Rejection[]                                     // KR-04 — поверхностно
-readCommit(value, path): Result<Commit>; decodeCommit(line, index)        // LG-06 и KR-04 — поверхностно
-apply(before: View, proposal, acts: LandActs, evidence): Result<Commit>   // фаза 1 — KR-06; prev, request, sig — null (G-14)
+readCommit(value, path): Result<Commit>; decodeCommit(line: bytes, index) // KR-10 — UTF-8 и JSON; LG-06 и KR-04 — поверхностно
+apply(before: View, proposal, acts: LandActs, evidence): Result<Commit | "no-op">   // фаза 1 — KR-06; без intents — no-op (LG-12, LG-54); prev, request, sig — null (G-14)
 fold(view: Rows, commit, evidence): Delta                                 // строка current:<id>
 openLines(lines): Result<{ view, tail }>; openView(store)                 // fold с начала при открытии; отказ KR-10, LG-06, KR-04
-land(ports, request, { dryRun }): Promise<LandingOutcome>                 // before — store tail main (LG-14); worktree → LG-23 → append jsonl → удалить proposal → push
+land(ports, request, { dryRun }): Promise<LandingOutcome>                 // before — store tail main (LG-14); worktree → LG-23 → append jsonl (не для no-op, LG-25) → удалить proposal → push
 assemble(ports: { git, acts, clock, ids }): Assembly                      // store на worktree — jsonl (LG-23); тестовая сборка — test/support/assembly.ts (Q-13)
 run(argv, { out, err, assembled }): Promise<number>                        // cli; bin передаёт assembled: null до S0-23 (Q-13)
 ```
@@ -82,7 +83,7 @@ run(argv, { out, err, assembled }): Promise<number>                        // cl
 
 ## Сделано иначе, чем в наброске
 
-Решения владельца по ревью — Q-09…Q-16 в `PLAN.md`.
+Решения владельца по ревью — Q-09…Q-19 в `PLAN.md`.
 
 - **Знание в git** (Q-09): кроме `store-memory` есть тонкий `store-jsonl` — одна каноническая строка на коммит в `store/knowledge.jsonl`, чтение с начала при открытии. Landing открывает его на worktree: worktree → `append` → удалить proposal → `push`. Worktree `git-fixture` — временный каталог, `push` фиксирует его содержимое; `prepare` сливает по общему предку и кончается `conflict`. Адаптер store canon не знает: ledger отдаёт строку коммита и сам разбирает строки. Read view в e2e открывается из tail `main`. Проверки цепочки, обрезанной строки, evidence в `store/evidence/` и строки, переданные адаптеру при открытии, — S0-11; CAS с пересборкой, `awaiting-act`, trailers OB-07, `request` и `git-repo` — S0-20.
 - **Отказы вместо исключений** (Q-10): KR-10 (не JSON, не UTF-8), LG-09 (форма proposal поверхностно; полная — S0-10), LG-54 (ровно один proposal) — с реестрами и фикстурами trigger/pass. Мягкий `JSON.parse` — только в `parseJson` (G-16, до S0-04).
@@ -96,7 +97,10 @@ run(argv, { out, err, assembled }): Promise<number>                        // cl
 - **KR-01** ловит строковые литералы, называющие `std` или его тип, и идентификаторы, названные по типу `std` (`Requirement`, `reviewNote`, `NAMESPACE`).
 - **`Rejection.expected` и `got`** — `JsonValue`, а не `unknown`: сообщение подставляет их каноническим JSON; набросок `CONVENTIONS.md` §3 поправлен.
 - **Чистота** строже раздела 8 `CONVENTIONS.md`: `import.meta` целиком, `globalThis`, `require`, `Buffer`, глобальный `crypto`, `Date()` как функция — пути к окружению и файлам ST-04; раздел дописан.
-- **`before` — store tail `main`** (LG-14): landing открывает store на worktree самого tail-коммита и складывает `before` оттуда. Store на worktree change request только сверяется с ним построчно, и `append` идёт в него. Change request, который сам изменил `store/knowledge.jsonl`, отклоняется LG-23 — `keptKnowledge`, фикстуры `test/fixtures/LG-23/`.
+- **`before` — store tail `main`** (LG-14): landing открывает store на worktree самого tail-коммита и складывает `before` оттуда; `append` идёт в store на worktree change request. Change request, который изменил хоть один байт `store/knowledge.jsonl`, отклоняется LG-23: снятый последний перевод строки, пустая строка, байты не UTF-8, лишняя или изменённая строка, удалённый файл. Сверка — по байтам файла в двух worktree (`keptKnowledge`, Q-19), фикстуры `test/fixtures/LG-23/`.
+- **Строки store — байтами** (Q-19): `commits` и `tail` отдают байты строк; `store-jsonl` режет файл по переводам строки, ничего не декодирует и не выбрасывает, ledger декодирует UTF-8 с отказом KR-10. Обрезанная последняя строка — S0-11 (Q-09). Порядок ключей строк — `sortRows` из порта `store` (Q-18).
+- **No-op** (LG-12, LG-25, LG-54): proposal без intents — `no-op` apply; landing не пишет коммит знания, удаляет файл proposal, оставляет код change request и пушит с trailer `Lattice-Proposal`. No-op отдельных intents (LG-13) и идемпотентность по hash (LG-12) — S0-13.
+- **`got` отказа** — пришедшее значение; описание `"absent"` — только у поля, которого нет; байты — их hash (`CONVENTIONS.md` §3, Q-19).
 - **Форма коммита при открытии store** — по образцу Q-10. Строка, которая не коммит, отклоняется поверхностно, с путём от строки: LG-06 — заголовок, KR-04 — заголовок записи (`readCommit`, `checkHeader`, фикстуры `test/fixtures/{LG-06,KR-04}/`). Полные проверки — S0-10 и S0-05.
 - **Сборка** (Q-13): `assemble(ports)` вместо `assemble(config)`. `src/assembly` соединяет порты `git`, `acts`, `clock`, `ids` и сама открывает `store-jsonl` на worktree (LG-23). Адаптеры для тестов собирает `test/support/assembly.ts`; их импорт из `src/` тест структуры отклоняет (ST-07). Bin передаёт `assembled: null` до S0-23 — это показывает `test/cli/bin.test.ts`.
 - **Порт `judge`** (Q-14): к нему пускают только `decide` и адаптеры `judge-*`, `assembly` — нет.

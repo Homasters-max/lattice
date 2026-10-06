@@ -1,7 +1,9 @@
 // Apply (LG-14): the only path into `knowledge`, a pure function
-// `apply(before, proposal, acts, evidence) → commit | rejections`. The walking
-// skeleton has phase 1 with the id check (KR-06) and forms the candidate
-// commit (LG-15); the phases of LG-16 arrive with S0-13…S0-18.
+// `apply(before, proposal, acts, evidence) → commit | no-op | rejections`. The
+// walking skeleton has phase 1 with the id check (KR-06), reports `no-op` for
+// a proposal without intents (LG-12, LG-54) and forms the candidate commit
+// (LG-15); the phases of LG-16, the no-op intents of LG-13 and the idempotence
+// of LG-12 arrive with S0-13…S0-18.
 import { checkId, hashRecord, KERNEL_VERSION, refused, type Record, type Result } from "../kernel/index.js";
 import type { Commit, Evidence } from "./commit.js";
 import type { Act } from "./ports/acts.js";
@@ -43,8 +45,15 @@ function candidate(before: View, proposal: Proposal, acts: LandActs): Commit {
 /** Phase 1, Record: the id of every intent (KR-06). */
 const phaseRecord = (p: Proposal) => p.intents.flatMap((i) => checkId(i.op, i.id, { intent: i.id, path: "/id" }));
 
-export const apply: (before: View, proposal: Proposal, acts: LandActs, evidence: readonly Evidence[]) => Result<Commit> = (
+/** LG-14: what apply ends with when it refuses nothing — a commit, or `no-op` when no intent changes knowledge. */
+export type Applied = Commit | "no-op";
+
+/** LG-12: an empty commit is never written — a proposal without intents (LG-54) is a no-op. */
+const applied = (before: View, proposal: Proposal, acts: LandActs): Applied =>
+  proposal.intents.length === 0 ? "no-op" : candidate(before, proposal, acts);
+
+export const apply: (before: View, proposal: Proposal, acts: LandActs, evidence: readonly Evidence[]) => Result<Applied> = (
   before,
   proposal,
   acts,
-) => refused<Commit>(phaseRecord(proposal)) ?? { ok: true, value: candidate(before, proposal, acts) };
+) => refused<Applied>(phaseRecord(proposal)) ?? { ok: true, value: applied(before, proposal, acts) };
