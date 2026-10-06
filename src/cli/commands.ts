@@ -2,7 +2,7 @@
 // slice implements, with the text of RT-Z03. Commands of later slices are
 // absent. This file belongs to the walking skeleton (ST-15).
 
-export interface Command {
+interface Command {
   readonly name: string;
   readonly does: string;
 }

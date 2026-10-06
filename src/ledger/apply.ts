@@ -46,7 +46,7 @@ function candidate(before: View, proposal: Proposal, acts: LandActs): Commit {
 const phaseRecord = (p: Proposal) => p.intents.flatMap((i) => checkId(i.op, i.id, { intent: i.id, path: "/id" }));
 
 /** LG-14: what apply ends with when it refuses nothing — a commit, or `no-op` when no intent changes knowledge. */
-export type Applied = Commit | "no-op";
+type Applied = Commit | "no-op";
 
 /** LG-12: an empty commit is never written — a proposal without intents (LG-54) is a no-op. */
 const applied = (before: View, proposal: Proposal, acts: LandActs): Applied =>

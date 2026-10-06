@@ -6,7 +6,7 @@ import { compareText, gotOf, hash, isJsonObject, reject, refused, type JsonObjec
 import { LG_09 } from "./rules.js";
 
 /** The authoring session event (TR-11); its certificate arrives with S0-16. */
-export type Session = JsonObject & { readonly id: string };
+type Session = JsonObject & { readonly id: string };
 
 export type Intent = {
   readonly op: Kind;

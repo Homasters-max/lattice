@@ -3,13 +3,13 @@
 // `reject` from a row of a rule registry.
 import { canon, compareText, type JsonValue } from "./json.js";
 
-export type RulePrefix = "PR" | "KR" | "TY" | "RF" | "LG" | "TR" | "RT" | "DP" | "LN" | "BN" | "OB" | "AG" | "ST" | "SL" | "RM" | "GL";
+type RulePrefix = "PR" | "KR" | "TY" | "RF" | "LG" | "TR" | "RT" | "DP" | "LN" | "BN" | "OB" | "AG" | "ST" | "SL" | "RM" | "GL";
 type Digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
 /** The ID of a row of a rule table; Z-blocks never name a rejection. */
-export type RuleId = `${RulePrefix}-${Digit}${Digit}`;
+type RuleId = `${RulePrefix}-${Digit}${Digit}`;
 
 /** Languages of message templates; S0 has only `en` (TR-40). */
-export type Lang = "en";
+type Lang = "en";
 
 /** A row of a module's rule registry. */
 export type Rule = {
