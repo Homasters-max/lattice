@@ -3,16 +3,20 @@
 // the code of LATTICE; until the strict parser of S0-04 replaces it, it still
 // takes duplicate keys, integers outside ±2^53, strings not in NFC and -0
 // (G-16).
+import { hashBytes } from "./hash.js";
 import type { JsonValue } from "./json.js";
 import { refuse, reject, type Result } from "./rejection.js";
 import { KR_10 } from "./rules.js";
 
-/** KR-10: the text of UTF-8 bytes, refused at `path` — where the bytes sit in their input — when they are not UTF-8. */
+/**
+ * KR-10: the text of UTF-8 bytes, refused at `path` — where the bytes sit in their input — when they are not
+ * UTF-8. Bytes are no JSON value: the refusal names them by their hash (CONVENTIONS.md §3, Q-19).
+ */
 export function decodeUtf8(bytes: Uint8Array, path = ""): Result<string> {
   try {
     return { ok: true, value: new TextDecoder("utf-8", { fatal: true }).decode(bytes) };
   } catch {
-    return refuse(reject(KR_10, { intent: null, path, expected: "UTF-8", got: "bytes that are not UTF-8" }));
+    return refuse(reject(KR_10, { intent: null, path, expected: "UTF-8", got: hashBytes(bytes) }));
   }
 }
 

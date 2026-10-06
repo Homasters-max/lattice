@@ -91,8 +91,9 @@ describe("thin canon and hash", () => {
 });
 
 describe("reading JSON (KR-10)", () => {
-  it("KR-10: refuses bytes that are not UTF-8 and a text that is not JSON, at the place given", () => {
-    expect(decodeUtf8(Uint8Array.from([0x7b, 0xff, 0x7d]), "/store/proposals/a.json")).toMatchObject({ ok: false, rejections: [{ rule: "KR-10", path: "/store/proposals/a.json" }] });
+  it("KR-10: refuses bytes that are not UTF-8 — named by their hash (Q-19) — and a text that is not JSON, at the place given", () => {
+    const bytes = Uint8Array.from([0x7b, 0xff, 0x7d]);
+    expect(decodeUtf8(bytes, "/store/proposals/a.json")).toMatchObject({ ok: false, rejections: [{ rule: "KR-10", path: "/store/proposals/a.json", got: hashBytes(bytes) }] });
     expect(parseJson("{", "/3")).toMatchObject({ ok: false, rejections: [{ rule: "KR-10", path: "/3", intent: null, got: "{" }] });
     expect(parseJson('{"a":[1,"x"]}')).toEqual({ ok: true, value: { a: [1, "x"] } });
   });
