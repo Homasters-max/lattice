@@ -56,6 +56,14 @@ describe.each(ADAPTERS)("store port: $name", ({ make }) => {
     expect(await store.row("missing")).toBeNull();
   });
 
+  it("LG-35: a row a delta closes without opening another holds no more — gone from row and rows", async () => {
+    const store = make();
+    await store.append({ commit: "1", delta: [row("current:a", 1), row("current:b", 1)], evidence: [] });
+    await store.append({ commit: "2", delta: [row("current:a", 1, 2)], evidence: [] });
+    expect(await store.row("current:a")).toBeNull();
+    expect((await all(store.rows("current:"))).map((r) => r.key)).toEqual(["current:b"]);
+  });
+
   it("ST-07: keeps the evidence a commit cites, byte for byte", async () => {
     const store = make();
     const bytes = Uint8Array.from([1, 2, 255]);
