@@ -37,7 +37,8 @@ describe("the bin lattice (RT-32)", () => {
     ]);
   });
 
-  it("SL-05, Q-13: the built bin has no store until S0-23 and does not run land: exit 2", () => {
+  // Q-13: the bin gets its store with S0-23.
+  it("SL-05: the built bin has no store yet and does not run land: exit 2", () => {
     const run = lattice("land", "cr/a", "--dry-run");
     expect([run.status, run.stdout, run.stderr]).toEqual([2, "", "lattice land: no store is configured — store/lattice.json arrives with plan task S0-23\n"]);
   });

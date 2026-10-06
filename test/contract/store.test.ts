@@ -84,7 +84,8 @@ describe("store-jsonl", () => {
     expect(await all(createStoreJsonl({ dir }).commits(1))).toEqual([utf8("{}"), new Uint8Array(), Uint8Array.from([0x7b, 0xff, 0x7d])]);
   });
 
-  it("LG-02, Q-19: gives the bytes after the last line feed as a line — a cut last line, which opening refuses from S0-11", async () => {
+  // Q-19; opening refuses a cut last line from S0-11 (Q-09).
+  it("LG-02: gives the bytes after the last line feed as a line — a cut last line is the ledger's to refuse", async () => {
     const dir = fileIn(utf8('{"seq":1}\n{"se'));
     expect(await all(createStoreJsonl({ dir }).commits(1))).toEqual([utf8('{"seq":1}'), utf8('{"se')]);
   });

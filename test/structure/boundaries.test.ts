@@ -58,8 +58,9 @@ describe("boundaries: adapters for tests (ST-07)", () => {
   });
 });
 
-describe("boundaries: the hash of a package (PR-13, Q-21)", () => {
-  it("PR-13, Q-21: refuses a package package-lock.json does not pin at the declared version with a sha512 integrity", () => {
+describe("boundaries: the hash of a package (PR-13)", () => {
+  // Q-21: the hash of a package is its sha512 integrity.
+  it("PR-13: refuses a package package-lock.json does not pin at the declared version with a sha512 integrity", () => {
     const files = { "src/ledger/ports/ids.ts": exportOne, "src/adapters/ids-ulid/index.ts": 'import { ulid } from "ulid";\nexport const id = ulid;\n' };
     const SHA512 = `sha512-${"A".repeat(86)}==`;
     const locks = [{}, { ulid: { version: "3.0.0", integrity: SHA512 } }, { ulid: { version: "3.0.1" } }, { ulid: { version: "3.0.1", integrity: "sha1-2jmP6zYSWxAJ0D7mHg7LkTgdoS8=" } }];

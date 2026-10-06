@@ -124,7 +124,8 @@ describe("landing into git (LG-22, LG-23)", () => {
     expect(await (await mainWorktree(ports.git)).list("store/")).toEqual(["store/knowledge.jsonl"]);
   });
 
-  it("LG-06, G-14: the next commit is chained to the tail: its prev is the hash of the one before", async () => {
+  // G-14: landing fills prev.
+  it("LG-06: the next commit is chained to the tail: its prev is the hash of the one before", async () => {
     const ports = portsOf();
     const first = await landed(ports, "cr/a");
     const second = await landed(ports, "cr/b");
@@ -150,7 +151,8 @@ describe("landing into git (LG-22, LG-23)", () => {
 });
 
 describe("the landing commit in git (LG-22)", () => {
-  it("LG-22: carries the trailers Lattice-Proposal and Lattice-Seq; those of OB-07 arrive with S0-20", async () => {
+  // The trailers of OB-07 arrive with S0-20 (Q-26).
+  it("LG-22: carries the trailers Lattice-Proposal and Lattice-Seq", async () => {
     const { git, pushes } = recording();
     const commit = await landed(portsOf({ git }), "cr/a");
     expect(pushes.map((p) => [p.ref, p.message, p.trailers])).toEqual([

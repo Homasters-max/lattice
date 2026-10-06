@@ -91,7 +91,8 @@ describe.each(ADAPTERS)("git port: $name", ({ make }) => {
 });
 
 describe.each(ADAPTERS)("git port: $name — paths and what is no file", ({ make }) => {
-  it("ST-07, Q-18: lists paths in the order of sortPaths — UTF-16 code units, never the locale", async () => {
+  // Q-18: one comparator of the port.
+  it("ST-07: lists paths in the order of sortPaths — UTF-16 code units, never the locale", async () => {
     const git = make();
     const listed = await (await worktree(git, "cr/names", await tailOf(git, "main"))).list("src/");
     expect(listed).toEqual(sortPaths(listed));

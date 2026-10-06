@@ -75,7 +75,8 @@ describe("imports: adapters and their ports (ST-01, ST-04, ST-06)", () => {
     expect(auditImports(t)).toEqual(["ST-06: src/ledger/index.ts:1 imports adapter store-memory; only assembly imports adapters"]);
   });
 
-  it("ST-06: refuses codec and generate imported outside assembly and cli; cli still imports only assembly (G-15)", () => {
+  // G-15: cli imports only assembly (ST-01).
+  it("ST-06: refuses codec and generate imported outside assembly and cli; cli still imports only assembly", () => {
     const t = tree({
       "src/codec/index.ts": exportOne,
       "src/generate/index.ts": exportOne,
