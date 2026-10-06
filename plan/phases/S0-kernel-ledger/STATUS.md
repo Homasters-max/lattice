@@ -5,7 +5,7 @@
 | Задача | Название | Этап | Статус | PR | Заметка |
 |---|---|---|---|---|---|
 | [S0-01](tasks/S0-01-repo-toolchain-ci.md) | Репозиторий, toolchain и CI-каркас | A | ✅ | [#1](https://github.com/Homasters-max/lattice/pull/1) | |
-| [S0-02](tasks/S0-02-code-conventions.md) | Соглашения кода, отказов и фикстур правил | A | ⬜ | | |
+| [S0-02](tasks/S0-02-code-conventions.md) | Соглашения кода, отказов и фикстур правил | A | ✅ | [#3](https://github.com/Homasters-max/lattice/pull/3) | |
 | [S0-03](tasks/S0-03-walking-skeleton.md) | Walking skeleton | B | ⬜ | | |
 | [S0-04](tasks/S0-04-canon-hash.md) | Canon, hash и канонические форматы | C | ⬜ | | |
 | [S0-05](tasks/S0-05-record-ref.md) | Record и Ref | C | ⬜ | | |

@@ -13,8 +13,8 @@
 
 ## Текущее
 
-- **Фаза:** S0 в работе; S0-01 сдана — репозиторий [Homasters-max/lattice](https://github.com/Homasters-max/lattice), CI на ubuntu и windows.
-- **Следующий шаг:** S0-02 «Соглашения кода, отказов и фикстур правил».
+- **Фаза:** S0 в работе; S0-01 и S0-02 сданы — репозиторий [Homasters-max/lattice](https://github.com/Homasters-max/lattice), CI на ubuntu и windows, соглашения кода в `CONVENTIONS.md`.
+- **Следующий шаг:** S0-03 «Walking skeleton».
 - **Сводка по задачам:** `node plan/tools/plan-check.mjs`.
 
 ## Журнал фаз
