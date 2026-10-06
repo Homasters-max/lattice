@@ -104,15 +104,14 @@ const tail: FixtureCheck = {
 };
 
 /**
- * `input`: `{ tail, request }` — what `store/knowledge.jsonl` is at the tail of main, a file or `null` as `tail`
- * passes it, and in the change request, as `heldOf` reads both.
+ * `input`: `{ tail, request }` — what `store/knowledge.jsonl` is at the tail of main and in the change request,
+ * as `heldOf` reads both. As in landing, main passes `fileOnMain` first; its refusal comes back as it is.
  */
 const knowledge: FixtureCheck = {
   enforces: [LG_23.id],
   run: (input) => {
     const onMain = fileOnMain(heldOf(field(input, "tail")));
-    if (!onMain.ok) throw new Error("bug: a knowledge fixture holds on main what the tail check refuses; it belongs to tail");
-    return keptKnowledge(onMain.value, heldOf(field(input, "request")));
+    return onMain.ok ? keptKnowledge(onMain.value, heldOf(field(input, "request"))) : onMain;
   },
 };
 

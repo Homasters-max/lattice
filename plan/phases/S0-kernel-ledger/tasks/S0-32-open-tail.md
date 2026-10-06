@@ -56,7 +56,7 @@ fileOnMain(tail: Held): Result<Uint8Array | null>   // LG-23, чистая; её
 
 ## Тесты и фикстуры
 
-- Новых rule ID нет. Фикстура `LG-23/trigger/directory-on-main` переходит со строки `knowledge` таблицы `checks.ts` на новую чистую строку `tail` — `fileOnMain`, которую зовёт `openTail`: раннер фикстур синхронный до S0-33. К ней — `LG-23/pass/file-on-main`. Строка `knowledge` с каталогом на `main` — ошибка фикстуры, а не отказ.
+- Новых rule ID нет. Фикстура `LG-23/trigger/directory-on-main` переходит со строки `knowledge` таблицы `checks.ts` на новую чистую строку `tail` — `fileOnMain`, которую зовёт `openTail`: раннер фикстур синхронный до S0-33. К ней — `LG-23/pass/file-on-main`. Строка `knowledge`, как landing, сперва проводит `main` через `fileOnMain` и возвращает его отказ как есть (CONVENTIONS.md §2), но фикстура каталога на `main` живёт в строке `tail`.
 - `test/ledger/tail.test.ts` — `openTail` на `git-fixture`: пустой `main`, store двух landing, каталог на месте файла (LG-23), `{}\n` (LG-06).
 - Тест структуры в `test/structure/repo.test.ts`: экспорт `src/ledger/view.ts` — ровно `View` и `createView`, а `createView` возвращает свойства `View`, без `row`.
 - Тесты `landing.test.ts` и e2e остаются зелёными без правки ожиданий. В `landing.test.ts` меняется только форма: где был список коммитов на `main`, сверяются `seq` и tail-коммит из `openTail` (`[commit]` → `[1, commit]`, `[]` → `null`).
