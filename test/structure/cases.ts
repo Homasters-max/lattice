@@ -1,6 +1,6 @@
 // A small tree that holds every structure rule, for trigger and pass cases:
 // a case changes one file and expects exactly the problems that change makes.
-import { virtualTree, type Tree } from "./tree.js";
+import { virtualTree, type Locked, type Tree } from "./tree.js";
 
 export const BASE: { readonly [path: string]: string } = {
   "src/kernel/index.ts": "export const kernel = 1;\n",
@@ -18,13 +18,17 @@ export const BASE: { readonly [path: string]: string } = {
 export const BASE_KERNEL: readonly string[] = ["src/kernel/index.ts"];
 
 /** BASE with some files replaced or added; a file given as `null` is removed. */
-export function tree(over: { readonly [path: string]: string | null } = {}, dependencies: { readonly [name: string]: string } = {}): Tree {
+export function tree(
+  over: { readonly [path: string]: string | null } = {},
+  dependencies: { readonly [name: string]: string } = {},
+  locked?: { readonly [name: string]: Locked },
+): Tree {
   const files: { [path: string]: string } = { ...BASE };
   for (const [path, text] of Object.entries(over)) {
     if (text === null) delete files[path];
     else files[path] = text;
   }
-  return virtualTree(files, dependencies);
+  return virtualTree(files, dependencies, locked);
 }
 
 /** A tree of one file and nothing else. */

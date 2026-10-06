@@ -63,15 +63,24 @@ const matrix: Check = (i, at, { ports }) => {
 
 const RELATIVE: readonly Check[] = [outside, judge, matrix];
 
-/** One exact version (semver), no range or tag: the code of another project is pinned (PR-13); its hash is pinned by package-lock.json and `npm ci`. */
+/** One exact version (semver), no range or tag: the code of another project is pinned by name and version (PR-13). */
 const PINNED = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+/** And by hash (PR-13, Q-21): package-lock.json holds the sha512 of its tarball, which `npm ci` checks. */
+const SHA512 = /^sha512-[A-Za-z0-9+/]{86}==$/;
+
+function lockProblem(name: string, version: string, at: string, tree: Tree): string | null {
+  const locked = tree.locked.get(name);
+  if (locked?.version === version && SHA512.test(locked.integrity ?? "")) return null;
+  return `PR-13: ${at} imports ${name}, which package-lock.json does not pin at ${version} with a sha512 integrity`;
+}
 
 function packageProblem(i: Import, at: string, { tree }: Context): string | null {
   const name = packageOf(i.specifier);
   if (placeOf(i.file)?.module !== "adapters") return `ST-04: ${at} imports ${name}; a vendor SDK lives only inside its adapter`;
   const version = tree.dependencies.get(name);
   if (version === undefined) return `PR-13: ${at} imports ${name}, which package.json does not declare in dependencies`;
-  return PINNED.test(version) ? null : `PR-13: ${at} imports ${name}, which package.json declares as ${version}, not one pinned version`;
+  if (!PINNED.test(version)) return `PR-13: ${at} imports ${name}, which package.json declares as ${version}, not one pinned version`;
+  return lockProblem(name, version, at, tree);
 }
 
 function importProblem(i: Import, cx: Context): string | null {

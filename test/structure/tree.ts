@@ -5,6 +5,9 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import ts from "typescript";
 
+/** What package-lock.json pins a package by: its version and the hash of its tarball. */
+export type Locked = { readonly version?: string; readonly integrity?: string };
+
 export interface Tree {
   /** Absolute, with forward slashes. */
   readonly root: string;
@@ -12,6 +15,8 @@ export interface Tree {
   readonly files: ReadonlyMap<string, ts.SourceFile>;
   /** `dependencies` of package.json: name → version as declared. */
   readonly dependencies: ReadonlyMap<string, string>;
+  /** The entry of package-lock.json for each of `dependencies` it holds (PR-13, Q-21). */
+  readonly locked: ReadonlyMap<string, Locked>;
   /** The program over `files`, built on first use. */
   readonly program: () => ts.Program;
 }
@@ -52,12 +57,20 @@ function createProgram(root: string, files: ReadonlyMap<string, ts.SourceFile>):
   return ts.createProgram({ rootNames: [...own.keys()], options, host });
 }
 
-function makeTree(root: string, texts: ReadonlyMap<string, string>, dependencies: { readonly [name: string]: string }): Tree {
+type Packages = { readonly [name: string]: Locked };
+
+function makeTree(root: string, texts: ReadonlyMap<string, string>, dependencies: { readonly [name: string]: string }, locked: Packages): Tree {
   const files = new Map(
     [...texts].map(([path, text]) => [path, ts.createSourceFile(`${root}/${path}`, text, ts.ScriptTarget.ES2023, true)]),
   );
   let program: ts.Program | undefined;
-  return { root, files, dependencies: new Map(Object.entries(dependencies)), program: () => (program ??= createProgram(root, files)) };
+  return {
+    root,
+    files,
+    dependencies: new Map(Object.entries(dependencies)),
+    locked: new Map(Object.entries(locked)),
+    program: () => (program ??= createProgram(root, files)),
+  };
 }
 
 /** The tree of this repository. */
@@ -69,11 +82,25 @@ export function repoTree(): Tree {
     .sort();
   const texts = new Map(paths.map((p) => [p, readFileSync(join(repoRoot, p), "utf8")]));
   const pkg = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8")) as { dependencies?: { readonly [name: string]: string } };
-  return makeTree(repoRoot, texts, pkg.dependencies ?? {});
+  const lock = JSON.parse(readFileSync(join(repoRoot, "package-lock.json"), "utf8")) as { packages?: Packages };
+  const dependencies = pkg.dependencies ?? {};
+  const locked = Object.keys(dependencies).flatMap((name) => {
+    const entry = lock.packages?.[`node_modules/${name}`];
+    return entry === undefined ? [] : [[name, entry] as const];
+  });
+  return makeTree(repoRoot, texts, dependencies, Object.fromEntries(locked));
 }
 
+/** Every dependency locked at its declared version with a sha512 integrity, as `npm install` writes it. */
+const lockedAsDeclared = (dependencies: { readonly [name: string]: string }): Packages =>
+  Object.fromEntries(Object.entries(dependencies).map(([name, version]) => [name, { version, integrity: `sha512-${"A".repeat(86)}==` }]));
+
 /** A tree of the given files, rooted where no real file lives. */
-export function virtualTree(files: { readonly [path: string]: string }, dependencies: { readonly [name: string]: string } = {}): Tree {
+export function virtualTree(
+  files: { readonly [path: string]: string },
+  dependencies: { readonly [name: string]: string } = {},
+  locked: Packages = lockedAsDeclared(dependencies),
+): Tree {
   const paths = Object.keys(files).sort();
-  return makeTree(`${repoRoot}/.virtual-tree`, new Map(paths.map((p) => [p, files[p] ?? ""])), dependencies);
+  return makeTree(`${repoRoot}/.virtual-tree`, new Map(paths.map((p) => [p, files[p] ?? ""])), dependencies, locked);
 }

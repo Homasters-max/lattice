@@ -58,6 +58,20 @@ describe("boundaries: adapters for tests (ST-07)", () => {
   });
 });
 
+describe("boundaries: the hash of a package (PR-13, Q-21)", () => {
+  it("PR-13, Q-21: refuses a package package-lock.json does not pin at the declared version with a sha512 integrity", () => {
+    const files = { "src/ledger/ports/ids.ts": exportOne, "src/adapters/ids-ulid/index.ts": 'import { ulid } from "ulid";\nexport const id = ulid;\n' };
+    const SHA512 = `sha512-${"A".repeat(86)}==`;
+    const locks = [{}, { ulid: { version: "3.0.0", integrity: SHA512 } }, { ulid: { version: "3.0.1" } }, { ulid: { version: "3.0.1", integrity: "sha1-2jmP6zYSWxAJ0D7mHg7LkTgdoS8=" } }];
+    for (const locked of locks) {
+      expect(auditImports(tree(files, { ulid: "3.0.1" }, locked))).toEqual([
+        "PR-13: src/adapters/ids-ulid/index.ts:1 imports ulid, which package-lock.json does not pin at 3.0.1 with a sha512 integrity",
+      ]);
+    }
+    expect(auditImports(tree(files, { ulid: "3.0.1" }, { ulid: { version: "3.0.1", integrity: SHA512 } }))).toEqual([]);
+  });
+});
+
 describe("boundaries: vendor SDKs and other projects (ST-04, PR-13)", () => {
   const sdk = 'import { ulid } from "ulid";\nexport const id = ulid;\n';
   const pinned = { ulid: "3.0.1" };
