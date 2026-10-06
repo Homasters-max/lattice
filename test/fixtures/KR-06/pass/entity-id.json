@@ -1,0 +1,31 @@
+{
+  "check": "apply",
+  "input": {
+    "proposal": {
+      "session": { "id": "01JB2X00000000000000000SES" },
+      "intents": [
+        {
+          "op": "entity",
+          "id": "demo/note",
+          "type": "core/type@1",
+          "expected": null,
+          "at": "2026-10-06T12:00:00.000000Z",
+          "body": {
+            "abstract": false,
+            "kind": "entity",
+            "schema": { "type": "object", "properties": { "text": { "type": "string" } }, "required": ["text"] }
+          }
+        },
+        {
+          "op": "entity",
+          "id": "demo/hello",
+          "type": "demo/note@1",
+          "expected": null,
+          "at": "2026-10-06T12:00:00.000000Z",
+          "body": { "text": "hello" }
+        }
+      ],
+      "sig": null
+    }
+  }
+}

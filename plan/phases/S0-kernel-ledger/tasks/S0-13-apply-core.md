@@ -18,7 +18,7 @@ Apply — единственный путь в `knowledge` (PR-02, LG-14). Ка�
 ## Объём
 
 Входит:
-- **`apply(before, proposal, acts, evidence) → commit | no-op | rejections`** (LG-14): чистая функция; `acts` — land session и сформированные act-события; время и id коммита приходят от landing;
+- **`apply(before, proposal, acts, evidence) → commit | no-op | rejections`** (LG-14): чистая функция; `acts` — land session и сформированные act-события; время и id коммита приходят от landing; `prev`, `request` и `sig` кандидата — `null`, их дописывает landing (G-14);
 - **кандидат** (LG-15): после фазы 1 — назначить `seq`, `rev` (следующий после latest), `hash`; `after = before ⊕ fold(before, candidate, evidence)` без записи;
 - **фазы** (LG-16): реестр фаз с видом (`before` / `after` / оба); внутри фазы собираются все отказы, стоп после первой отказавшей; фазы 4–6 — пустые места, которые заполнят свои задачи; **фаза 7 в S0** — по Q-05;
 - **фаза 1 Record**: заголовок, канонические байты, форматы (KR-04…KR-13, функции S0-04, S0-05);
@@ -47,3 +47,5 @@ Apply — единственный путь в `knowledge` (PR-02, LG-14). Ка�
 ## Риски и заметки
 
 - G-04: если владелец выберет вопрос read view вместо поиска в landing — это правка LG-38, а не локальное решение.
+- G-14 (принята, Q-12): фазе 3 (`at` не убывает, LG-06) нужен `at` tail-коммита из `before`, а закрытый список LG-38 его не даёт. Кандидат на правку LG-38 — tail-заголовок (`seq`, hash, `at`) в read view; тогда и `prev` переходит из landing в apply. Решает владелец до кода фазы 3.
+- От S0-03 (ревью, волна 3): `apply` уже возвращает `Result<Commit | "no-op">`, и proposal без intents — `no-op` (LG-12, LG-54); landing садит его без коммита знания (LG-25). Задача добавляет no-op отдельных intents (LG-13) и повтор hash proposal (LG-12, G-04).

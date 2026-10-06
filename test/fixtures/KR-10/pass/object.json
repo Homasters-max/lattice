@@ -1,0 +1,6 @@
+{
+  "check": "json",
+  "input": {
+    "text": "{\"text\":\"hello\"}"
+  }
+}

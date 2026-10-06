@@ -16,7 +16,7 @@ const audit = (registered: string[], folders: FixtureFolder[], design = ["KR-06"
   auditCoverage({ registered: new Set(registered), folders, design: new Set(design) });
 
 describe("rule fixture coverage", () => {
-  it("passes when every registered rule has trigger and pass cases", () => {
+  it("ST-17: passes when every registered rule has trigger and pass cases", () => {
     expect(audit(["KR-06"], [folder("KR-06")])).toEqual([]);
   });
 
@@ -33,22 +33,22 @@ describe("rule fixture coverage", () => {
     expect(audit(["KR-06"], [folder("KR-06", { pass: [] })])).toEqual(["KR-06: no pass/ cases"]);
   });
 
-  it("refuses a folder that is not a rule ID of the design", () => {
+  it("ST-17: refuses a folder that is not a rule ID of the design", () => {
     expect(audit([], [folder("KR-99")])).toEqual(["KR-99: not a rule ID defined in docs/design"]);
     expect(audit([], [folder("notes")])).toEqual(["notes: not a rule ID defined in docs/design"]);
   });
 
-  it("refuses a folder of a rule no registry declares", () => {
+  it("ST-17: refuses a folder of a rule no registry declares", () => {
     expect(audit([], [folder("KR-10")])).toEqual(["KR-10: no registry src/**/rules.ts declares it"]);
   });
 
-  it("refuses a registered ID the design does not define", () => {
+  it("ST-17: refuses a registered ID the design does not define", () => {
     expect(audit(["KR-99"], [folder("KR-99")])).toEqual([
       "KR-99: not a rule ID defined in docs/design",
     ]);
   });
 
-  it("refuses a case that is not a .json file or does not parse", () => {
+  it("ST-17: refuses a case that is not a .json file or does not parse", () => {
     const f = folder("KR-06", { pass: [ok("good.json"), ok("notes.md"), { name: "broken.json", data: undefined }] });
     expect(audit(["KR-06"], [f])).toEqual([
       "KR-06/pass/broken.json: not valid JSON",
@@ -56,12 +56,12 @@ describe("rule fixture coverage", () => {
     ]);
   });
 
-  it("reads rule IDs from table rows, not from prose, Z-blocks or mentions", () => {
+  it("ST-17: reads rule IDs from table rows, not from prose, Z-blocks or mentions", () => {
     const md = "KR-Z01. Prose about KR-03.\n\n| ID | Rule |\n|---|---|\n| KR-01 | One, see KR-02. |\n| KR-02 | Two. |\n";
     expect([...designRuleIds([md])].sort()).toEqual(["KR-01", "KR-02"]);
   });
 
-  it("holds for this repository", async () => {
+  it("ST-17: holds for this repository", async () => {
     const design = designRuleIds(loadDesignTexts());
     expect(design.has("ST-17")).toBe(true);
     const registered = await loadRegistered();

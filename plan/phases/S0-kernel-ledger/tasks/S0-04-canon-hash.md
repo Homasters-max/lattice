@@ -56,3 +56,4 @@ hashRecord(type: string, body: JsonValue): Result<string, Violation[]>          
 
 - `JSON.parse` нельзя использовать даже как первый шаг: дубликаты теряются молча.
 - `String.prototype.normalize` зависит от версии Unicode в ICU; версия ICU записывается рядом с векторами NFC, расхождение между ОС ловит CI на windows (D-09).
+- От S0-03 (G-16, Q-10): JSON уже разбирает одна функция — `parseJson(text, path)` в `src/kernel/parse.ts`, с `decodeUtf8(bytes, path)`; обе отказывают с KR-10, фикстуры `test/fixtures/KR-10/` есть. Задача заменяет мягкий `JSON.parse` строгим парсером, дописывает trigger на дубликат ключа, ±2^53, NFC, `-0` и снимает тест «G-16» в `test/kernel/kernel.test.ts`.

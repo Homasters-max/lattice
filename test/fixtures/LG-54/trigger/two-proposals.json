@@ -1,0 +1,13 @@
+{
+  "check": "change-request",
+  "input": {
+    "files": [
+      "store/proposals/a.json",
+      "store/proposals/b.json"
+    ]
+  },
+  "expect": {
+    "rule": "LG-54",
+    "path": "/store/proposals"
+  }
+}

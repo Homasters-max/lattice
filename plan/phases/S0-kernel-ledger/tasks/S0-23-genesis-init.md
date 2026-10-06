@@ -25,7 +25,7 @@ rules: [LG-47, LG-18, LG-50, TY-01, SL-04, KR-03, RT-32]
 - **исключения** LG-18 — по rule ID в реестре apply: самотипизированный мета-тип, тип сессии вместе с первой сессией, namespace в создаваемом им namespace, init-сессии без reason, `sig`/`proposal_sig` `null` в genesis;
 - **init ledger `std`**: commit 2 несёт namespace `std` вместе с типом этой записи и всеми типами, достижимыми от него по `extends` и `$ref` (LG-18, LG-47);
 - **пути** (LG-50): `store/knowledge.jsonl`, `store/proposals/`, `store/evidence/`, `store/lattice.json` — конфигурация init и расположение store и пакетов библиотек; `.gitignore` для `gen/` и `.lattice/`;
-- **`lattice init`** (RT-32) и схема `store/lattice.json` в `assembly`.
+- **`lattice init`** (RT-32) и схема `store/lattice.json` в `assembly`: схема называет только рабочие адаптеры — `*-fixture`, `clock-fixed` и `ids-counter` остаются в тестовой сборке (`plan/closure-check.md`, «acts и права»); `src/cli/main.ts` передаёт в `run` сборку из `lattice.json` вместо `assembled: null` (S0-03).
 
 ## Тесты и фикстуры
 
@@ -42,3 +42,4 @@ rules: [LG-47, LG-18, LG-50, TY-01, SL-04, KR-03, RT-32]
 ## Риски и заметки
 
 - Задача на четыре модуля — триггер аудита ST-15.
+- От S0-03 (Q-13): `assemble(ports)` в `src/assembly` соединяет порты `git`, `acts`, `clock`, `ids` и сама открывает `store-jsonl` на worktree; тестовая сборка — `test/support/assembly.ts`, и тест структуры отклоняет импорт адаптеров для тестов из `src/` (ST-07). Задача добавляет чтение `store/lattice.json` в рабочие адаптеры и передаёт их в `assemble`; `test/cli/bin.test.ts` тогда меняет ожидание «no store» на путь `land` из bin.

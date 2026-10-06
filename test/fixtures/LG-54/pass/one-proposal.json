@@ -1,0 +1,8 @@
+{
+  "check": "change-request",
+  "input": {
+    "files": [
+      "store/proposals/cr-good.json"
+    ]
+  }
+}

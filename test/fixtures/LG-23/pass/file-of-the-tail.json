@@ -1,0 +1,45 @@
+{
+  "check": "knowledge",
+  "input": {
+    "tail": {
+      "proposal": {
+        "session": {
+          "id": "01JB2X00000000000000000SES"
+        },
+        "intents": [
+          {
+            "op": "entity",
+            "id": "demo/hello",
+            "type": "demo/note@1",
+            "expected": null,
+            "at": "2026-10-06T12:00:00.000000Z",
+            "body": {
+              "text": "hello"
+            }
+          }
+        ],
+        "sig": null
+      }
+    },
+    "request": {
+      "proposal": {
+        "session": {
+          "id": "01JB2X00000000000000000SES"
+        },
+        "intents": [
+          {
+            "op": "entity",
+            "id": "demo/hello",
+            "type": "demo/note@1",
+            "expected": null,
+            "at": "2026-10-06T12:00:00.000000Z",
+            "body": {
+              "text": "hello"
+            }
+          }
+        ],
+        "sig": null
+      }
+    }
+  }
+}

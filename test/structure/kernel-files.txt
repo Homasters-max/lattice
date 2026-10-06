@@ -1,0 +1,10 @@
+# ST-05: every file reachable from src/kernel/index.ts; the structure test
+# fails when the reach and this list differ. One path per line, sorted.
+src/kernel/hash.ts
+src/kernel/index.ts
+src/kernel/json.ts
+src/kernel/parse.ts
+src/kernel/record.ts
+src/kernel/rejection.ts
+src/kernel/rules.ts
+src/kernel/version.ts

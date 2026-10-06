@@ -1,11 +1,11 @@
 // Runs one rule fixture through the hard check it names (ST-17, LG-17).
-// Layout and format: CONVENTIONS.md, section «Жёсткие проверки и фикстуры».
+// Layout and format: CONVENTIONS.md §4.
 
-interface Refusal {
+type Refusal = {
   readonly rule: string;
   readonly path: string;
   readonly intent: string | null;
-}
+};
 
 /** What the runner needs of a hard check's outcome; the full types live in `src/kernel`. */
 export type CheckOutcome = { readonly ok: true } | { readonly ok: false; readonly rejections: readonly Refusal[] };
@@ -16,23 +16,23 @@ export interface FixtureCheck {
   readonly run: (input: unknown) => CheckOutcome;
 }
 
-interface Case {
+type Case = {
   readonly check: string;
   readonly input: unknown;
   readonly expect?: unknown;
-}
+};
 
-interface Expected {
+type Expected = {
   readonly rule: string;
   readonly path: string;
   readonly intent?: string | null;
-}
+};
 
-const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
-const isCase = (v: unknown): v is Case => isRecord(v) && typeof v.check === "string" && "input" in v;
+const isObject = (v: unknown): v is { readonly [key: string]: unknown } => typeof v === "object" && v !== null && !Array.isArray(v);
+const isCase = (v: unknown): v is Case => isObject(v) && typeof v.check === "string" && "input" in v;
 
 function isExpected(v: unknown, rule: string): v is Expected {
-  if (!isRecord(v) || v.rule !== rule || typeof v.path !== "string") return false;
+  if (!isObject(v) || v.rule !== rule || typeof v.path !== "string") return false;
   return v.intent === undefined || v.intent === null || typeof v.intent === "string";
 }
 
@@ -59,7 +59,7 @@ function runTrigger(check: FixtureCheck, rule: string, c: Case): string | null {
 
 /** The problem with one fixture case, or `null` when it does what its folder says. */
 export function runFixture(
-  checks: Readonly<Record<string, FixtureCheck>>,
+  checks: { readonly [check: string]: FixtureCheck },
   rule: string,
   kind: "trigger" | "pass",
   data: unknown,

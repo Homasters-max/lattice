@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it } from "vitest";
 const tool = join(import.meta.dirname, "../../discussion/tools/lint-ids.mjs");
 const dirs: string[] = [];
 
-function lint(files: Record<string, string>): { status: number | null; out: string } {
+function lint(files: { readonly [name: string]: string }): { status: number | null; out: string } {
   const dir = mkdtempSync(join(tmpdir(), "lint-ids-"));
   dirs.push(dir);
   for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, name), text);
