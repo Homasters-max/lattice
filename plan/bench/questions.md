@@ -34,3 +34,6 @@
 | 26 | Is the type of a record a floating or a pinned reference? | lattice/kr-07 | normal | S0-05 | 2026-10-07 |
 | 27 | May the revision number in a pinned reference have leading zeros? | — | blank | S0-05, G-12 (KR-23 называет `id@n`, но не грамматику `n`) | 2026-10-07 |
 | 28 | Must an external link of format uri have a scheme, and may it carry a fragment? | — | blank | S0-05, G-06 (KR-24 — «absolute URI», а RFC 3986 `absolute-URI` без фрагмента) | 2026-10-07 |
+| 29 | Which JSON Schema keywords may a schema of a type hold? | lattice/kr-18, lattice/kr-19 | normal | S0-06 | 2026-10-07 |
+| 30 | What may stand beside a $ref in a schema? | — | blank | S0-06, G-22 (KR-18 называет `$ref`, но не его соседей) | 2026-10-07 |
+| 31 | May a field nested inside another object carry the annotation unique? | — | blank | S0-06, G-23 (KR-19 — «a required field», глубина не названа) | 2026-10-07 |

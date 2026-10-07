@@ -12,7 +12,7 @@
 | [S0-34](tasks/S0-34-worktree-release.md) | Жизненный цикл worktree | B | ✅ | [#12](https://github.com/Homasters-max/lattice/pull/12) | разбор S0-03, Q-30, D206 |
 | [S0-04](tasks/S0-04-canon-hash.md) | Canon, hash и канонические форматы | C | ✅ | [#15](https://github.com/Homasters-max/lattice/pull/15) | G-20, G-21 |
 | [S0-05](tasks/S0-05-record-ref.md) | Record и Ref | C | ✅ | [#17](https://github.com/Homasters-max/lattice/pull/17) | G-06, G-12 |
-| [S0-06](tasks/S0-06-schema-validate.md) | Schema — закрытое подмножество и validate | C | ⬜ | | |
+| [S0-06](tasks/S0-06-schema-validate.md) | Schema — закрытое подмножество и validate | C | ✅ | [#19](https://github.com/Homasters-max/lattice/pull/19) | G-22, G-23 |
 | [S0-07](tasks/S0-07-type-compare.md) | Type и compare | C | ⬜ | | |
 | [S0-08](tasks/S0-08-std-types-s0.md) | core и std — типы S0 как данные | D | ⬜ | | |
 | [S0-09](tasks/S0-09-std-schemas-drafts.md) | Черновики всех схем std — проверка подмножества до заморозки ядра | D | ⬜ | | может перейти в SW |
