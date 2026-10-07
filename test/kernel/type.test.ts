@@ -147,6 +147,13 @@ describe("the chain of extends (KR-15)", () => {
     ]);
     expect(refusals(type(NOTE, { extends: "demo/base@1" }), typesOf({ "demo/base@1": { kind: "entity" } }))).toEqual([["KR-15", "/extends"]]);
   });
+
+  it("KR-15: refuses a known parent whose own parent the caller does not know — the chain cannot be shown", () => {
+    const types = typesOf({ "demo/base@1": type(NOTE, { abstract: true, extends: "demo/grand@1" }) });
+    expect(checkType(deepFreeze(type(NOTE, { extends: "demo/base@1" })), types, ROOT)).toEqual([
+      reject(KR_15, { intent: null, path: "/extends", expected: "a type resolve knows", got: "demo/grand@1" }),
+    ]);
+  });
 });
 
 describe("positions of the card along the chain (KR-19)", () => {
