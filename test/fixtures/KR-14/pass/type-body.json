@@ -1,0 +1,6 @@
+{
+  "check": "type",
+  "input": {
+    "body": { "abstract": false, "kind": "entity", "schema": { "type": "object", "properties": { "text": { "type": "string" } }, "required": ["text"] } }
+  }
+}

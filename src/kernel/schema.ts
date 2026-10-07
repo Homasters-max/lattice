@@ -210,6 +210,19 @@ function siteRejections(site: Site, kind: Kind, intent: string | null): Rejectio
   ];
 }
 
+/** Every schema object a schema holds, the root among them, with where each sits; a member that is no object is passed over. */
+export function sitesOf(schema: JsonValue, path: string): Site[] {
+  const out: Site[] = [];
+  const pending: Node[] = [{ schema, path, site: "root", required: false }];
+  for (let node = pending.pop(); node !== undefined; node = pending.pop()) {
+    if (!isJsonObject(node.schema)) continue;
+    const site: Site = { ...node, schema: node.schema };
+    out.push(site);
+    for (const child of childrenOf(site)) pending.push(child);
+  }
+  return out;
+}
+
 /**
  * KR-18, KR-19: the schema of a type of this kind, refused keyword by keyword at the place the caller names — where
  * the schema sits in its input; the rejections come sorted (CONVENTIONS.md §5).

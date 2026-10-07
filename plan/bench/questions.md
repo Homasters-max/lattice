@@ -44,3 +44,8 @@
 | 36 | May a paragraph of a design document span several lines? | — | blank | S0-25, G-25 (LG-42 называет пустую строку между блоками, но не форму абзаца; решено: абзац — одна строка) | 2026-10-07 |
 | 37 | Where may a list stand in a design document? | lattice/rm-z03, lattice/lg-42 | normal | S0-25 | 2026-10-07 |
 | 38 | How is an item of a list written in canonical md? | — | blank | S0-25, G-25 (LG-42 называет списки, но не форму строки; решено: `- <текст>`, один уровень) | 2026-10-07 |
+| 39 | Which session writes the meta-type, and at what time? | lattice/kr-14, lattice/lg-47 | normal | S0-07 | 2026-10-07 |
+| 40 | Is the body of a type validated against the schema of the meta-type? | — | blank | S0-07, G-26 (KR-14 называет мета-тип, но подмножество не описывает схему) | 2026-10-07 |
+| 41 | Does a child type repeat the fields of its parent in its own schema? | lattice/kr-15, lattice/kr-22 | normal | S0-07, G-26 | 2026-10-07 |
+| 42 | Is a new type revision that adds a required field narrower? | lattice/kr-22 | normal | S0-07 | 2026-10-07 |
+| 43 | Which edge label does the extends field of a type carry? | — | blank | S0-07, G-26 (в словаре TY-16 метки `extends` нет) | 2026-10-07 |

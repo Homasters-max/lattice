@@ -1,0 +1,13 @@
+{
+  "check": "type",
+  "input": {
+    "body": {
+      "extends": "demo/base@1",
+      "abstract": false,
+      "kind": "entity",
+      "schema": { "type": "object", "properties": { "text": { "type": ["string", "null"] } }, "required": ["text"] }
+    },
+    "types": { "demo/base@1": { "abstract": true, "kind": "entity", "schema": { "type": "object", "properties": { "text": { "type": "string" } }, "required": ["text"] } } }
+  },
+  "expect": { "rule": "KR-15", "path": "/schema" }
+}

@@ -1,6 +1,6 @@
 // ST-04, KR-02: pure code has no clock, randomness, environment, network,
 // files, scheduler, locale, evaluation, GC or console (CONVENTIONS.md §8).
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { auditPurity } from "./audit-purity.js";
 import { alone } from "./cases.js";
 
@@ -38,6 +38,13 @@ const REFUSED: readonly (readonly [string, string])[] = [
   ['import { randomBytes } from "node:crypto";\nexport const r = randomBytes;\n', "node:crypto randomBytes"],
   ['import * as c from "node:crypto";\nexport const h = c.createHash;\n', "node:crypto as a whole; name what it uses"],
 ];
+
+// The lib and @types files every program of the run shares are parsed and
+// bound here, not in the first case: under the load of the whole run that
+// takes longer than the timeout of a test.
+beforeAll(() => {
+  alone("src/trust/x.ts", "").program().getTypeChecker();
+}, 30_000);
 
 describe("purity: refused in pure code (ST-04)", () => {
   for (const [code, use] of REFUSED) {

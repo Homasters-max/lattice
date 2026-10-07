@@ -40,9 +40,13 @@ function exportsOf(tree: Tree, path: string) {
 }
 
 let repo: Tree;
+// The program and its checker over all of src/ are built here, not in the
+// first test that audits: under the load of the whole run that takes longer
+// than the timeout of a test.
 beforeAll(() => {
   repo = repoTree();
-});
+  repo.program().getTypeChecker();
+}, 30_000);
 
 describe("structure of this repository", () => {
   it("ST-01, ST-04, ST-06, PR-13: the imports of src/ hold the matrix", () => {

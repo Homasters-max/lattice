@@ -1,0 +1,6 @@
+{
+  "check": "record-type",
+  "input": {
+    "type": { "abstract": false, "kind": "entity", "schema": { "type": "object", "properties": { "text": { "type": "string" } }, "required": ["text"] } }
+  }
+}

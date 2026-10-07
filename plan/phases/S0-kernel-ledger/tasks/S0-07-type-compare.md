@@ -30,9 +30,12 @@ rules: [KR-14, KR-15, KR-16, KR-17, KR-19, KR-22]
 ## Интерфейс
 
 ```ts
-META_TYPE: Record                                     // core/type, KR-14
-checkType(body, resolve): Violation[]                 // KR-14…KR-17, KR-19 card_order
-compare(a: Schema, b: Schema, mode: "revision" | "extends", resolve): { relation, aspects }
+// src/kernel/type.ts, check-type.ts, meta-type.ts, compare*.ts
+type ResolveType = (ref: string) => JsonValue | null  // тело типа по pinned ссылке, из after
+META_TYPE: MetaType                                   // core/type@1 без by и at (G-26), KR-14
+checkType(body, resolve: ResolveType, place): Rejection[]   // KR-14…KR-17, KR-18/19 схемы, KR-19 card_order по цепочке
+checkRecordType(type, place): Rejection[]             // KR-16: у abstract типа нет записей — для фазы 2
+compare(a: Schema, b: Schema, mode: Mode, resolve: ResolveType): { relation: Relation, aspects: Aspect[] }
 ```
 
 ## Шаги
@@ -49,12 +52,21 @@ compare(a: Schema, b: Schema, mode: "revision" | "extends", resolve): { relation
 
 ## Готово, когда
 
-- [ ] hash мета-типа — константа, закреплённая в тесте
-- [ ] таблица KR-22 и property-тест корректности зелёные
-- [ ] фикстуры KR-14, KR-15, KR-16 — trigger и pass
+- [x] hash мета-типа — константа, закреплённая в тесте
+- [x] таблица KR-22 и property-тест корректности зелёные
+- [x] фикстуры KR-14, KR-15, KR-16 — trigger и pass
 
 ## Риски и заметки
 
 - Правило «`incomparable`, когда узость нельзя показать структурно» — главный предохранитель; любой спорный случай решается в его пользу и записывается в PLAN.md, раздел 12, как пробел.
 - Если задача растёт сверх L — делить на «тип и `extends`» и «`compare`», а не по слоям.
 - От S0-06: `checkSchema(schema, kind, place)` ядра возвращает `Rejection[]` с KR-18 и KR-19 и путём от `place.path` (`/body/schema/...`), а не `Violation[]`: это жёсткая проверка (CONVENTIONS §2). Место и форму `card_order` (целое, на поле) она уже проверяет; уникальность позиций по цепочке `extends` — здесь. `$ref` она проверяет только как pinned ссылку `type@n` (`isPinned`): что цель — abstract тип, видит только проверка с типом цели. Форма схемы — G-22, места аннотаций — G-23; `compare` читает схему в этой форме: пара `type` — в любом порядке, поле — член `properties` на любой глубине.
+
+## Отступления
+
+- **Интерфейс.** `checkType` — жёсткая проверка (CONVENTIONS §2): возвращает `Rejection[]` от `place`, а не `Violation[]`; `resolve` даёт тело типа (`ResolveType`), а не схему: проверке нужны `kind`, `abstract` и `extends` родителя и цели `$ref`. `META_TYPE` — запись без `by` и `at` (`MetaType`): их пишет genesis (LG-47), ядро сессий не знает (KR-01), hash от них не зависит (G-26). Для фазы 2 добавлен `checkRecordType` (KR-16). Тип результата `compare` не экспортируется: `Relation`, `Aspect`, `Mode` — имена из KR-22.
+- **Файлы.** `type.ts` — тело типа и цепочка `extends`; `check-type.ts` — проверка тела; `meta-type.ts`; `compare.ts` — обход пары, `compare-values.ts` — значения одной схемы, `compare-annotations.ts` — граф и представление, `compare-shown.ts` — что показано о паре. `schema.ts` отдаёт обход схемы `sitesOf`.
+- **KR-17** показан тестом `test/kernel/type.test.ts`: несколько родителей — отказ формы `extends` с KR-14; своей проверки и фикстур у KR-17 нет — по построению.
+- **KR-19** по цепочке — фикстура `test/fixtures/KR-19/trigger/card-order-repeated-in-chain.json`.
+- **Файлы skeleton.** `test/structure/purity.test.ts` и `test/structure/repo.test.ts` (`skeleton-files.txt`) поправлены: программа TypeScript и её checker строятся в `beforeAll` с таймаутом 30 с, а не в первом тесте, — под нагрузкой полного прогона сборка дольше 5 с теста. Проверки и ожидания не изменены. Это триггер аудита ST-15.
+- **Пробелы** G-26 (тело и мета-тип, глубина, `card_order` по цепочке) и G-27 (форма `aspects`, `$ref`, `oneOf`, предел обхода) — работа по рекомендации, решает владелец.

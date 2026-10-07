@@ -1,0 +1,23 @@
+{
+  "check": "type",
+  "input": {
+    "body": {
+      "extends": "demo/base@1",
+      "abstract": false,
+      "kind": "entity",
+      "schema": {
+        "type": "object",
+        "properties": { "title": { "type": "string", "card_order": 1 }, "text": { "type": "string", "card_order": 1 } },
+        "required": ["title", "text"]
+      }
+    },
+    "types": {
+      "demo/base@1": {
+        "abstract": true,
+        "kind": "entity",
+        "schema": { "type": "object", "properties": { "title": { "type": "string", "card_order": 1 } }, "required": ["title"] }
+      }
+    }
+  },
+  "expect": { "rule": "KR-19", "path": "/schema/properties/text/card_order" }
+}
