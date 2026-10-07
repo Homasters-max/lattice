@@ -4,7 +4,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { idOf, parse, print, type Block, type Section } from "../../src/codec/index.js";
+import { idOf, parse, print, type Block, type Document, type Section } from "../../src/codec/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
 const DESIGN = join(import.meta.dirname, "../../docs/design");
@@ -12,14 +12,14 @@ const FILES = readdirSync(DESIGN)
   .filter((f) => f.endsWith(".md"))
   .sort();
 
-function parsed(file: string): Section {
+function parsed(file: string): Document {
   const out = parse(readFileSync(join(DESIGN, file)), { intent: null, path: `/${file}` });
   if (!out.ok) throw new Error(`${file}: ${out.rejections.map((r) => `${r.rule} ${r.path} ${JSON.stringify(r.got)}`).join("; ")}`);
   return out.value;
 }
 
 /** Every block of a section and of its subsections, the rows of its tables of clauses among them, in document order. */
-const blocks = (s: Section): Block[] => s.items.flatMap((i) => (i.type === "section" ? blocks(i) : i.type === "clauses" ? i.rows : [i]));
+const blocks = (s: Section): Block[] => s.items.flatMap((i): readonly Block[] => (i.type === "section" ? blocks(i) : i.type === "clauses" ? i.rows : [i]));
 
 const find = (file: string, id: string): Block | undefined => blocks(parsed(file)).find((b) => idOf(b) === id);
 
