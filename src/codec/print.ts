@@ -1,10 +1,10 @@
-// The canonical print of the md model (LG-42, G-24): blocks separated by one
+// The canonical print of the md model (LG-42, G-25): blocks separated by one
 // blank line, a table as its header, a `|---|` separator per column and its
 // rows, headings by level, a field right after its block, a final newline.
 // What `parse` accepts, `print` writes back byte for byte.
 import type { Block, Item, Section, Table } from "./model.js";
 
-/** A row of a table: every cell padded by one space (G-24). */
+/** A row of a table: every cell padded by one space (G-25). */
 const tableRow = (cells: readonly string[]): string => `| ${cells.join(" | ")} |`;
 
 const separator = (columns: number): string => `|${"---|".repeat(columns)}`;

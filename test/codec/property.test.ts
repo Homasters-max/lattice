@@ -27,7 +27,7 @@ const field: fc.Arbitrary<Field | undefined> = fc.option(
   { nil: undefined },
 );
 
-/** A block that carries a field ends its text with ":" (RM-Z03, G-24). */
+/** A block that carries a field ends its text with ":" (RM-Z03, G-25). */
 const colon = (f: Field | undefined): string => (f === undefined ? "" : ":");
 
 const prose = fc.tuple(id, inline, field).map(([i, t, f]): Block => ({ type: "prose", id: i, text: `${i}. ${t}${colon(f)}`, ...f }));

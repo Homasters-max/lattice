@@ -1,6 +1,6 @@
 // The rule registry of the codec (CONVENTIONS.md §3): one constant per rule
 // ID its hard checks enforce. Bytes that are not UTF-8 are refused by the
-// kernel's `decodeUtf8` under KR-10 (G-24).
+// kernel's `decodeUtf8` under KR-10 (G-25).
 import type { Rule } from "../kernel/index.js";
 
 export const LG_42 = {

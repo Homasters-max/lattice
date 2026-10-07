@@ -1,4 +1,4 @@
-// The parse of canonical md (LG-42, RM-01, RM-02, G-24): a document becomes
+// The parse of canonical md (LG-42, RM-01, RM-02, G-25): a document becomes
 // the model, and input that is not canonical is refused, never repaired, at
 // the number of its line under the path given.
 import { describe, expect, it } from "vitest";
@@ -116,7 +116,7 @@ describe("non-canonical blocks are refused (LG-42)", () => {
     expect(rules(md("# Doc", "", "# Again"))).toEqual([["LG-42", "/3"]]);
   });
 
-  it("LG-42: refuses blocks without one blank line between them — a paragraph is one line (G-24)", () => {
+  it("LG-42: refuses blocks without one blank line between them — a paragraph is one line (G-25)", () => {
     expect(rules(md("# Doc", "AA-Z01. x"))).toEqual([["LG-42", "/2"]]);
     expect(rules(md("# Doc", "", "AA-Z01. x", "continued"))).toEqual([["LG-42", "/4"]]);
     expect(rules(md("# Doc", "", "| ID | Rule |", "|---|---|", "| AA-01 | x |", "AA-Z01. y"))).toEqual([["LG-42", "/6"]]);

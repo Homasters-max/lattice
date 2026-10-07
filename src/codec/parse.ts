@@ -1,4 +1,4 @@
-// The parse of canonical md into its model (RM-Z03, LG-42, G-24). Input that
+// The parse of canonical md into its model (RM-Z03, LG-42, G-25). Input that
 // is not canonical is refused, never repaired (LG-42); text that belongs to no
 // block, and a second block with the same ID, are refused by RM-01, an ID off
 // its grammar or of the other kind by RM-02. Every refusal is
@@ -48,7 +48,7 @@ function place(reader: Reader, block: Block, line: number): void {
   current(reader).push(block);
 }
 
-/** A chunk of one line; the line after it, with no blank line between, is refused (LG-42, G-24). */
+/** A chunk of one line; the line after it, with no blank line between, is refused (LG-42, G-25). */
 function oneLine(reader: Reader, chunk: TextChunk): string {
   const [line = "", next] = chunk.lines;
   if (next !== undefined) lg42(reader, chunk.line + 1, "one blank line between blocks", next);
@@ -73,7 +73,7 @@ function readProse(reader: Reader, chunk: TextChunk): void {
   place(reader, { type: "prose", id, text }, chunk.line);
 }
 
-/** The text that ends with ":" when a block takes a field (RM-Z03, G-24); an example's without its last newline. */
+/** The text that ends with ":" when a block takes a field (RM-Z03, G-25); an example's without its last newline. */
 function lastText(block: Block): string {
   if (block.type === "clause") return block.cells.at(-1) ?? "";
   return block.type === "example" ? block.text.slice(0, -1) : block.text;
@@ -121,7 +121,7 @@ function readTableChunk(reader: Reader, chunk: TextChunk): void {
   for (const r of rows) readTableRow(reader, r.line, r.cells);
 }
 
-/** RM-Z03, G-24: a fenced block opened by ```<lang> <ID> is an example; its text is the lines inside, verbatim. */
+/** RM-Z03, G-25: a fenced block opened by ```<lang> <ID> is an example; its text is the lines inside, verbatim. */
 function readFence(reader: Reader, chunk: FenceChunk): void {
   const [, lang = "", id] = OPEN.exec(chunk.open) ?? [];
   if (id === undefined) return refuseAt(reader, RM_01, chunk.line, { expected: "a fenced block with an ID after its language", got: chunk.open });

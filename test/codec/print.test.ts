@@ -1,4 +1,4 @@
-// The canonical print of the md model (LG-42, G-24): one blank line between
+// The canonical print of the md model (LG-42, G-25): one blank line between
 // blocks, tables with a |---| separator per column, headings by level, a
 // field right after its block, one final newline.
 import { describe, expect, it } from "vitest";

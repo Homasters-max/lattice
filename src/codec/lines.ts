@@ -1,4 +1,4 @@
-// The lines of canonical md (LG-42, G-24): LF only, one final newline, no
+// The lines of canonical md (LG-42, G-25): LF only, one final newline, no
 // trailing spaces, blocks separated by exactly one blank line. A fenced block
 // is read verbatim up to its closing line ```; nothing inside it is checked.
 // The text is cut into chunks — the runs of lines between blank lines — and

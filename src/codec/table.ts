@@ -1,4 +1,4 @@
-// A table of canonical md (LG-42, G-24): a header row, a separator `|---|`
+// A table of canonical md (LG-42, G-25): a header row, a separator `|---|`
 // per column, rows with as many cells as the header. A cell is padded by one
 // space on each side; a `|` inside it is escaped as `\|` and kept verbatim.
 import type { Rejection } from "../kernel/index.js";
