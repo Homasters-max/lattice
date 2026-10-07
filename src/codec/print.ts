@@ -5,11 +5,11 @@
 import type { Block, Item, Section, Table } from "./model.js";
 
 /** A row of a table: every cell padded by one space (G-24). */
-const row = (cells: readonly string[]): string => `| ${cells.join(" | ")} |`;
+const tableRow = (cells: readonly string[]): string => `| ${cells.join(" | ")} |`;
 
 const separator = (columns: number): string => `|${"---|".repeat(columns)}`;
 
-const tableLines = (table: Table): string[] => [row(table.header), separator(table.header.length), ...table.rows.map(row)];
+const tableLines = (table: Table): string[] => [tableRow(table.header), separator(table.header.length), ...table.rows.map(tableRow)];
 
 /** The field of a block as its own group of lines, or none (RM-Z03). */
 function field(block: Block): string[][] {
@@ -24,9 +24,9 @@ function groups(item: Item, before: string[] | undefined): string[][] {
     case "section":
       return sectionGroups(item);
     case "header":
-      return [[row(item.cells), separator(item.cells.length)]];
+      return [[tableRow(item.cells), separator(item.cells.length)]];
     case "clause":
-      before?.push(row(item.cells));
+      before?.push(tableRow(item.cells));
       return field(item);
     case "prose":
       return [[item.text], ...field(item)];

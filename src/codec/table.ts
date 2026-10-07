@@ -4,10 +4,10 @@
 import type { Rejection } from "../kernel/index.js";
 import { notCanonical } from "./lines.js";
 
-/** A row of a table and the number of its line. */
-export type Row = { readonly line: number; readonly cells: readonly string[] };
+/** A row of a table of md and the number of its line; not a row of fold or delta (LG-35). */
+export type TableRow = { readonly line: number; readonly cells: readonly string[] };
 
-export type ReadTable = { readonly header: readonly string[]; readonly rows: readonly Row[] };
+export type ReadTable = { readonly header: readonly string[]; readonly rows: readonly TableRow[] };
 
 /** A table read, or the refusals of its form. */
 type Read = { readonly table: ReadTable } | { readonly found: readonly Rejection[] };
@@ -31,8 +31,8 @@ function cellsOf(line: string): string[] | null {
 }
 
 /** LG-42: the rows after the separator, each with the header's number of cells. */
-function readRows(lines: readonly string[], first: number, columns: number, path: string): { rows: Row[]; found: Rejection[] } {
-  const rows: Row[] = [];
+function readRows(lines: readonly string[], first: number, columns: number, path: string): { rows: TableRow[]; found: Rejection[] } {
+  const rows: TableRow[] = [];
   const found: Rejection[] = [];
   lines.forEach((text, i) => {
     const line = first + i;

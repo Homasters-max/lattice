@@ -102,7 +102,7 @@ function readList(reader: Reader, chunk: TextChunk): void {
   attach(reader, { list: chunk.lines.map((l) => l.slice(2)) }, chunk);
 }
 
-function readRow(reader: Reader, line: number, cells: readonly string[]): void {
+function readTableRow(reader: Reader, line: number, cells: readonly string[]): void {
   const [id = ""] = cells;
   if (isRuleId(id)) place(reader, { type: "clause", id, cells }, line);
   else if (isIdLike(id)) refuseAt(reader, RM_02, line, { expected: RULE_ID, got: id });
@@ -118,7 +118,7 @@ function readTableChunk(reader: Reader, chunk: TextChunk): void {
   const { header, rows } = read.table;
   if (!rows.some((r) => isIdLike(r.cells[0] ?? ""))) return attach(reader, { table: { header, rows: rows.map((r) => r.cells) } }, chunk);
   current(reader).push({ type: "header", cells: header });
-  for (const r of rows) readRow(reader, r.line, r.cells);
+  for (const r of rows) readTableRow(reader, r.line, r.cells);
 }
 
 /** RM-Z03, G-24: a fenced block opened by ```<lang> <ID> is an example; its text is the lines inside, verbatim. */
