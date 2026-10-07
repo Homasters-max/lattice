@@ -1,0 +1,6 @@
+{
+  "check": "ref",
+  "input": {
+    "ref": "demo/hello@2#items/0/text"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "check": "ref",
+  "input": {
+    "ref": "demo/hello#Body"
+  },
+  "expect": {
+    "rule": "KR-23",
+    "path": ""
+  }
+}

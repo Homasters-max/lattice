@@ -9,7 +9,30 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileOf } from "../../src/adapters/store-jsonl/index.js";
-import { checkFormat, KR_04, KR_06, KR_10, KR_11, KR_13, parseJson, parseJsonBytes, refused, type Format, type JsonValue } from "../../src/kernel/index.js";
+import {
+  checkFormat,
+  checkHeader,
+  checkRev,
+  checkUri,
+  isJsonObject,
+  KR_04,
+  KR_06,
+  KR_07,
+  KR_08,
+  KR_10,
+  KR_11,
+  KR_13,
+  KR_23,
+  KR_24,
+  parseJson,
+  parseJsonBytes,
+  parseRef,
+  refused,
+  type Format,
+  type JsonValue,
+  type Kind,
+  type Rejection,
+} from "../../src/kernel/index.js";
 import { apply, createView, encodeCommit, land, LG_06, LG_09, LG_23, LG_54, openLines, readProposal, type LandActs } from "../../src/ledger/index.js";
 import { landingPortsForTests, type GitFixtureOptions } from "../support/assembly.js";
 import type { CheckOutcome, FixtureCheck } from "./run.js";
@@ -32,6 +55,35 @@ const json: FixtureCheck = {
 const format: FixtureCheck = {
   enforces: [KR_11.id],
   run: (input) => refused(checkFormat(field(input, "format") as Format, field(input, "value") as JsonValue, { intent: null, path: "" })) ?? { ok: true },
+};
+
+/** `rev` against the kind of the record's type, when the fixture gives the kind (KR-05). */
+function revOf(record: JsonValue, kind: Kind | undefined): readonly Rejection[] {
+  return kind === undefined ? [] : checkRev(kind, isJsonObject(record) ? record.rev : undefined, { intent: null, path: "/rev" });
+}
+
+/**
+ * `input`: `{ record, kind? }` — the header of a record, checked from the root as a store opens; with `kind`, the kind
+ * of its type, `rev` against it too, as phase 2 of apply will (KR-05).
+ */
+const header: FixtureCheck = {
+  enforces: [KR_04.id, KR_06.id, KR_07.id, KR_08.id, KR_11.id],
+  run: (input) => {
+    const record = field(input, "record") as JsonValue;
+    return refused([...checkHeader(record, ""), ...revOf(record, field(input, "kind") as Kind | undefined)]) ?? { ok: true };
+  },
+};
+
+/** `input`: `{ ref }` — a string parsed as a reference from the root. */
+const ref: FixtureCheck = {
+  enforces: [KR_23.id],
+  run: (input) => parseRef(String(field(input, "ref"))),
+};
+
+/** `input`: `{ value }` — a JSON value checked as an external link from the root. */
+const uri: FixtureCheck = {
+  enforces: [KR_24.id],
+  run: (input) => refused(checkUri(field(input, "value") as JsonValue, { intent: null, path: "" })) ?? { ok: true },
 };
 
 /** `input`: `{ proposal }`, read as a proposal value, refused from its root. */
@@ -127,6 +179,9 @@ const landCheck: FixtureCheck = {
 export const CHECKS: { readonly [check: string]: FixtureCheck } = {
   json,
   format,
+  header,
+  ref,
+  uri,
   proposal,
   apply: applyCheck,
   store,

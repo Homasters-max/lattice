@@ -5,8 +5,10 @@ export { canon } from "./canon.js";
 export { checkFormat, isFormat, isUlid, type Format } from "./formats.js";
 export { BODY_LIMIT, hash, hashBytes, hashRecord } from "./hash.js";
 export { compareText, gotOf, isJsonObject, type JsonObject, type JsonValue } from "./json.js";
+export { checkId, isEntityId, type Kind } from "./id.js";
 export { parseJson, parseJsonBytes } from "./parse.js";
-export { checkHeader, checkId, isEntityId, type Kind, type Record } from "./record.js";
+export { checkHeader, checkRev, type Record } from "./record.js";
+export { formatRef, parseRef, type Ref } from "./ref.js";
 export {
   refuse,
   refused,
@@ -18,5 +20,6 @@ export {
   type Result,
   type Rule,
 } from "./rejection.js";
-export { KR_04, KR_06, KR_10, KR_11, KR_13, RULES } from "./rules.js";
+export { KR_04, KR_06, KR_07, KR_08, KR_10, KR_11, KR_13, KR_23, KR_24, RULES } from "./rules.js";
+export { checkUri, isUri } from "./uri.js";
 export { KERNEL_VERSION } from "./version.js";

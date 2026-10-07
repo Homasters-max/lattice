@@ -1,0 +1,10 @@
+{
+  "check": "uri",
+  "input": {
+    "value": "https://example.com/a b"
+  },
+  "expect": {
+    "rule": "KR-24",
+    "path": ""
+  }
+}

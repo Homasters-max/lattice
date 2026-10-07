@@ -1,0 +1,20 @@
+{
+  "check": "header",
+  "input": {
+    "record": {
+      "id": "demo/seen-1",
+      "type": "demo/seen@1",
+      "hash": "sha256:d83c4d4a7f5280fb989d50557ddd6dca3996470e606839792d6d487181d55793",
+      "by": "01JB2X00000000000000000SES",
+      "at": "2026-10-06T12:00:00.000000Z",
+      "body": {
+        "of": "demo/hello"
+      }
+    },
+    "kind": "event"
+  },
+  "expect": {
+    "rule": "KR-06",
+    "path": "/id"
+  }
+}

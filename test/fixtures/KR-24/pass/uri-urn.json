@@ -1,0 +1,6 @@
+{
+  "check": "uri",
+  "input": {
+    "value": "urn:isbn:0451450523"
+  }
+}

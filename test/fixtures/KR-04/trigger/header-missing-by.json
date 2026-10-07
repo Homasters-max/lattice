@@ -1,0 +1,19 @@
+{
+  "check": "header",
+  "input": {
+    "record": {
+      "id": "demo/hello",
+      "rev": 1,
+      "type": "demo/note@1",
+      "hash": "sha256:71ede0305bcc8a6f99a4590524a12a2a889fabd0f54f5e9c31bb744713898a59",
+      "at": "2026-10-06T12:00:00.000000Z",
+      "body": {
+        "text": "hello"
+      }
+    }
+  },
+  "expect": {
+    "rule": "KR-04",
+    "path": "/by"
+  }
+}

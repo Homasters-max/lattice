@@ -1,0 +1,10 @@
+{
+  "check": "ref",
+  "input": {
+    "ref": "01JB2X00000000000000000EVT@1"
+  },
+  "expect": {
+    "rule": "KR-23",
+    "path": ""
+  }
+}
