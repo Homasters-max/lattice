@@ -3,8 +3,9 @@
 // skeleton checks the change request before apply in the order of G-19, takes
 // `before` from the store at the tail of `main` (LG-14, tail.ts), appends the
 // commit to the `jsonl` store on the worktree — nothing for a no-op (LG-25) —
-// removes the proposal and pushes. Every refusal is placed from the root of
-// the tree of the change request (Q-29). Rebuilds on a moved `main`,
+// removes the proposal and pushes; every worktree it prepared is released, on
+// any outcome (LG-23, D206). Every refusal is placed from the root of the tree
+// of the change request (Q-29). Rebuilds on a moved `main`,
 // `awaiting-act`, the land session event, acts as events, the trailers of
 // OB-07 and `request` arrive with S0-19 and S0-20.
 import { parseJsonBytes, refuse, reject, type Rejections, type Result } from "../kernel/index.js";
@@ -20,7 +21,7 @@ import { proposalHash, readProposal, type Proposal } from "./proposal.js";
 import type { Rows } from "./rows.js";
 import type { View } from "./rows-view.js";
 import { LG_23, LG_54 } from "./rules.js";
-import { atPath, KNOWLEDGE, MAIN, nameOf, openTail, type AtPath, type TailPorts } from "./tail.js";
+import { atPath, KNOWLEDGE, MAIN, nameOf, openTail, type AtPath, type OpenedTail, type TailPorts } from "./tail.js";
 
 export interface LandingPorts extends TailPorts {
   readonly acts: Acts;
@@ -103,23 +104,24 @@ type Checked = Found & {
 };
 
 /**
- * The checks of a change request before apply, in the order of G-19: it exists (LG-54); the store at the tail of
- * main opens (LG-23, LG-06) — without it there is no `before` (LG-14) and no `onto` to merge onto; it merges (LG-24,
- * Q-28); its proposal (LG-54, KR-10, LG-09); the bytes of the store it brings (LG-23).
+ * The checks before the worktree of a change request, the first of G-19: it exists (LG-54); the store at the tail
+ * of main opens (LG-23, LG-06) — without it there is no `before` (LG-14) and no `onto` to merge onto.
  */
-async function check(ports: LandingPorts, request: string): Promise<LandingOutcome | Checked> {
+async function opened(ports: LandingPorts, request: string): Promise<LandingOutcome | OpenedTail> {
   const head = changeRequest(await ports.git.tail(request));
   if (!head.ok) return rejected(head);
   // LG-14: `before` is the read view at the tail — the store of main, never the one the request brings.
   const before = await openTail(ports);
-  if (!before.ok) return rejected(before);
-  const { onto, view, tail, file } = before.value;
-  const worktree = await ports.git.prepare({ request, onto });
-  if (worktree.kind === "conflict") return conflicted(file, worktree.paths);
+  return before.ok ? before.value : rejected(before);
+}
+
+/** The checks on the worktree of a change request that merged, the rest of G-19: its proposal (LG-54, KR-10, LG-09); the bytes of the store it brings (LG-23). */
+async function checkOn(ports: LandingPorts, before: OpenedTail, worktree: Worktree): Promise<LandingOutcome | Checked> {
   const found = await proposalOf(worktree);
   if (!found.ok) return rejected(found);
-  const kept = keptKnowledge(file, await atPath(worktree, KNOWLEDGE));
+  const kept = keptKnowledge(before.file, await atPath(worktree, KNOWLEDGE));
   if (!kept.ok) return rejected(kept);
+  const { onto, view, tail } = before;
   return { ...found.value, onto, view, tail, worktree, store: ports.openStore(worktree) };
 }
 
@@ -149,13 +151,29 @@ async function pushed(ports: LandingPorts, checked: Checked, commit: Commit | nu
   return done === "moved" ? { outcome: "moved" } : ended(commit, true);
 }
 
-/** Lands the proposal of a change request on the tail of `main`, or only checks it with `dryRun` (LG-26). */
-export async function land(ports: LandingPorts, request: string, options: LandOptions): Promise<LandingOutcome> {
-  const checked = await check(ports, request);
-  if ("outcome" in checked) return checked;
+/** Apply on `before`, then the push — or, with `dryRun`, only the outcome (LG-26). */
+async function applied(ports: LandingPorts, checked: Checked, request: string, options: LandOptions): Promise<LandingOutcome> {
   const acts: LandActs = { session: { id: ports.ids.ulid(), at: ports.clock.now() }, events: await ports.acts.read(request) };
-  const applied = apply(checked.view, checked.proposal, acts, []);
-  if (!applied.ok) return rejected(applied);
-  const commit = applied.value === "no-op" ? null : onTail(applied.value, checked.tail);
+  const result = apply(checked.view, checked.proposal, acts, []);
+  if (!result.ok) return rejected(result);
+  const commit = result.value === "no-op" ? null : onTail(result.value, checked.tail);
   return options.dryRun ? ended(commit, false) : pushed(ports, checked, commit);
+}
+
+/**
+ * Lands the proposal of a change request on the tail of `main`, or only checks it with `dryRun` (LG-26). The checks
+ * before apply go in the order of G-19, the merge (LG-24, Q-28) between those before the worktree and those on it.
+ */
+export async function land(ports: LandingPorts, request: string, options: LandOptions): Promise<LandingOutcome> {
+  const before = await opened(ports, request);
+  if ("outcome" in before) return before;
+  const worktree = await ports.git.prepare({ request, onto: before.onto });
+  if (worktree.kind === "conflict") return conflicted(before.file, worktree.paths);
+  // LG-23, D206: the worktree is released on every outcome, a throw too; after a push the release does nothing.
+  try {
+    const checked = await checkOn(ports, before, worktree);
+    return "outcome" in checked ? checked : await applied(ports, checked, request, options);
+  } finally {
+    await worktree.release();
+  }
 }

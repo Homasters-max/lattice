@@ -20,7 +20,7 @@ import {
 } from "../../src/ledger/index.js";
 import { AT, gitForTests, landingPortsForTests, type GitFixtureBranch, type GitFixtureOptions } from "../support/assembly.js";
 import { deepFreeze } from "../support/deep-freeze.js";
-import { proposal, storeTextOf, text } from "../support/landing.js";
+import { moveMain, onMain, proposal, refusals, storeTextOf, text } from "../support/landing.js";
 
 const BRANCHES: GitFixtureOptions["branches"] = {
   main: { files: { "README.md": "one\n" } },
@@ -65,21 +65,14 @@ async function storeOnMain(ports: LandingPorts) {
 /** The store on main as text: `store/knowledge.jsonl` as `openTail` read it, `""` where main has none. */
 const storeTextOnMain = async (ports: LandingPorts) => text((await storeOnMain(ports)).file);
 
-/** The tail of main and a worktree of `request` prepared onto it; without `request`, of the tail commit alone. */
-async function onMain(git: Git, request?: string) {
-  const onto = await git.tail("main");
-  const worktree = onto === null ? null : await git.prepare({ request: request ?? onto, onto });
-  if (onto === null || worktree?.kind !== "worktree") throw new Error(`bug: ${request ?? "main"} of the fixture prepares onto main`);
-  return { onto, worktree };
-}
-
 /** The paths of the files under `under` on main: the tree of its tail commit, code and proposals, which the store does not answer. */
-const filesOnMain = async (git: Git, under: string) => (await onMain(git)).worktree.list(under);
-
-/** Someone else moves main: the code of `request` pushed onto its tail, with its own message and no trailers of landing. */
-async function moveMain(git: Git, request: string): Promise<void> {
-  const { onto, worktree } = await onMain(git, request);
-  await git.push({ worktree, ref: "main", expected: onto, message: "m", trailers: [] });
+async function filesOnMain(git: Git, under: string): Promise<readonly string[]> {
+  const { worktree } = await onMain(git);
+  try {
+    return await worktree.list(under);
+  } finally {
+    await worktree.release();
+  }
 }
 
 const landed = async (ports: LandingPorts, request: string) => {
@@ -87,8 +80,6 @@ const landed = async (ports: LandingPorts, request: string) => {
   if (out.outcome !== "commit") throw new Error(`bug: ${request} ended ${out.outcome}`);
   return out.commit;
 };
-
-const refusals = (out: LandingOutcome) => (out.outcome === "rejections" ? out.rejections.map((r) => [r.rule, r.path]) : out.outcome);
 
 /** The git of the fixture, every push it was given kept in `pushes`. */
 function recording(branches = BRANCHES): { readonly git: Git; readonly pushes: Push[] } {

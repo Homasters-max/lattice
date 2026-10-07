@@ -1,8 +1,9 @@
 // ST-07, LG-23: one set of contract tests for the `git` port, run against
 // every adapter of S0-03: `tail`, `prepare` → worktree or conflict, `push` as
 // a compare-and-swap; `tail` of a ref that does not exist is `null`; paths come
-// in the order of `sortPaths`, the one comparator of the port (Q-18).
-import { mkdtempSync, rmSync } from "node:fs";
+// in the order of `sortPaths`, the one comparator of the port (Q-18); every
+// worktree `prepare` returns is released — by `push`, or by `release` (D206).
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -87,6 +88,46 @@ describe.each(ADAPTERS)("git port: $name", ({ make }) => {
     expect(await push(git, await worktree(git, "cr/edit", onto), onto)).toBe("pushed");
     expect(await git.prepare({ request: "cr/clash", onto: await tailOf(git, "main") })).toEqual({ kind: "conflict", paths: ["README.md"] });
     expect((await git.prepare({ request: "cr/add", onto: await tailOf(git, "main") })).kind).toBe("worktree");
+  });
+});
+
+describe.each(ADAPTERS)("git port: $name — releasing a worktree (LG-23, D206)", ({ make }) => {
+  it("ST-07, LG-23: release removes the directory of the worktree, and a second release does nothing", async () => {
+    const git = make();
+    const w = await worktree(git, "cr/add", await tailOf(git, "main"));
+    expect(existsSync(w.dir)).toBe(true);
+    await w.release();
+    expect(existsSync(w.dir)).toBe(false);
+    await w.release();
+    expect(existsSync(w.dir)).toBe(false);
+  });
+
+  it("ST-07, LG-23: push releases the worktree it pushes, and a release after it does nothing", async () => {
+    const git = make();
+    const onto = await tailOf(git, "main");
+    const w = await worktree(git, "cr/add", onto);
+    expect(await push(git, w, onto)).toBe("pushed");
+    expect(existsSync(w.dir)).toBe(false);
+    await w.release();
+    const after = await worktree(git, "main", await tailOf(git, "main"));
+    expect([existsSync(w.dir), await after.list("src/")]).toEqual([false, ["src/a.ts", "src/b.ts"]]);
+  });
+
+  it("ST-07, LG-23: a worktree whose push ended moved is released by release", async () => {
+    const git = make();
+    const onto = await tailOf(git, "main");
+    const [first, second] = [await worktree(git, "cr/add", onto), await worktree(git, "cr/edit", onto)];
+    expect([await push(git, first, onto), await push(git, second, onto)]).toEqual(["pushed", "moved"]);
+    await second.release();
+    expect(existsSync(second.dir)).toBe(false);
+  });
+
+  it("ST-07, LG-23: release of one worktree leaves another of the same commit as it was", async () => {
+    const git = make();
+    const onto = await tailOf(git, "main");
+    const [first, second] = [await worktree(git, "cr/add", onto), await worktree(git, "cr/add", onto)];
+    await first.release();
+    expect([first.dir === second.dir, await text(second, "src/b.ts")]).toEqual([false, "b\n"]);
   });
 });
 

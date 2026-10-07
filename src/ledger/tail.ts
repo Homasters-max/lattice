@@ -1,9 +1,10 @@
 // The store at the tail of `main` (LG-02, LG-14, LG-23, LG-38): a worktree of
 // the tail commit alone, what it holds at `store/knowledge.jsonl`, the lines
 // of the `jsonl` store opened there, folded from genesis into the read view.
-// Landing takes `before` from it, assembly the read view. Verifying the chain,
-// handing the rows to the adapter (Q-25) and refusing a cut last line arrive
-// with S0-11; releasing the worktree with S0-34.
+// Landing takes `before` from it, assembly the read view. The worktree is
+// released once the lines are read, on any outcome (LG-23, D206): the view
+// keeps the rows it folded. Verifying the chain, handing the rows to the
+// adapter (Q-25) and refusing a cut last line arrive with S0-11.
 import { hashBytes, refuse, reject, type Result } from "../kernel/index.js";
 import { decodeCommit, type Commit } from "./commit.js";
 import { fold } from "./fold.js";
@@ -83,9 +84,13 @@ export async function openTail(ports: TailPorts): Promise<Result<OpenedTail>> {
   if (onto === null) throw new Error(`bug: the repository of the store has no ${MAIN}`);
   const worktree = await ports.git.prepare({ request: onto, onto });
   if (worktree.kind === "conflict") throw new Error("bug: a commit conflicts with itself");
-  const file = fileOnMain(await atPath(worktree, KNOWLEDGE));
-  if (!file.ok) return file;
-  // The store opens only on a file; main without one holds the empty store.
-  const opened = openLines(file.value === null ? [] : await linesOf(ports.openStore(worktree)));
-  return opened.ok ? { ok: true, value: { ...opened.value, onto, file: file.value } } : opened;
+  try {
+    const file = fileOnMain(await atPath(worktree, KNOWLEDGE));
+    if (!file.ok) return file;
+    // The store opens only on a file; main without one holds the empty store.
+    const opened = openLines(file.value === null ? [] : await linesOf(ports.openStore(worktree)));
+    return opened.ok ? { ok: true, value: { ...opened.value, onto, file: file.value } } : opened;
+  } finally {
+    await worktree.release();
+  }
 }

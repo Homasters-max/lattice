@@ -1,10 +1,11 @@
 // `git-fixture` (LG-23): git for tests. Commits are whole trees kept in
 // memory; a worktree is a temporary directory under `dir`, and `push` commits
-// what that directory holds, as a compare-and-swap of the ref. `prepare`
-// merges the change request onto `onto` against their merge base and ends
-// `conflict` where both changed a path differently, or one put a file where the
-// other put a directory (LG-24). A test adds a branch from where a ref is now
-// with `branch`, as a developer does in git.
+// what that directory holds, as a compare-and-swap of the ref; `push` and
+// `release` remove the directory, a second removal does nothing (LG-23, D206).
+// `prepare` merges the change request onto `onto` against their merge base and
+// ends `conflict` where both changed a path differently, or one put a file
+// where the other put a directory (LG-24). A test adds a branch from where a
+// ref is now with `branch`, as a developer does in git.
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { sortPaths, type Conflict, type Git, type Prepare, type Push, type Worktree } from "../../ledger/ports/git.js";
@@ -73,6 +74,7 @@ async function worktreeOf(dir: string, onto: string, head: string, tree: Tree): 
     list: async (under) => sortPaths([...(await filesOf(dir)).keys()].filter((p) => p.startsWith(under))),
     read: (path) => readFile(join(dir, path)).catch((e: NodeJS.ErrnoException) => (NO_FILE.includes(e.code ?? "") ? null : Promise.reject(e))),
     remove: (path) => rm(join(dir, path), { force: true }),
+    release: () => rm(dir, { recursive: true, force: true }),
   };
 }
 
@@ -117,7 +119,7 @@ export function createGitFixture({ dir, branches }: GitFixtureOptions): GitFixtu
       if (refs.get(ref) !== expected) return "moved";
       const text = [message, "", ...trailers.map((t) => `${t.key}: ${t.value}`)].join("\n");
       refs.set(ref, add({ parents: [expected, worktree.head], tree: await filesOf(worktree.dir), message: text }));
-      await rm(worktree.dir, { recursive: true, force: true });
+      await worktree.release();
       return "pushed";
     },
   };
