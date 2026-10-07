@@ -6,7 +6,7 @@
 // forms the rule leaves open are G-22. The check walks with its own stack, so
 // no depth of nesting overflows. Whether `$ref` names an abstract type needs
 // the type of its target: the Type check asks it (S0-07).
-import { annotationRejections, isAnnotation, type Context, type Site } from "./annotations.js";
+import { annotationRejections, isAnnotation, type Holder, type Site } from "./annotations.js";
 import type { Kind } from "./id.js";
 import { isJsonArray, isJsonObject, own, pointer, serialize, type JsonObject, type JsonValue } from "./json.js";
 import { isPinned } from "./ref.js";
@@ -95,10 +95,10 @@ function keywordRejections(schema: Schema, key: string, path: string, intent: st
 }
 
 /** KR-18, KR-19: each key of a schema — a keyword, an annotation, or neither and refused. */
-function keyRejections(site: Site, key: string, context: Context): Rejection[] {
-  if (isKeyword(key)) return keywordRejections(site.schema, key, site.path, context.intent);
-  if (isAnnotation(key)) return annotationRejections(site, key, context);
-  return [reject(KR_18, { intent: context.intent, path: pointer(site.path, key), expected: "a keyword or an annotation of the closed subset", got: key })];
+function keyRejections(site: Site, key: string, holder: Holder): Rejection[] {
+  if (isKeyword(key)) return keywordRejections(site.schema, key, site.path, holder.intent);
+  if (isAnnotation(key)) return annotationRejections(site, key, holder);
+  return [reject(KR_18, { intent: holder.intent, path: pointer(site.path, key), expected: "a keyword or an annotation of the closed subset", got: key })];
 }
 
 /** What a schema may hold beside `$ref` or `oneOf`, annotations aside (G-22). */
@@ -200,13 +200,13 @@ function childrenOf(site: Site): Node[] {
 }
 
 /** KR-18, KR-19: every key of one schema and its shape. */
-function siteRejections(site: Site, context: Context): Rejection[] {
+function siteRejections(site: Site, holder: Holder): Rejection[] {
   const { schema, path } = site;
   return [
-    ...Object.keys(schema).flatMap((key) => keyRejections(site, key, context)),
-    ...shapeRejections(schema, path, context.intent),
-    ...objectRejections(schema, path, context.intent),
-    ...unionRejections(schema, path, context.intent),
+    ...Object.keys(schema).flatMap((key) => keyRejections(site, key, holder)),
+    ...shapeRejections(schema, path, holder.intent),
+    ...objectRejections(schema, path, holder.intent),
+    ...unionRejections(schema, path, holder.intent),
   ];
 }
 
@@ -215,7 +215,7 @@ function siteRejections(site: Site, context: Context): Rejection[] {
  * the schema sits in its input; the rejections come sorted (CONVENTIONS.md §5).
  */
 export function checkSchema(schema: JsonValue, kind: Kind, place: Place): Rejection[] {
-  const context: Context = { kind, intent: place.intent };
+  const holder: Holder = { kind, intent: place.intent };
   const out: Rejection[] = [];
   const pending: Node[] = [{ schema, path: place.path, site: "root", required: false }];
   for (let node = pending.pop(); node !== undefined; node = pending.pop()) {
@@ -225,7 +225,7 @@ export function checkSchema(schema: JsonValue, kind: Kind, place: Place): Reject
       continue;
     }
     const site: Site = { ...node, schema: s };
-    for (const r of siteRejections(site, context)) out.push(r);
+    for (const r of siteRejections(site, holder)) out.push(r);
     for (const child of childrenOf(site)) pending.push(child);
   }
   return sortRejections(out);

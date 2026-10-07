@@ -19,8 +19,8 @@ export type Site = {
   readonly required: boolean;
 };
 
-/** What a check of a schema knows besides the schema: the kind of the type and the intent refusals are about. */
-export type Context = { readonly kind: Kind; readonly intent: string | null };
+/** The type that holds the schema: its kind and the intent refusals are about. */
+export type Holder = { readonly kind: Kind; readonly intent: string | null };
 
 /** A broken part of an annotation: a member of it, or `null` for the whole, what was expected and what came. */
 type Fault = { readonly key: string | null; readonly expected: JsonValue; readonly got: JsonValue };
@@ -82,12 +82,12 @@ function placeOf(site: Site, kind: Kind): string {
 }
 
 /** KR-19: the annotation `key` of a schema, refused where it does not sit and where its form is broken. */
-export function annotationRejections(site: Site, key: string, context: Context): Rejection[] {
+export function annotationRejections(site: Site, key: string, holder: Holder): Rejection[] {
   const annotation = isAnnotation(key) ? ANNOTATIONS[key] : undefined;
   if (annotation === undefined) throw new Error(`bug: ${key} is not an annotation of KR-19`);
   const path = pointer(site.path, key);
-  const { intent } = context;
-  if (!annotation.on(site, context.kind)) return [reject(KR_19, { intent, path, expected: annotation.where, got: placeOf(site, context.kind) })];
+  const { intent } = holder;
+  if (!annotation.on(site, holder.kind)) return [reject(KR_19, { intent, path, expected: annotation.where, got: placeOf(site, holder.kind) })];
   return annotation
     .faults(site.schema[key] ?? null)
     .map((f) => reject(KR_19, { intent, path: f.key === null ? path : pointer(path, f.key), expected: f.expected, got: f.got }));
