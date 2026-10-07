@@ -1,0 +1,7 @@
+{
+  "check": "record-type",
+  "input": {
+    "type": { "abstract": true, "kind": "entity", "schema": { "type": "object", "properties": { "text": { "type": "string" } }, "required": ["text"] } }
+  },
+  "expect": { "rule": "KR-16", "path": "/type" }
+}

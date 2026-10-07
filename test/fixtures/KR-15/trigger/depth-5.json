@@ -1,0 +1,14 @@
+{
+  "check": "type",
+  "input": {
+    "body": { "extends": "demo/t1@1", "abstract": false, "kind": "entity", "schema": { "type": "object", "properties": { "text": { "type": "string" } }, "required": ["text"] } },
+    "types": {
+      "demo/t1@1": { "extends": "demo/t2@1", "abstract": true, "kind": "entity", "schema": { "type": "object", "properties": { "text": { "type": "string" } }, "required": ["text"] } },
+      "demo/t2@1": { "extends": "demo/t3@1", "abstract": true, "kind": "entity", "schema": { "type": "object", "properties": { "text": { "type": "string" } }, "required": ["text"] } },
+      "demo/t3@1": { "extends": "demo/t4@1", "abstract": true, "kind": "entity", "schema": { "type": "object", "properties": { "text": { "type": "string" } }, "required": ["text"] } },
+      "demo/t4@1": { "extends": "demo/t5@1", "abstract": true, "kind": "entity", "schema": { "type": "object", "properties": { "text": { "type": "string" } }, "required": ["text"] } },
+      "demo/t5@1": { "abstract": true, "kind": "entity", "schema": { "type": "object", "properties": { "text": { "type": "string" } }, "required": ["text"] } }
+    }
+  },
+  "expect": { "rule": "KR-15", "path": "/extends" }
+}

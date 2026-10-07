@@ -14,8 +14,10 @@ import {
   checkBody,
   checkFormat,
   checkHeader,
+  checkRecordType,
   checkRev,
   checkSchema,
+  checkType,
   checkUri,
   isJsonObject,
   KR_04,
@@ -25,6 +27,9 @@ import {
   KR_10,
   KR_11,
   KR_13,
+  KR_14,
+  KR_15,
+  KR_16,
   KR_18,
   KR_19,
   KR_21,
@@ -38,6 +43,7 @@ import {
   type JsonValue,
   type Kind,
   type Rejection,
+  type ResolveType,
   type Schema,
 } from "../../src/kernel/index.js";
 import {
@@ -133,6 +139,24 @@ const body: FixtureCheck = {
     const resolve = resolveFrom(field(input, "types"));
     return refused(checkBody(field(input, "body") as JsonValue, field(input, "schema") as Schema, resolve, { intent: null, path: "" })) ?? { ok: true };
   },
+};
+
+/** The type bodies `types` gives by pinned reference, as phase 2 resolves them over `after` (KR-15, KR-16); `null` for others. */
+function typesFrom(types: unknown): ResolveType {
+  const known = (types ?? {}) as { readonly [ref: string]: JsonValue };
+  return (ref) => (Object.hasOwn(known, ref) ? (known[ref] ?? null) : null);
+}
+
+/** `input`: `{ body, types? }` — the body of a type, checked from the root; its parents and `$ref` targets resolved from `types`. */
+const type: FixtureCheck = {
+  enforces: [KR_14.id, KR_15.id, KR_16.id, KR_18.id, KR_19.id],
+  run: (input) => refused(checkType(field(input, "body") as JsonValue, typesFrom(field(input, "types")), { intent: null, path: "" })) ?? { ok: true },
+};
+
+/** `input`: `{ type }` — the body of the type of a record, checked at `/type`, where the record names it (KR-16). */
+const recordType: FixtureCheck = {
+  enforces: [KR_16.id],
+  run: (input) => refused(checkRecordType(field(input, "type") as JsonValue, { intent: null, path: "/type" })) ?? { ok: true },
 };
 
 /** `input`: `{ proposal }`, read as a proposal value, refused from its root. */
@@ -285,6 +309,8 @@ export const CHECKS: { readonly [check: string]: FixtureCheck } = {
   uri,
   schema,
   body,
+  type,
+  "record-type": recordType,
   proposal,
   apply: applyCheck,
   store,

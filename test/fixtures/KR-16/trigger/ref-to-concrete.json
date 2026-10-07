@@ -1,0 +1,8 @@
+{
+  "check": "type",
+  "input": {
+    "body": { "abstract": false, "kind": "entity", "schema": { "type": "object", "properties": { "period": { "$ref": "demo/period@1" } }, "required": ["period"] } },
+    "types": { "demo/period@1": { "abstract": false, "kind": "entity", "schema": { "type": "object", "properties": { "from": { "type": "string", "format": "date" } }, "required": ["from"] } } }
+  },
+  "expect": { "rule": "KR-16", "path": "/schema/properties/period/$ref" }
+}
