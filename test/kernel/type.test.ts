@@ -205,7 +205,9 @@ describe("abstract types (KR-16)", () => {
     expect(ofType(holder, typesOf({ "demo/period@1": shape(false) }))).toEqual([
       reject(KR_16, { intent: null, path: "/body/schema/properties/period/$ref", expected: "an abstract type", got: "demo/period@1" }),
     ]);
-    expect(refusals(holder)).toEqual([["KR-16", "/body/schema/properties/period/$ref"]]);
+    expect(ofType(holder)).toEqual([
+      reject(KR_16, { intent: null, path: "/body/schema/properties/period/$ref", expected: "an abstract type resolve knows", got: "demo/period@1" }),
+    ]);
   });
 
   it("KR-16: an abstract type has no records", () => {

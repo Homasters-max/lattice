@@ -128,6 +128,39 @@ describe("a type body by the meta-type (KR-14, KR-15, KR-22)", () => {
     const holder = type({ schema: { type: "object", properties: { at: { $ref: "demo/shape@1" } }, required: ["at"] } });
     const broken = { abstract: true, kind: "entity", schema: { type: "object", properties: { at: { type: "string", pattern: "x" } } } };
     expect(refusals(record(holder), typesOf({ "demo/shape@1": base }))).toEqual([]);
-    expect(refusals(record(holder), typesOf({ "demo/shape@1": broken }))).toEqual([["KR-16", "/body/schema/properties/at/$ref"]]);
+    expect(check(record(holder), typesOf({ "demo/shape@1": broken }))).toEqual([
+      reject(KR_16, { intent: null, path: "/body/schema/properties/at/$ref", expected: "an admitted abstract type", got: "demo/shape@1" }),
+    ]);
+  });
+
+  it("KR-14: the kernel reads core/type@1 from its META_TYPE, not from resolve", () => {
+    const other = { abstract: true, kind: "event", schema: { type: "object", properties: {} } };
+    expect(check(record(type()), typesOf({ "core/type@1": other }))).toEqual([]);
+    expect(check(record(type({ kind: "fact" })), typesOf({ "core/type@1": other })).map((r) => [r.rule, r.path])).toEqual([["KR-14", "/body/kind"]]);
+  });
+});
+
+describe("the place of the record (LG-16, CONVENTIONS.md §5)", () => {
+  const record = { type: "demo/shape@1", body: { text: "abcdef" } };
+
+  it("LG-16: refusals from rev, the type and the body come sorted by path", () => {
+    expect(check(record)).toEqual([
+      reject(KR_21, { intent: null, path: "/body/text", expected: { maxLength: 5 }, got: 6 }),
+      reject(KR_04, { intent: null, path: "/rev", expected: "a revision", got: "absent" }),
+      reject(KR_16, { intent: null, path: "/type", expected: "a type that is not abstract", got: "an abstract type" }),
+    ]);
+  });
+
+  it("LG-16: refusals sit under the place the caller names — /rev, /type and /body of the record there", () => {
+    const place = { intent: "demo/a", path: "/records/0" };
+    expect(check(record, TYPES, place)).toEqual([
+      reject(KR_21, { ...place, path: "/records/0/body/text", expected: { maxLength: 5 }, got: 6 }),
+      reject(KR_04, { ...place, path: "/records/0/rev", expected: "a revision", got: "absent" }),
+      reject(KR_16, { ...place, path: "/records/0/type", expected: "a type that is not abstract", got: "an abstract type" }),
+    ]);
+    expect(check({ type: "demo/gone@1", rev: 1, body: {} }, TYPES, place)).toEqual([
+      reject(KR_15, { ...place, path: "/records/0/type", expected: "a type resolve knows", got: "demo/gone@1" }),
+    ]);
+    expect(check({ type: "core/type@1", rev: 1, body: type({ kind: "fact" }) }, TYPES, place).map((r) => r.path)).toEqual(["/records/0/body/kind"]);
   });
 });
