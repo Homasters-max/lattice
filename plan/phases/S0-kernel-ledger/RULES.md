@@ -55,7 +55,7 @@
 | KR-07 | полностью | [S0-05](tasks/S0-05-record-ref.md) |
 | KR-08 | полностью | [S0-05](tasks/S0-05-record-ref.md) |
 | KR-09 | полностью | [S0-05](tasks/S0-05-record-ref.md) |
-| KR-10 | полностью | [S0-04](tasks/S0-04-canon-hash.md), [S0-33](tasks/S0-33-landing-checks.md) |
+| KR-10 | полностью | [S0-04](tasks/S0-04-canon-hash.md), [S0-26](tasks/S0-26-codec-import.md), [S0-33](tasks/S0-33-landing-checks.md) |
 | KR-11 | полностью | [S0-04](tasks/S0-04-canon-hash.md) |
 | KR-12 | полностью | [S0-04](tasks/S0-04-canon-hash.md) |
 | KR-13 | полностью | [S0-04](tasks/S0-04-canon-hash.md) |
