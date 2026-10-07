@@ -49,7 +49,7 @@
 | KR-01 | полностью | [S0-03](tasks/S0-03-walking-skeleton.md) |
 | KR-02 | полностью | [S0-03](tasks/S0-03-walking-skeleton.md) |
 | KR-03 | полностью | [S0-03](tasks/S0-03-walking-skeleton.md), [S0-23](tasks/S0-23-genesis-init.md) |
-| KR-04 | полностью | [S0-05](tasks/S0-05-record-ref.md) |
+| KR-04 | полностью | [S0-05](tasks/S0-05-record-ref.md), [S0-35](tasks/S0-35-closed-form.md), [S0-36](tasks/S0-36-record-against-type.md) |
 | KR-05 | полностью | [S0-05](tasks/S0-05-record-ref.md) |
 | KR-06 | полностью | [S0-05](tasks/S0-05-record-ref.md) |
 | KR-07 | полностью | [S0-05](tasks/S0-05-record-ref.md) |
@@ -59,15 +59,15 @@
 | KR-11 | полностью | [S0-04](tasks/S0-04-canon-hash.md) |
 | KR-12 | полностью | [S0-04](tasks/S0-04-canon-hash.md) |
 | KR-13 | полностью | [S0-04](tasks/S0-04-canon-hash.md) |
-| KR-14 | полностью | [S0-07](tasks/S0-07-type-compare.md) |
-| KR-15 | полностью | [S0-07](tasks/S0-07-type-compare.md) |
-| KR-16 | полностью | [S0-07](tasks/S0-07-type-compare.md) |
+| KR-14 | полностью | [S0-07](tasks/S0-07-type-compare.md), [S0-35](tasks/S0-35-closed-form.md), [S0-36](tasks/S0-36-record-against-type.md) |
+| KR-15 | полностью | [S0-07](tasks/S0-07-type-compare.md), [S0-36](tasks/S0-36-record-against-type.md) |
+| KR-16 | полностью | [S0-07](tasks/S0-07-type-compare.md), [S0-36](tasks/S0-36-record-against-type.md) |
 | KR-17 | полностью | [S0-07](tasks/S0-07-type-compare.md) |
-| KR-18 | полностью | [S0-06](tasks/S0-06-schema-validate.md) |
-| KR-19 | полностью | [S0-06](tasks/S0-06-schema-validate.md), [S0-07](tasks/S0-07-type-compare.md), [S0-15](tasks/S0-15-phase4-references.md) |
+| KR-18 | полностью | [S0-06](tasks/S0-06-schema-validate.md), [S0-36](tasks/S0-36-record-against-type.md) |
+| KR-19 | полностью | [S0-06](tasks/S0-06-schema-validate.md), [S0-07](tasks/S0-07-type-compare.md), [S0-15](tasks/S0-15-phase4-references.md), [S0-35](tasks/S0-35-closed-form.md), [S0-36](tasks/S0-36-record-against-type.md) |
 | KR-20 | полностью | [S0-06](tasks/S0-06-schema-validate.md) |
-| KR-21 | полностью | [S0-06](tasks/S0-06-schema-validate.md) |
-| KR-22 | полностью | [S0-07](tasks/S0-07-type-compare.md) |
+| KR-21 | полностью | [S0-06](tasks/S0-06-schema-validate.md), [S0-36](tasks/S0-36-record-against-type.md) |
+| KR-22 | полностью | [S0-07](tasks/S0-07-type-compare.md), [S0-36](tasks/S0-36-record-against-type.md) |
 | KR-23 | полностью | [S0-05](tasks/S0-05-record-ref.md) |
 | KR-24 | полностью | [S0-05](tasks/S0-05-record-ref.md) |
 | KR-25 | полностью | [S0-05](tasks/S0-05-record-ref.md) |
@@ -124,17 +124,17 @@
 | LG-03 | частично; остальное — S1 | [S0-11](tasks/S0-11-store-port.md) |
 | LG-04 | полностью | [S0-10](tasks/S0-10-proposal-commit.md) |
 | LG-05 | полностью | [S0-10](tasks/S0-10-proposal-commit.md), [S0-11](tasks/S0-11-store-port.md) |
-| LG-06 | полностью | [S0-10](tasks/S0-10-proposal-commit.md) |
-| LG-09 | полностью | [S0-10](tasks/S0-10-proposal-commit.md), [S0-21](tasks/S0-21-draft-command.md), [S0-33](tasks/S0-33-landing-checks.md) |
-| LG-10 | полностью | [S0-10](tasks/S0-10-proposal-commit.md) |
+| LG-06 | полностью | [S0-10](tasks/S0-10-proposal-commit.md), [S0-35](tasks/S0-35-closed-form.md) |
+| LG-09 | полностью | [S0-10](tasks/S0-10-proposal-commit.md), [S0-21](tasks/S0-21-draft-command.md), [S0-33](tasks/S0-33-landing-checks.md), [S0-35](tasks/S0-35-closed-form.md) |
+| LG-10 | полностью | [S0-10](tasks/S0-10-proposal-commit.md), [S0-35](tasks/S0-35-closed-form.md) |
 | LG-11 | полностью | [S0-13](tasks/S0-13-apply-core.md) |
 | LG-12 | полностью | [S0-13](tasks/S0-13-apply-core.md) |
 | LG-13 | полностью | [S0-13](tasks/S0-13-apply-core.md) |
 | LG-54 | полностью | [S0-10](tasks/S0-10-proposal-commit.md), [S0-21](tasks/S0-21-draft-command.md), [S0-33](tasks/S0-33-landing-checks.md) |
 | LG-14 | полностью | [S0-13](tasks/S0-13-apply-core.md), [S0-32](tasks/S0-32-open-tail.md) |
 | LG-15 | полностью | [S0-13](tasks/S0-13-apply-core.md) |
-| LG-16 | полностью | [S0-13](tasks/S0-13-apply-core.md) |
-| LG-17 | полностью | [S0-02](tasks/S0-02-code-conventions.md), [S0-13](tasks/S0-13-apply-core.md), [S0-33](tasks/S0-33-landing-checks.md) |
+| LG-16 | полностью | [S0-13](tasks/S0-13-apply-core.md), [S0-36](tasks/S0-36-record-against-type.md) |
+| LG-17 | полностью | [S0-02](tasks/S0-02-code-conventions.md), [S0-13](tasks/S0-13-apply-core.md), [S0-33](tasks/S0-33-landing-checks.md), [S0-35](tasks/S0-35-closed-form.md), [S0-37](tasks/S0-37-check-result.md) |
 | LG-18 | полностью | [S0-13](tasks/S0-13-apply-core.md), [S0-23](tasks/S0-23-genesis-init.md) |
 | LG-19 | полностью | [S0-15](tasks/S0-15-phase4-references.md) |
 | LG-20 | полностью | [S0-20](tasks/S0-20-git-landing.md) |
@@ -153,7 +153,7 @@
 | LG-38 | частично; остальное — S1 | [S0-12](tasks/S0-12-fold-view.md), [S0-32](tasks/S0-32-open-tail.md) |
 | LG-39 | полностью | [S0-12](tasks/S0-12-fold-view.md) |
 | LG-41 | полностью | [S0-12](tasks/S0-12-fold-view.md) |
-| LG-42 | полностью | [S0-25](tasks/S0-25-codec-md-model.md), [S0-26](tasks/S0-26-codec-import.md), [S0-27](tasks/S0-27-codec-export.md) |
+| LG-42 | полностью | [S0-25](tasks/S0-25-codec-md-model.md), [S0-26](tasks/S0-26-codec-import.md), [S0-27](tasks/S0-27-codec-export.md), [S0-38](tasks/S0-38-md-model-tables.md) |
 | LG-44 | полностью | [S0-22](tasks/S0-22-libraries-visible-set.md), [S0-24](tasks/S0-24-std-ledger.md) |
 | LG-45 | полностью | [S0-22](tasks/S0-22-libraries-visible-set.md) |
 | LG-47 | полностью | [S0-23](tasks/S0-23-genesis-init.md) |
@@ -218,7 +218,7 @@
 | ST-09 | полностью | [S0-28](tasks/S0-28-generate.md) |
 | ST-11 | полностью | [S0-30](tasks/S0-30-architecture-audit.md) |
 | ST-12 | полностью | [S0-29](tasks/S0-29-e2e-acceptance.md) |
-| ST-17 | полностью | [S0-02](tasks/S0-02-code-conventions.md), [S0-33](tasks/S0-33-landing-checks.md) |
+| ST-17 | полностью | [S0-02](tasks/S0-02-code-conventions.md), [S0-33](tasks/S0-33-landing-checks.md), [S0-35](tasks/S0-35-closed-form.md), [S0-36](tasks/S0-36-record-against-type.md), [S0-37](tasks/S0-37-check-result.md) |
 | ST-13 | полностью | [S0-30](tasks/S0-30-architecture-audit.md) |
 | ST-14 | полностью | [S0-30](tasks/S0-30-architecture-audit.md) |
 | ST-15 | полностью | [S0-30](tasks/S0-30-architecture-audit.md) |
@@ -241,11 +241,11 @@
 
 | Правило | В фазе | Задачи |
 |---|---|---|
-| RM-01 | полностью | [S0-01](tasks/S0-01-repo-toolchain-ci.md), [S0-25](tasks/S0-25-codec-md-model.md) |
-| RM-02 | полностью | [S0-01](tasks/S0-01-repo-toolchain-ci.md), [S0-25](tasks/S0-25-codec-md-model.md) |
+| RM-01 | полностью | [S0-01](tasks/S0-01-repo-toolchain-ci.md), [S0-25](tasks/S0-25-codec-md-model.md), [S0-38](tasks/S0-38-md-model-tables.md) |
+| RM-02 | полностью | [S0-01](tasks/S0-01-repo-toolchain-ci.md), [S0-25](tasks/S0-25-codec-md-model.md), [S0-37](tasks/S0-37-check-result.md), [S0-38](tasks/S0-38-md-model-tables.md) |
 | RM-03 | полностью | [S0-26](tasks/S0-26-codec-import.md) |
 | RM-04 | полностью | [S0-30](tasks/S0-30-architecture-audit.md) |
 | RM-05 | полностью | [S0-30](tasks/S0-30-architecture-audit.md) |
 | RM-06 | полностью | [S0-27](tasks/S0-27-codec-export.md), [S0-29](tasks/S0-29-e2e-acceptance.md) |
-| RM-07 | полностью | [S0-25](tasks/S0-25-codec-md-model.md), [S0-26](tasks/S0-26-codec-import.md), [S0-27](tasks/S0-27-codec-export.md) |
+| RM-07 | полностью | [S0-25](tasks/S0-25-codec-md-model.md), [S0-26](tasks/S0-26-codec-import.md), [S0-27](tasks/S0-27-codec-export.md), [S0-38](tasks/S0-38-md-model-tables.md) |
 | RM-08 | полностью | [S0-30](tasks/S0-30-architecture-audit.md) |
