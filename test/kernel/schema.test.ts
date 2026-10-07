@@ -231,6 +231,11 @@ describe("what a rejection names (KR-18, LG-17)", () => {
       { oneOf: [branch("a"), { type: "object", properties: { other: { type: "string" } } }], discriminator: "kind" },
       [refuse("/oneOf/1/properties/kind", "a field with const", "absent"), refuse("/oneOf/1/required", "fields that name kind", "absent")],
     ],
+    [
+      "a branch whose discriminator holds no const",
+      { oneOf: [branch("a"), { type: "object", properties: { kind: { type: "string" } }, required: ["kind"] }], discriminator: "kind" },
+      [refuse("/oneOf/1/properties/kind", "a field with const", { type: "string" })],
+    ],
     ["a repeated const", { oneOf: [branch("a"), branch("a")], discriminator: "kind" }, [refuse("/oneOf/1/properties/kind/const", "a const no other branch holds", "a")]],
   ];
 
