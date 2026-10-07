@@ -34,8 +34,10 @@ describe("dev-loop documents, agents", () => {
 });
 
 describe("dev-loop documents, commands and contract", () => {
-  it("uses in the skill every command of the tool but scope, and only those", () => {
-    const commands = [...tool.matchAll(/^\/\/ {3}(\w+) /gm)].map((m) => m[1]!).filter((c) => c !== "scope");
+  it("uses in the skill every command of the tool, and only those; start runs before the worktree exists", () => {
+    // scope and restore are for debugging: start runs them inside.
+    expect(skill).toContain("`node plan/tools/dev-loop.mjs start");
+    const commands = [...tool.matchAll(/^\/\/ {3}(\w+) /gm)].map((m) => m[1]!).filter((c) => !["scope", "restore", "start"].includes(c));
     const used = new Set([...skill.matchAll(/`dl (\w+)/g)].map((m) => m[1]!));
     expect([...used].sort()).toEqual([...new Set(commands)].sort());
   });

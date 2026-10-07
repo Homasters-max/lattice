@@ -31,20 +31,21 @@ argument-hint: "[S0-NN | PR <n>]"
 | `done`, `final` | «Сдать» |
 | `escalate`, `owner` | «Эскалация» с `--why` из вывода |
 | `ask` | «Эскалация», п. 3, с `questions` из вывода |
+| `executor` | «Исполнитель» |
 | `stop` | цикл окончен; PR остаётся draft с `blocked` |
 | `end` | сообщи владельцу, что цикл завершён |
 
 ## Начать или продолжить
 
-- Аргумент `S0-NN`: есть открытый PR задачи (`gh pr list --state open --search "S0-NN in:title"`) — продолжить его, иначе новая задача.
-- Аргумент `PR <n>` или `#<n>` — продолжить этот PR.
-- Без аргумента — первая из «готовы к старту» по `node plan/tools/plan-check.mjs`. Скажи владельцу одной строкой, какую задачу берёшь, и начинай.
+Аргумент `S0-NN` — `--task S0-NN`; `PR <n>` или `#<n>` — `--pr <n>`. Без аргумента — первая из «готовы к старту» по `node plan/tools/plan-check.mjs`; скажи владельцу одной строкой, какую задачу берёшь.
 
-Worktree: `git fetch origin`. Новая задача — `git worktree add --detach <work> origin/main`, есть PR — `git worktree add --detach <work> origin/<ветка>`; если `<work>` уже есть, он и берётся. Нет `<work>/node_modules` — `npm ci` в `<work>`. Worktree грязный или впереди `origin` — прошлый агент оборвался: повтори его поручение тем же типом агента.
+`node plan/tools/dev-loop.mjs start --task <ID> | --pr <n>` из рабочей копии — одна команда. Она находит открытый PR задачи, создаёт или проверяет worktree, ставит зависимости, восстанавливает состояние из комментариев и печатает `dir` (`<папка>`), `work` (`<work>`) и `next`.
 
-Продолжение PR: `gh pr view <n> --json comments > <папка>/comments.json`, затем `dl restore --comments <папка>/comments.json` — дальше по `next`. `entry: none`: PR draft — «Исполнитель»; ready — `dl init --task <ID> --pr <n> --branch <ветка>`, «Ворота».
+- `next: executor` — «Исполнитель».
+- `interrupted: true` — прошлый агент оборвался: повтори его поручение — агент по `brief` (роль в нём), если `brief` есть, иначе по `next`.
+- Иначе — по `next` из «Переходов».
 
-Уборка: worktree циклов, чьи PR закрыты, — `git worktree remove D:/tmp/lattice/dev-loop/<ID>/work`.
+Уборка: worktree циклов, чьи PR закрыты, — `git worktree remove <папка>/work`.
 
 ## Исполнитель
 
