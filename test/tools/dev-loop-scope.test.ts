@@ -194,10 +194,38 @@ describe("dev-loop scope, stops of later rounds", { timeout: 30_000 }, () => {
     expect(scope(dir, prev, true, base).stops).toEqual([]);
   });
 
-  it("stops on a rewritten line of CONVENTIONS.md", () => {
-    const { dir } = repo({ ...LEDGER, "CONVENTIONS.md": "# C\n\n- one rule\n" });
+  it("stops on a rewritten line of CONVENTIONS.md from main", () => {
+    const { dir, base } = repo({ ...LEDGER, "CONVENTIONS.md": "# C\n\n- one rule\n" });
     const prev = commit(dir, { "src/ledger/land.ts": land("  return 2;") }, "round 1");
     commit(dir, { "CONVENTIONS.md": "# C\n\n- another rule\n" }, "fix");
+    expect(scope(dir, prev, true, base).stops).toHaveLength(1);
+  });
+
+  it("stops on a removed line of CONVENTIONS.md from main", () => {
+    const { dir, base } = repo({ ...LEDGER, "CONVENTIONS.md": "# C\n\n- one rule\n- two rule\n" });
+    const prev = commit(dir, { "CONVENTIONS.md": "# C\n\n- one rule\n- two rule\n- own rule\n" }, "round 1");
+    commit(dir, { "CONVENTIONS.md": "# C\n\n- one rule\n- own rule\n" }, "fix");
+    expect(scope(dir, prev, true, base).stops).toHaveLength(1);
+  });
+
+  it("does not stop when the answer rewrites a line of CONVENTIONS.md the branch added", () => {
+    const { dir, base } = repo({ ...LEDGER, "CONVENTIONS.md": "# C\n\n- one rule\n" });
+    const prev = commit(dir, { "CONVENTIONS.md": "# C\n\n- one rule\n- own rule\n" }, "round 1");
+    commit(dir, { "CONVENTIONS.md": "# C\n\n- one rule\n- own rule, reworded\n" }, "fix");
+    expect(scope(dir, prev, true, base).stops).toEqual([]);
+  });
+
+  it("does not stop when the answer restores the line of main the branch rewrote and adds its own", () => {
+    const { dir, base } = repo({ ...LEDGER, "CONVENTIONS.md": "# C\n\n- one rule\n" });
+    const prev = commit(dir, { "CONVENTIONS.md": "# C\n\n- one rule, rewritten\n" }, "round 1");
+    commit(dir, { "CONVENTIONS.md": "# C\n\n- one rule\n- own rule\n" }, "fix");
+    expect(scope(dir, prev, true, base).stops).toEqual([]);
+  });
+
+  it("counts every removed line of CONVENTIONS.md without main to compare with", () => {
+    const { dir } = repo({ ...LEDGER, "CONVENTIONS.md": "# C\n\n- one rule\n" });
+    const prev = commit(dir, { "CONVENTIONS.md": "# C\n\n- one rule\n- own rule\n" }, "round 1");
+    commit(dir, { "CONVENTIONS.md": "# C\n\n- one rule\n- own rule, reworded\n" }, "fix");
     expect(scope(dir, prev, true).stops).toHaveLength(1);
   });
 });

@@ -118,12 +118,35 @@ function expectationsOf(files, hunks) {
   return files.filter((f) => f.cls === "tests" && (fixture(f) || changed(f))).map((f) => f.path);
 }
 
-function stopsOf(branch, hunks, delta) {
+// Строки файла на ревизии со счётом повторов; файла нет — пусто.
+function lineCounts(rev, path) {
+  const counts = new Map();
+  let text = "";
+  try {
+    text = git("show", `${rev}:${path}`);
+  } catch {
+    // файла на ревизии нет
+  }
+  for (const l of text.split("\n")) counts.set(l, (counts.get(l) ?? 0) + 1);
+  return counts;
+}
+
+// Ответ на ревью убрал строку CONVENTIONS.md, которая есть на main: на head её копий меньше, чем на main.
+// Строки, добавленные самой веткой, правило main не меняют. Без main отличить нельзя — считается любая убранная строка.
+function conventionsRemoved(hunks, fork, head) {
+  const removed = (hunks.get("CONVENTIONS.md") ?? []).filter((l) => l.startsWith("-")).map((l) => l.slice(1));
+  if (!fork || removed.length === 0) return removed.length > 0;
+  const onMain = lineCounts(fork, "CONVENTIONS.md");
+  const onHead = lineCounts(head, "CONVENTIONS.md");
+  return removed.some((l) => (onHead.get(l) ?? 0) < (onMain.get(l) ?? 0));
+}
+
+function stopsOf(branch, hunks, delta, fork, head) {
   const stops = [];
   if (branch.some((f) => f.cls === "design") && !branch.some((f) => f.path === "discussion/decisions.md"))
     stops.push("docs/design изменён без записи в discussion/decisions.md (AGENTS.md)");
-  if (delta && (hunks.get("CONVENTIONS.md") ?? []).some((l) => l.startsWith("-")))
-    stops.push("в ответе на ревью изменены или удалены строки CONVENTIONS.md: правило меняет владелец");
+  if (delta && conventionsRemoved(hunks, fork, head))
+    stops.push("в ответе на ревью изменены или удалены строки CONVENTIONS.md из main: правило меняет владелец");
   return stops;
 }
 
@@ -147,7 +170,8 @@ export function scope({ base, head = "HEAD", delta = false, main = "origin/main"
   const triggers = triggersOf(files, from, head);
   const expectations = expectationsOf(files, hunks);
   const total = files.reduce((n, f) => n + f.lines, 0);
-  const branch = delta && succeeds("rev-parse", "--verify", main) ? changes(git("merge-base", main, head).trim(), head) : files;
+  const fork = delta && succeeds("rev-parse", "--verify", main) ? git("merge-base", main, head).trim() : null;
+  const branch = fork ? changes(fork, head) : files;
   const reasons = {
     spec: specReasons(has, expectations, delta),
     standards: has("code", "tests", "config", "conventions") ? ["изменены код, тесты, конфигурация или CONVENTIONS.md"] : [],
@@ -163,7 +187,7 @@ export function scope({ base, head = "HEAD", delta = false, main = "origin/main"
     reasons.spec.push("изменения выше порога проверки закрытия");
 
   const axes = mode === "review" ? ["spec", "standards", "architecture"].filter((a) => reasons[a].length) : [];
-  const stops = stopsOf(branch, hunks, delta);
+  const stops = stopsOf(branch, hunks, delta, fork, head);
   return { mode, axes, reasons, stops, triggers, expectations, rebased: false, lines: total, base: from, head: git("rev-parse", head).trim() };
 }
 
