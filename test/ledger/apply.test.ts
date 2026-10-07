@@ -6,9 +6,11 @@ import { describe, expect, it } from "vitest";
 import { BODY_LIMIT, KERNEL_VERSION, type JsonValue } from "../../src/kernel/index.js";
 import {
   apply,
+  commitHash,
   createView,
   encodeCommit,
   fold,
+  NO_FACTS,
   openLines,
   proposalHash,
   readProposal,
@@ -108,8 +110,9 @@ describe("apply, the candidate commit", () => {
   it("LG-06, LG-10: any order of intents gives the same records and proposal hash", () => {
     const event = intent("01JB2X0000000000000000EVNT", { text: "seen" }, "event");
     const [ab, ba] = [proposal(intent("demo/a"), event, intent("demo/b")), proposal(event, intent("demo/b"), intent("demo/a"))];
-    expect(proposalHash(ab)).toBe(proposalHash(ba));
+    expect(proposalHash(ab, NO_FACTS)).toBe(proposalHash(ba, NO_FACTS));
     expect(landed(empty(), ab).records).toEqual(landed(empty(), ba).records);
+    expect(commitHash(landed(empty(), ab))).toBe(commitHash(landed(empty(), ba)));
     expect(landed(empty(), ab).records.map((r) => r.id)).toEqual(["demo/a", "demo/b", "01JB2X0000000000000000EVNT"]);
   });
 });

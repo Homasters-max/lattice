@@ -16,7 +16,7 @@
 | [S0-07](tasks/S0-07-type-compare.md) | Type и compare | C | ⬜ | | |
 | [S0-08](tasks/S0-08-std-types-s0.md) | core и std — типы S0 как данные | D | ⬜ | | |
 | [S0-09](tasks/S0-09-std-schemas-drafts.md) | Черновики всех схем std — проверка подмножества до заморозки ядра | D | ⬜ | | может перейти в SW |
-| [S0-10](tasks/S0-10-proposal-commit.md) | Proposal и commit — форматы, hash, подписи, цепочка | E | ⬜ | | |
+| [S0-10](tasks/S0-10-proposal-commit.md) | Proposal и commit — форматы, hash, подписи, цепочка | E | ✅ | [#21](https://github.com/Homasters-max/lattice/pull/21) | G-03, G-10, G-24 |
 | [S0-11](tasks/S0-11-store-port.md) | Порт store — адаптеры memory и jsonl, контракт-тесты | E | ⬜ | | |
 | [S0-12](tasks/S0-12-fold-view.md) | Fold, проекции, read view и verify-store | E | ⬜ | | |
 | [S0-13](tasks/S0-13-apply-core.md) | Apply — каркас, кандидат, before/after, фазы 1–3 | F | ⬜ | | |

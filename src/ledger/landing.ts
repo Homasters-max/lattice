@@ -10,14 +10,14 @@
 // OB-07 and `request` arrive with S0-19 and S0-20.
 import { parseJsonBytes, refuse, reject, type Rejections, type Result } from "../kernel/index.js";
 import { apply, type LandActs } from "./apply.js";
-import { commitHash, encodeCommit, type Commit } from "./commit.js";
+import { chainTo, encodeCommit, type Commit } from "./commit.js";
 import { fold } from "./fold.js";
 import type { Acts } from "./ports/acts.js";
 import type { Clock } from "./ports/clock.js";
 import type { Trailer, Worktree } from "./ports/git.js";
 import type { Ids } from "./ports/ids.js";
 import type { Store } from "./ports/store.js";
-import { proposalHash, readProposal, type Proposal } from "./proposal.js";
+import { NO_FACTS, proposalHash, readProposal, type Proposal } from "./proposal.js";
 import type { Rows } from "./rows.js";
 import type { View } from "./rows-view.js";
 import { LG_23, LG_54 } from "./rules.js";
@@ -125,9 +125,6 @@ async function checkOn(ports: LandingPorts, before: OpenedTail, worktree: Worktr
   return { ...found.value, onto, view, tail, worktree, store: ports.openStore(worktree) };
 }
 
-/** G-14: apply knows neither the tail nor the change request; landing chains the commit to the tail. */
-const onTail = (candidate: Commit, tail: Commit | null): Commit => ({ ...candidate, prev: tail === null ? null : commitHash(tail) });
-
 /** LG-22: the trailers of the landing commit that name the proposal and the `seq`; those of OB-07 arrive with S0-20. */
 const trailersOf = (proposal: string, seq: number | null): readonly Trailer[] => [
   { key: "Lattice-Proposal", value: proposal },
@@ -146,7 +143,7 @@ async function pushed(ports: LandingPorts, checked: Checked, commit: Commit | nu
   if (commit !== null) await store.append({ commit: encodeCommit(commit), delta: fold(view, commit, []), evidence: [] });
   await worktree.remove(path);
   const message = commit === null ? "lattice: land no-op" : `lattice: land commit ${commit.seq}`;
-  const trailers = trailersOf(proposalHash(proposal), commit?.seq ?? null);
+  const trailers = trailersOf(proposalHash(proposal, NO_FACTS), commit?.seq ?? null);
   const done = await ports.git.push({ worktree, ref: MAIN, expected: onto, message, trailers });
   return done === "moved" ? { outcome: "moved" } : ended(commit, true);
 }
@@ -156,7 +153,7 @@ async function applied(ports: LandingPorts, checked: Checked, request: string, o
   const acts: LandActs = { session: { id: ports.ids.ulid(), at: ports.clock.now() }, events: await ports.acts.read(request) };
   const result = apply(checked.view, checked.proposal, acts, []);
   if (!result.ok) return rejected(result);
-  const commit = result.value === "no-op" ? null : onTail(result.value, checked.tail);
+  const commit = result.value === "no-op" ? null : chainTo(result.value, checked.tail);
   return options.dryRun ? ended(commit, false) : pushed(ports, checked, commit);
 }
 

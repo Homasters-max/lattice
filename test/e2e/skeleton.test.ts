@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Assembly, View } from "../../src/assembly/index.js";
 import { run } from "../../src/cli/run.js";
 import type { JsonValue } from "../../src/kernel/index.js";
-import { proposalHash, readProposal } from "../../src/ledger/index.js";
+import { NO_FACTS, proposalHash, readProposal } from "../../src/ledger/index.js";
 import { assembleForTests, type FixtureConfig } from "../support/assembly.js";
 import { hashOf } from "../support/hash-of.js";
 
@@ -21,7 +21,7 @@ const AT = "2026-10-06T12:30:00.000000Z";
 function approve(proposal: JsonValue, request: string) {
   const read = readProposal(proposal);
   if (!read.ok) throw new Error("bug: the fixture proposal has the form of LG-09");
-  return { verb: "approve" as const, target: proposalHash(read.value), identity: "owner", uri: `fixture:${request}`, at: AT, verified: true };
+  return { verb: "approve" as const, target: proposalHash(read.value, NO_FACTS), identity: "owner", uri: `fixture:${request}`, at: AT, verified: true };
 }
 
 const configIn = (dir: string): FixtureConfig => ({

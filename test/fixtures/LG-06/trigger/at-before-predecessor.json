@@ -1,0 +1,56 @@
+{
+  "check": "chain",
+  "input": {
+    "proposals": [
+      {
+        "session": {
+          "id": "01JB2X00000000000000000SES"
+        },
+        "intents": [
+          {
+            "op": "entity",
+            "id": "demo/a",
+            "type": "demo/note@1",
+            "expected": null,
+            "at": "2026-10-06T11:00:00.000000Z",
+            "body": {
+              "text": "demo/a"
+            }
+          }
+        ],
+        "sig": null
+      },
+      {
+        "session": {
+          "id": "01JB2X00000000000000000SES"
+        },
+        "intents": [
+          {
+            "op": "entity",
+            "id": "demo/b",
+            "type": "demo/note@1",
+            "expected": null,
+            "at": "2026-10-06T11:00:00.000000Z",
+            "body": {
+              "text": "demo/b"
+            }
+          }
+        ],
+        "sig": null
+      }
+    ],
+    "edits": [
+      {
+        "line": 2,
+        "set": {
+          "/at": "2026-10-06T11:59:59.999999Z"
+        },
+        "signedBy": "land"
+      }
+    ]
+  },
+  "expect": {
+    "rule": "LG-06",
+    "path": "/store/knowledge.jsonl/2/at"
+  }
+}

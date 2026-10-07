@@ -43,3 +43,4 @@ rules: [TR-01, TR-02, TR-05, TR-06, TR-07, TR-09, TR-10, TR-11, TR-12, GL-07, RT
 
 - Подпись — по Q-04: под ядром `0` dev-ключи из `test/keys/`; человек подписывает сертификат сырой Ed25519-подписью ключом из незашифрованного OpenSSH-файла.
 - Задача на три модуля — триггер аудита ST-15.
+- От S0-10: подписи и ключи — `src/trust/signature.ts` (`signHash`, `verifyHash`, `publicKeyOf`; запись — G-10, подписываемые байты — G-24, `CONVENTIONS.md` §1); `signProposal` и проверка LG-10 `verifyProposal(p, key, keyOf, path)` — в `src/ledger/proposal.ts`, фикстуры `test/fixtures/LG-10/`. Задача берёт ключ из сертификата сессии (TR-11, TR-12) и зовёт `verifyProposal` в apply; `sig: null` форма LG-09 пропускает — его отклоняет LG-10. Ключи тестов, выведенные из имени, — `test/support/keys.ts`; dev-ключи `test/keys/` (Q-04) — этой задачи и S0-24.
