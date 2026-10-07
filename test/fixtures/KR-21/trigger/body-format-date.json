@@ -1,0 +1,16 @@
+{
+  "check": "body",
+  "input": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "due": { "type": "string", "format": "date" }
+      }
+    },
+    "body": { "due": "06.10.2026" }
+  },
+  "expect": {
+    "rule": "KR-21",
+    "path": "/due"
+  }
+}

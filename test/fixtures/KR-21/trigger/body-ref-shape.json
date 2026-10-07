@@ -1,0 +1,20 @@
+{
+  "check": "body",
+  "input": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "size": { "$ref": "demo/size@1" }
+      },
+      "required": ["size"]
+    },
+    "types": {
+      "demo/size@1": { "type": "object", "properties": { "n": { "type": "integer", "minimum": 0 } }, "required": ["n"] }
+    },
+    "body": { "size": { "n": -1 } }
+  },
+  "expect": {
+    "rule": "KR-21",
+    "path": "/size/n"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "check": "schema",
+  "input": {
+    "kind": "entity",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "extra": { "description": "anything at all" }
+      }
+    }
+  },
+  "expect": {
+    "rule": "KR-18",
+    "path": "/properties/extra"
+  }
+}

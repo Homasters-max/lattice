@@ -1,0 +1,13 @@
+{
+  "check": "schema",
+  "input": {
+    "kind": "entity",
+    "schema": {
+      "oneOf": [
+        { "type": "object", "properties": { "kind": { "const": "text" }, "text": { "type": "string" } }, "required": ["kind", "text"] },
+        { "type": "object", "properties": { "kind": { "const": "link" }, "to": { "type": "string", "format": "uri" } }, "required": ["kind", "to"] }
+      ],
+      "discriminator": "kind"
+    }
+  }
+}

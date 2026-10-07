@@ -1,0 +1,15 @@
+{
+  "check": "schema",
+  "input": {
+    "kind": "event",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "of": { "type": "string", "format": "ref", "ref": { "to": "demo/shape@1", "pin": "pinned", "label": "about" }, "key": true },
+        "code": { "type": "string", "unique": true, "card_order": 1 },
+        "source": { "type": "string", "format": "uri", "edge": "derived-from" }
+      },
+      "required": ["of", "code"]
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "check": "schema",
+  "input": {
+    "kind": "entity",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "count": { "type": "integer", "minLength": 1 }
+      }
+    }
+  },
+  "expect": {
+    "rule": "KR-18",
+    "path": "/properties/count/minLength"
+  }
+}

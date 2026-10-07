@@ -1,0 +1,16 @@
+{
+  "check": "body",
+  "input": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" }
+      }
+    },
+    "body": { "title": "a", "colour": "red" }
+  },
+  "expect": {
+    "rule": "KR-21",
+    "path": "/colour"
+  }
+}

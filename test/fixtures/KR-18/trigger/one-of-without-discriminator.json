@@ -1,0 +1,16 @@
+{
+  "check": "schema",
+  "input": {
+    "kind": "entity",
+    "schema": {
+      "oneOf": [
+        { "type": "object", "properties": { "kind": { "const": "a" } }, "required": ["kind"] },
+        { "type": "object", "properties": { "kind": { "const": "b" } }, "required": ["kind"] }
+      ]
+    }
+  },
+  "expect": {
+    "rule": "KR-18",
+    "path": "/discriminator"
+  }
+}
