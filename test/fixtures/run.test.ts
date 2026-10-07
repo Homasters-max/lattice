@@ -1,6 +1,7 @@
 // ST-17, LG-17: a trigger case is refused by its check with the folder's rule
-// ID at the expected path; a pass case is accepted. The last case runs every
-// fixture of this repository through the table of hard checks.
+// ID at the expected path; a pass case is accepted, whether the check answers
+// at once or waits on a port. The last case runs every fixture of this
+// repository through the table of hard checks.
 import { describe, expect, it } from "vitest";
 import { CHECKS } from "./checks.js";
 import { loadFolders } from "./load.js";
@@ -70,6 +71,9 @@ describe("rule fixture runner", () => {
     expect(await runFixture(checks, "KR-06", "pass", { check: "id", input: "bad" })).toBe('refused: KR-06 at /id (intent "x")');
   });
 
+});
+
+describe("the rule fixtures of this repository", () => {
   it("ST-17: holds for every fixture of this repository", async () => {
     const cases = loadFolders().flatMap((f) => (["trigger", "pass"] as const).flatMap((kind) => (f[kind] ?? []).map((c) => ({ at: `${f.name}/${kind}/${c.name}`, rule: f.name, kind, data: c.data }))));
     const problems = await Promise.all(
