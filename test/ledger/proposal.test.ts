@@ -14,6 +14,7 @@ import {
   type KeyOf,
   type Proposal,
 } from "../../src/ledger/index.js";
+import { verifyHash } from "../../src/trust/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 import { testKey } from "../support/keys.js";
 
@@ -23,8 +24,8 @@ const SESSION = { id: "01JB2X00000000000000000SES" };
 const entity = (id: string): JsonValue => ({ op: "entity", id, type: "demo/note@1", expected: null, at: AT, body: { text: id } });
 const event = (id: string, of = "demo/a", type = "demo/mark@1"): JsonValue => ({ op: "event", id, type, expected: null, at: AT, body: { of, value: true } });
 
-function proposal(intents: readonly JsonValue[], sig: string | null = null): Proposal {
-  const read = readProposal({ session: SESSION, intents, sig });
+function proposal(intents: readonly JsonValue[], sig: string | null = null, session: JsonValue = SESSION): Proposal {
+  const read = readProposal({ session, intents, sig });
   if (!read.ok) throw new Error("bug: the test proposal has the form of LG-09");
   return deepFreeze(read.value);
 }
@@ -79,6 +80,22 @@ describe("canonical order and the hash of a proposal (LG-06, LG-10, G-03)", () =
     expect(order(NO_FACTS)).toEqual(["demo/a", "demo/b", "01JB2X0000000000000000000A", "01JB2X0000000000000000000B", "01JB2X0000000000000000000C"]);
   });
 
+  it("LG-06, G-03: between facts of one key the id decides, so any order of them gives one order and one hash", () => {
+    const intents = [entity("demo/a"), event("01JB2X0000000000000000000B", "demo/a"), event("01JB2X0000000000000000000A", "demo/a"), event("01JB2X0000000000000000000C", "demo/b")];
+    const expected = proposalHash(proposal(intents), MARKS);
+    fc.assert(
+      fc.property(fc.shuffledSubarray(intents, { minLength: intents.length }), (shuffled) => {
+        expect(canonicalIntents(proposal(shuffled).intents, MARKS).map((i: Intent) => i.id)).toEqual([
+          "demo/a",
+          "01JB2X0000000000000000000A",
+          "01JB2X0000000000000000000B",
+          "01JB2X0000000000000000000C",
+        ]);
+        expect(proposalHash(proposal(shuffled), MARKS)).toBe(expected);
+      }),
+    );
+  });
+
   it("LG-10, LG-11: any order of intents gives the same hash", () => {
     const intents = [entity("demo/a"), entity("demo/b"), event("01JB2X0000000000000000000A", "demo/b"), event("01JB2X0000000000000000000B", "demo/a")];
     const expected = proposalHash(proposal(intents), MARKS);
@@ -93,6 +110,11 @@ describe("canonical order and the hash of a proposal (LG-06, LG-10, G-03)", () =
     const { key } = testKey("alice");
     const unsigned = proposal([entity("demo/a")]);
     expect(proposalHash(signProposal(unsigned, key, NO_FACTS), NO_FACTS)).toBe(proposalHash(unsigned, NO_FACTS));
+  });
+
+  it("LG-10: the hash covers the session — the same intents of another session hash otherwise", () => {
+    const intents = [entity("demo/a")];
+    expect(proposalHash(proposal(intents, null, { id: "01JB2X00000000000000000OTH" }), NO_FACTS)).not.toBe(proposalHash(proposal(intents), NO_FACTS));
   });
 
   it("LG-10: the hash changes with a byte of an intent", () => {
@@ -122,6 +144,27 @@ describe("the signature of a proposal (LG-10)", () => {
     const [rejection] = verifyProposal(p, alice.publicKey, NO_FACTS);
     expect(rejection?.expected).toEqual({ hash: proposalHash(p, NO_FACTS), key: alice.publicKey });
     expect(rejection?.got).toBeNull();
+  });
+
+  it("LG-10: a signature of the session's proposal does not verify the same intents of another session", () => {
+    const intents = [entity("demo/a")];
+    const signed = signProposal(proposal(intents), alice.key, NO_FACTS);
+    const other = proposal(intents, signed.sig, { id: "01JB2X00000000000000000OTH" });
+    expect(verifyProposal(signed, alice.publicKey, NO_FACTS)).toEqual([]);
+    expect(verifyProposal(other, alice.publicKey, NO_FACTS).map((r) => [r.rule, r.path])).toEqual([["LG-10", "/sig"]]);
+  });
+
+  it("LG-10, G-03: the signed hash is the one of intents in the order the fact keys give, and the rejection names it", () => {
+    // By MARKS the fact of demo/y comes before the fact of demo/z; without facts the ids decide.
+    const p = proposal([event("01JB2X0000000000000000000A", "demo/z"), event("01JB2X0000000000000000000C", "demo/y")]);
+    const [byKeys, byIds] = [proposalHash(p, MARKS), proposalHash(p, NO_FACTS)];
+    expect(byKeys).not.toBe(byIds);
+    const signed = signProposal(p, alice.key, MARKS);
+    expect(verifyHash(byKeys, signed.sig!, alice.publicKey)).toBe(true);
+    expect(verifyProposal(signed, alice.publicKey, MARKS)).toEqual([]);
+    expect(verifyProposal(signed, alice.publicKey, NO_FACTS).map((r) => r.rule)).toEqual(["LG-10"]);
+    const [rejection] = verifyProposal(p, alice.publicKey, MARKS);
+    expect(rejection?.expected).toEqual({ hash: byKeys, key: alice.publicKey });
   });
 
   it("LG-54: a proposal without intents is signed and verified as any other", () => {
