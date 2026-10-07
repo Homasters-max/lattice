@@ -52,9 +52,9 @@ compare(a: Schema, b: Schema, mode: Mode, resolve: ResolveType): { relation: Rel
 
 ## Готово, когда
 
-- [ ] hash мета-типа — константа, закреплённая в тесте
-- [ ] таблица KR-22 и property-тест корректности зелёные
-- [ ] фикстуры KR-14, KR-15, KR-16 — trigger и pass
+- [x] hash мета-типа — константа, закреплённая в тесте
+- [x] таблица KR-22 и property-тест корректности зелёные
+- [x] фикстуры KR-14, KR-15, KR-16 — trigger и pass
 
 ## Риски и заметки
 

@@ -13,7 +13,7 @@
 | [S0-04](tasks/S0-04-canon-hash.md) | Canon, hash и канонические форматы | C | ✅ | [#15](https://github.com/Homasters-max/lattice/pull/15) | G-20, G-21 |
 | [S0-05](tasks/S0-05-record-ref.md) | Record и Ref | C | ✅ | [#17](https://github.com/Homasters-max/lattice/pull/17) | G-06, G-12 |
 | [S0-06](tasks/S0-06-schema-validate.md) | Schema — закрытое подмножество и validate | C | ✅ | [#19](https://github.com/Homasters-max/lattice/pull/19) | G-22, G-23 |
-| [S0-07](tasks/S0-07-type-compare.md) | Type и compare | C | ⬜ | | |
+| [S0-07](tasks/S0-07-type-compare.md) | Type и compare | C | ✅ | [#22](https://github.com/Homasters-max/lattice/pull/22) | G-26, G-27 |
 | [S0-08](tasks/S0-08-std-types-s0.md) | core и std — типы S0 как данные | D | ⬜ | | |
 | [S0-09](tasks/S0-09-std-schemas-drafts.md) | Черновики всех схем std — проверка подмножества до заморозки ядра | D | ⬜ | | может перейти в SW |
 | [S0-10](tasks/S0-10-proposal-commit.md) | Proposal и commit — форматы, hash, подписи, цепочка | E | ✅ | [#21](https://github.com/Homasters-max/lattice/pull/21) | G-03, G-10, G-24 |
