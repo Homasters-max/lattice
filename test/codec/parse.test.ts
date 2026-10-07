@@ -122,6 +122,8 @@ describe("non-canonical blocks are refused (LG-42)", () => {
     expect(rules(md("# Doc", "", "| ID | Rule |", "|---|---|", "| AA-01 | x |", "AA-Z01. y"))).toEqual([["LG-42", "/6"]]);
     expect(rules(md("# Doc", "", "AA-Z01. x", "```text AA-Z02", "```"))).toEqual([["LG-42", "/4"]]);
     expect(rules(md("# Doc", "", "```text AA-Z02", "```", "AA-Z01. x"))).toEqual([["LG-42", "/5"]]);
+    expect(rules(md("# Doc", "", "AA-Z01. x", "```text AA-Z02", "```", "AA-Z03. y"))).toEqual([["LG-42", "/4"], ["LG-42", "/6"]]);
+    expect(rules(md("# Doc", "", "x", "```text AA-Z02", "```", "y"))).toEqual([["RM-01", "/3"], ["LG-42", "/4"], ["LG-42", "/6"], ["RM-01", "/6"]]);
     expect(rules(md("# Doc", "", "AA-Z01. x:", "", "- a", "b"))).toEqual([["LG-42", "/6"]]);
   });
 
