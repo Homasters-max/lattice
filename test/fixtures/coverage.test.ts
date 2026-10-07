@@ -3,7 +3,7 @@
 // the last case runs the audit over this repository.
 import { describe, expect, it } from "vitest";
 import { auditCoverage, designRuleIds, type FixtureFolder } from "./coverage.js";
-import { loadDesignTexts, loadFolders, loadRegistered } from "./load.js";
+import { loadDesign, loadFolders, loadRegistered } from "./load.js";
 
 const ok = (name: string) => ({ name, data: { check: "c", input: {} } });
 const folder = (name: string, over: Partial<FixtureFolder> = {}): FixtureFolder => ({
@@ -56,13 +56,17 @@ describe("rule fixture coverage", () => {
     ]);
   });
 
-  it("ST-17: reads rule IDs from table rows, not from prose, Z-blocks or mentions", () => {
-    const md = "KR-Z01. Prose about KR-03.\n\n| ID | Rule |\n|---|---|\n| KR-01 | One, see KR-02. |\n| KR-02 | Two. |\n";
-    expect([...designRuleIds([md])].sort()).toEqual(["KR-01", "KR-02"]);
+  it("ST-17, RM-01: reads rule IDs as the codec reads clauses — table rows in every section, not prose, Z-blocks or mentions", () => {
+    const md = "# Doc\n\nKR-Z01. Prose about KR-03.\n\n| ID | Rule |\n|---|---|\n| KR-01 | One, see KR-02. |\n| KR-02 | Two. |\n\n## Part\n\n| ID | Rule |\n|---|---|\n| KR-04 | Four. |\n";
+    expect([...designRuleIds([{ name: "doc.md", bytes: new TextEncoder().encode(md) }])].sort()).toEqual(["KR-01", "KR-02", "KR-04"]);
+  });
+
+  it("LG-42: a document of the design the codec refuses fails the audit, named with its rejections", () => {
+    expect(() => designRuleIds([{ name: "doc.md", bytes: new TextEncoder().encode("| KR-01 | One. |\n") }])).toThrow(/doc\.md: LG-42 at \/doc\.md\/1/);
   });
 
   it("ST-17: holds for this repository", async () => {
-    const design = designRuleIds(loadDesignTexts());
+    const design = designRuleIds(loadDesign());
     expect(design.has("ST-17")).toBe(true);
     const registered = await loadRegistered();
     expect(auditCoverage({ registered, folders: loadFolders(), design })).toEqual([]);
