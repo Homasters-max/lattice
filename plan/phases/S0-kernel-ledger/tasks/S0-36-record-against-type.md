@@ -53,6 +53,7 @@ checkAgainstType(record: Pick<Record, "type" | "rev" | "body">, resolve: Resolve
 - Неизвестный тип записи — отказ KR-15 на `/type`, `expected: "a type resolve knows"` (G-28).
 - Чтение схемы — `src/kernel/read-schema.ts`: `typesOf`, `fitsType`, `propertiesOf`, `requiredOf`, `numberOf`, `tagOf`, `branchesOf`, `childrenOf`, `sitesOf`. `Format` — шесть форматов KR-18 и список `FORMATS`; канонические форматы KR-11 — `CanonicalFormat`, их берут `isFormat` и `checkFormat`. Ключ словаря — `SEGMENT` из `ref.ts`.
 - `Resolve` остаётся типом параметра `validate` внутри ядра; снаружи `validate` зовут с функцией `ref → Schema | null`. Из `index.ts` экспортируется `Comparison` — результат `compare`.
+- CONVENTIONS §2: перевод нарушений `validate` в отказы KR-21 называет вход фазы 2 `checkAgainstType` вместо `checkBody`, с одним резолвером тел типов и правилом Q-33.
 
 ## Шаги
 
