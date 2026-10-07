@@ -16,7 +16,7 @@ const ULID = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/;
 
 const isLeap = (year: number): boolean => (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
 
-const DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+const DAYS: readonly number[] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 /** `YYYY-MM-DD`, a day that exists in its month. */
 function isDate(s: string): boolean {
