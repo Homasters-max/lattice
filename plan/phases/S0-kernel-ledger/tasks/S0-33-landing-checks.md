@@ -59,6 +59,7 @@ rules: [LG-09, LG-17, LG-23, LG-24, LG-54, KR-10, ST-17]
 - Новые trigger:
   - `LG-23/trigger/conflict-on-moved-main`;
   - `LG-09/trigger/proposal-file-intent-id-not-string`, `LG-09/trigger/proposal-file-intents-missing` с `path` от корня дерева через `land`;
+  - `LG-09/trigger/proposal-file-intent-without-op` через `land` — отказ про intent со строковым `id` остаётся внутри intent (G-13): `path` `/op`, `intent` `demo/x`;
   - `KR-10/trigger/proposal-file-not-json`, `KR-10/trigger/proposal-file-not-utf8`; pass через `land` — `KR-10/pass/proposal-file`, `LG-09/pass/proposal-file`.
 - Fitness-тесты `coverage.test.ts` и `run.test.ts` остаются зелёными на асинхронном раннере.
 
