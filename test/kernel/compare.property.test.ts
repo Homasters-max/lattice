@@ -55,7 +55,7 @@ const NAMES = ["a", "b", "c"] as const;
 const { schema } = fc.letrec<{ schema: Schema; container: Schema }>((tie) => ({
   schema: fc.oneof({ depthSize: "small", withCrossShrink: true }, nullable(leaf), tie("container")),
   container: fc.oneof(
-    fc.record({ items: tie("schema"), min: optional(count), max: optional(count) }).map((r) => json({ type: "array", items: r.items, minItems: r.min, maxItems: r.max })),
+    fc.record({ items: optional(tie("schema")), min: optional(count), max: optional(count) }).map((r) => json({ type: "array", items: r.items, minItems: r.min, maxItems: r.max })),
     fc.record({ values: tie("schema") }).map((r): Schema => ({ type: "object", values: r.values })),
     fc
       .dictionary(fc.constantFrom(...NAMES), fc.tuple(tie("schema"), fc.boolean()), { maxKeys: 3 })
@@ -96,7 +96,7 @@ const TYPED: { readonly [type: string]: (s: Schema) => fc.Arbitrary<JsonValue> }
   integer: () => fc.integer({ min: -2, max: 3 }),
   number: () => fc.constantFrom(-1.5, -1, 0, 0.5, 1, 2.5),
   boolean: () => fc.boolean(),
-  array: (s) => fc.array(valueOf(s.items ?? null), { maxLength: 3 }),
+  array: (s) => fc.array(s.items === undefined ? fc.constantFrom(...SCALARS) : valueOf(s.items), { maxLength: 3 }),
   object: (s) =>
     s.values !== undefined
       ? fc.dictionary(fc.constantFrom("k", "x"), valueOf(s.values), { maxKeys: 2 })
@@ -165,15 +165,16 @@ function refield(s: Schema, near: (s: Schema) => fc.Arbitrary<Schema>): fc.Arbit
   ];
 }
 
-/** A schema near another: one change, so that a pair often relates. */
+/** A schema near another: one change — `items` dropped among them — so that a pair often relates. */
 function near(s: Schema): fc.Arbitrary<Schema> {
   const inner = (["items", "values"] as const).flatMap((k) => {
     const v = s[k];
     return isJsonObject(v) ? [near(v).map((i): Schema => ({ ...s, [k]: i }))] : [];
   });
+  const any = s.items === undefined ? [] : [fc.constant<Schema>(json({ ...s, items: undefined }))];
   const scalar = typeof s.type === "string" && s.type !== "object" && s.type !== "array";
   const pair = scalar || Array.isArray(s.type) ? [fc.constant<Schema>(json({ ...s, type: Array.isArray(s.type) ? (s.type[0] as JsonValue) : [s.type as string, "null"] }))] : [];
-  return fc.oneof(fc.constant(s), nullable(leaf), ...pair, ...rebound(s), ...inner, ...refield(s, near));
+  return fc.oneof(fc.constant(s), nullable(leaf), ...pair, ...rebound(s), ...inner, ...any, ...refield(s, near));
 }
 
 /** Pairs of schemas the subset admits, each with values drawn from both sides. */

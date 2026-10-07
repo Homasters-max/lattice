@@ -50,7 +50,8 @@ const rows: readonly Row[] = [
   ["narrower: integer within number", { type: "integer", minimum: 0 }, { type: "number" }, "revision", { relation: "narrower", aspects: ["validity"] }],
   ["wider: a type paired with null", { type: ["string", "null"] }, S, "revision", { relation: "wider", aspects: ["validity"] }],
   ["narrower: fewer items", { type: "array", items: S, maxItems: 2 }, { type: "array", items: S }, "revision", { relation: "narrower", aspects: ["validity"] }],
-  ["narrower: narrower items", { type: "array", items: { type: "string", maxLength: 1 } }, { type: "array", items: S }, "revision", { relation: "narrower", aspects: ["validity"] }],
+  ["wider: an array without items admits any item", { type: "array" }, { type: "array", items: S }, "revision", { relation: "wider", aspects: ["validity"] }],
+  ["narrower: narrower items",{ type: "array", items: { type: "string", maxLength: 1 } }, { type: "array", items: S }, "revision", { relation: "narrower", aspects: ["validity"] }],
   ["narrower: narrower map values", { type: "object", values: { type: "integer" } }, { type: "object", values: { type: "number" } }, "revision", { relation: "narrower", aspects: ["validity"] }],
   ["narrower: an optional field made required", object({ a: S }), object({ a: S }, ["a"]), "revision", { relation: "narrower", aspects: ["validity"] }],
   // objects in revision mode are closed
