@@ -48,3 +48,4 @@ validate(value, schema, resolve: (ref) => Schema | null): Violation[] // KR-21; 
 
 - `pattern` сознательно исключён (D30); если тип `std` без него не выражается — это находка для S0-09, а не повод добавить ключевое слово.
 - От S0-04: `format` KR-11 проверяет булев `isFormat(format, s)` из ядра — нарушение `validate` остаётся своим типом (KR-21), а `checkFormat` с отказом KR-11 — для проверок вне схемы.
+- От S0-05: `format: ref` — `parseRef(s)` (`ok` — ссылка, иначе отказ KR-23), `format: uri` — булев `isUri(s)` (KR-24, G-06); для нарушения `validate` берётся булев ответ, `checkUri` с отказом KR-24 — для проверок вне схемы, как `checkFormat`.
