@@ -217,9 +217,9 @@
 | ST-08 | полностью | [S0-28](tasks/S0-28-generate.md) |
 | ST-09 | полностью | [S0-28](tasks/S0-28-generate.md) |
 | ST-11 | полностью | [S0-30](tasks/S0-30-architecture-audit.md) |
-| ST-12 | полностью | [S0-29](tasks/S0-29-e2e-acceptance.md) |
-| ST-17 | полностью | [S0-02](tasks/S0-02-code-conventions.md), [S0-33](tasks/S0-33-landing-checks.md), [S0-35](tasks/S0-35-closed-form.md), [S0-36](tasks/S0-36-record-against-type.md), [S0-37](tasks/S0-37-check-result.md) |
-| ST-13 | полностью | [S0-30](tasks/S0-30-architecture-audit.md) |
+| ST-12 | полностью | [S0-29](tasks/S0-29-e2e-acceptance.md), [S0-39](tasks/S0-39-proof-loop-design.md), [S0-40](tasks/S0-40-tools-tests.md), [S0-41](tasks/S0-41-deterministic-tests.md), [S0-42](tasks/S0-42-verify-levels.md), [S0-43](tasks/S0-43-dl-gate.md) |
+| ST-17 | полностью | [S0-02](tasks/S0-02-code-conventions.md), [S0-33](tasks/S0-33-landing-checks.md), [S0-35](tasks/S0-35-closed-form.md), [S0-36](tasks/S0-36-record-against-type.md), [S0-37](tasks/S0-37-check-result.md), [S0-44](tasks/S0-44-mutate.md) |
+| ST-13 | полностью | [S0-30](tasks/S0-30-architecture-audit.md), [S0-44](tasks/S0-44-mutate.md) |
 | ST-14 | полностью | [S0-30](tasks/S0-30-architecture-audit.md) |
 | ST-15 | полностью | [S0-30](tasks/S0-30-architecture-audit.md) |
 | ST-16 | полностью | [S0-30](tasks/S0-30-architecture-audit.md) |

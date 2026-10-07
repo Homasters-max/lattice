@@ -6,6 +6,12 @@
 |---|---|---|---|---|---|
 | [S0-01](tasks/S0-01-repo-toolchain-ci.md) | Репозиторий, toolchain и CI-каркас | A | ✅ | [#1](https://github.com/Homasters-max/lattice/pull/1) | |
 | [S0-02](tasks/S0-02-code-conventions.md) | Соглашения кода, отказов и фикстур правил | A | ✅ | [#3](https://github.com/Homasters-max/lattice/pull/3) | |
+| [S0-39](tasks/S0-39-proof-loop-design.md) | Контур проверки — правки дизайна | A | ⬜ | | инструмент, разбор #30 |
+| [S0-40](tasks/S0-40-tools-tests.md) | Тесты dev-loop — отдельный project и быстрее | A | ⬜ | | инструмент |
+| [S0-41](tasks/S0-41-deterministic-tests.md) | Детерминизм тестов — seed и бюджет property-тестов | A | ⬜ | | инструмент |
+| [S0-42](tasks/S0-42-verify-levels.md) | Уровни verify — affected и fitness, ratchet ST-18 | A | ⬜ | | инструмент |
+| [S0-43](tasks/S0-43-dl-gate.md) | dl gate — runner цикла и записи run'ов verify | A | ⬜ | | инструмент |
+| [S0-44](tasks/S0-44-mutate.md) | mutate — отчёт мутаций для ревью | A | ⬜ | | инструмент |
 | [S0-03](tasks/S0-03-walking-skeleton.md) | Walking skeleton | B | ✅ | [#5](https://github.com/Homasters-max/lattice/pull/5) | G-14…G-18, Q-09…Q-27 |
 | [S0-32](tasks/S0-32-open-tail.md) | Открытие store на tail main | B | ✅ | [#8](https://github.com/Homasters-max/lattice/pull/8) | разбор S0-03 |
 | [S0-33](tasks/S0-33-landing-checks.md) | Проверки landing до apply | B | ✅ | [#10](https://github.com/Homasters-max/lattice/pull/10) | разбор S0-03, Q-28, Q-29 |
