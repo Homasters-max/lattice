@@ -16,7 +16,10 @@ export const withoutEndSpace = (line: string): string => line.replace(TRAILING, 
 /** LG-42: text that is one line of md — no line break, no carriage return, no space or tab at its end. */
 export const isOneLine = (text: string): boolean => !/[\r\n]/.test(text) && !endsWithSpace(text);
 
-const HEADING = /^(#{1,6}) (.+)$/;
+/** G-25: headings go from level 1, the document's, to level 6. */
+export const DEEPEST_LEVEL = 6;
+
+const HEADING = new RegExp(`^(#{1,${DEEPEST_LEVEL}}) (.+)$`);
 
 /** A heading of level 1…6: its level in `#` and its text after one space. */
 export const headingLine = (level: number, text: string): string => `${"#".repeat(level)} ${text}`;

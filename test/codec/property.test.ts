@@ -61,9 +61,10 @@ const clausesItem: fc.Arbitrary<Item> = fc
 
 const block: fc.Arbitrary<Item> = fc.oneof(proseItem, exampleItem, clausesItem);
 
-/** A section: its blocks and tables, then its subsections, one level deeper. */
+/** A section: its blocks and tables, then its subsections, each one or two levels deeper — which levels md keeps is the model's to say. */
 function section(level: number, depth: number): fc.Arbitrary<Section> {
-  const subs = depth === 0 ? fc.constant([]) : fc.array(section(level + 1, depth - 1), { maxLength: 2 });
+  const sub = fc.integer({ min: 1, max: 2 }).chain((k) => section(level + k, depth - 1));
+  const subs = depth === 0 ? fc.constant([]) : fc.array(sub, { maxLength: 2 });
   return fc
     .tuple(inline, fc.array(block, { maxLength: 4 }), subs)
     .map(([heading, items, inner]): Section => ({ type: "section", heading, level, items: [...items, ...inner] }));

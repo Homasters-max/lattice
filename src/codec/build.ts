@@ -8,6 +8,7 @@
 // document name the row or the item under it (JSON Pointer).
 import { isId, isIdLike, isRuleId, isZBlockId, reject, refused, ROOT, type JsonValue, type Place, type Rejection, type Result, type Rule } from "../kernel/index.js";
 import {
+  DEEPEST_LEVEL,
   FENCE_OPEN_FORM,
   FENCED_TEXT_FORM,
   fenceOpen,
@@ -166,8 +167,6 @@ function levelRefusals(section: Section, above: number, before: number, place: P
   return ok ? [] : [refusal(LG_42, under(place, "/level"), `a level from ${above + 1} to ${before}`, section.level)];
 }
 
-const DEEPEST = 6;
-
 /** LG-42: a heading of its level reads back as it is. */
 function headingRefusals(section: Section, place: Place): Rejection[] {
   const read = readHeading(headingLine(section.level, section.heading));
@@ -182,7 +181,7 @@ function sectionOf(walk: Walk, section: Section, place: Place): void {
   section.items.forEach((item, i) => {
     const at = under(place, `/items/${i}`);
     if (item.type !== "section") return blockOf(walk, item, previous !== null, at);
-    const levels = levelRefusals(item, section.level, previous ?? DEEPEST, at);
+    const levels = levelRefusals(item, section.level, previous ?? DEEPEST_LEVEL, at);
     walk.found.push(...levels);
     if (levels.length === 0) sectionOf(walk, item, at);
     previous = item.level;

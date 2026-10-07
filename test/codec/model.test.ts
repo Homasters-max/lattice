@@ -79,7 +79,7 @@ describe("an ID follows its grammar and its kind (RM-02)", () => {
   });
 });
 
-describe("a document that print does not write back is not built (LG-42)", () => {
+describe("a block that print does not write back is not built (LG-42)", () => {
   it("LG-42: refuses a field after a block whose text does not end with ':'", () => {
     expect(refusals(prose({ text: "AA-Z01. Kinds", field: LIST }))).toEqual([["LG-42", ""]]);
     expect(refusals(clause({ cells: ["AA-01", "Kinds"], field: LIST }))).toEqual([["LG-42", ""]]);
@@ -116,13 +116,21 @@ describe("a document that print does not write back is not built (LG-42)", () =>
     expect(refusals(example({ lang: "Text", id: "AA-Z01", text: "" }))).toEqual([["LG-42", ""]]);
     expect(refusals(example({ lang: "text", id: "AA-Z01", text: "a\n```json\n" }))).toEqual([]);
   });
+});
 
+describe("a document whose sections print does not write back is not built (LG-42)", () => {
   it("LG-42: refuses a block after a subsection, and a subsection not deeper than its section", () => {
     const sub = (level: number): Item => ({ type: "section", heading: "A", level, items: [] });
     expect(refusals(document({ heading: "Doc", items: [sub(2), value(prose({ text: "AA-Z01. x" }))] }))).toEqual([["LG-42", "/items/1"]]);
     expect(refusals(document({ heading: "Doc", items: [sub(1)] }))).toEqual([["LG-42", "/items/0/level"]]);
     expect(refusals(document({ heading: "Doc", items: [{ type: "section", heading: "A", level: 3, items: [sub(3)] }] }))).toEqual([["LG-42", "/items/0/items/0/level"]]);
     expect(refusals(document({ heading: "Doc", items: [sub(7)] }))).toEqual([["LG-42", "/items/0/level"]]);
+  });
+
+  it("LG-42: refuses a subsection deeper than the subsection before it — parse would read it into that one", () => {
+    const sub = (level: number): Item => ({ type: "section", heading: "A", level, items: [] });
+    expect(refusals(document({ heading: "Doc", items: [sub(2), sub(3)] }))).toEqual([["LG-42", "/items/1/level"]]);
+    expect(text([sub(3), sub(2)])).toBe("# Doc\n\n### A\n\n## A\n");
   });
 
   it("LG-42: refuses from the place given, with its intent", () => {
