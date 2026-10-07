@@ -20,6 +20,7 @@ const TYPES: { readonly [ref: string]: JsonValue } = {
   "demo/tree@1": { abstract: true, kind: "entity", schema: { type: "object", properties: { kids: { type: "array", items: { $ref: "demo/tree@1" } } } } },
   "demo/tree@2": { abstract: true, kind: "entity", schema: { type: "object", properties: { kids: { type: "array", items: { $ref: "demo/tree@2" } } } } },
   "demo/odd@1": { abstract: true, kind: "entity", schema: { type: "array", const: [1], items: 5 } },
+  "demo/oddchild@1": { extends: "demo/base@1", abstract: false, kind: "entity", schema: { type: "array", const: [1], items: 5 } },
 };
 
 const resolve: ResolveType = (ref) => (Object.hasOwn(TYPES, ref) ? (TYPES[ref] ?? null) : null);
@@ -75,6 +76,7 @@ const rows: readonly Row[] = [
   ["graph: floating is narrower than any", REF({ pin: "floating" }), REF({ pin: "any" }), "revision", { relation: "narrower", aspects: ["ref"] }],
   ["graph: pinned and floating are incomparable", REF({ pin: "pinned" }), REF({ pin: "floating" }), "revision", { relation: "incomparable", aspects: ["ref"] }],
   ["graph: a subtype as ref.to is narrower", REF({ to: "demo/child@1" }), REF({ to: "demo/base@1" }), "revision", { relation: "narrower", aspects: ["ref"] }],
+  ["graph: a ref.to the kernel does not admit reaches no parent — incomparable (Q-33)", REF({ to: "demo/oddchild@1" }), REF({ to: "demo/base@1" }), "revision", { relation: "incomparable", aspects: ["ref"] }],
   ["graph: an unrelated ref.to is incomparable", REF({ to: "demo/other@1" }), REF({ to: "demo/base@1" }), "revision", { relation: "incomparable", aspects: ["ref"] }],
   ["graph: added unique is narrower", object({ a: { type: "string", unique: true } }), object({ a: S }), "revision", { relation: "narrower", aspects: ["unique"] }],
   ["graph: removed unique is wider", object({ a: S }), object({ a: { type: "string", unique: true } }), "revision", { relation: "wider", aspects: ["unique"] }],
