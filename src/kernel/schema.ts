@@ -137,12 +137,12 @@ function objectRejections(schema: Schema, path: string, intent: string | null): 
 /** KR-18: one branch of a tagged union — an object whose discriminator field is required and holds a `const`. */
 function branchRejections(branch: Schema, discriminator: string, path: string, intent: string | null): Rejection[] {
   if (branch.type !== "object") return [reject(KR_18, { intent, path: pointer(path, "type"), expected: "object", got: branch.type ?? "absent" })];
-  const tag = own(propertiesOf(branch), discriminator);
+  const field = own(propertiesOf(branch), discriminator);
   const required = requiredOf(branch).includes(discriminator);
   return [
-    ...(isJsonObject(tag) && tag.const !== undefined
+    ...(tagOf(branch, discriminator) !== undefined
       ? []
-      : [reject(KR_18, { intent, path: pointer(pointer(path, "properties"), discriminator), expected: "a field with const", got: tag ?? "absent" })]),
+      : [reject(KR_18, { intent, path: pointer(pointer(path, "properties"), discriminator), expected: "a field with const", got: field ?? "absent" })]),
     ...(required ? [] : [reject(KR_18, { intent, path: pointer(path, "required"), expected: `fields that name ${discriminator}`, got: branch.required ?? "absent" })]),
   ];
 }
