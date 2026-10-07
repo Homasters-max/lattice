@@ -1,8 +1,9 @@
 // The kernel version (KR-03), the grammar of ids (KR-06), the header on the
 // surface (KR-04), the form of a rejection (LG-17, CONVENTIONS.md §3) and the
 // hash of bytes (LG-30). Canon, hash and formats are in canon.test.ts,
-// parse.test.ts, formats.test.ts and vectors.test.ts; the full header arrives
-// with S0-05. Every input crosses the module boundary frozen.
+// parse.test.ts, formats.test.ts and vectors.test.ts; the full header is in
+// record.test.ts, references and links in ref.test.ts. Every input crosses the
+// module boundary frozen.
 import { describe, expect, it } from "vitest";
 import { checkHeader, checkId, hashBytes, isEntityId, isUlid, KERNEL_VERSION, parseJson, parseJsonBytes, reject, sortRejections } from "../../src/kernel/index.js";
 import { KR_04, KR_06, RULES } from "../../src/kernel/rules.js";
@@ -73,7 +74,7 @@ describe("rejections (LG-17)", () => {
   });
 
   it("ST-17: registers every rule the kernel enforces once", () => {
-    expect(RULES.map((r) => r.id)).toEqual(["KR-04", "KR-06", "KR-10", "KR-11", "KR-13"]);
+    expect(RULES.map((r) => r.id)).toEqual(["KR-04", "KR-06", "KR-07", "KR-08", "KR-10", "KR-11", "KR-13", "KR-23", "KR-24"]);
   });
 });
 

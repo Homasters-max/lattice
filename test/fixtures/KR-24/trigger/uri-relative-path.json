@@ -1,0 +1,10 @@
+{
+  "check": "uri",
+  "input": {
+    "value": "docs/design/02-kernel.md"
+  },
+  "expect": {
+    "rule": "KR-24",
+    "path": ""
+  }
+}

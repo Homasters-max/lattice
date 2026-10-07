@@ -1,0 +1,6 @@
+{
+  "check": "uri",
+  "input": {
+    "value": "https://example.com/a?b=c#d"
+  }
+}
