@@ -89,6 +89,7 @@ function refused<T>(rejections: readonly Rejection[]): Result<T> | null;  // nul
 
   Имя константы — rule ID с `_` вместо `-`. Один rule ID может стоять в реестрах двух модулей, если правило велит проверять в двух местах (LG-20: landing и recording); повтор той же проверки в другом модуле — обход (`plan/closure-check.md`).
 - **Исключения genesis и store init** (LG-18) тоже называются rule ID — константами реестра `ledger` в отдельном списке `EXEMPTIONS`, не в `RULES`: исключение ничего не отклоняет, фикстур ST-17 у него нет; показывают его тесты init.
+- **Закрытая форма** — объект, у которого каждое поле названо и лишних нет (заголовок record KR-04, тело типа KR-14, `ref` KR-19, commit LG-06, proposal и intent LG-09), — это таблица `Members` по имени поля и вызов `closedRejections(value, members, rule, place)` из `src/kernel/closed-form.ts` (S0-35): лишнее поле — отказ с `expected: "absent"`, член, который не подошёл, — с `expected` из таблицы, путь — JSON Pointer. Общие члены — `STRING`, `NUMBER`, `STRING_OR_NULL`, `JSON_VALUE` того же файла; вложенное проверяет вызывающий отдельным вызовом. Hash подписанной формы берёт поля из той же таблицы — `unsigned(value, members)` в `src/ledger/commit.ts`, без `sig`. Новая закрытая форма (S0-08, S0-13, S0-16, S0-23) — новая таблица, не своя копия проверки полей.
 
 ## 4. Жёсткие проверки и фикстуры
 

@@ -4,9 +4,25 @@
 // `by` is the proposal's session, so it holds no `by`, `rev`, `seq` or `hash`.
 // The session event with its certificate and the chain of TR-12 arrive with
 // S0-16.
-import { canon, compareText, gotOf, hash, isJsonObject, reject, refused, type JsonObject, type JsonValue, type Kind, type Rejection, type Result } from "../kernel/index.js";
+import {
+  canon,
+  closedRejections,
+  compareText,
+  hash,
+  isJsonObject,
+  JSON_VALUE,
+  reject,
+  refused,
+  STRING,
+  type JsonObject,
+  type JsonValue,
+  type Kind,
+  type Member,
+  type Rejection,
+  type Result,
+} from "../kernel/index.js";
 import { signHash, verifyHash, type PublicKey, type SessionKey } from "../trust/index.js";
-import { known } from "./commit.js";
+import { known, unsigned } from "./commit.js";
 import { LG_09, LG_10 } from "./rules.js";
 
 /** The authoring session event (TR-11); its certificate arrives with S0-16. */
@@ -27,50 +43,35 @@ export type Proposal = {
   readonly sig: string | null;
 };
 
-type Field = { readonly expected: string; readonly fits: (v: JsonValue | undefined) => boolean };
-
-const STRING: Field = { expected: "a string", fits: (v) => typeof v === "string" };
-
-const INTENT: { readonly [field in keyof Intent]: Field } = {
+/** LG-09: the members of an intent; no other field. */
+const INTENT: { readonly [field in keyof Intent]: Member } = {
   op: { expected: "entity or event", fits: (v) => v === "entity" || v === "event" },
   id: STRING,
   type: STRING,
   // Whether it is the latest revision is phase 3 of apply (LG-11).
   expected: { expected: "a revision or null", fits: (v) => v === null || typeof v === "number" },
   at: STRING,
-  body: { expected: "a JSON value", fits: (v) => v !== undefined },
+  body: JSON_VALUE,
 };
 
-const PROPOSAL: { readonly [field in keyof Proposal]: Field } = {
+/** LG-09: the members of a proposal; no other field. */
+const PROPOSAL: { readonly [field in keyof Proposal]: Member } = {
   session: { expected: "a session event", fits: (v) => isJsonObject(v) && typeof v.id === "string" },
   intents: { expected: "a list of intents", fits: (v) => Array.isArray(v) },
   // Whether it is a signature (G-10) of the proposal by its session is LG-10.
   sig: { expected: "a signature or null", fits: (v) => v === null || typeof v === "string" },
 };
 
-type Refusal = (name: string, expected: string, got: JsonValue | undefined) => Rejection;
-
-const refusal = (intent: string | null, path: string, expected: string, got: JsonValue | undefined) =>
-  reject(LG_09, { intent, path, expected, got: gotOf(got) });
-
-/** The fields of an object against a closed form: each field of the form fits, and no other field is there. */
-function closed(value: JsonObject, form: { readonly [name: string]: Field }, refuse: Refusal): Rejection[] {
-  const own = Object.entries(form).flatMap(([name, field]) => (field.fits(value[name]) ? [] : [refuse(name, field.expected, value[name])]));
-  const other = Object.keys(value).filter((name) => !Object.hasOwn(form, name));
-  return [...own, ...other.map((name) => refuse(name, "absent", value[name]))];
-}
-
 /** G-13: inside an intent with a string `id` the path is the intent's own; otherwise from `root`, where the proposal sits. */
 function intentRejections(v: JsonValue, i: number, root: string): Rejection[] {
-  if (!isJsonObject(v)) return [refusal(null, `${root}/intents/${i}`, "an intent", v)];
-  const id = typeof v.id === "string" ? v.id : null;
-  const path = (name: string) => (id === null ? `${root}/intents/${i}/${name}` : `/${name}`);
-  return closed(v, INTENT, (name, expected, got) => refusal(id, path(name), expected, got));
+  const at = `${root}/intents/${i}`;
+  if (!isJsonObject(v)) return [reject(LG_09, { intent: null, path: at, expected: "an intent", got: v })];
+  return closedRejections(v, INTENT, LG_09, typeof v.id === "string" ? { intent: v.id, path: "" } : { intent: null, path: at });
 }
 
 function proposalRejections(value: JsonValue, root: string): Rejection[] {
-  if (!isJsonObject(value)) return [refusal(null, root, "a proposal", value)];
-  const own = closed(value, PROPOSAL, (name, expected, got) => refusal(null, `${root}/${name}`, expected, got));
+  if (!isJsonObject(value)) return [reject(LG_09, { intent: null, path: root, expected: "a proposal", got: value })];
+  const own = closedRejections(value, PROPOSAL, LG_09, { intent: null, path: root });
   const intents = Array.isArray(value.intents) ? (value.intents as readonly JsonValue[]) : [];
   return [...own, ...intents.flatMap((v, i) => intentRejections(v, i, root))];
 }
@@ -121,7 +122,7 @@ export function canonicalIntents(intents: readonly Intent[], keyOf: KeyOf): Inte
 
 /** LG-10: the hash of a proposal without `sig`, with intents in canonical order; the proposal is canonical (KR-10) as phase 1 of apply finds it. */
 export function proposalHash(p: Proposal, keyOf: KeyOf): string {
-  return known(hash({ session: p.session, intents: canonicalIntents(p.intents, keyOf) }), "a proposal");
+  return known(hash({ ...unsigned(p, PROPOSAL), intents: canonicalIntents(p.intents, keyOf) }), "a proposal");
 }
 
 /** LG-10: the proposal signed by the key of its session (TR-12): `sig` is the signature of its hash. */

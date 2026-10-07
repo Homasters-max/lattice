@@ -47,8 +47,8 @@ describe("the header of a record (KR-04)", () => {
     const { hash, ...noHash } = record;
     expect([hash, ...checkHeader(deepFreeze({ ...noHash, rev: "1" }), "/0").map((r) => [r.rule, r.path, r.got])]).toEqual([
       "sha256:00",
-      ["KR-04", "/0/rev", "1"],
       ["KR-04", "/0/hash", "absent"],
+      ["KR-04", "/0/rev", "1"],
     ]);
     expect(checkHeader(null, "/0")).toEqual([reject(KR_04, { intent: null, path: "/0", expected: "a record", got: null })]);
     expect(checkHeader(deepFreeze([1]), "/0").map((r) => r.got)).toEqual([[1]]);

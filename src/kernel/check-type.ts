@@ -6,34 +6,22 @@
 // keyword is no field name (G-26). Several parents are no form of `extends`
 // (KR-17). The parents and targets come from the caller (KR-21); one that the
 // caller does not know as a type is refused, since the chain cannot be shown.
+import { closedRejections, type Members } from "./closed-form.js";
 import { compare } from "./compare.js";
-import { gotOf, compareText, isJsonObject, pointer, type JsonObject, type JsonValue } from "./json.js";
+import { compareText, isJsonObject, pointer, type JsonValue } from "./json.js";
 import { isPinned } from "./ref.js";
 import { reject, sortRejections, type Place, type Rejection } from "./rejection.js";
 import { KR_14, KR_15, KR_16, KR_19 } from "./rules.js";
 import { checkSchema, sitesOf, type Schema } from "./schema.js";
 import { chainOf, MAX_DEPTH, readType, type ResolveType, type Type } from "./type.js";
 
-type Member = { readonly expected: JsonValue; readonly fits: (v: JsonValue | undefined) => boolean };
-
-/** KR-14: the members of a type body; `extends` absent means no parent (G-26). */
-const MEMBERS: { readonly [member: string]: Member } = {
+/** KR-14, KR-17: the members of a type body; `extends` absent means no parent (G-26), and several parents are no form of it. */
+const MEMBERS: Members = {
   extends: { expected: "a pinned reference to one parent type, type@n", fits: (v) => v === undefined || (typeof v === "string" && isPinned(v)) },
   abstract: { expected: "a boolean", fits: (v) => typeof v === "boolean" },
   kind: { expected: ["entity", "event"], fits: (v) => v === "entity" || v === "event" },
   schema: { expected: "a schema", fits: (v) => v !== undefined },
 };
-
-/** KR-14, KR-17: no member outside the body, every member in its form. */
-function formRejections(body: JsonObject, place: Place): Rejection[] {
-  const extra = Object.keys(body)
-    .filter((k) => !Object.hasOwn(MEMBERS, k))
-    .map((k) => reject(KR_14, { ...place, path: pointer(place.path, k), expected: "absent", got: gotOf(body[k]) }));
-  const members = Object.entries(MEMBERS)
-    .filter(([k, m]) => !m.fits(body[k]))
-    .map(([k, m]) => reject(KR_14, { ...place, path: pointer(place.path, k), expected: m.expected, got: gotOf(body[k]) }));
-  return [...extra, ...members];
-}
 
 /** KR-16: every `$ref` of the schema names an abstract type the caller knows. */
 function refRejections(schema: Schema, resolve: ResolveType, place: Place): Rejection[] {
@@ -96,7 +84,7 @@ function chainRejections(type: Type, resolve: ResolveType, place: Place): Reject
  */
 export function checkType(body: JsonValue, resolve: ResolveType, place: Place): Rejection[] {
   if (!isJsonObject(body)) return [reject(KR_14, { ...place, expected: "a type body {extends, abstract, kind, schema}", got: body })];
-  const form = formRejections(body, place);
+  const form = closedRejections(body, MEMBERS, KR_14, place);
   const { kind, schema } = body;
   const ofSchema = (kind === "entity" || kind === "event") && schema !== undefined ? checkSchema(schema, kind, { ...place, path: pointer(place.path, "schema") }) : [];
   const type = readType(body);

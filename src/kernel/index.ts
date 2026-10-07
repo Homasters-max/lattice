@@ -3,6 +3,7 @@
 // test/structure/kernel-files.txt (ST-05).
 export { canon } from "./canon.js";
 export { checkRecordType, checkType } from "./check-type.js";
+export { closedRejections, JSON_VALUE, NUMBER, STRING, STRING_OR_NULL, type Member, type Members } from "./closed-form.js";
 export { compare, type Mode, type Relation } from "./compare.js";
 export type { Aspect } from "./compare-shown.js";
 export { checkFormat, isFormat, isUlid, type Format } from "./formats.js";
