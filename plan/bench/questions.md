@@ -42,4 +42,5 @@
 | 34 | Which bytes does the Ed25519 signature of a commit or a proposal sign: the text of the hash or its raw digest? | — | blank | S0-10, G-24 (LG-06 и LG-10 — «signature of the hash», байты не названы) | 2026-10-07 |
 | 35 | How is a signature written in a record? | — | blank | S0-10, G-10 (TR-10 задаёт формат ключа, но не подписи) | 2026-10-07 |
 | 32 | May a paragraph of a design document span several lines? | — | blank | S0-25, G-24 (LG-42 называет пустую строку между блоками, но не форму абзаца; решено: абзац — одна строка) | 2026-10-07 |
-| 33 | How is a list written in a design document, and where may it stand? | lattice/rm-z03, lattice/lg-42 | normal | S0-25, G-24 (синтаксис строки списка не назван; решено: `- <текст>`, один уровень) | 2026-10-07 |
+| 33 | Where may a list stand in a design document? | lattice/rm-z03, lattice/lg-42 | normal | S0-25 | 2026-10-07 |
+| 34 | How is an item of a list written in canonical md? | — | blank | S0-25, G-24 (LG-42 называет списки, но не форму строки; решено: `- <текст>`, один уровень) | 2026-10-07 |

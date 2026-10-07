@@ -24,8 +24,10 @@ const flat = (s: Section): Item[] => s.items.flatMap((i) => (i.type === "section
 const find = (file: string, id: string): Item | undefined => flat(parsed(file)).find((i) => "id" in i && i.id === id);
 
 describe("the reference: docs/design round-trips byte for byte (LG-42, RM-07)", () => {
-  it("LG-42: reads the whole corpus — the 17 files of docs/design", () => {
-    expect(FILES).toHaveLength(17);
+  it("LG-42: reads the whole corpus — README and every document its table RM-Z02 names, 17 files today", () => {
+    const docs = find("README.md", "RM-Z02");
+    const named = docs?.type === "prose" ? (docs.table?.rows ?? []).map((r) => /\]\(([^)]+)\)/.exec(r[0] ?? "")?.[1]) : [];
+    expect(FILES).toEqual(["README.md", ...named].sort());
   });
 
   it.each(FILES)("LG-42, RM-07: print(parse(%s)) is the same bytes", (file) => {

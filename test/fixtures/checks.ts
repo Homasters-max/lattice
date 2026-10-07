@@ -219,10 +219,13 @@ const chain: FixtureCheck = {
   },
 };
 
-/** `input`: `{ text }` — a document in md, parsed as the codec reads it, refused from the root by line (LG-42, RM-01, RM-02). */
+/**
+ * `input`: `{ text }` — a document in md, parsed as the codec reads it, refused from the root by line (LG-42, RM-01,
+ * RM-02) — or `{ bytes }`, the numbers of bytes that are not UTF-8, refused by the kernel's decode (KR-10).
+ */
 const md: FixtureCheck = {
-  enforces: [LG_42.id, RM_01.id, RM_02.id],
-  run: (input) => parse(bytesOf(field(input, "text"))),
+  enforces: [LG_42.id, RM_01.id, RM_02.id, KR_10.id],
+  run: (input) => parse(bytesOf(field(input, "bytes") ?? field(input, "text"))),
 };
 
 type FixtureFile = string | Uint8Array | null;

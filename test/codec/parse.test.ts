@@ -40,6 +40,9 @@ describe("the model of md (RM-Z03)", () => {
     });
   });
 
+});
+
+describe("fields and verbatim text of the model (RM-Z03, LG-42)", () => {
   it("RM-Z03: a table or a list without IDs right after a block ending with ':' is a field of that block", () => {
     const text = md("# Doc", "", "AA-Z01. Formats:", "", "| Name | Form |", "|---|---|", "| a | b |", "", "| ID | Rule |", "|---|---|", "| AA-01 | Kinds: |", "", "- one", "- two `x`");
     const out = read(text);
@@ -103,6 +106,9 @@ describe("non-canonical md is refused, never repaired (LG-42)", () => {
     }
   });
 
+});
+
+describe("non-canonical blocks are refused (LG-42)", () => {
   it("LG-42: refuses a document that does not start with one heading of level 1", () => {
     expect(rules(md("AA-Z01. x"))).toEqual([["LG-42", "/1"]]);
     expect(rules(md("## Doc"))).toEqual([["LG-42", "/1"]]);

@@ -6,7 +6,7 @@ export { checkFormat, isFormat, isUlid, type Format } from "./formats.js";
 export { BODY_LIMIT, hash, hashBytes, hashRecord } from "./hash.js";
 export { compareText, gotOf, isJsonObject, type JsonObject, type JsonValue } from "./json.js";
 export { checkId, isEntityId, type Kind } from "./id.js";
-export { parseJson, parseJsonBytes } from "./parse.js";
+export { decodeUtf8, parseJson, parseJsonBytes } from "./parse.js";
 export { checkHeader, checkRev, type Record } from "./record.js";
 export { formatRef, isPinned, parseRef, type Ref } from "./ref.js";
 export {

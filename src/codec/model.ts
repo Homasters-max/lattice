@@ -9,17 +9,19 @@ export type Table = {
   readonly rows: readonly (readonly string[])[];
 };
 
-/** The field a block carries when its text ends with ":" (RM-Z03): a table or a list, never both (G-24). */
-type Field = { readonly table?: Table; readonly list?: readonly string[] };
+/** The field a block carries when its text ends with ":" (RM-Z03): a table or a list, never both (G-24), or none. */
+export type Field = { readonly table: Table; readonly list?: never } | { readonly table?: never; readonly list: readonly string[] };
+
+type MaybeField = Field | { readonly table?: never; readonly list?: never };
 
 /** A paragraph starting with its ID and a dot; `text` is the paragraph, ID included (RM-Z03). */
-export type Prose = { readonly type: "prose"; readonly id: string; readonly text: string } & Field;
+export type Prose = { readonly type: "prose"; readonly id: string; readonly text: string } & MaybeField;
 
 /** A table row with its ID in the first cell; `cells` are its cells in column order, the ID cell first. */
-export type Clause = { readonly type: "clause"; readonly id: string; readonly cells: readonly string[] } & Field;
+export type Clause = { readonly type: "clause"; readonly id: string; readonly cells: readonly string[] } & MaybeField;
 
 /** A fenced block with an ID after its language; `text` is the bytes between the fences, verbatim (G-24). */
-export type Example = { readonly type: "example"; readonly id: string; readonly lang: string; readonly text: string } & Field;
+export type Example = { readonly type: "example"; readonly id: string; readonly lang: string; readonly text: string } & MaybeField;
 
 /** The header of a table of clauses: the clauses that follow it, up to the next item of another kind, are its rows. */
 export type Header = { readonly type: "header"; readonly cells: readonly string[] };

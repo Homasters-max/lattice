@@ -2,10 +2,8 @@
 // back exactly what `print` wrote — the model is the md format, both ways.
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { parse, print, type Block, type Item, type Section, type Table } from "../../src/codec/index.js";
+import { parse, print, type Block, type Field, type Item, type Section, type Table } from "../../src/codec/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
-
-type Field = { readonly table?: Table; readonly list?: readonly string[] };
 
 const id = fc
   .tuple(fc.constantFrom("AA", "KR", "LG", "RM"), fc.boolean(), fc.integer({ min: 0, max: 99 }))

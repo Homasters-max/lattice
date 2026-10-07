@@ -1,0 +1,10 @@
+{
+  "check": "md",
+  "input": {
+    "bytes": [35, 32, 255, 10]
+  },
+  "expect": {
+    "rule": "KR-10",
+    "path": ""
+  }
+}
