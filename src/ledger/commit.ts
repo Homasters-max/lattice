@@ -1,11 +1,36 @@
 // A `knowledge` commit (LG-06) and the evidence it cites (LG-30). The store
 // keeps a commit as its canonical line (KR-10): the ledger encodes and decodes
 // it, the adapter never parses it, and a line that is not those bytes is
-// refused. A line is read as a commit on the surface — the header fields,
-// their JSON kinds and the header of each record (KR-04). A commit is chained
-// to its predecessor and signed by its land session; `verifyChain` checks the
-// chain and the signatures, which opening a store runs from S0-11 (LG-05).
-import { canon, checkHeader, compareText, gotOf, hash, hashBytes, isJsonObject, KR_10, parseJsonBytes, refuse, refused, reject, type JsonValue, type Record, type Rejection, type Result } from "../kernel/index.js";
+// refused. A line is read as a commit on the surface — the header fields and
+// no other (Q-31), their JSON kinds and the header of each record (KR-04); the
+// hash covers every field but `sig`. A commit is chained to its predecessor
+// and signed by its land session; `verifyChain` checks the chain and the
+// signatures, which opening a store runs from S0-11 (LG-05).
+import {
+  canon,
+  checkHeader,
+  closedRejections,
+  compareText,
+  gotOf,
+  hash,
+  hashBytes,
+  isJsonObject,
+  KR_10,
+  NUMBER,
+  parseJsonBytes,
+  refuse,
+  refused,
+  reject,
+  STRING,
+  STRING_OR_NULL,
+  type JsonObject,
+  type JsonValue,
+  type Member,
+  type Members,
+  type Record,
+  type Rejection,
+  type Result,
+} from "../kernel/index.js";
 import { signHash, verifyHash, type PublicKey, type SessionKey } from "../trust/index.js";
 import { LG_04, LG_05, LG_06 } from "./rules.js";
 
@@ -39,10 +64,17 @@ export type Evidence = {
   readonly bytes: Uint8Array;
 };
 
+/**
+ * LG-06, LG-10: what the hash of a signed closed form covers — every member of its table but `sig`, which signs that
+ * hash. A new member of the form is hashed without a second list.
+ */
+export function unsigned(value: JsonObject, members: Members): JsonObject {
+  return Object.fromEntries(Object.keys(members).flatMap((name) => (name === "sig" || value[name] === undefined ? [] : [[name, value[name]] as const])));
+}
+
 /** LG-06: the hash of a commit, computed without `sig`. */
 export function commitHash(c: Commit): string {
-  const { seq, prev, kernel, base, proposal, proposal_sig, by, at, request, records } = c;
-  return known(hash({ seq, prev, kernel, base, proposal, proposal_sig, by, at, request, records }), "a commit");
+  return known(hash(unsigned(c, COMMIT)), "a commit");
 }
 
 /** G-14: apply knows neither the tail nor the change request; landing chains the commit to the tail (LG-05). */
@@ -88,13 +120,8 @@ export function verifyChain(commits: readonly Commit[], keyOfSession: KeyOfSessi
 /** The line a store keeps for a commit: its canonical JSON. */
 export const encodeCommit = (c: Commit): string => known(canon(c), "a commit");
 
-type Field = { readonly expected: string; readonly fits: (v: JsonValue | undefined) => boolean };
-
-const STRING: Field = { expected: "a string", fits: (v) => typeof v === "string" };
-const NUMBER: Field = { expected: "a number", fits: (v) => typeof v === "number" };
-const STRING_OR_NULL: Field = { expected: "a string or null", fits: (v) => v === null || typeof v === "string" };
-
-const COMMIT: { readonly [field in keyof Commit]: Field } = {
+/** LG-06: the header of a commit and its records; no other field. */
+const COMMIT: { readonly [field in keyof Commit]: Member } = {
   seq: NUMBER,
   prev: STRING_OR_NULL,
   kernel: STRING,
@@ -110,9 +137,7 @@ const COMMIT: { readonly [field in keyof Commit]: Field } = {
 
 function commitRejections(value: JsonValue, path: string): Rejection[] {
   if (!isJsonObject(value)) return [reject(LG_06, { intent: null, path, expected: "a commit", got: gotOf(value) })];
-  const header = Object.entries(COMMIT).flatMap(([name, field]) =>
-    field.fits(value[name]) ? [] : [reject(LG_06, { intent: null, path: `${path}/${name}`, expected: field.expected, got: gotOf(value[name]) })],
-  );
+  const header = closedRejections(value, COMMIT, LG_06, { intent: null, path });
   const records = Array.isArray(value.records) ? (value.records as readonly JsonValue[]) : [];
   return [...header, ...records.flatMap((r, i) => checkHeader(r, `${path}/records/${i}`))];
 }

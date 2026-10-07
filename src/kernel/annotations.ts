@@ -5,10 +5,11 @@
 // array of references too. That `ref.to` names a type and `label` a known
 // edge label is a question of phase 4 (RF-07); positions of `card_order` along
 // the `extends` chain, of the Type check (S0-07).
+import { closedRejections, type Members } from "./closed-form.js";
 import type { Kind } from "./id.js";
-import { gotOf, isJsonObject, pointer, type JsonObject, type JsonValue } from "./json.js";
+import { isJsonObject, pointer, type JsonObject, type JsonValue } from "./json.js";
 import { isPinned } from "./ref.js";
-import { reject, type Rejection } from "./rejection.js";
+import { reject, type Place, type Rejection } from "./rejection.js";
 import { KR_19 } from "./rules.js";
 
 /** Where a schema sits in the schema of a type: a field — required or not — or another place. */
@@ -19,51 +20,40 @@ export type Site = {
   readonly required: boolean;
 };
 
-/** A broken part of an annotation: a member of it, or `null` for the whole, what was expected and what came. */
-type Fault = { readonly key: string | null; readonly expected: JsonValue; readonly got: JsonValue };
-
+/** An annotation: where it may sit, as a refusal names it, and the check of its value, refused at the place of the annotation. */
 type Annotation = {
   readonly on: (site: Site, kind: Kind) => boolean;
   readonly where: string;
-  readonly faults: (value: JsonValue) => readonly Fault[];
+  readonly check: (value: JsonValue, place: Place) => Rejection[];
 };
 
 /** An annotation whose whole value has one form. */
 const one =
   (expected: JsonValue, fits: (v: JsonValue) => boolean) =>
-  (value: JsonValue): readonly Fault[] =>
-    fits(value) ? [] : [{ key: null, expected, got: value }];
+  (value: JsonValue, place: Place): Rejection[] =>
+    fits(value) ? [] : [reject(KR_19, { ...place, expected, got: value })];
 
 const PINS: readonly JsonValue[] = ["pinned", "floating", "any"];
 
-type Member = { readonly expected: JsonValue; readonly fits: (v: JsonValue | undefined) => boolean };
-
 /** KR-19: `ref: {to, pin, label}` — every member present, nothing else. */
-const REF: { readonly [member: string]: Member } = {
+const REF: Members = {
   to: { expected: "a pinned reference to a type, type@n", fits: (v) => typeof v === "string" && isPinned(v) },
   pin: { expected: PINS, fits: (v) => v !== undefined && PINS.includes(v) },
   label: { expected: "an edge label", fits: (v) => typeof v === "string" },
 };
 
-function refFaults(value: JsonValue): readonly Fault[] {
-  if (!isJsonObject(value)) return [{ key: null, expected: "{to, pin, label}", got: value }];
-  const extra = Object.keys(value)
-    .filter((k) => !Object.hasOwn(REF, k))
-    .map((k): Fault => ({ key: k, expected: "absent", got: gotOf(value[k]) }));
-  const members = Object.entries(REF)
-    .filter(([k, m]) => !m.fits(value[k]))
-    .map(([k, m]): Fault => ({ key: k, expected: m.expected, got: gotOf(value[k]) }));
-  return [...extra, ...members];
+function checkRef(value: JsonValue, place: Place): Rejection[] {
+  return isJsonObject(value) ? closedRejections(value, REF, KR_19, place) : [reject(KR_19, { ...place, expected: "{to, pin, label}", got: value })];
 }
 
 const isField = (s: Site): boolean => s.site === "field";
 
 const ANNOTATIONS: { readonly [name: string]: Annotation } = {
-  ref: { on: (s) => s.schema.format === "ref", where: "a format: ref schema", faults: refFaults },
-  edge: { on: (s) => s.schema.format === "uri", where: "a format: uri schema", faults: one("an edge label", (v) => typeof v === "string") },
-  unique: { on: (s) => isField(s) && s.required, where: "a required field", faults: one(true, (v) => v === true) },
-  key: { on: (s, kind) => isField(s) && s.required && kind === "event", where: "a required field of an event type", faults: one(true, (v) => v === true) },
-  card_order: { on: isField, where: "a field", faults: one("an integer", (v) => typeof v === "number" && Number.isSafeInteger(v)) },
+  ref: { on: (s) => s.schema.format === "ref", where: "a format: ref schema", check: checkRef },
+  edge: { on: (s) => s.schema.format === "uri", where: "a format: uri schema", check: one("an edge label", (v) => typeof v === "string") },
+  unique: { on: (s) => isField(s) && s.required, where: "a required field", check: one(true, (v) => v === true) },
+  key: { on: (s, kind) => isField(s) && s.required && kind === "event", where: "a required field of an event type", check: one(true, (v) => v === true) },
+  card_order: { on: isField, where: "a field", check: one("an integer", (v) => typeof v === "number" && Number.isSafeInteger(v)) },
 };
 
 /** KR-19: whether a key of a schema is an annotation. */
@@ -87,7 +77,5 @@ export function annotationRejections(site: Site, key: string, kind: Kind, intent
   if (annotation === undefined) throw new Error(`bug: ${key} is not an annotation of KR-19`);
   const path = pointer(site.path, key);
   if (!annotation.on(site, kind)) return [reject(KR_19, { intent, path, expected: annotation.where, got: placeOf(site, kind) })];
-  return annotation
-    .faults(site.schema[key] ?? null)
-    .map((f) => reject(KR_19, { intent, path: f.key === null ? path : pointer(path, f.key), expected: f.expected, got: f.got }));
+  return annotation.check(site.schema[key] ?? null, { intent, path });
 }

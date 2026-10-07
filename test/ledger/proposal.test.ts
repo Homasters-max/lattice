@@ -106,14 +106,6 @@ describe("canonical order and the hash of a proposal (LG-06, LG-10, G-03)", () =
     );
   });
 
-  it("LG-10: the hash covers every member of the proposal but sig", () => {
-    const base = proposal([entity("demo/a")]);
-    const changed: Partial<Proposal> = { session: { id: "01JB2X00000000000000000OTH" }, intents: [] };
-    expect(Object.keys(changed).sort()).toEqual(Object.keys(base).filter((k) => k !== "sig").sort());
-    for (const [name, value] of Object.entries(changed)) expect(proposalHash({ ...base, [name]: value }, NO_FACTS)).not.toBe(proposalHash(base, NO_FACTS));
-    expect(proposalHash({ ...base, sig: "ed25519:other" }, NO_FACTS)).toBe(proposalHash(base, NO_FACTS));
-  });
-
   it("LG-10: the hash leaves out sig", () => {
     const { key } = testKey("alice");
     const unsigned = proposal([entity("demo/a")]);
@@ -127,6 +119,16 @@ describe("canonical order and the hash of a proposal (LG-06, LG-10, G-03)", () =
 
   it("LG-10: the hash changes with a byte of an intent", () => {
     expect(proposalHash(proposal([entity("demo/a")]), NO_FACTS)).not.toBe(proposalHash(proposal([entity("demo/b")]), NO_FACTS));
+  });
+});
+
+describe("the members of a proposal under its hash (LG-10)", () => {
+  it("LG-10: the hash covers every member of the proposal but sig", () => {
+    const base = proposal([entity("demo/a")]);
+    const changed: Partial<Proposal> = { session: { id: "01JB2X00000000000000000OTH" }, intents: [] };
+    expect(Object.keys(changed).sort()).toEqual(Object.keys(base).filter((k) => k !== "sig").sort());
+    for (const [name, value] of Object.entries(changed)) expect(proposalHash({ ...base, [name]: value }, NO_FACTS)).not.toBe(proposalHash(base, NO_FACTS));
+    expect(proposalHash({ ...base, sig: "ed25519:other" }, NO_FACTS)).toBe(proposalHash(base, NO_FACTS));
   });
 });
 

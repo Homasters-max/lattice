@@ -41,25 +41,6 @@ describe("the chain of knowledge commits (LG-04, LG-05, LG-06)", () => {
     expect(commitHash({ ...first!, sig: null })).toBe(commitHash(first!));
   });
 
-  it("LG-06: the hash covers every member of the commit but sig", () => {
-    const [first] = chain();
-    const changed: Partial<Commit> = {
-      seq: 9,
-      prev: `sha256:${"1".repeat(64)}`,
-      kernel: "9",
-      base: 9,
-      proposal: `sha256:${"2".repeat(64)}`,
-      proposal_sig: "ed25519:other",
-      by: "01JB2X00000000000000000OTH",
-      at: "2026-10-07T00:00:00.000000Z",
-      request: "https://example.org/pull/1",
-      records: [],
-    };
-    expect(Object.keys(changed).sort()).toEqual(Object.keys(first!).filter((k) => k !== "sig").sort());
-    for (const [name, value] of Object.entries(changed)) expect(commitHash({ ...first!, [name]: value })).not.toBe(commitHash(first!));
-    expect(commitHash({ ...first!, sig: "ed25519:other" })).toBe(commitHash(first!));
-  });
-
   it("LG-04: refuses a hole in seq and a seq that does not start at 1", () => {
     expect(refusals(resigned(chain(), 3, { seq: 4 }))).toEqual([["LG-04", `${ROOT}/3/seq`]]);
     const [first] = chain();
@@ -132,5 +113,26 @@ describe("the signatures of knowledge commits (LG-06)", () => {
     const [rejection] = verifyChain(withCommit(commits, 1, { ...commits[0]!, sig: null }), keyOfLand, ROOT);
     expect(rejection?.expected).toEqual({ hash: commitHash(commits[0]!), key: LAND_KEY.publicKey });
     expect(rejection?.got).toBeNull();
+  });
+});
+
+describe("the hash of a commit (LG-06)", () => {
+  it("LG-06: the hash covers every member of the commit but sig", () => {
+    const [first] = chain();
+    const changed: Partial<Commit> = {
+      seq: 9,
+      prev: `sha256:${"1".repeat(64)}`,
+      kernel: "9",
+      base: 9,
+      proposal: `sha256:${"2".repeat(64)}`,
+      proposal_sig: "ed25519:other",
+      by: "01JB2X00000000000000000OTH",
+      at: "2026-10-07T00:00:00.000000Z",
+      request: "https://example.org/pull/1",
+      records: [],
+    };
+    expect(Object.keys(changed).sort()).toEqual(Object.keys(first!).filter((k) => k !== "sig").sort());
+    for (const [name, value] of Object.entries(changed)) expect(commitHash({ ...first!, [name]: value })).not.toBe(commitHash(first!));
+    expect(commitHash({ ...first!, sig: "ed25519:other" })).toBe(commitHash(first!));
   });
 });

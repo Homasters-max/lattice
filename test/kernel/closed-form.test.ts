@@ -21,11 +21,11 @@ describe("the closed form of an object", () => {
     expect([check({ name: "a", count: 1 }), check({ name: "a" })]).toEqual([[], []]);
   });
 
-  it("refuses a field outside the table: expected absent, got the value that came", () => {
+  it("LG-17: refuses a field outside the table: expected absent, got the value that came", () => {
     expect(check({ name: "a", seq: 3 })).toEqual([reject(KR_04, { ...ROOT, path: "/0/seq", expected: "absent", got: 3 })]);
   });
 
-  it("refuses a member not of its kind with what the table expects, and a missing one as absent", () => {
+  it("LG-17: refuses a member not of its kind with what the table expects, and a missing one as absent", () => {
     expect(check({ name: 1, count: "x" })).toEqual([
       reject(KR_04, { ...ROOT, path: "/0/count", expected: "a number or absent", got: "x" }),
       reject(KR_04, { ...ROOT, path: "/0/name", expected: "a string", got: 1 }),
@@ -33,17 +33,17 @@ describe("the closed form of an object", () => {
     expect(check({})).toEqual([reject(KR_04, { ...ROOT, path: "/0/name", expected: "a string", got: "absent" })]);
   });
 
-  it("Q-32: escapes / and ~ in the name of a field (RFC 6901)", () => {
+  it("LG-17: the path is a JSON Pointer — / and ~ in the name of a field escaped (Q-32)", () => {
     expect(check({ name: "a", "a/b~c": 1 })).toEqual([reject(KR_04, { ...ROOT, path: "/0/a~1b~0c", expected: "absent", got: 1 })]);
   });
 
-  it("refuses in the order of CONVENTIONS.md §5, whatever the order of the fields", () => {
+  it("LG-17: refuses in the order of CONVENTIONS.md §5, whatever the order of the fields", () => {
     const got = check({ z: 1, count: "x", b: 2 });
     expect(got).toEqual(sortRejections(got));
     expect(got.map((r) => r.path)).toEqual(["/0/b", "/0/count", "/0/name", "/0/z"]);
   });
 
-  it("refuses by the caller's rule, about the caller's intent, from the caller's path", () => {
+  it("LG-17: refuses by the caller's rule, about the caller's intent, from the caller's path", () => {
     const place = { intent: "demo/a", path: "/body" };
     expect(closedRejections(deepFreeze({ name: "a", extra: true }), MEMBERS, KR_14, place)).toEqual([
       reject(KR_14, { ...place, path: "/body/extra", expected: "absent", got: true }),

@@ -8,6 +8,7 @@
 // (KR-07, PR-01), `by` is the ULID of the event that wrote the record (KR-08)
 // and `at` a canonical date-time (KR-11) the kernel gives no meaning (KR-09).
 // Whether `hash` is the hash of the record (KR-12) is not a matter of its form.
+import { closedRejections, JSON_VALUE, STRING, type Member } from "./closed-form.js";
 import { checkFormat, isUlid } from "./formats.js";
 import { checkId, type Kind } from "./id.js";
 import { gotOf, isJsonObject, type JsonObject, type JsonValue } from "./json.js";
@@ -26,35 +27,18 @@ export type Record = {
   readonly body: JsonValue;
 };
 
-type Field = { readonly expected: string; readonly fits: (v: JsonValue | undefined) => boolean };
-
-const STRING: Field = { expected: "a string", fits: (v) => typeof v === "string" };
-
 /** A revision: an integer from 1 (G-12), safe as every JSON integer (G-20). */
 const isRevision = (v: JsonValue | undefined): boolean => typeof v === "number" && Number.isSafeInteger(v) && v >= 1;
 
-const HEADER: { readonly [field in keyof Record]-?: Field } = {
+const HEADER: { readonly [field in keyof Record]-?: Member } = {
   id: STRING,
   rev: { expected: "a revision — an integer from 1 — or absent", fits: (v) => v === undefined || isRevision(v) },
   type: STRING,
   hash: STRING,
   by: STRING,
   at: STRING,
-  body: { expected: "a JSON value", fits: (v) => v !== undefined },
+  body: JSON_VALUE,
 };
-
-const isHeaderField = (name: string): boolean => Object.hasOwn(HEADER, name);
-
-/** KR-04: no field outside the header, and every field of the header of its JSON kind. */
-function form(value: JsonObject, path: string): Rejection[] {
-  const extra = Object.keys(value)
-    .filter((name) => !isHeaderField(name))
-    .map((name) => reject(KR_04, { intent: null, path: `${path}/${name}`, expected: "absent", got: gotOf(value[name]) }));
-  const fields = Object.entries(HEADER).flatMap(([name, field]) =>
-    field.fits(value[name]) ? [] : [reject(KR_04, { intent: null, path: `${path}/${name}`, expected: field.expected, got: gotOf(value[name]) })],
-  );
-  return [...extra, ...fields];
-}
 
 /** KR-07: `type` is a pinned reference `type@n` — an entity with a revision and no fragment. */
 function checkType(type: string, path: string): Rejection[] {
@@ -79,7 +63,7 @@ function grammar(value: JsonObject, path: string, kind: Kind): Rejection[] {
  */
 export function checkHeader(value: JsonValue, path: string): Rejection[] {
   if (!isJsonObject(value)) return [reject(KR_04, { intent: null, path, expected: "a record", got: gotOf(value) })];
-  return [...form(value, path), ...grammar(value, path, value.rev === undefined ? "event" : "entity")];
+  return [...closedRejections(value, HEADER, KR_04, { intent: null, path }), ...grammar(value, path, value.rev === undefined ? "event" : "entity")];
 }
 
 /** KR-04, KR-05: `rev` is present exactly when the kind of the record's type is entity, refused at the place the caller names. */

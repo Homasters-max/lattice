@@ -3,6 +3,7 @@
 src/kernel/annotations.ts
 src/kernel/canon.ts
 src/kernel/check-type.ts
+src/kernel/closed-form.ts
 src/kernel/compare-annotations.ts
 src/kernel/compare-shown.ts
 src/kernel/compare-values.ts
