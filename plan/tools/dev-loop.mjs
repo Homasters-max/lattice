@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // dev-loop: инструмент оркестратора /dev-loop (plan/dev-loop.md). Каждая команда печатает одну строку JSON.
 //   scope <base> [<head>] [--delta] [--main <ref>]          режим и оси круга
-//   start (--task T | --pr N) [--root R]                      старт или продолжение: PR, worktree, npm ci, следующий шаг
+//   start (--task T | --pr N) [--root R]                      старт или продолжение: копия на main, PR, worktree, npm ci, следующий шаг
 //   brief executor --dir D --task T --worktree W [--owner текст]
 //   init --dir D --task T (--from executor.out.json | --pr N --branch B)
 //   wave --dir D --worktree W [--conflicts a,b]               следующий круг: briefs агентов
@@ -16,7 +16,7 @@
 // Файлы цикла в D: state.json, waves/<n>/<агент>.in.json и .out.json, waves/<n>/scope.json, comments/<NN>-<вид>.md.
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { check, FIXER_JOBS } from "./dev-loop/protocol.mjs";
 import { answer, decision, escalation, final, parseHeader, questions, review } from "./dev-loop/render.mjs";
 import { changedLines, scope } from "./dev-loop/scope.mjs";
@@ -257,10 +257,36 @@ function lastBrief(loop) {
   return found.length === 1 ? found[0] : null;
 }
 
+// Рабочая копия владельца, откуда запущен start, — на свежий main, если это ничего не теряет: копия чистая
+// и стоит на main или на ветке со смерженным PR. Иначе копия не трогается, а why говорит почему.
+function syncCopy(repo) {
+  const run = (...args) => git(repo, ...args);
+  const behind = () => Number(run("rev-list", "--count", "HEAD..origin/main"));
+  if (resolve(repo, run("rev-parse", "--git-dir")) !== resolve(repo, run("rev-parse", "--git-common-dir")))
+    return { branch: null, synced: false, behind: null, why: "start запущен не из главной рабочей копии" };
+  const branch = run("branch", "--show-current");
+  const stay = (why) => ({ branch: branch || null, synced: false, behind: behind(), why });
+  if (run("status", "--porcelain") !== "") return stay("в копии есть изменения");
+  if (!branch) return stay("копия не на ветке");
+  try {
+    if (branch !== "main") {
+      const merged = gh("pr", "list", "--head", branch, "--state", "merged", "--json", "number").length > 0;
+      if (!merged) return stay(`PR ветки ${branch} не смержен`);
+      if (run("rev-list", "--count", "origin/main..HEAD") !== "0") return stay(`в ветке ${branch} есть коммиты вне origin/main`);
+      run("checkout", "-q", "main");
+    }
+    run("merge", "-q", "--ff-only", "origin/main");
+  } catch (e) {
+    return stay(`git: ${String(e.stderr ?? e.message).trim().split("\n")[0]}`);
+  }
+  return { branch: "main", synced: true, behind: 0, from: branch === "main" ? undefined : branch };
+}
+
 // Старт или продолжение цикла: PR задачи, worktree, зависимости, состояние и следующий шаг.
 function start() {
   const repo = git(".", "rev-parse", "--show-toplevel");
   git(repo, "fetch", "-q", "origin");
+  const copy = syncCopy(repo);
   const pr = findPr();
   const task = flags.task ?? /^(S\d-\d{2})\b/.exec(pr?.title ?? "")?.[1] ?? null;
   const loop = flags.dir ?? join(flags.root ?? join("D:/tmp", repo.split("/").at(-1), "dev-loop"), task ?? `pr-${pr.number}`);
@@ -283,7 +309,7 @@ function start() {
       route = { entry: "none", next: "gate" };
     } else if (route.entry === "none") route = { entry: "none", next: "executor" };
   }
-  print({ ok: true, task, pr: pr?.number ?? null, branch: pr?.headRefName ?? null, dir: loop, work, created, interrupted, brief: interrupted ? lastBrief(loop) : null, ...route });
+  print({ ok: true, task, pr: pr?.number ?? null, branch: pr?.headRefName ?? null, dir: loop, work, created, interrupted, brief: interrupted ? lastBrief(loop) : null, copy, ...route });
 }
 
 const commands = {
