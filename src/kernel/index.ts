@@ -8,7 +8,7 @@ export { compareText, gotOf, isJsonObject, type JsonObject, type JsonValue } fro
 export { checkId, isEntityId, type Kind } from "./id.js";
 export { parseJson, parseJsonBytes } from "./parse.js";
 export { checkHeader, checkRev, type Record } from "./record.js";
-export { formatRef, parseRef, type Ref } from "./ref.js";
+export { formatRef, isPinned, parseRef, type Ref } from "./ref.js";
 export {
   refuse,
   refused,
@@ -20,6 +20,8 @@ export {
   type Result,
   type Rule,
 } from "./rejection.js";
-export { KR_04, KR_06, KR_07, KR_08, KR_10, KR_11, KR_13, KR_23, KR_24, RULES } from "./rules.js";
+export { KR_04, KR_06, KR_07, KR_08, KR_10, KR_11, KR_13, KR_18, KR_19, KR_21, KR_23, KR_24, RULES } from "./rules.js";
+export { checkSchema, type Schema } from "./schema.js";
 export { checkUri, isUri } from "./uri.js";
+export { checkBody, validate, type Resolve, type Violation, type Violations } from "./validate.js";
 export { KERNEL_VERSION } from "./version.js";

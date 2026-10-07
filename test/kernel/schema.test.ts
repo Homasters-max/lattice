@@ -171,6 +171,14 @@ describe("tagged unions (KR-18)", () => {
     expect(union(branch("a"), branch("b", { required: [] }))).toEqual([["KR-18", "/oneOf/1/required"]]);
     expect(union(branch("a"), branch("a"))).toEqual([["KR-18", "/oneOf/1/properties/kind/const"]]);
   });
+
+  it("KR-18: reads only the schema's own members — a discriminator named constructor is absent from a branch without it", () => {
+    const out = checkSchema(deepFreeze({ oneOf: [{ type: "object", properties: {}, required: [] }], discriminator: "constructor" }), "entity", ROOT);
+    expect(out.map((r) => [r.path, r.got])).toEqual([
+      ["/oneOf/0/properties/constructor", "absent"],
+      ["/oneOf/0/required", []],
+    ]);
+  });
 });
 
 describe("cardinality (KR-20)", () => {

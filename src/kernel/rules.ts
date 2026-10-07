@@ -37,6 +37,21 @@ export const KR_13 = {
   message: { en: "a body is at most {expected} bytes of canonical UTF-8, a limit of the kernel version; got {got}" },
 } as const satisfies Rule;
 
+export const KR_18 = {
+  id: "KR-18",
+  message: { en: "a schema holds only the keywords of the closed subset, each where it applies and in its form; expected {expected}, got {got}" },
+} as const satisfies Rule;
+
+export const KR_19 = {
+  id: "KR-19",
+  message: { en: "an annotation sits only where the closed subset puts it, in its form; expected {expected}, got {got}" },
+} as const satisfies Rule;
+
+export const KR_21 = {
+  id: "KR-21",
+  message: { en: "a body is valid against the schema of its type; expected {expected}, got {got}" },
+} as const satisfies Rule;
+
 export const KR_23 = {
   id: "KR-23",
   message: { en: "a reference is id, id@n or the ULID of an event, with an optional fragment #seg/seg/…; got {got}" },
@@ -47,4 +62,4 @@ export const KR_24 = {
   message: { en: "an external link is an absolute URI, with a scheme; got {got}" },
 } as const satisfies Rule;
 
-export const RULES: readonly Rule[] = [KR_04, KR_06, KR_07, KR_08, KR_10, KR_11, KR_13, KR_23, KR_24];
+export const RULES: readonly Rule[] = [KR_04, KR_06, KR_07, KR_08, KR_10, KR_11, KR_13, KR_18, KR_19, KR_21, KR_23, KR_24];

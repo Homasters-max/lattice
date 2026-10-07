@@ -112,6 +112,14 @@ describe("oneOf and $ref (KR-21)", () => {
     expect(violations("a", union)).toEqual([["", "oneOf"]]);
   });
 
+  it("KR-21: reads only the value's own members — a discriminator named constructor is absent from {}", () => {
+    const named = { oneOf: [{ type: "object", properties: { constructor: { const: "a" } }, required: ["constructor"] }], discriminator: "constructor" };
+    expect(validate(deepFreeze({}), deepFreeze(named), NONE)).toEqual({
+      ok: false,
+      violations: [{ path: "/constructor", keyword: "discriminator", expected: ["a"], got: "absent" }],
+    });
+  });
+
   it("KR-21: $ref is resolved by the caller's function; an unknown target is a violation", () => {
     const shape = { type: "object", properties: { n: { type: "integer" } }, required: ["n"] };
     const resolve = (ref: string) => (ref === "demo/shape@1" ? shape : null);

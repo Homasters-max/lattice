@@ -58,6 +58,15 @@ export function parseRef(s: string, place: Place = ROOT): Result<Ref> {
   return { ok: true, value: fragment === undefined ? target : { ...target, fragment } };
 }
 
+/**
+ * KR-07, KR-18, KR-19: a pinned reference `id@n` to an entity, with no fragment — how the type of a record, a `$ref`
+ * and the `to` of a `ref` annotation name a type.
+ */
+export function isPinned(s: string): boolean {
+  const ref = parseRef(s);
+  return ref.ok && ref.value.kind === "entity" && ref.value.rev !== undefined && ref.value.fragment === undefined;
+}
+
 /** KR-23: the string of a reference; `formatRef(parseRef(s))` is `s`. */
 export function formatRef(r: Ref): string {
   const rev = r.kind === "entity" && r.rev !== undefined ? `@${r.rev}` : "";

@@ -11,7 +11,7 @@
 import { checkFormat, isUlid } from "./formats.js";
 import { checkId, type Kind } from "./id.js";
 import { gotOf, isJsonObject, type JsonObject, type JsonValue } from "./json.js";
-import { parseRef } from "./ref.js";
+import { isPinned } from "./ref.js";
 import { reject, type Place, type Rejection } from "./rejection.js";
 import { KR_04, KR_07, KR_08 } from "./rules.js";
 
@@ -58,9 +58,7 @@ function form(value: JsonObject, path: string): Rejection[] {
 
 /** KR-07: `type` is a pinned reference `type@n` — an entity with a revision and no fragment. */
 function checkType(type: string, path: string): Rejection[] {
-  const ref = parseRef(type);
-  const pinned = ref.ok && ref.value.kind === "entity" && ref.value.rev !== undefined && ref.value.fragment === undefined;
-  return pinned ? [] : [reject(KR_07, { intent: null, path: `${path}/type`, expected: "type@n", got: type })];
+  return isPinned(type) ? [] : [reject(KR_07, { intent: null, path: `${path}/type`, expected: "type@n", got: type })];
 }
 
 /** KR-06, KR-07, KR-08, KR-11: the grammar of every string field; a field that is no string KR-04 refuses already. */
