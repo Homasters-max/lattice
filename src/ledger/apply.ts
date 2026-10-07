@@ -1,11 +1,12 @@
 // Apply (LG-14): the only path into `knowledge`, a pure function
 // `apply(before, proposal, acts, evidence) → commit | no-op | rejections`. The
-// walking skeleton has phase 1 with the id check (KR-06), reports `no-op` for
-// a proposal without intents (LG-12, LG-54) and forms the candidate commit
+// walking skeleton has phase 1 with the id check (KR-06) and, from S0-04, the
+// canonical form (KR-10) and the body limit (KR-13); it reports `no-op` for a
+// proposal without intents (LG-12, LG-54) and forms the candidate commit
 // (LG-15); the phases of LG-16, the no-op intents of LG-13 and the idempotence
 // of LG-12 arrive with S0-13…S0-18.
-import { checkId, hashRecord, KERNEL_VERSION, refused, type Record, type Result } from "../kernel/index.js";
-import type { Commit, Evidence } from "./commit.js";
+import { canon, checkId, hashRecord, KERNEL_VERSION, refused, type Record, type Rejection, type Result } from "../kernel/index.js";
+import { known, type Commit, type Evidence } from "./commit.js";
 import type { Act } from "./ports/acts.js";
 import { canonicalIntents, proposalHash, type Intent, type Proposal } from "./proposal.js";
 import type { View } from "./view.js";
@@ -17,7 +18,7 @@ export type LandActs = {
 };
 
 function recordOf(before: View, proposal: Proposal, i: Intent): Record {
-  const head = { id: i.id, type: i.type, hash: hashRecord(i.type, i.body), by: proposal.session.id, at: i.at, body: i.body };
+  const head = { id: i.id, type: i.type, hash: known(hashRecord(i.type, i.body), "a record"), by: proposal.session.id, at: i.at, body: i.body };
   return i.op === "entity" ? { ...head, rev: (before.current(i.id)?.rev ?? 0) + 1 } : head;
 }
 
@@ -42,8 +43,24 @@ function candidate(before: View, proposal: Proposal, acts: LandActs): Commit {
   };
 }
 
-/** Phase 1, Record: the id of every intent (KR-06). */
-const phaseRecord = (p: Proposal) => p.intents.flatMap((i) => checkId(i.op, i.id, { intent: i.id, path: "/id" }));
+const refusals = (r: Result<string>): readonly Rejection[] => (r.ok ? [] : r.rejections);
+
+/** KR-10, KR-12, KR-13: an intent in canonical form, inside it (G-13); then its record within the body limit. */
+function canonicalIntent(i: Intent): readonly Rejection[] {
+  const place = { intent: i.id, path: "" };
+  const form = canon(i, place);
+  return form.ok ? refusals(hashRecord(i.type, i.body, place)) : form.rejections;
+}
+
+/**
+ * Phase 1, Record (LG-16): the id of every intent (KR-06); the proposal in canonical form (KR-10) — the session and
+ * the signature from its root, each intent inside it — and every body within the limit (KR-13). After it, all that
+ * the commit is formed of is canonical.
+ */
+function phaseRecord(p: Proposal): Rejection[] {
+  const { intents, ...rest } = p;
+  return [...refusals(canon(rest)), ...intents.flatMap((i) => [...checkId(i.op, i.id, { intent: i.id, path: "/id" }), ...canonicalIntent(i)])];
+}
 
 /** LG-14: what apply ends with when it refuses nothing — a commit, or `no-op` when no intent changes knowledge. */
 type Applied = Commit | "no-op";

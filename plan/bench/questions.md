@@ -28,3 +28,6 @@
 | 20 | How does landing end for a change request whose proposal has no intents? | lattice/lg-54, lattice/lg-25, lattice/lg-12 | normal | S0-03, ревью волна 3 | 2026-10-06 |
 | 21 | How does landing end for a change request that edited store/knowledge.jsonl when main has moved and the merge conflicts at that file? | — | blank | S0-33, Q-28 (LG-23 и LG-24 молчат; решено: отказ LG-23) | 2026-10-07 |
 | 22 | From which root is the path of a rejection of landing counted? | — | blank | S0-33, Q-29 (G-13 — «от корня входа», вход landing не назван; решено: дерево change request) | 2026-10-07 |
+| 23 | Is the integer 2^53 itself admitted into the canonical form? | — | blank | S0-04, G-20 (KR-10 «outside ±2^53» не говорит о границе; I-JSON и RFC 8785 — до 2^53−1) | 2026-10-07 |
+| 24 | Does a date-time admit a leap second? | — | blank | S0-04, G-21 (KR-11 задаёт написание, но не диапазон) | 2026-10-07 |
+| 25 | Which numbers does the canonical form refuse? | lattice/kr-10 | normal | S0-04 | 2026-10-07 |

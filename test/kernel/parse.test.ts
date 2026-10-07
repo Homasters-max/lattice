@@ -25,6 +25,9 @@ describe("the strict parse (KR-10)", () => {
     for (const text of texts) expect([text, where(parseJson(text, "/f"))]).toEqual([text, [["KR-10", "/f", "a JSON text", text]]]);
   });
 
+});
+
+describe("the strict parse refuses inside the value (KR-10)", () => {
   it("KR-10: refuses a duplicate key at the member, never keeping one of them", () => {
     expect(where(parseJson('{"a": 1, "b": {"c": 1, "c": 2}, "a": 3}', "/f"))).toEqual([
       ["KR-10", "/f/a", "a key once", "a"],

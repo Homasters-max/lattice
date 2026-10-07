@@ -4,7 +4,7 @@ title: Canon, hash и канонические форматы
 phase: S0
 stage: C
 size: M
-modules: [kernel]
+modules: [kernel, ledger]
 depends: [S0-33, S0-34]
 rules: [KR-10, KR-11, KR-12, KR-13]
 ---
@@ -28,11 +28,17 @@ Hash каждой записи, proposal и коммита считается о
 
 ## Интерфейс
 
+Как сделано (`Result` и `Rejection` — `CONVENTIONS.md` §2–3; `place` — `{intent, path}`, по умолчанию корень входа, G-13):
+
 ```ts
-parseStrict(text: string): Result<JsonValue, Violation[]>   // KR-10
-canon(value: JsonValue): Result<string, Violation[]>          // RFC 8785
-checkFormat(format: "date-time" | "date" | "decimal" | "ulid", s: string): boolean   // KR-11
-hashRecord(type: string, body: JsonValue): Result<string, Violation[]>               // KR-12, KR-13
+parseJson(text: string, path?: string): Result<JsonValue>              // KR-10, строгий парсер вместо мягкого (G-16)
+parseJsonBytes(bytes: Uint8Array, path?: string): Result<JsonValue>    // KR-10: UTF-8, затем parseJson
+canon(value: JsonValue, place?: Place): Result<string>                  // KR-10, RFC 8785
+hash(value: JsonValue, place?: Place): Result<string>                   // KR-12
+hashRecord(type: string, body: JsonValue, place?: Place): Result<string> // KR-12, KR-13
+BODY_LIMIT = 262_144                                                     // KR-13, G-05
+isFormat(format: Format, s: string): boolean                             // KR-11
+checkFormat(format: Format, value: JsonValue, place: Place): Rejection[] // KR-11
 ```
 
 ## Шаги
@@ -57,3 +63,14 @@ hashRecord(type: string, body: JsonValue): Result<string, Violation[]>          
 - `JSON.parse` нельзя использовать даже как первый шаг: дубликаты теряются молча.
 - `String.prototype.normalize` зависит от версии Unicode в ICU; версия ICU записывается рядом с векторами NFC, расхождение между ОС ловит CI на windows (D-09).
 - От S0-03 (G-16, Q-10): JSON уже разбирает одна функция — `parseJson(text, path)` в `src/kernel/parse.ts`, с `decodeUtf8(bytes, path)`; обе отказывают с KR-10, фикстуры `test/fixtures/KR-10/` есть. Задача заменяет мягкий `JSON.parse` строгим парсером, дописывает trigger на дубликат ключа, ±2^53, NFC, `-0` и снимает тест «G-16» в `test/kernel/kernel.test.ts`.
+
+## Как сделано
+
+- **Файлы ядра.** `src/kernel/json.ts` — значения и `serialize`, писатель RFC 8785 без проверок: под `canon` и для сообщений отказов, чей `got` может быть ровно тем, что KR-10 отклоняет (одиночный суррогат, не-NFC). `canon.ts` — `canon` и проверки KR-10, общие с парсером. `parse.ts` — строгий парсер, свой код по RFC 8259. `hash.ts` — `hash`, `hashRecord`, `BODY_LIMIT`. `formats.ts` — `isFormat`, `checkFormat`; `isUlid` переехал сюда из `record.ts`. Реестр: `KR_11`, `KR_13`. Парсер и `canon` идут своим стеком: никакая вложенность не переполняет стек вызовов.
+- **Интерфейс по соглашениям, а не по наброску.** Отказы — `Result<T>` с `Rejection` по `CONVENTIONS.md` §2–3, а не `Violation[]`: `Violation` — тип `validate` (KR-21). `parseStrict` — это строгий `parseJson` (имя из S0-03 осталось, как велит заметка выше). `checkFormat` отказывает с KR-11 и путём, как `checkId`; булев ответ — `isFormat`: им пользуется `validate` (S0-06). `canon`, `hash`, `hashRecord` берут необязательное `place`, чтобы отказ внутри intent был путём intent (G-13), а не переписывался.
+- **Что отклоняет KR-10.** Строгий парсер: текст не JSON (целиком, по пути входа); внутри значения по JSON Pointer — дубликат ключа, `-0`, не конечное число (`1e400`), целое вне ±(2^53−1) (G-20), строка или ключ с одиночным суррогатом, с noncharacter (I-JSON, RFC 7493 §2.1: «Input must be I-JSON») или не в NFC. `got` числа — как оно написано. `canon` отклоняет то же на значении, собранном в коде.
+- **Векторы.** `test/vectors/rfc8785-numbers.json` (приложение B целиком), `rfc8785-examples.json` (примеры §3.2.2 и §3.2.3), `nfc.json` (с версиями ICU и Unicode, на которых записан), `formats.json`. Закреплены по hash в `test/kernel/vectors.test.ts`. Приложение B «проходит» так: вывод каждого конечного числа равен RFC 8785; `canon` допускает его в том же написании или отклоняет по KR-10 — `-0`, `NaN`, `Infinity` и целые от 2^53 (`1e+21`, `1e+23`, `2^68`, максимум double). Оба примера RFC тоже отклоняются строгим разбором: `1E30` — целое вне диапазона, ключ `U+FB33` — не NFC; их канонический вывод сверен через `serialize`.
+- **Фаза 1 apply** (ledger): отказы `hashRecord` пришлось принять в apply — иначе тело больше 256 KiB, которое строгий разбор пропускает, падало бы исключением. Фаза 1 проверяет canon proposal (session и sig от корня, каждый intent внутри себя, G-13) и лимит каждого тела (KR-13). После неё всё, из чего сложен коммит, канонично; `known` в `src/ledger/commit.ts` раскрывает `Result` у `encodeCommit`, `commitHash`, `proposalHash` и hash записи, отказ там — `bug:`. Поэтому `modules: [kernel, ledger]`. Остальное фазы 1 (заголовок, форматы `at` и `by`) — S0-05 и S0-13.
+- **Фикстуры.** KR-10 — строка `json` (дубликат ключа, `-0`, целое вне диапазона, не конечное число, строка и ключ не в NFC, одиночный суррогат, noncharacter) и строка `apply` (тело не в NFC, путь внутри intent). KR-11 — новая строка `format` в `test/fixtures/checks.ts`, trigger и pass на каждый формат. KR-13 — строка `apply`: тело в 262 145 канонических байт.
+- **Тесты.** `test/kernel/{parse,canon,formats,vectors}.test.ts`; свойства fast-check — в `canon.test.ts`. Тест «G-16» и «thin canon» сняты из `kernel.test.ts`.
+- **Пробелы.** G-20 — граница целых и точность дробей; G-21 — секунда координации и диапазон года в `date-time`.

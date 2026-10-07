@@ -3,6 +3,7 @@
 // event with its certificate, the signature and facts in the canonical order
 // arrive with S0-10 and S0-16.
 import { compareText, gotOf, hash, isJsonObject, reject, refused, type JsonObject, type JsonValue, type Kind, type Rejection, type Result } from "../kernel/index.js";
+import { known } from "./commit.js";
 import { LG_09 } from "./rules.js";
 
 /** The authoring session event (TR-11); its certificate arrives with S0-16. */
@@ -75,7 +76,7 @@ const order = (a: Intent, b: Intent) => (a.op === b.op ? compareText(a.id, b.id)
 /** LG-06, G-03: entities by `id`, then events by `id`; the group of facts by key arrives with S0-10. */
 export const canonicalIntents = (intents: readonly Intent[]): Intent[] => [...intents].sort(order);
 
-/** LG-10: the hash of a proposal without `sig`, with intents in canonical order. */
+/** LG-10: the hash of a proposal without `sig`, with intents in canonical order; the proposal is canonical (KR-10) as phase 1 of apply finds it. */
 export function proposalHash(p: Proposal): string {
-  return hash({ session: p.session, intents: canonicalIntents(p.intents) });
+  return known(hash({ session: p.session, intents: canonicalIntents(p.intents) }), "a proposal");
 }

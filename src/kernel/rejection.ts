@@ -1,7 +1,7 @@
 // The form of a refusal (LG-17, CONVENTIONS.md §2–3, §5–6): a hard check
 // returns a Result; a rejection names its rule ID and is made only by
 // `reject` from a row of a rule registry.
-import { canon, compareText, type JsonValue } from "./json.js";
+import { compareText, serialize, type JsonValue } from "./json.js";
 
 type RulePrefix = "PR" | "KR" | "TY" | "RF" | "LG" | "TR" | "RT" | "DP" | "LN" | "BN" | "OB" | "AG" | "ST" | "SL" | "RM" | "GL";
 type Digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
@@ -30,6 +30,9 @@ export type Rejection = {
   readonly id?: string;
 };
 
+/** Where a check refuses: the intent it is about, or `null`, and a JSON Pointer (G-13). */
+export type Place = Pick<Rejection, "intent" | "path">;
+
 export type Rejections = readonly [Rejection, ...Rejection[]];
 
 export type Result<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly rejections: Rejections };
@@ -39,11 +42,11 @@ const PLACEHOLDER = /\{(intent|path|expected|got|id)\}/g;
 /** The rejection of a rule at a place; the message is the rule's template filled with canonical JSON. */
 export function reject(rule: Rule, place: Omit<Rejection, "rule" | "message">): Rejection {
   const fields: { readonly [k: string]: JsonValue | undefined } = place;
-  const message = rule.message.en.replace(PLACEHOLDER, (_, name: string) => canon(fields[name] ?? null));
+  const message = rule.message.en.replace(PLACEHOLDER, (_, name: string) => serialize(fields[name] ?? null));
   return { intent: place.intent, rule: rule.id, message, path: place.path, expected: place.expected, got: place.got, ...(place.id === undefined ? {} : { id: place.id }) };
 }
 
-const keyOf = (r: Rejection): readonly string[] => [r.intent === null ? "" : `~${r.intent}`, r.path, r.rule, r.id ?? "", canon(r.expected), canon(r.got)];
+const keyOf = (r: Rejection): readonly string[] => [r.intent === null ? "" : `~${r.intent}`, r.path, r.rule, r.id ?? "", serialize(r.expected), serialize(r.got)];
 
 function compare(a: Rejection, b: Rejection): number {
   const [ka, kb] = [keyOf(a), keyOf(b)];
