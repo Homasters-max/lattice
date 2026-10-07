@@ -4,13 +4,16 @@
 // validate are in validate-order.test.ts. Every input crosses the module
 // boundary frozen.
 import { describe, expect, it } from "vitest";
-import { validate, type JsonValue, type Resolve, type Schema, type Violation } from "../../src/kernel/index.js";
+import { validate, type JsonValue, type Schema, type Violation } from "../../src/kernel/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
 const NONE = () => null;
 
+/** KR-21: the schema the caller gives for a `$ref`, or `null`. */
+type Resolve = (ref: string) => Schema | null;
+
 /** The path and keyword of every violation of a value against a schema. */
-function violations(value: JsonValue, schema: Schema, resolve: (ref: string) => Schema | null = NONE): (readonly [string, string])[] {
+function violations(value: JsonValue, schema: Schema, resolve: Resolve = NONE): (readonly [string, string])[] {
   const out = validate(deepFreeze(value), deepFreeze(schema), resolve);
   return out.ok ? [] : out.violations.map((v) => [v.path, v.keyword] as const);
 }

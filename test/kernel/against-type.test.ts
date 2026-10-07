@@ -6,10 +6,10 @@
 // out of the body itself and admits no type it has not checked (Q-33). Every
 // input crosses the module boundary frozen.
 import { describe, expect, it } from "vitest";
-import { checkAgainstType, KR_04, KR_15, KR_16, KR_21, reject, type JsonValue, type ResolveType } from "../../src/kernel/index.js";
+import { checkAgainstType, KR_04, KR_15, KR_16, KR_21, reject, type JsonValue, type Place, type ResolveType } from "../../src/kernel/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
-const ROOT = { intent: null, path: "" } as const;
+const ROOT: Place = { intent: null, path: "" };
 
 /** The type bodies a test knows by pinned reference, as phase 2 resolves them over `after`. */
 const typesOf =
@@ -55,7 +55,7 @@ describe("no record of an abstract type (KR-16)", () => {
 describe("the body against the schema of its type (KR-21)", () => {
   it("KR-21: refuses each violation of the body at its path under /body, the keyword in expected", () => {
     expect(check({ type: "demo/note@1", rev: 1, body: { text: "abcdef" } }, TYPES, { intent: "demo/a", path: "" })).toEqual([
-      reject(KR_21, { intent: "demo/a", path: "/body/text", expected: { maxLength: 5 }, got: "abcdef" }),
+      reject(KR_21, { intent: "demo/a", path: "/body/text", expected: { maxLength: 5 }, got: 6 }),
     ]);
   });
 

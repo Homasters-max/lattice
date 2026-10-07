@@ -7,10 +7,12 @@
 // checked here: `ref.pin` and `label` are phase 4's (S0-15). A string is
 // measured in code points (G-22). The walk keeps its own stack, so no depth of
 // nesting overflows; a `$ref` that comes back to itself before the value
-// descends is a violation, not a loop.
-import { isFormat } from "./formats.js";
+// descends is a violation, not a loop. What the schema holds is read by
+// read-schema.ts.
+import { isFormat, isSchemaFormat, type Format } from "./formats.js";
 import { compareText, gotOf, isJsonArray, isJsonObject, own, pointer, serialize, type JsonObject, type JsonValue } from "./json.js";
-import { parseRef } from "./ref.js";
+import { branchesOf, fitsType, numberOf, propertiesOf, requiredOf } from "./read-schema.js";
+import { parseRef, SEGMENT } from "./ref.js";
 import { reject, type Place, type Rejection } from "./rejection.js";
 import { KR_21 } from "./rules.js";
 import type { Schema } from "./schema.js";
@@ -21,7 +23,7 @@ export type Violation = { readonly path: string; readonly keyword: string; reado
 
 export type Violations = readonly [Violation, ...Violation[]];
 
-/** KR-21: the schema the caller knows for a pinned reference `$ref`, or `null`. */
+/** KR-21: the schema the caller knows for a pinned reference `$ref`, or `null`; inside the kernel, read from a type it admits. */
 export type Resolve = (ref: string) => Schema | null;
 
 /** One value against one schema; `refs` — the `$ref` followed to it since the value last descended. */
@@ -39,35 +41,11 @@ function schemaAt(value: JsonValue | undefined, where: string): Schema {
   return value;
 }
 
-const FORMATS: { readonly [format: string]: (s: string) => boolean } = {
-  "date-time": (s) => isFormat("date-time", s),
-  date: (s) => isFormat("date", s),
-  decimal: (s) => isFormat("decimal", s),
-  ulid: (s) => isFormat("ulid", s),
-  ref: (s) => parseRef(s).ok,
-  uri: isUri,
-};
-
-const TYPES: { readonly [type: string]: (v: JsonValue) => boolean } = {
-  string: (v) => typeof v === "string",
-  integer: (v) => typeof v === "number" && Number.isInteger(v),
-  number: (v) => typeof v === "number",
-  boolean: (v) => typeof v === "boolean",
-  object: isJsonObject,
-  array: (v) => isJsonArray(v),
-  null: (v) => v === null,
-};
-
-/** KR-18: a value of the type or of either type of the pair. */
-function fitsType(type: JsonValue, value: JsonValue): boolean {
-  const types = isJsonArray(type) ? type : [type];
-  return types.some((t) => typeof t === "string" && Object.hasOwn(TYPES, t) && TYPES[t]?.(value) === true);
+/** KR-11, KR-23, KR-24: a string of the format, read by the rule that owns it. */
+function fitsFormat(format: Format, s: string): boolean {
+  if (format === "ref") return parseRef(s).ok;
+  return format === "uri" ? isUri(s) : isFormat(format, s);
 }
-
-const number = (schema: Schema, keyword: string): number | undefined => {
-  const v = schema[keyword];
-  return typeof v === "number" ? v : undefined;
-};
 
 /** A bound a value must not fall under (`min`) or go over. */
 function bound(path: string, keyword: string, limit: number | undefined, measure: number): Violation[] {
@@ -80,11 +58,10 @@ function bound(path: string, keyword: string, limit: number | undefined, measure
 function stringViolations(s: string, schema: Schema, path: string): Violation[] {
   const length = [...s].length;
   const { format } = schema;
-  const check = typeof format === "string" ? FORMATS[format] : undefined;
   return [
-    ...bound(path, "minLength", number(schema, "minLength"), length),
-    ...bound(path, "maxLength", number(schema, "maxLength"), length),
-    ...(check === undefined || check(s) ? [] : [violation(path, "format", format ?? null, s)]),
+    ...bound(path, "minLength", numberOf(schema, "minLength"), length),
+    ...bound(path, "maxLength", numberOf(schema, "maxLength"), length),
+    ...(!isSchemaFormat(format) || fitsFormat(format, s) ? [] : [violation(path, "format", format, s)]),
   ];
 }
 
@@ -95,7 +72,7 @@ function scalarViolations(value: JsonValue, schema: Schema, path: string): Viola
     ...(isJsonArray(listed) && !listed.includes(value) ? [violation(path, "enum", listed, value)] : []),
     ...(fixed !== undefined && fixed !== value ? [violation(path, "const", fixed, value)] : []),
     ...(typeof value === "string" ? stringViolations(value, schema, path) : []),
-    ...(typeof value === "number" ? [...bound(path, "minimum", number(schema, "minimum"), value), ...bound(path, "maximum", number(schema, "maximum"), value)] : []),
+    ...(typeof value === "number" ? [...bound(path, "minimum", numberOf(schema, "minimum"), value), ...bound(path, "maximum", numberOf(schema, "maximum"), value)] : []),
   ];
 }
 
@@ -103,19 +80,16 @@ function scalarViolations(value: JsonValue, schema: Schema, path: string): Viola
 function visitArray(items: readonly JsonValue[], schema: Schema, path: string): Visit {
   const inner = schema.items === undefined ? undefined : schemaAt(schema.items, "items");
   return {
-    violations: [...bound(path, "minItems", number(schema, "minItems"), items.length), ...bound(path, "maxItems", number(schema, "maxItems"), items.length)],
+    violations: [...bound(path, "minItems", numberOf(schema, "minItems"), items.length), ...bound(path, "maxItems", numberOf(schema, "maxItems"), items.length)],
     next: inner === undefined ? [] : items.map((value, i) => ({ value, schema: inner, path: pointer(path, i), refs: [] })),
   };
 }
 
-/** KR-18: a map key, as KR-23 reads it in a fragment. */
-const MAP_KEY = /^[a-z0-9][a-z0-9._@-]*$/;
-
-/** A map: every key in the grammar of KR-18, every value against `values`. */
+/** A map: every key in the grammar of KR-18 — a segment of a fragment (KR-23) — every value against `values`. */
 function visitMap(object: JsonObject, values: Schema, path: string): Visit {
   const entries = Object.entries(object);
   return {
-    violations: entries.filter(([k]) => !MAP_KEY.test(k)).map(([k]) => violation(pointer(path, k), "values", "a key [a-z0-9][a-z0-9._@-]*", k)),
+    violations: entries.filter(([k]) => !SEGMENT.test(k)).map(([k]) => violation(pointer(path, k), "values", `a key ${SEGMENT.source.slice(1, -1)}`, k)),
     next: entries.map(([k, value]) => ({ value, schema: values, path: pointer(path, k), refs: [] })),
   };
 }
@@ -123,8 +97,8 @@ function visitMap(object: JsonObject, values: Schema, path: string): Visit {
 /** A closed object: no key outside `properties`, every `required` field present, each field against its schema. */
 function visitObject(object: JsonObject, schema: Schema, path: string): Visit {
   if (schema.values !== undefined) return visitMap(object, schemaAt(schema.values, "values"), path);
-  const properties = isJsonObject(schema.properties) ? schema.properties : {};
-  const required = isJsonArray(schema.required) ? schema.required : [];
+  const properties = propertiesOf(schema);
+  const required = requiredOf(schema);
   const entries = Object.entries(object);
   const listed = entries.filter(([k]) => Object.hasOwn(properties, k));
   return {
@@ -139,21 +113,20 @@ function visitObject(object: JsonObject, schema: Schema, path: string): Visit {
 /** `type` first: a value of another type meets no other keyword. */
 function visitTyped(task: Task): Visit {
   const { value, schema, path } = task;
-  if (schema.type !== undefined && !fitsType(schema.type, value)) return only(violation(path, "type", schema.type, value));
+  if (schema.type !== undefined && !fitsType(schema, value)) return only(violation(path, "type", schema.type, value));
   const container = schema.type === undefined ? null : isJsonArray(value) ? visitArray(value, schema, path) : isJsonObject(value) ? visitObject(value, schema, path) : null;
   return { violations: [...scalarViolations(value, schema, path), ...(container?.violations ?? [])], next: container?.next ?? [] };
 }
 
 /** `oneOf` with `discriminator`: the branch whose discriminator `const` the value holds. */
-function visitUnion(task: Task, branches: readonly JsonValue[]): Visit {
+function visitUnion(task: Task, discriminator: string): Visit {
   const { value, schema, path } = task;
-  const discriminator = typeof schema.discriminator === "string" ? schema.discriminator : "";
   if (!isJsonObject(value)) return only(violation(path, "oneOf", "an object", value));
-  const tags = branches.map((b) => schemaAt(own(schemaAt(schemaAt(b, "a branch").properties, "properties"), discriminator), discriminator).const ?? null);
+  const branches = branchesOf(schema);
   const tag = own(value, discriminator);
-  const chosen = tag === undefined ? undefined : branches[tags.indexOf(tag)];
-  if (chosen === undefined) return only(violation(pointer(path, discriminator), "discriminator", tags, gotOf(tag)));
-  return { violations: [], next: [{ ...task, schema: schemaAt(chosen, "a branch") }] };
+  const chosen = branches.find((b) => b.tag === tag);
+  if (tag === undefined || chosen === undefined) return only(violation(pointer(path, discriminator), "discriminator", branches.map((b) => b.tag), gotOf(tag)));
+  return { violations: [], next: [{ ...task, schema: chosen.schema }] };
 }
 
 /** `$ref`: the schema the caller resolves, unless it is unknown or the reference came back to itself. */
@@ -165,9 +138,9 @@ function visitRef(task: Task, ref: string, resolve: Resolve): Visit {
 }
 
 function visit(task: Task, resolve: Resolve): Visit {
-  const { $ref: ref, oneOf } = task.schema;
+  const { $ref: ref, discriminator } = task.schema;
   if (typeof ref === "string") return visitRef(task, ref, resolve);
-  if (isJsonArray(oneOf)) return visitUnion(task, oneOf);
+  if (typeof discriminator === "string") return visitUnion(task, discriminator);
   return visitTyped(task);
 }
 
@@ -198,8 +171,8 @@ export function validate(value: JsonValue, schema: Schema, resolve: Resolve): { 
 
 /**
  * KR-21: the body of a record against the schema of its type — each violation refused with KR-21 at `place.path`
- * and its path, the keyword and what it wants as `expected`: `{"maxLength": 200}`. Phase 2 of apply calls it with
- * the intent and `/body` (S0-13).
+ * and its path, the keyword and what it wants as `expected`: `{"maxLength": 200}`. Phase 2 of one record calls it
+ * at `/body` with `$ref` resolved to types the kernel admits (against-type.ts).
  */
 export function checkBody(body: JsonValue, schema: Schema, resolve: Resolve, place: Place): Rejection[] {
   const out = validate(body, schema, resolve);

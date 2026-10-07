@@ -1,11 +1,12 @@
 // The header of a record (KR-04…KR-09, PR-01): exactly the fields of KR-04,
-// `rev` against the kind of the type the caller gives (KR-05), the grammar of
+// `rev` as the header claims it — against the kind of the type, in phase 2,
+// against-type.test.ts (KR-05) — the grammar of
 // `id` (KR-06), a pinned `type` read by the one reference parser (KR-07,
 // PR-01), `by` a ULID and `at` a canonical date-time that the kernel gives no
 // meaning (KR-08, KR-09, KR-11). Every input crosses the module boundary
 // frozen.
 import { describe, expect, it } from "vitest";
-import { checkHeader, checkRev, KR_04, KR_06, KR_07, KR_08, KR_11, reject, type JsonObject, type JsonValue } from "../../src/kernel/index.js";
+import { checkHeader, KR_04, KR_06, KR_07, KR_08, KR_11, reject, type JsonObject, type JsonValue } from "../../src/kernel/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
 const ENTITY: JsonObject = deepFreeze({
@@ -51,13 +52,6 @@ describe("the header of a record (KR-04, KR-05)", () => {
     for (const rev of [0, -1, 1.5, 9007199254740992, "1", null]) {
       expect([rev, checkHeader(changed(ENTITY, "rev", rev), "/0").map((r) => [r.rule, r.path])]).toEqual([rev, [["KR-04", "/0/rev"]]]);
     }
-  });
-
-  it("KR-04, KR-05: checkRev holds rev against the kind of the type the caller gives, at the place given", () => {
-    const place = deepFreeze({ intent: "demo/a", path: "/rev" });
-    expect([checkRev("entity", 1, place), checkRev("event", undefined, place)]).toEqual([[], []]);
-    expect(checkRev("event", 1, place)).toEqual([reject(KR_04, { ...place, expected: "absent", got: 1 })]);
-    expect(checkRev("entity", undefined, place)).toEqual([reject(KR_04, { ...place, expected: "a revision", got: "absent" })]);
   });
 
   it("KR-04: refuses a record that is no object", () => {

@@ -19,6 +19,7 @@ const TYPES: { readonly [ref: string]: JsonValue } = {
   "demo/span@3": { abstract: true, kind: "entity", schema: { type: "object", properties: { n: { type: "integer", maximum: 10 } }, required: ["n"] } },
   "demo/tree@1": { abstract: true, kind: "entity", schema: { type: "object", properties: { kids: { type: "array", items: { $ref: "demo/tree@1" } } } } },
   "demo/tree@2": { abstract: true, kind: "entity", schema: { type: "object", properties: { kids: { type: "array", items: { $ref: "demo/tree@2" } } } } },
+  "demo/odd@1": { abstract: true, kind: "entity", schema: { type: "array", const: [1], items: 5 } },
 };
 
 const resolve: ResolveType = (ref) => (Object.hasOwn(TYPES, ref) ? (TYPES[ref] ?? null) : null);
@@ -119,6 +120,11 @@ describe("compare (KR-22)", () => {
     const deep = (n: number, leaf: Schema): Schema => (n === 0 ? leaf : { type: "array", items: deep(n - 1, leaf) });
     expect(run(deep(5000, { type: "string", maxLength: 1 }), deep(5000, S)).relation).toBe("incomparable");
     expect(run(deep(5000, S), deep(5000, S)).relation).toBe("same");
+  });
+
+  it("KR-22: a $ref to a type the kernel does not admit names no schema — incomparable, never a crash (Q-33)", () => {
+    expect(run({ $ref: "demo/odd@1" }, { $ref: "demo/span@1" })).toEqual({ relation: "incomparable", aspects: ["validity"] });
+    expect(run({ $ref: "demo/span@1" }, { $ref: "demo/odd@1" })).toEqual({ relation: "incomparable", aspects: ["validity"] });
   });
 
   it("KR-22: a schema wider than the steps the walk takes is incomparable", () => {

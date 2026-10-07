@@ -1,11 +1,11 @@
 // validate (KR-21): violations in a deterministic order (CONVENTIONS.md §5)
 // whatever the order of the keys of the value and the schema; nothing read but
-// the caller's `resolve`; and checkBody, the hard check that refuses each
-// violation of a body with KR-21. Every input crosses the module boundary
-// frozen.
+// the caller's `resolve`. The hard check that refuses each violation of a body
+// with KR-21 is phase 2 of one record, against-type.test.ts. Every input
+// crosses the module boundary frozen.
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { checkBody, KR_21, reject, validate, type JsonValue, type Schema } from "../../src/kernel/index.js";
+import { validate, type JsonValue, type Schema } from "../../src/kernel/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
 const SHAPE = { type: "object", properties: { n: { type: "integer", minimum: 0 }, s: { type: "string", maxLength: 2 } }, required: ["n"] };
@@ -75,15 +75,5 @@ describe("what validate reads (KR-21)", () => {
     expect(asked).toEqual(["demo/shape@1", "demo/shape@1", "demo/shape@1", "demo/shape@1"]);
     asked.length = 0;
     expect([validate(deepFreeze({ n: 1 }), deepFreeze(SHAPE), spy), asked]).toEqual([{ ok: true }, []]);
-  });
-});
-
-describe("checkBody (KR-21)", () => {
-  it("KR-21: refuses each violation of a body with KR-21, at its place, the keyword in expected", () => {
-    const place = deepFreeze({ intent: "demo/note", path: "/body" });
-    expect(checkBody(deepFreeze({ n: "1" }), deepFreeze(SHAPE), resolve, place)).toEqual([
-      reject(KR_21, { intent: "demo/note", path: "/body/n", expected: { type: "integer" }, got: "1" }),
-    ]);
-    expect(checkBody(deepFreeze({ n: 1 }), deepFreeze(SHAPE), resolve, place)).toEqual([]);
   });
 });

@@ -1,8 +1,8 @@
 // Records (KR-04…KR-09). The header is exactly `{id, rev, type, hash, by, at,
 // body}`. `rev` is present only for an entity, and whether a record is one is
 // the `kind` of its type (KR-05), which the kernel does not hold: `checkRev`
-// takes the kind from a caller that knows the type — phase 2 of apply (S0-13)
-// — while `checkHeader`, which a store runs as it opens, before its types are
+// takes the kind from a caller that knows the type — phase 2 of one record
+// (against-type.ts) — while `checkHeader`, which a store runs as it opens, before its types are
 // folded, reads the kind the header claims from `rev`. `id` follows that kind
 // (KR-06), `type` is a pinned reference read by the one reference parser
 // (KR-07, PR-01), `by` is the ULID of the event that wrote the record (KR-08)
