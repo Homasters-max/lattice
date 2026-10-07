@@ -12,7 +12,9 @@ import { fileOf } from "../../src/adapters/store-jsonl/index.js";
 import {
   checkFormat,
   checkHeader,
+  checkRev,
   checkUri,
+  isJsonObject,
   KR_04,
   KR_06,
   KR_07,
@@ -29,6 +31,7 @@ import {
   type Format,
   type JsonValue,
   type Kind,
+  type Rejection,
 } from "../../src/kernel/index.js";
 import { apply, createView, encodeCommit, land, LG_06, LG_09, LG_23, LG_54, openLines, readProposal, type LandActs } from "../../src/ledger/index.js";
 import { landingPortsForTests, type GitFixtureOptions } from "../support/assembly.js";
@@ -54,10 +57,21 @@ const format: FixtureCheck = {
   run: (input) => refused(checkFormat(field(input, "format") as Format, field(input, "value") as JsonValue, { intent: null, path: "" })) ?? { ok: true },
 };
 
-/** `input`: `{ record, kind? }` — the header of a record, checked from the root; `kind` — the kind of its type, when known (KR-05). */
+/** `rev` against the kind of the record's type, when the fixture gives the kind (KR-05). */
+function revOf(record: JsonValue, kind: Kind | undefined): readonly Rejection[] {
+  return kind === undefined ? [] : checkRev(kind, isJsonObject(record) ? record.rev : undefined, { intent: null, path: "/rev" });
+}
+
+/**
+ * `input`: `{ record, kind? }` — the header of a record, checked from the root as a store opens; with `kind`, the kind
+ * of its type, `rev` against it too, as phase 2 of apply will (KR-05).
+ */
 const header: FixtureCheck = {
   enforces: [KR_04.id, KR_06.id, KR_07.id, KR_08.id, KR_11.id],
-  run: (input) => refused(checkHeader(field(input, "record") as JsonValue, "", field(input, "kind") as Kind | undefined)) ?? { ok: true },
+  run: (input) => {
+    const record = field(input, "record") as JsonValue;
+    return refused([...checkHeader(record, ""), ...revOf(record, field(input, "kind") as Kind | undefined)]) ?? { ok: true };
+  },
 };
 
 /** `input`: `{ ref }` — a string parsed as a reference from the root. */

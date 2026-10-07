@@ -1,11 +1,11 @@
 // The header of a record (KR-04…KR-09, PR-01): exactly the fields of KR-04,
-// `rev` against the kind of the type when the caller knows it (KR-05), the
-// grammar of `id` (KR-06), a pinned `type` read by the one reference parser
-// (KR-07, PR-01), `by` a ULID and `at` a canonical date-time that the kernel
-// gives no meaning (KR-08, KR-09, KR-11). Every input crosses the module
-// boundary frozen.
+// `rev` against the kind of the type the caller gives (KR-05), the grammar of
+// `id` (KR-06), a pinned `type` read by the one reference parser (KR-07,
+// PR-01), `by` a ULID and `at` a canonical date-time that the kernel gives no
+// meaning (KR-08, KR-09, KR-11). Every input crosses the module boundary
+// frozen.
 import { describe, expect, it } from "vitest";
-import { checkHeader, KR_04, KR_06, KR_07, KR_08, KR_11, reject, type JsonObject, type JsonValue } from "../../src/kernel/index.js";
+import { checkHeader, checkRev, KR_04, KR_06, KR_07, KR_08, KR_11, reject, type JsonObject, type JsonValue } from "../../src/kernel/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
 const ENTITY: JsonObject = deepFreeze({
@@ -18,20 +18,19 @@ const ENTITY: JsonObject = deepFreeze({
   body: {},
 });
 
-const { rev: _rev, ...eventFields } = ENTITY;
-const EVENT: JsonObject = deepFreeze({ ...eventFields, id: "01JB2X00000000000000000EVT", type: "demo/seen@1" });
+const EVENT: JsonObject = deepFreeze(Object.fromEntries(Object.entries({ ...ENTITY, id: "01JB2X00000000000000000EVT", type: "demo/seen@1" }).filter(([k]) => k !== "rev")));
 
 const at = (path: string) => ({ intent: null, path });
 
 /** The header with one field changed; `undefined` removes it. */
 function changed(record: JsonObject, name: string, value: JsonValue | undefined): JsonObject {
-  const { [name]: _old, ...rest } = record;
+  const rest = Object.fromEntries(Object.entries(record).filter(([k]) => k !== name));
   return deepFreeze(value === undefined ? rest : { ...rest, [name]: value });
 }
 
 describe("the header of a record (KR-04, KR-05)", () => {
-  it("KR-04: takes an entity with rev and an event without, the kind known or not", () => {
-    expect([checkHeader(ENTITY, "/0"), checkHeader(ENTITY, "/0", "entity"), checkHeader(EVENT, "/1"), checkHeader(EVENT, "/1", "event")]).toEqual([[], [], [], []]);
+  it("KR-04: takes an entity with rev and an event without", () => {
+    expect([checkHeader(ENTITY, "/0"), checkHeader(EVENT, "/1")]).toEqual([[], []]);
   });
 
   it("KR-04: refuses a field outside the header, with the value that came", () => {
@@ -54,9 +53,11 @@ describe("the header of a record (KR-04, KR-05)", () => {
     }
   });
 
-  it("KR-04, KR-05: checks rev against the kind of the type the caller gives", () => {
-    expect(checkHeader(ENTITY, "/0", "event")).toEqual([reject(KR_04, { ...at("/0/rev"), expected: "absent", got: 1 })]);
-    expect(checkHeader(changed(ENTITY, "rev", undefined), "/0", "entity")).toEqual([reject(KR_04, { ...at("/0/rev"), expected: "a revision", got: "absent" })]);
+  it("KR-04, KR-05: checkRev holds rev against the kind of the type the caller gives, at the place given", () => {
+    const place = deepFreeze({ intent: "demo/a", path: "/rev" });
+    expect([checkRev("entity", 1, place), checkRev("event", undefined, place)]).toEqual([[], []]);
+    expect(checkRev("event", 1, place)).toEqual([reject(KR_04, { ...place, expected: "absent", got: 1 })]);
+    expect(checkRev("entity", undefined, place)).toEqual([reject(KR_04, { ...place, expected: "a revision", got: "absent" })]);
   });
 
   it("KR-04: refuses a record that is no object", () => {
@@ -65,10 +66,10 @@ describe("the header of a record (KR-04, KR-05)", () => {
 });
 
 describe("the id of a record (KR-06)", () => {
-  it("KR-06: an entity id is namespace/slug and an event id a ULID — rev tells which when the kind is not given", () => {
+  it("KR-06: an entity id is namespace/slug and an event id a ULID — the header claims the kind by rev", () => {
     expect(checkHeader(changed(ENTITY, "id", "Demo/A"), "/0")).toEqual([reject(KR_06, { ...at("/0/id"), expected: "namespace/slug", got: "Demo/A" })]);
+    expect(checkHeader(changed(ENTITY, "id", "01JB2X00000000000000000EVT"), "/0").map((r) => r.rule)).toEqual(["KR-06"]);
     expect(checkHeader(changed(EVENT, "id", "demo/a"), "/0")).toEqual([reject(KR_06, { ...at("/0/id"), expected: "a ULID", got: "demo/a" })]);
-    expect(checkHeader(changed(EVENT, "id", "demo/a"), "/0", "event").map((r) => r.rule)).toEqual(["KR-06"]);
   });
 });
 

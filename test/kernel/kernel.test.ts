@@ -40,7 +40,7 @@ describe("the header of a record (KR-04)", () => {
 
   it("KR-04: takes a header with every field of its kind, rev absent for an event", () => {
     const { rev, ...event } = record;
-    expect([rev, checkHeader(record, "/records/0"), checkHeader(deepFreeze(event), "/records/1")]).toEqual([1, [], []]);
+    expect([rev, checkHeader(record, "/records/0"), checkHeader(deepFreeze({ ...event, id: "01JB2X00000000000000000EVT" }), "/records/1")]).toEqual([1, [], []]);
   });
 
   it("KR-04: refuses a field of the wrong kind or absent, and a record that is no object, at the path given, with the value that came", () => {
