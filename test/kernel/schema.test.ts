@@ -144,6 +144,11 @@ describe("objects are always closed (KR-18)", () => {
 
   it("KR-18: $ref stands alone, beside only a description and annotations", () => {
     expect(refusals({ $ref: SHAPE, type: "object" })).toEqual([["KR-18", "/type"]]);
+    const union = { oneOf: [{ type: "object", properties: { kind: { const: "a" } }, required: ["kind"] }], discriminator: "kind" };
+    expect(refusals({ $ref: SHAPE, ...union })).toEqual([
+      ["KR-18", "/discriminator"],
+      ["KR-18", "/oneOf"],
+    ]);
     expect(refusals(object({ a: { $ref: SHAPE, card_order: 1 } }))).toEqual([]);
   });
 });
