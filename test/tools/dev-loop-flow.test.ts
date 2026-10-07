@@ -58,7 +58,7 @@ const read = (file: string): Json => JSON.parse(readFileSync(file, "utf8")) as J
 const agents = (r: Json) => r.agents as { agent: string; brief: string }[];
 const out = (brief: string, value: Json) => writeFileSync(brief.replace(".in.json", ".out.json"), JSON.stringify(value));
 const head = (l: Loop) => sh(l.work, "git", ["rev-parse", "HEAD"]);
-const BLOCK = { severity: "block", rule: "CONVENTIONS §1", where: "src/ledger/land.ts:2", quote: "return 2;", text: "magic number; use the constant" };
+const BLOCK = { kind: "rule", rule: "CONVENTIONS §1", where: "src/ledger/land.ts:2", quote: "return 2;", text: "magic number; use the constant" };
 const fixerBrief = (l: Loop) => dl(l, "brief", "fixer", "--worktree", l.work, "--job", "answer").brief as string;
 
 function round(l: Loop, findings: Json[]): Json {
@@ -156,7 +156,7 @@ describe("dev-loop, outputs the protocol refuses", { timeout: 30_000 }, () => {
     const fb = fixerBrief(l);
     const base = (read(fb).base as string).slice(0, 7);
     out(fb, { status: "done", head: head(l), answers: [{ id: "W1-T1", action: "fixed", commits: [head(l)] }, { id: "W1-T1", action: "disputed", note: "CONVENTIONS §2" }, { id: "W1-T2", action: "disputed", note: "no" }] });
-    expect(dl(l, "answer").errors).toEqual(["answers: на находку — ровно один ответ", `answers.W1-T1: commits — коммиты этого ответа (${base}..head)`, "answers.W1-T2: довод называет правило"]);
+    expect(dl(l, "answer").errors).toEqual(["answers: на находку — ровно один ответ", `answers.W1-T1: commits — коммиты из ${base}..head`, "answers.W1-T2: спор — только о блокирующей находке и с правилом"]);
     writeFileSync(join(l.work, "x.txt"), "x");
     sh(l.work, "git", ["add", "-A"]);
     sh(l.work, "git", ["commit", "-q", "-m", "local"]);
@@ -164,8 +164,43 @@ describe("dev-loop, outputs the protocol refuses", { timeout: 30_000 }, () => {
     expect(dl(l, "answer").errors).toEqual([`head: не запушен в origin/${BRANCH}`]);
   });
 
-  it("makes a block without a rule advice", () => {
+  it("refuses a blocking kind without a rule and a kind outside the protocol", () => {
     const l = loop();
-    expect(round(l, [{ ...BLOCK, rule: "" }])).toMatchObject({ next: "done", warnings: ["findings[0]: block без rule или quote — стал советом"] });
+    const w = dl(l, "wave", "--worktree", l.work);
+    const std = agents(w).find((a) => a.agent === "reviewer-standards")!.brief;
+    for (const a of agents(w)) out(a.brief, { axis: read(a.brief).axis, head: head(l), summary: "checked", statuses: [], findings: [] });
+    out(std, { axis: "standards", head: head(l), summary: "x", statuses: [], findings: [{ ...BLOCK, kind: "untested", rule: "" }, { ...BLOCK, kind: "block" }] });
+    expect((dl(l, "merge").errors as { [agent: string]: string[] })["reviewer-standards"]).toEqual([
+      "findings[0]: kind untested блокирует — нужны rule и quote; без них это advice",
+      "findings[1].kind: rule | scope | untested | expectation | mechanism | advice",
+    ]);
+  });
+});
+
+describe("dev-loop, nothing is lost before the end", { timeout: 30_000 }, () => {
+  it("accepts in tidy an advice fixed by a commit before the reviewed head", () => {
+    const l = loop();
+    expect(round(l, [{ ...BLOCK, kind: "advice", rule: "" }])).toMatchObject({ next: "tidy" });
+    const tb = dl(l, "brief", "fixer", "--worktree", l.work, "--job", "tidy").brief as string;
+    const task = sh(l.work, "git", ["log", "-1", "--format=%H", "HEAD"]);
+    out(tb, { status: "done", head: head(l), answers: [{ id: "W1-T1", action: "fixed", commits: [task] }] });
+    expect(dl(l, "answer", "--job", "tidy")).toMatchObject({ ok: true, status: "done" });
+  });
+
+  it("sends advice to a tidy round that records what is deferred in the plan", () => {
+    const l = loop();
+    const advice = { ...BLOCK, kind: "advice", rule: "", text: "a fixture would show the path" };
+    expect(round(l, [advice])).toMatchObject({ next: "tidy" });
+    const tb = dl(l, "brief", "fixer", "--worktree", l.work, "--job", "tidy").brief as string;
+    expect(read(tb)).toMatchObject({ job: "tidy", findings: [], advice: [{ id: "W1-T1" }] });
+    out(tb, { status: "done", head: head(l), answers: [{ id: "W1-T1", action: "deferred", where: "plan/phases/S0/tasks/S0-98-x.md" }] });
+    expect(dl(l, "answer", "--job", "tidy").errors).toEqual(["answers.W1-T1: where — файл задачи или PLAN.md фазы, изменённый в этом ответе"]);
+    const rec = commit(l.work, { "plan/phases/S0/tasks/S0-98-x.md": "# S0-98\n\n- [ ] a fixture shows the path\n" }, "S0-99: review — defer the fixture to S0-98");
+    out(tb, { status: "done", head: rec, answers: [{ id: "W1-T1", action: "deferred", where: "plan/phases/S0/tasks/S0-98-x.md", note: "S0-98" }] });
+    expect(dl(l, "answer", "--job", "tidy")).toMatchObject({ ok: true, status: "done" });
+    const w2 = dl(l, "wave", "--worktree", l.work);
+    for (const a of agents(w2)) out(a.brief, { axis: read(a.brief).axis, head: rec, summary: "checked", statuses: [], findings: [] });
+    expect(dl(l, "merge")).toMatchObject({ ok: true, next: "done" });
+    expect(readFileSync(dl(l, "final").comment as string, "utf8")).toContain("→ `plan/phases/S0/tasks/S0-98-x.md`");
   });
 });

@@ -1,6 +1,8 @@
 // state: состояние цикла и его переходы (plan/dev-loop.md, «Круги»). Чистые функции.
 // Состояние: {pr, task, branch, budget, wave, head, base, waves[], findings[], answers, decisions[], gaps[], triggers,
-//   pending — вопрос владельцу {why, question?, agent?, findings?}, owner — ответ владельца агенту {text, agent, job?}, stopped}.
+//   pending — вопрос владельцу {why, question?, agent?, job?, findings?}, owner — ответ владельца агенту {text, agent, job?},
+//   tidied — круг tidy пройден, stopped}.
+// Статусы находки: open, dispute-kept, closed, dispute-accepted, advice, applied, deferred (+ deferredTo), declined, owner-closed.
 // Находка: {id, axis, severity, rule, where, quote, text, ratchet, late, wave, status, history[{wave, status, note}]}.
 import { LETTER } from "./protocol.mjs";
 
@@ -9,14 +11,14 @@ export const OWNER_ACTIONS = ["fix", "drop", "task", "gap", "stop"];
 const DUPLICATE_LINES = 3;
 
 export function initial({ pr, task, branch, gaps = [] }) {
-  return { pr, task, branch, budget: BUDGET, wave: 0, head: null, base: null, waves: [], findings: [], answers: null, decisions: [], gaps, triggers: null, pending: null, owner: null, stopped: false };
+  return { pr, task, branch, budget: BUDGET, wave: 0, head: null, base: null, waves: [], findings: [], answers: null, decisions: [], gaps, triggers: null, pending: null, owner: null, tidied: false, stopped: false };
 }
 
 const isOpen = (f) => f.severity === "block" && (f.status === "open" || f.status === "dispute-kept");
 export const openFindings = (state) => state.findings.filter(isOpen);
 const disputedIds = (state) => (state.answers?.items ?? []).filter((a) => a.action === "disputed").map((a) => a.id);
-// Что должен закрыть исправляющий: открытые находки и решения владельца task и gap.
-export const toAnswer = (state) => [...openFindings(state).map((f) => f.id), ...state.decisions.filter((d) => d.action !== "fix").map((d) => d.id)];
+// Хвосты перед сдачей: советы и блокирующие находки вне дельты. Круг tidy решает каждый.
+export const looseFindings = (state) => state.findings.filter((f) => f.status === "advice" || (isOpen(f) && f.late));
 
 // Кто ставит статус каждой открытой находке и какие агенты нужны кругу.
 export function planWave(state, scope) {
@@ -86,15 +88,28 @@ export function decide(state) {
   if (state.stopped) return { next: "stop", why: "владелец остановил цикл" };
   if (state.decisions.length) return { next: "fix", why: "решения владельца к исполнению" };
   if (open.some((f) => f.status === "dispute-kept")) return { next: "escalate", why: "автор и ревьюер расходятся в правиле" };
-  if (!open.some((f) => !f.late)) return { next: "done", why: "блокирующих находок нет" };
+  if (!open.some((f) => !f.late)) {
+    const loose = looseFindings(state).length;
+    if (loose && !state.tidied) return { next: "tidy", why: `хвостов перед сдачей: ${loose} — исправить, отложить в план или отклонить` };
+    return { next: "done", why: "блокирующих находок нет" };
+  }
   if (state.wave >= state.budget) return { next: "escalate", why: `бюджет ${state.budget} кругов исчерпан` };
   return { next: "fix", why: `открыто блокирующих: ${open.length}` };
 }
 
-export function recordAnswer(state, out) {
+// Ответ исправляющего (answer или tidy) → состояние. Советы и отложенное получают итоговый статус сразу;
+// исправленные блокирующие находки закрывает следующий круг.
+export function recordAnswer(state, out, job) {
   const next = structuredClone(state);
-  next.answers = { wave: state.wave, head: out.head, items: out.answers ?? [], advice: out.advice ?? [] };
-  for (const a of next.answers.advice) if (a.applied) next.findings.find((f) => f.id === a.id).status = "applied";
+  next.answers = { wave: state.wave, job, head: out.head, items: out.answers ?? [] };
+  for (const a of next.answers.items) {
+    const f = next.findings.find((g) => g.id === a.id);
+    if (!f) continue;
+    if (a.action === "deferred") Object.assign(f, { status: "deferred", deferredTo: a.where });
+    else if (a.action === "declined") Object.assign(f, { status: "declined", declinedWhy: a.note });
+    else if (a.action === "fixed" && f.status === "advice") f.status = "applied";
+  }
+  if (job === "tidy") Object.assign(next, { tidied: true, budget: next.budget + 1 });
   next.gaps = [...new Set([...next.gaps, ...(out.gaps ?? [])])];
   next.decisions = [];
   next.owner = null;

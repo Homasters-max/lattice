@@ -12,15 +12,18 @@ Push автора — `git push origin HEAD:refs/heads/<branch>` (worktree в de
 
 ## Блокирует или совет
 
-**Блокирует** (`block`) находка с `rule` и `quote`, которая показывает одно из:
+Ревьюер называет `kind` — какой критерий нарушен; `block` или `advice` из него выводит инструмент.
 
-- нарушен rule ID из `docs/design`, раздел `CONVENTIONS.md` или пункт `AGENTS.md`;
-- пункт «Готово, когда» или объём задачи не выполнен или выполнен неверно;
-- правило из `rules` задачи ничем не показано (ST-13), или тест не упадёт, если правило сломать;
-- ожидание теста изменено или тест отключён без изменения правила (PR-11);
-- новый механизм или обход по `plan/closure-check.md` (PR-03, RM-08).
+| `kind` | Что показывает находка | Тяжесть |
+|---|---|---|
+| `rule` | нарушен rule ID из `docs/design`, раздел `CONVENTIONS.md` или пункт `AGENTS.md` | block |
+| `scope` | пункт «Готово, когда» или объём задачи не выполнен или выполнен неверно | block |
+| `untested` | правило из `rules` или утверждение задачи и PR ничем не показано: тест не упадёт, если это сломать (ST-13, ST-17) | block |
+| `expectation` | ожидание теста изменено или тест отключён без изменения правила (PR-11) | block |
+| `mechanism` | новый механизм или обход по `plan/closure-check.md` (PR-03, RM-08) | block |
+| `advice` | всё остальное: вкус, стиль вне правил, «можно проще» | advice |
 
-Всё остальное — **совет** (`advice`). Совет не продлевает цикл. `block` без `rule` или `quote` инструмент делает советом.
+Блокирующий `kind` без `rule` и `quote` инструмент не принимает: либо правило и цитата, либо `advice`.
 
 `rule` — одно из: `LG-23`, `CONVENTIONS §1`, `AGENTS.md`, строка файла задачи `S0-33:68`.
 
@@ -36,7 +39,13 @@ Push автора — `git push origin HEAD:refs/heads/<branch>` (worktree в de
 | `status` | у находки нет оси в круге (`verifier`) | только статусы |
 | `conflicts` | после пересборки на `main` (`verifier`) | `git range-diff` по `range` и `files`: верно ли соединены обе стороны |
 
-Находку в строке, которую дельта не меняла, инструмент помечает `late`: она не продлевает цикл сама, её исправляют, если круг и так будет, иначе она уходит владельцу в итог. Ветка во время кругов на `main` не пересобирается — только после последнего зелёного круга.
+Находку в строке, которую дельта не меняла, инструмент помечает `late`: она не продлевает цикл сама; её исправляют, если круг и так будет, иначе её решает `tidy`. Ветка во время кругов на `main` не пересобирается — только после последнего зелёного круга.
+
+## Ничего не теряется
+
+Когда блокирующих находок не осталось, а советы или находки `late` есть, перед сдачей идёт один круг `tidy`. Исправляющий решает каждую: `fixed` — исправлено коммитом; `deferred` — работа записана в план, в `where` файл записи: новая задача или пункт ещё не начатой задачи по `plan-task` («Отступления»), либо `PLAN.md` фазы; `declined` — совет отклонён, причина в `note`. Инструмент проверяет, что `where` изменён в этом ответе, — план не расходится с кодом. Итог перечисляет отложенное со ссылками и отклонённое с причинами.
+
+## Статусы
 
 Статус находки: `closed` — нарушения нет; `open` — осталось (в `note` — что); `dispute-accepted` — довод автора верен; `dispute-kept` — правило говорит иное (в `note` — цитата правила). `dispute-*` — только для id из `disputed` в brief.
 
@@ -50,19 +59,21 @@ Push автора — `git push origin HEAD:refs/heads/<branch>` (worktree в de
 
 **reviewer** — `reviewer-spec`, `reviewer-standards`, `reviewer-architecture`, `verifier` (ось `verify`).
 - Вход: `axis`, `job`, `wave`, `base`, `head`, `reasons` (почему выбрана ось), `expectations` (Spec), `triggers` (Architecture), `files` и `range` (conflicts), `findings` — порученные находки, `disputed`, `answers` — ответ автора на них.
-- Выход: `{axis, head, summary, statuses: [{id, status, note?}], findings: [{severity, rule, where, quote, text, ratchet?}]}`.
+- Выход: `{axis, head, summary, statuses: [{id, status, note?}], findings: [{kind, rule, where, quote, text, ratchet?}]}`.
   - `summary` — что проверено, до 800 знаков.
   - `where` — `файл:строка` в `head`.
   - `text` — что не так и что было бы верно, одно-два предложения по-русски.
   - `ratchet: true` — нарушение мог бы ловить тест или lint (ST-16).
   - id находкам даёт инструмент.
 
-**fixer** — `job`: `answer` — ответ на круг, `verify-red` — красный verify по `log`, `rebase` — пересборка на `origin/main`, `owner` — поручение владельца из `owner`.
-- Вход: `branch`, `base` — ревьюированный head, `findings` — открытые `block`, в том числе `late`, `advice`, `decisions` — решения владельца `{id, action: fix|task|gap, note}`, `log` (verify-red).
-- Выход: `{status: "done" | "needs_owner", head, answers: [{id, action: "fixed" | "disputed", commits, note}], advice: [{id, applied, commits?, note}], conflicts: [файл], question?, gaps?}`.
-  - На каждую находку из `findings` и каждое решение `task` или `gap` из `decisions` — ровно один ответ.
-  - `fixed` — коммиты из `base..head`.
-  - `disputed` — `note` называет правило, которое говорит иное. «Трудно» или «вне объёма» — не довод, а повод для задачи или вопроса владельцу (`plan-task`, «Отступления»).
+**fixer** — `job`: `answer` — ответ на круг, `tidy` — хвосты перед сдачей, `verify-red` — красный verify по `log`, `rebase` — пересборка на `origin/main`, `owner` — поручение владельца из `owner`.
+- Вход: `branch`, `base` — ревьюированный head, `since` — начало ветки (`tidy`), `findings` — открытые `block` (в `answer` все, в `tidy` — `late`), `advice` — советы (`tidy`), `decisions` — решения владельца `{id, action: fix|task|gap, note}`, `log` (verify-red).
+- Выход: `{status: "done" | "needs_owner", head, answers: [{id, action, commits?, where?, note?}], conflicts?: [файл], question?, gaps?}`.
+  - На каждую находку из `findings` и `advice` и каждое решение `task` или `gap` — ровно один ответ.
+  - `action`: в `answer` — `fixed` | `disputed`; в `tidy` ещё `deferred` | `declined`.
+  - `fixed` — коммиты из `base..head`; в `tidy` — из `since..head`, всей ветки: хвост мог закрыть и более ранний коммит.
+  - `disputed` — только о блокирующей находке; `note` называет правило, которое говорит иное. «Трудно» или «вне объёма» — не довод, а `deferred` или вопрос владельцу.
+  - `deferred` — `where`: файл задачи или `PLAN.md` фазы, изменённый в этом ответе. `declined` — только совет, причина в `note`.
   - `head` — HEAD worktree, запушенный в `branch`.
   - `conflicts` (rebase) — файлы, где конфликт решён руками.
 

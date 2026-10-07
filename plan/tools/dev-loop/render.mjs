@@ -5,7 +5,7 @@ import { openFindings } from "./state.mjs";
 const AXIS = { spec: "Spec", standards: "Standards", architecture: "Architecture", verify: "Проверка закрытия" };
 const STATUS = { closed: "закрыта", open: "открыта", "dispute-accepted": "спор принят", "dispute-kept": "спор отклонён" };
 const MODE = { none: "без ревью", verify: "проверка закрытия", review: "ревью осей", conflicts: "проверка конфликтов пересборки" };
-const NEXT = { fix: "исправления", done: "сдача", escalate: "решение владельца" };
+const NEXT = { fix: "исправления", tidy: "хвосты перед сдачей", done: "сдача", escalate: "решение владельца" };
 export const OWNER_OPTIONS = [
   { label: "чинить", action: "fix", description: "исправить по находке; как — можно дописать через Other" },
   { label: "снять", action: "drop", description: "находка закрыта решением владельца" },
@@ -18,7 +18,8 @@ const title = (state, what) => `## ${what} · PR #${state.pr}${state.task ? ` ($
 const lines = (out) => out.join("\n") + "\n";
 
 // Закрытые находки в заголовке — без текста: комментарий не растёт с каждым кругом.
-const LIVE = ["open", "dispute-kept", "advice"];
+const LIVE = ["open", "dispute-kept", "advice", "deferred", "declined"];
+const ACTION = { fixed: "исправлено", disputed: "оспорено", deferred: "отложено в план", declined: "отклонено" };
 const compact = (f) => (LIVE.includes(f.status) ? f : { id: f.id, axis: f.axis, severity: f.severity, rule: f.rule, where: f.where, status: f.status, late: f.late, wave: f.wave, ratchet: f.ratchet, history: [] });
 
 export function header(kind, state) {
@@ -63,12 +64,8 @@ export function review(state, { scope, outputs, next }) {
 export function answer(state) {
   const a = state.answers;
   const out = [header("answer", state), title(state, `Ответ на ревью · круг ${a.wave}`), "", `Head \`${short(a.head)}\` · \`npm run verify\` зелёный`, ""];
-  out.push("| Находка | Ответ | Коммиты |", "|---|---|---|");
-  for (const x of a.items) out.push(`| ${x.id} | ${x.action === "fixed" ? "исправлено" : "оспорено"}: ${cell(x.note)} | ${(x.commits ?? []).map(short).join(", ")} |`);
-  if (a.advice.length) {
-    out.push("", "| Совет | Применён | Почему |", "|---|---|---|");
-    for (const x of a.advice) out.push(`| ${x.id} | ${x.applied ? (x.commits ?? []).map(short).join(", ") || "да" : "нет"} | ${cell(x.note)} |`);
-  }
+  out.push("| Находка | Ответ | Коммиты или запись |", "|---|---|---|");
+  for (const x of a.items) out.push(`| ${x.id} | ${ACTION[x.action]}: ${cell(x.note)} | ${x.where ? `\`${x.where}\`` : (x.commits ?? []).map(short).join(", ")} |`);
   if (state.gaps.length) out.push("", `Пробелы для решения владельца до merge: ${state.gaps.join(", ")}.`);
   return lines(out);
 }
@@ -125,9 +122,14 @@ export function final(state, { scope } = {}) {
     out.push("", "| Круг | Режим | Оси | Найдено | Закрыто |", "|---|---|---|---|---|");
     for (const w of state.waves) out.push(`| ${w.n} | ${MODE[w.mode]} | ${w.axes.map((a) => AXIS[a]).join(", ")} | ${w.found.join(", ") || "—"} | ${w.closed.join(", ") || "—"} |`);
   }
+  const of = (status) => state.findings.filter((f) => f.status === status);
+  const deferred = of("deferred").map((f) => `- ${f.id} · \`${f.where}\`: ${f.text} → \`${f.deferredTo}\``);
+  const declined = of("declined").map((f) => `- ${f.id} · \`${f.where}\`: ${f.text} — ${f.declinedWhy}`);
+  if (deferred.length) out.push("", "### Отложено в план", "", ...deferred);
+  if (declined.length) out.push("", "### Отклонённые советы", "", ...declined);
   const todo = [
     ...openFindings(state).filter((f) => f.late).map((f) => `- находка вне дельты ${f.id} · ${f.rule} · \`${f.where}\`: ${f.text}`),
-    ...state.findings.filter((f) => f.status === "advice").map((f) => `- совет ${f.id} · \`${f.where}\`: ${f.text}`),
+    ...of("advice").map((f) => `- совет ${f.id} · \`${f.where}\`: ${f.text}`),
     ...state.gaps.map((g) => `- пробел ${g} в PLAN.md: решение до merge`),
   ];
   out.push("", "### Решить владельцу до merge", "", ...(todo.length ? todo : ["нечего"]));
