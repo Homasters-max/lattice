@@ -8,8 +8,8 @@
 import type { Site } from "./annotations.js";
 import { isJsonArray, isJsonObject, own, pointer, serialize, type JsonObject, type JsonValue } from "./json.js";
 
-/** A schema as read here: an object, admitted or not — `Schema` of schema.ts is the one `checkSchema` admits. */
-type Schema = JsonObject;
+/** A schema object as read here, admitted or not — `Schema` of schema.ts is the one `checkSchema` admits. */
+type SchemaObject = JsonObject;
 
 /** KR-18: the JSON types of the subset, each with the values it holds. */
 const TYPES: { readonly [type: string]: (v: JsonValue) => boolean } = {
@@ -29,7 +29,7 @@ export const isJsonType = (v: JsonValue): v is string => typeof v === "string" &
 export const isTypePair = (v: JsonValue): v is readonly string[] => isJsonArray(v) && v.length === 2 && v.every(isJsonType) && v[0] !== v[1] && v.includes("null");
 
 /** The JSON types a schema names, its `null` among them; none for a schema of `enum`, `const`, `$ref` or `oneOf` alone. */
-export function typesOf(schema: Schema): readonly string[] {
+export function typesOf(schema: SchemaObject): readonly string[] {
   const { type } = schema;
   if (type === undefined) return [];
   if (isJsonType(type)) return [type];
@@ -37,16 +37,16 @@ export function typesOf(schema: Schema): readonly string[] {
 }
 
 /** KR-18: whether a value is of a type the schema names; a schema without `type` names none. */
-export const fitsType = (schema: Schema, value: JsonValue): boolean => typesOf(schema).some((t) => TYPES[t]?.(value) === true);
+export const fitsType = (schema: SchemaObject, value: JsonValue): boolean => typesOf(schema).some((t) => TYPES[t]?.(value) === true);
 
 /** The fields of an object schema by name. */
-export const propertiesOf = (schema: Schema): JsonObject => (isJsonObject(schema.properties) ? schema.properties : {});
+export const propertiesOf = (schema: SchemaObject): JsonObject => (isJsonObject(schema.properties) ? schema.properties : {});
 
 /** The names `required` lists, as written. */
-export const requiredOf = (schema: Schema): readonly JsonValue[] => (isJsonArray(schema.required) ? schema.required : []);
+export const requiredOf = (schema: SchemaObject): readonly JsonValue[] => (isJsonArray(schema.required) ? schema.required : []);
 
 /** The number a keyword of the schema holds — a length, a count or a bound — or `undefined`. */
-export function numberOf(schema: Schema, keyword: string): number | undefined {
+export function numberOf(schema: SchemaObject, keyword: string): number | undefined {
   const v = schema[keyword];
   return typeof v === "number" ? v : undefined;
 }
@@ -58,10 +58,10 @@ export function tagOf(branch: JsonValue, discriminator: string): JsonValue | und
 }
 
 /** A branch of a tagged union, by the canonical text of its tag. */
-export type Branch = { readonly key: string; readonly tag: JsonValue; readonly schema: Schema };
+export type Branch = { readonly key: string; readonly tag: JsonValue; readonly schema: SchemaObject };
 
 /** KR-18: the branches of `oneOf` with `discriminator`, each with its tag; a branch without a tag is passed over. */
-export function branchesOf(schema: Schema): readonly Branch[] {
+export function branchesOf(schema: SchemaObject): readonly Branch[] {
   const { oneOf, discriminator } = schema;
   if (!isJsonArray(oneOf) || typeof discriminator !== "string") return [];
   return oneOf.flatMap((branch) => {
