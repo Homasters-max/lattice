@@ -68,4 +68,5 @@ compare(a: Schema, b: Schema, mode: Mode, resolve: ResolveType): { relation: Rel
 - **Файлы.** `type.ts` — тело типа и цепочка `extends`; `check-type.ts` — проверка тела; `meta-type.ts`; `compare.ts` — обход пары, `compare-values.ts` — значения одной схемы, `compare-annotations.ts` — граф и представление, `compare-shown.ts` — что показано о паре. `schema.ts` отдаёт обход схемы `sitesOf`.
 - **KR-17** показан тестом `test/kernel/type.test.ts`: несколько родителей — отказ формы `extends` с KR-14; своей проверки и фикстур у KR-17 нет — по построению.
 - **KR-19** по цепочке — фикстура `test/fixtures/KR-19/trigger/card-order-repeated-in-chain.json`.
+- **Файлы skeleton.** `test/structure/purity.test.ts` и `test/structure/repo.test.ts` (`skeleton-files.txt`) поправлены: программа TypeScript и её checker строятся в `beforeAll` с таймаутом 30 с, а не в первом тесте, — под нагрузкой полного прогона сборка дольше 5 с теста. Проверки и ожидания не изменены. Это триггер аудита ST-15.
 - **Пробелы** G-26 (тело и мета-тип, глубина, `card_order` по цепочке) и G-27 (форма `aspects`, `$ref`, `oneOf`, предел обхода) — работа по рекомендации, решает владелец.
