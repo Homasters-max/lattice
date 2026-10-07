@@ -4,10 +4,10 @@
 // soundness of `narrower` and `same` over values is compare.property.test.ts.
 // Every input crosses the module boundary frozen.
 import { describe, expect, it } from "vitest";
-import { compare, type Comparison, type JsonValue, type ResolveType, type Schema } from "../../src/kernel/index.js";
+import { compare, type JsonValue, type Mode, type ResolveType, type Schema } from "../../src/kernel/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
-type Mode = "revision" | "extends";
+type Comparison = ReturnType<typeof compare>;
 
 /** The type bodies a test knows by pinned reference. */
 const TYPES: { readonly [ref: string]: JsonValue } = {
@@ -107,7 +107,7 @@ describe("compare (KR-22)", () => {
 
   it("KR-22: the relation of B to A is the reverse of A to B in revision mode", () => {
     const flip = { same: "same", narrower: "wider", wider: "narrower", incomparable: "incomparable" } as const;
-    for (const [, a, b, mode] of [...rows, ...unions].filter((r) => r[3] === "revision")) {
+    for (const [, a, b] of [...rows, ...unions].filter((r) => r[3] === "revision")) {
       expect([a, b, run(b, a).relation]).toEqual([a, b, flip[run(a, b).relation]]);
     }
   });

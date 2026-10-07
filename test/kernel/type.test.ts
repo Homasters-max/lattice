@@ -38,19 +38,14 @@ const NOTE = { type: "object", properties: { text: { type: "string" } }, require
 const type = (schema: JsonValue, more: { readonly [key: string]: JsonValue } = {}) => ({ abstract: false, kind: "entity", schema, ...more });
 
 describe("the meta-type (KR-14)", () => {
-  it("KR-14: core/type@1 is typed by itself, made by kernel code in the genesis session", () => {
-    expect(META_TYPE).toMatchObject({
-      id: "core/type",
-      rev: 1,
-      type: "core/type@1",
-      by: "00000000000000000000000000",
-      at: "1970-01-01T00:00:00.000000Z",
-    });
+  it("KR-14: core/type@1 is typed by itself and made by kernel code; by and at are the genesis session's (LG-47)", () => {
+    expect(Object.keys(META_TYPE).sort()).toEqual(["body", "hash", "id", "rev", "type"]);
+    expect(META_TYPE).toMatchObject({ id: "core/type", rev: 1, type: "core/type@1" });
     expect(Object.isFrozen(META_TYPE) && Object.isFrozen(META_TYPE.body)).toBe(true);
   });
 
   it("KR-14: its hash is a constant of the kernel version", () => {
-    expect(META_TYPE.hash).toBe("sha256:7d5e0a5b1c1c7d4f0e6a2c0f7a9b3e2d1c0b9a8f7e6d5c4b3a2918f7e6d5c4b3");
+    expect(META_TYPE.hash).toBe("sha256:3a1996b59660785be00156ceb2f78d0ee37da00974aa5b1fb5dddfb01c862349");
     const again = hashRecord(META_TYPE.type, META_TYPE.body);
     expect(again.ok && again.value).toBe(META_TYPE.hash);
   });

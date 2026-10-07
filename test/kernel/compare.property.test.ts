@@ -60,16 +60,19 @@ function valueOf(s: JsonValue): fc.Arbitrary<JsonValue> {
   return fc.oneof(...types.map((t) => typed(s, t)), fc.constantFrom(...SCALARS));
 }
 
-function typed(s: Schema, type: string): fc.Arbitrary<JsonValue> {
-  if (type === "string") return fc.constantFrom(...STRINGS);
-  if (type === "integer") return fc.integer({ min: -2, max: 3 });
-  if (type === "number") return fc.constantFrom(-1.5, -1, 0, 0.5, 1, 2.5);
-  if (type === "boolean") return fc.boolean();
-  if (type === "array") return fc.array(valueOf(s.items ?? null), { maxLength: 3 });
-  if (type === "object" && s.values !== undefined) return fc.dictionary(fc.constantFrom("k", "x"), valueOf(s.values), { maxKeys: 2 });
-  if (type === "object") return objectOf(isJsonObject(s.properties) ? s.properties : {}, Array.isArray(s.required) ? (s.required as string[]) : []);
-  return fc.constant(null);
-}
+const TYPED: { readonly [type: string]: (s: Schema) => fc.Arbitrary<JsonValue> } = {
+  string: () => fc.constantFrom(...STRINGS),
+  integer: () => fc.integer({ min: -2, max: 3 }),
+  number: () => fc.constantFrom(-1.5, -1, 0, 0.5, 1, 2.5),
+  boolean: () => fc.boolean(),
+  array: (s) => fc.array(valueOf(s.items ?? null), { maxLength: 3 }),
+  object: (s) =>
+    s.values !== undefined
+      ? fc.dictionary(fc.constantFrom("k", "x"), valueOf(s.values), { maxKeys: 2 })
+      : objectOf(isJsonObject(s.properties) ? s.properties : {}, Array.isArray(s.required) ? (s.required as string[]) : []),
+};
+
+const typed = (s: Schema, type: string): fc.Arbitrary<JsonValue> => TYPED[type]?.(s) ?? fc.constant(null);
 
 function objectOf(properties: { readonly [k: string]: JsonValue }, required: readonly string[]): fc.Arbitrary<JsonValue> {
   const fields = Object.fromEntries(Object.entries(properties).map(([k, s]) => [k, required.includes(k) ? valueOf(s) : optional(valueOf(s))]));
@@ -88,9 +91,55 @@ function restrict(value: JsonValue, b: JsonValue): JsonValue {
 
 const valid = (v: JsonValue, s: Schema) => validate(v, s, NONE).ok;
 
+const BOUNDS: { readonly [type: string]: readonly [string, string] } = {
+  string: ["minLength", "maxLength"],
+  integer: ["minimum", "maximum"],
+  number: ["minimum", "maximum"],
+  array: ["minItems", "maxItems"],
+};
+
+/** A bound of a schema of one type moved, set or dropped. */
+function rebound(s: Schema): fc.Arbitrary<Schema>[] {
+  const keys = typeof s.type === "string" ? BOUNDS[s.type] : undefined;
+  if (keys === undefined) return [];
+  return [fc.tuple(fc.constantFrom(...keys), optional(s.type === "string" || s.type === "array" ? count : bound)).map(([k, v]) => json({ ...s, [k]: v }))];
+}
+
+const schemaOf = (v: JsonValue | undefined): Schema => (isJsonObject(v) ? v : {});
+
+/** A field of an object made optional or required, dropped, added, or its schema moved. */
+function refield(s: Schema, near: (s: Schema) => fc.Arbitrary<Schema>): fc.Arbitrary<Schema>[] {
+  if (!isJsonObject(s.properties)) return [];
+  const properties = s.properties;
+  const required = (Array.isArray(s.required) ? s.required : []) as string[];
+  const names = Object.keys(properties);
+  const toggle = (k: string) => ({ ...s, required: required.includes(k) ? required.filter((r) => r !== k) : [...required, k] });
+  const drop = (k: string) => ({ ...s, properties: Object.fromEntries(Object.entries(properties).filter(([n]) => n !== k)), required: required.filter((r) => r !== k) });
+  const add = leaf.map((l): Schema => ({ ...s, properties: { ...properties, c: l } }));
+  if (names.length === 0) return [add];
+  const name = fc.constantFrom(...names);
+  return [
+    add,
+    name.map(toggle),
+    name.map(drop),
+    name.chain((k) => near(schemaOf(properties[k])).map((f): Schema => ({ ...s, properties: { ...properties, [k]: f } }))),
+  ];
+}
+
+/** A schema near another: one change, so that a pair often relates. */
+function near(s: Schema): fc.Arbitrary<Schema> {
+  const inner = (["items", "values"] as const).flatMap((k) => {
+    const v = s[k];
+    return isJsonObject(v) ? [near(v).map((i): Schema => ({ ...s, [k]: i }))] : [];
+  });
+  const scalar = typeof s.type === "string" && s.type !== "object" && s.type !== "array";
+  const pair = scalar || Array.isArray(s.type) ? [fc.constant<Schema>(json({ ...s, type: Array.isArray(s.type) ? (s.type[0] as JsonValue) : [s.type as string, "null"] }))] : [];
+  return fc.oneof(fc.constant(s), nullable(leaf), ...pair, ...rebound(s), ...inner, ...refield(s, near));
+}
+
 /** Pairs of schemas the subset admits, each with values drawn from both sides. */
 const pairs = fc
-  .tuple(schema, schema)
+  .oneof(fc.tuple(schema, schema), schema.chain((a) => fc.tuple(fc.constant(a), near(a))), schema.chain((b) => fc.tuple(near(b), fc.constant(b))))
   .filter(([a, b]) => checkSchema(a, "entity", { intent: null, path: "" }).length === 0 && checkSchema(b, "entity", { intent: null, path: "" }).length === 0)
   .chain(([a, b]) => fc.tuple(fc.constant(deepFreeze(a)), fc.constant(deepFreeze(b)), fc.array(fc.oneof(valueOf(a), valueOf(b)), { minLength: 8, maxLength: 8 })));
 

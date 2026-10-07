@@ -2,6 +2,9 @@
 // other module (KR-02). Every file it reaches is listed in
 // test/structure/kernel-files.txt (ST-05).
 export { canon } from "./canon.js";
+export { checkRecordType, checkType } from "./check-type.js";
+export { compare, type Mode, type Relation } from "./compare.js";
+export type { Aspect } from "./compare-shown.js";
 export { checkFormat, isFormat, isUlid, type Format } from "./formats.js";
 export { BODY_LIMIT, hash, hashBytes, hashRecord } from "./hash.js";
 export { compareText, gotOf, isJsonObject, type JsonObject, type JsonValue } from "./json.js";
@@ -20,8 +23,10 @@ export {
   type Result,
   type Rule,
 } from "./rejection.js";
-export { KR_04, KR_06, KR_07, KR_08, KR_10, KR_11, KR_13, KR_18, KR_19, KR_21, KR_23, KR_24, RULES } from "./rules.js";
+export { META_TYPE, type MetaType } from "./meta-type.js";
+export { KR_04, KR_06, KR_07, KR_08, KR_10, KR_11, KR_13, KR_14, KR_15, KR_16, KR_18, KR_19, KR_21, KR_23, KR_24, RULES } from "./rules.js";
 export { checkSchema, type Schema } from "./schema.js";
+export type { ResolveType, Type } from "./type.js";
 export { checkUri, isUri } from "./uri.js";
 export { checkBody, validate, type Resolve, type Violation, type Violations } from "./validate.js";
 export { KERNEL_VERSION } from "./version.js";
