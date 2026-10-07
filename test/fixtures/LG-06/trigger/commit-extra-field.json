@@ -1,0 +1,12 @@
+{
+  "check": "store",
+  "input": {
+    "lines": [
+      "{\"at\":\"2026-10-06T12:00:00.000000Z\",\"base\":0,\"by\":\"01JB2X00000000000000000LND\",\"kernel\":\"0\",\"prev\":null,\"proposal\":\"sha256:4d8a836df029a21dd21c3121bf4740e20919b720d3aa1407e9ffcb950ea0900b\",\"proposal_sig\":null,\"records\":[{\"at\":\"2026-10-06T12:00:00.000000Z\",\"body\":{\"text\":\"hello\"},\"by\":\"01JB2X00000000000000000SES\",\"hash\":\"sha256:71ede0305bcc8a6f99a4590524a12a2a889fabd0f54f5e9c31bb744713898a59\",\"id\":\"demo/hello\",\"rev\":1,\"type\":\"demo/note@1\"}],\"request\":null,\"seq\":1,\"sig\":null,\"zzz\":1}"
+    ]
+  },
+  "expect": {
+    "rule": "LG-06",
+    "path": "/store/knowledge.jsonl/1/zzz"
+  }
+}
