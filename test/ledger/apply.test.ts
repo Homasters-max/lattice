@@ -3,7 +3,7 @@
 // the next seq, rev and hash, the land session's `by` and `at` (LG-22), and
 // its records in canonical order (LG-06, LG-10).
 import { describe, expect, it } from "vitest";
-import { hashRecord, KERNEL_VERSION, type JsonValue } from "../../src/kernel/index.js";
+import { BODY_LIMIT, hashRecord, KERNEL_VERSION, type JsonValue } from "../../src/kernel/index.js";
 import {
   apply,
   createView,
@@ -57,6 +57,31 @@ describe("apply, phase 1 (KR-06)", () => {
       ["KR-06", "B/b", "/id"],
       ["KR-06", "Z/z", "/id"],
     ]);
+  });
+});
+
+describe("apply, phase 1: canonical form and the body limit (KR-10, KR-13)", () => {
+  const refusals = (p: JsonValue) => {
+    const read = readProposal(deepFreeze(p));
+    if (!read.ok) throw new Error("bug: the test proposal has the form of LG-09");
+    const out = apply(empty(), read.value, LAND, []);
+    return out.ok ? [] : out.rejections.map((r) => [r.rule, r.intent, r.path]);
+  };
+
+  it("KR-10: refuses what canon refuses — in the session and the signature from the root, in an intent inside it (G-13)", () => {
+    const session = { id: "01JB2X00000000000000000SES", name: "e\u0301" };
+    const p = { session, intents: [{ ...(intent("demo/a") as { readonly [k: string]: JsonValue }), expected: -0 }], sig: "\uD800" };
+    expect(refusals(p)).toEqual([
+      ["KR-10", null, "/session/name"],
+      ["KR-10", null, "/sig"],
+      ["KR-10", "demo/a", "/expected"],
+    ]);
+  });
+
+  it("KR-13: refuses a body over the limit at its intent, and writes one at the limit", () => {
+    const at = (bytes: number) => ({ session: { id: "01JB2X00000000000000000SES" }, intents: [intent("demo/a", "x".repeat(bytes - 2))], sig: null });
+    expect(refusals(at(BODY_LIMIT + 1))).toEqual([["KR-13", "demo/a", "/body"]]);
+    expect(refusals(at(BODY_LIMIT))).toEqual([]);
   });
 });
 

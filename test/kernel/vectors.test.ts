@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { canon, isFormat, parseJson, type Format, type JsonValue } from "../../src/kernel/index.js";
 import { serialize } from "../../src/kernel/json.js";
+import { deepFreeze } from "../support/deep-freeze.js";
 
 const dir = join(import.meta.dirname, "..", "vectors");
 const bytes = (file: string) => readFileSync(join(dir, file));
@@ -79,7 +80,7 @@ describe("NFC cases (KR-10)", () => {
   it("KR-10: canon and the parse take a string in NFC and refuse one that is not", () => {
     for (const c of cases) {
       const text = serialize({ s: c.text });
-      expect([c.note, canon({ s: c.text }).ok, parseJson(text).ok]).toEqual([c.note, c.nfc, c.nfc]);
+      expect([c.note, canon(deepFreeze({ s: c.text })).ok, parseJson(text).ok]).toEqual([c.note, c.nfc, c.nfc]);
     }
   });
 });

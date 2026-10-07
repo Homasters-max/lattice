@@ -44,7 +44,7 @@ describe("canon (KR-10)", () => {
 
   it("KR-10: writes a value nested deeper than the call stack without overflow", () => {
     let deep: JsonValue = [];
-    for (let i = 0; i < 100_000; i++) deep = [deep];
+    for (let i = 0; i < 100_000; i++) deep = Object.freeze([deep]);
     const text = canon(deep);
     expect(text.ok && text.value.length).toBe(200_002);
   });
@@ -70,7 +70,7 @@ const textOf = (v: JsonValue): string => {
 describe("canon properties (KR-10)", () => {
   it("KR-10: canon(parse(canon(x))) == canon(x)", () => {
     fc.assert(
-      fc.property(admitted, (v) => {
+      fc.property(admitted.map(deepFreeze), (v) => {
         const parsed = parseJson(textOf(v));
         expect(parsed.ok && textOf(parsed.value)).toBe(textOf(v));
       }),
@@ -80,8 +80,8 @@ describe("canon properties (KR-10)", () => {
   it("KR-10: an order of keys does not change canon", () => {
     const object = fc.dictionary(fc.string().map((s) => s.normalize("NFC").replace(/\p{Noncharacter_Code_Point}/gu, "")), admitted);
     fc.assert(
-      fc.property(object, (o) => {
-        const reversed = Object.fromEntries(Object.entries(o).reverse());
+      fc.property(object.map(deepFreeze), (o) => {
+        const reversed = deepFreeze(Object.fromEntries(Object.entries(o).reverse()));
         expect(textOf(reversed)).toBe(textOf(o));
       }),
     );
