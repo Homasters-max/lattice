@@ -31,6 +31,6 @@
 | 23 | Is the integer 2^53 itself admitted into the canonical form? | — | blank | S0-04, G-20 (KR-10 «outside ±2^53» не говорит о границе; I-JSON и RFC 8785 — до 2^53−1; решено: нет, только \|x\| ≤ 2^53−1) | 2026-10-07 |
 | 24 | Does a date-time admit a leap second? | — | blank | S0-04, G-21 (KR-11 задаёт написание, но не диапазон; решено: нет) | 2026-10-07 |
 | 25 | Which numbers does the canonical form refuse? | lattice/kr-10 | normal | S0-04 | 2026-10-07 |
-| 23 | Is the type of a record a floating or a pinned reference? | lattice/kr-07 | normal | S0-05 | 2026-10-07 |
-| 24 | May the revision number in a pinned reference have leading zeros? | — | blank | S0-05, G-12 (KR-23 называет `id@n`, но не грамматику `n`) | 2026-10-07 |
-| 25 | Must an external link of format uri have a scheme, and may it carry a fragment? | — | blank | S0-05, G-06 (KR-24 — «absolute URI», а RFC 3986 `absolute-URI` без фрагмента) | 2026-10-07 |
+| 26 | Is the type of a record a floating or a pinned reference? | lattice/kr-07 | normal | S0-05 | 2026-10-07 |
+| 27 | May the revision number in a pinned reference have leading zeros? | — | blank | S0-05, G-12 (KR-23 называет `id@n`, но не грамматику `n`) | 2026-10-07 |
+| 28 | Must an external link of format uri have a scheme, and may it carry a fragment? | — | blank | S0-05, G-06 (KR-24 — «absolute URI», а RFC 3986 `absolute-URI` без фрагмента) | 2026-10-07 |
