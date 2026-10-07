@@ -34,6 +34,6 @@ rules: [ST-12]
 
 ## Готово, когда
 
-- [ ] ST-18, RT-12, RT-21, LT-31, LT-32, RM-Z04 правлены; D207 и далее записаны
-- [ ] `node discussion/tools/lint-ids.mjs` и `plan-check` без ошибок; файлы `docs/design` — LF
-- [ ] `npm run verify` зелёный
+- [x] ST-18, RT-12, RT-21, LT-31, LT-32, RM-Z04 правлены; D207 и далее записаны
+- [x] `node discussion/tools/lint-ids.mjs` и `plan-check` без ошибок; файлы `docs/design` — LF
+- [x] `npm run verify` зелёный
