@@ -1,16 +1,31 @@
 {
-  "check": "body",
+  "check": "record",
   "input": {
-    "schema": {
-      "type": "object",
-      "properties": {
-        "title": { "type": "string" }
+    "record": {
+      "type": "demo/note@1",
+      "rev": 1,
+      "body": {
+        "title": "a",
+        "colour": "red"
       }
     },
-    "body": { "title": "a", "colour": "red" }
+    "types": {
+      "demo/note@1": {
+        "abstract": false,
+        "kind": "entity",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
   },
   "expect": {
     "rule": "KR-21",
-    "path": "/colour"
+    "path": "/body/colour"
   }
 }

@@ -5,59 +5,45 @@
       "type": "core/type@1",
       "rev": 1,
       "body": {
-        "extends": "demo/a@1",
+        "extends": "demo/base@1",
         "abstract": false,
         "kind": "entity",
         "schema": {
           "type": "object",
           "properties": {
+            "title": {
+              "type": "string",
+              "card_order": 1
+            },
             "text": {
-              "type": "string"
+              "type": "string",
+              "card_order": 2
             }
           },
           "required": [
+            "title",
             "text"
           ]
         }
       }
     },
     "types": {
-      "demo/a@1": {
-        "extends": "demo/b@1",
+      "demo/base@1": {
         "abstract": true,
         "kind": "entity",
         "schema": {
           "type": "object",
           "properties": {
-            "text": {
-              "type": "string"
+            "title": {
+              "type": "string",
+              "card_order": 1
             }
           },
           "required": [
-            "text"
-          ]
-        }
-      },
-      "demo/b@1": {
-        "extends": "demo/a@1",
-        "abstract": true,
-        "kind": "entity",
-        "schema": {
-          "type": "object",
-          "properties": {
-            "text": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "text"
+            "title"
           ]
         }
       }
     }
-  },
-  "expect": {
-    "rule": "KR-15",
-    "path": "/body/extends"
   }
 }

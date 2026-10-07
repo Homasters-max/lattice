@@ -25,7 +25,7 @@ const REV = /^[1-9][0-9]*$/;
  * holds the other two, so a segment is read by it; which of the three a segment is, the type of the target tells
  * when the ledger resolves the reference.
  */
-const SEGMENT = /^[a-z0-9][a-z0-9._@-]*$/;
+export const SEGMENT = /^[a-z0-9][a-z0-9._@-]*$/;
 
 /** KR-23: an entity `id` or `id@n`, or the ULID of an event; `null` for anything else. */
 function parseTarget(s: string): Target | null {

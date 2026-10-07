@@ -10,8 +10,7 @@
       "body": {
         "of": "demo/hello"
       }
-    },
-    "kind": "event"
+    }
   },
   "expect": {
     "rule": "KR-06",

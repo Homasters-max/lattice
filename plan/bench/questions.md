@@ -49,3 +49,4 @@
 | 41 | Does a child type repeat the fields of its parent in its own schema? | lattice/kr-15, lattice/kr-22 | normal | S0-07, G-26 | 2026-10-07 |
 | 42 | Is a new type revision that adds a required field narrower? | lattice/kr-22 | normal | S0-07 | 2026-10-07 |
 | 43 | Which edge label does the extends field of a type carry? | — | blank | S0-07, G-26 (в словаре TY-16 метки `extends` нет) | 2026-10-07 |
+| 44 | Which rule refuses a record whose type the ledger does not know, before references are checked? | — | blank | S0-36, G-28 (LG-16 читает тело против `type@n`, RF-03 — фаза 4; решено: KR-15 на `/type`) | 2026-10-07 |

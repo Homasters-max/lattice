@@ -19,6 +19,8 @@ const TYPES: { readonly [ref: string]: JsonValue } = {
   "demo/span@3": { abstract: true, kind: "entity", schema: { type: "object", properties: { n: { type: "integer", maximum: 10 } }, required: ["n"] } },
   "demo/tree@1": { abstract: true, kind: "entity", schema: { type: "object", properties: { kids: { type: "array", items: { $ref: "demo/tree@1" } } } } },
   "demo/tree@2": { abstract: true, kind: "entity", schema: { type: "object", properties: { kids: { type: "array", items: { $ref: "demo/tree@2" } } } } },
+  "demo/odd@1": { abstract: true, kind: "entity", schema: { type: "array", const: [1], items: 5 } },
+  "demo/oddchild@1": { extends: "demo/base@1", abstract: false, kind: "entity", schema: { type: "array", const: [1], items: 5 } },
 };
 
 const resolve: ResolveType = (ref) => (Object.hasOwn(TYPES, ref) ? (TYPES[ref] ?? null) : null);
@@ -74,6 +76,7 @@ const rows: readonly Row[] = [
   ["graph: floating is narrower than any", REF({ pin: "floating" }), REF({ pin: "any" }), "revision", { relation: "narrower", aspects: ["ref"] }],
   ["graph: pinned and floating are incomparable", REF({ pin: "pinned" }), REF({ pin: "floating" }), "revision", { relation: "incomparable", aspects: ["ref"] }],
   ["graph: a subtype as ref.to is narrower", REF({ to: "demo/child@1" }), REF({ to: "demo/base@1" }), "revision", { relation: "narrower", aspects: ["ref"] }],
+  ["graph: a ref.to the kernel does not admit reaches no parent — incomparable (Q-33)", REF({ to: "demo/oddchild@1" }), REF({ to: "demo/base@1" }), "revision", { relation: "incomparable", aspects: ["ref"] }],
   ["graph: an unrelated ref.to is incomparable", REF({ to: "demo/other@1" }), REF({ to: "demo/base@1" }), "revision", { relation: "incomparable", aspects: ["ref"] }],
   ["graph: added unique is narrower", object({ a: { type: "string", unique: true } }), object({ a: S }), "revision", { relation: "narrower", aspects: ["unique"] }],
   ["graph: removed unique is wider", object({ a: S }), object({ a: { type: "string", unique: true } }), "revision", { relation: "wider", aspects: ["unique"] }],
@@ -119,6 +122,11 @@ describe("compare (KR-22)", () => {
     const deep = (n: number, leaf: Schema): Schema => (n === 0 ? leaf : { type: "array", items: deep(n - 1, leaf) });
     expect(run(deep(5000, { type: "string", maxLength: 1 }), deep(5000, S)).relation).toBe("incomparable");
     expect(run(deep(5000, S), deep(5000, S)).relation).toBe("same");
+  });
+
+  it("KR-22: a $ref to a type the kernel does not admit names no schema — incomparable, never a crash (Q-33)", () => {
+    expect(run({ $ref: "demo/odd@1" }, { $ref: "demo/span@1" })).toEqual({ relation: "incomparable", aspects: ["validity"] });
+    expect(run({ $ref: "demo/span@1" }, { $ref: "demo/odd@1" })).toEqual({ relation: "incomparable", aspects: ["validity"] });
   });
 
   it("KR-22: a schema wider than the steps the walk takes is incomparable", () => {

@@ -38,13 +38,22 @@ rules: [KR-04, KR-14, KR-15, KR-16, KR-18, KR-19, KR-21, KR-22, LG-16, ST-17]
 
 ## Интерфейс
 
-Набросок; точную форму выбирает задача.
+Сделано так:
 
 ```ts
-// src/kernel/<file>.ts — фаза 2 одной записи (LG-16)
-checkAgainstType(record: Record, resolve: ResolveType, place: Place): Rejection[]
+// src/kernel/against-type.ts — фаза 2 одной записи (LG-16)
+checkAgainstType(record: Pick<Record, "type" | "rev" | "body">, resolve: ResolveType, place: Place): Rejection[]
 // resolve: тело типа по pinned ссылке из `after` (LG-11: тип и его блоки — в одном коммите); null — неизвестен
+// place — место записи во входе: `rev` на /rev, тип на /type, тело под /body; отказы отсортированы
 ```
+
+- Запись берётся полями `type`, `rev`, `body`: заголовок проверила фаза 1, остальные поля фаза 2 не читает.
+- `core/type@1` ядро читает из своего `META_TYPE`, а не у `resolve`: мета-тип создаёт код ядра (KR-14), и до genesis его в `after` нет.
+- Тип, который ядро читает, — `typeAt(ref, resolve)` в `type.ts`: `readType` и `checkSchema`; иначе — почему типа нет: `"a type resolve knows"` или `"an admitted type"`. Через него читаются тип записи, родители цепочки, цели `$ref` (KR-16 — `"an admitted abstract type"`, `validate` — нарушение `$ref`, `compare` — `incomparable`) и `ref.to`.
+- Неизвестный тип записи — отказ KR-15 на `/type`, `expected: "a type resolve knows"` (G-28).
+- Чтение схемы — `src/kernel/read-schema.ts`: `typesOf`, `fitsType`, `propertiesOf`, `requiredOf`, `numberOf`, `tagOf`, `branchesOf`, `childrenOf`, `sitesOf`. `Format` — шесть форматов KR-18 и список `FORMATS`; канонические форматы KR-11 — `CanonicalFormat`, их берут `isFormat` и `checkFormat`. Ключ словаря — `SEGMENT` из `ref.ts`.
+- `Resolve` остаётся типом параметра `validate` внутри ядра; снаружи `validate` зовут с функцией `ref → Schema | null`. Из `index.ts` экспортируется `Comparison` — результат `compare`.
+- CONVENTIONS §2: перевод нарушений `validate` в отказы KR-21 называет вход фазы 2 `checkAgainstType` вместо `checkBody`, с одним резолвером тел типов и правилом Q-33.
 
 ## Шаги
 
@@ -56,21 +65,23 @@ checkAgainstType(record: Record, resolve: ResolveType, place: Place): Rejection[
 ## Тесты и фикстуры
 
 - `KR-15/trigger/parent-not-admitted` — родитель, схему которого `checkSchema` не допускает; отказ KR-15 на `/extends`, без исключения (Q-33). К ней — `KR-15/pass/parent-admitted`.
-- Строки `body`, `type` и `record-type` в `checks.ts` сводятся к одной строке `record`: вход — запись и тела типов по ссылкам. Фикстуры KR-04 (rev по виду), KR-14…KR-16, KR-21 переходят на неё; `rule` ожиданий не меняется, `path` получает место записи — смена входа строки, как у LG-23 в S0-32, а не правила. Строка `schema` (KR-18, KR-19) остаётся.
-- Свойство: схемы property-тестов `compare` генерируются через `checkSchema` — недопущенная схема в них не попадает.
+- Строки `body`, `type` и `record-type` в `checks.ts` сводятся к одной строке `record`: вход — `{ record: {type, rev?, body}, types? }`, тела типов по ссылкам. Фикстуры KR-04 (rev по виду), KR-14…KR-16, KR-19 (`card-order-repeated-in-chain`), KR-21 переходят на неё; `rule` ожиданий не меняется, `path` получает место записи (`/body/…`) — смена входа строки, как у LG-23 в S0-32, а не правила. В KR-21 `types` — тела abstract типов, а не схемы. Строка `header` больше не берёт `kind`: `KR-04/trigger/header-rev-on-event` стала `rev-on-event` на строке `record`, к ней — `rev-missing-on-entity` и pass `rev-on-entity`, `no-rev-on-event`; поле `kind` убрано из фикстур KR-04 и KR-06 строки `header`. Строка `schema` (KR-18, KR-19) остаётся; строка `record` объявляет KR-18 и KR-19 и потому несёт свои: `KR-18/trigger/type-body-keyword-pattern` и `pass/type-body-note` (схема в теле типа), `KR-19/pass/card-order-kept-in-chain` (ребёнок держит позицию унаследованного поля).
+- Свойство: схемы property-тестов `compare` генерируются через `checkSchema` — недопущенная схема в них не попадает. Фильтр уже стоял (S0-07), правки нет.
+- Тесты ядра на новом входе: `test/kernel/against-type.test.ts`; `type.test.ts` проверяет тело типа записью `core/type@1`, пути — под `/body`; тест `checkRev` из `record.test.ts` и тест `checkBody` из `validate-order.test.ts` перенесены в `against-type.test.ts`; `compare.test.ts` — `$ref` на недопущенный тип даёт `incomparable` (Q-33).
 - `compare.property.test.ts` (`validate` против `compare`) зелёный без правки.
 
 ## Готово, когда
 
-- [ ] фаза 2 одной записи — один вход ядра с одним резолвером тел типов
-- [ ] недопущенный тип в цепочке — отказ KR-15 с фикстурой; `bug:` на этом пути не бросается
-- [ ] разбор схемы (типы, поля, ветка по тегу) живёт в одном внутреннем модуле; копии из «Зачем» удалены
-- [ ] `checkRev`, `checkRecordType`, `checkType`, `checkBody`, `Resolve` не экспортируются из `index.ts`
-- [ ] `npm run verify` зелёный
+- [x] фаза 2 одной записи — один вход ядра с одним резолвером тел типов
+- [x] недопущенный тип в цепочке — отказ KR-15 с фикстурой; `bug:` на этом пути не бросается
+- [x] разбор схемы (типы, поля, ветка по тегу) живёт в одном внутреннем модуле; копии из «Зачем» удалены
+- [x] `checkRev`, `checkRecordType`, `checkType`, `checkBody`, `Resolve` не экспортируются из `index.ts`
+- [x] `npm run verify` зелёный
 
 ## Риски и заметки
 
 - **Q-33** — решение владельца 2026-10-07 (PLAN.md, раздел 11).
+- **G-28** — каким правилом отклоняется запись неизвестного типа в фазе 2: рекомендация принята владельцем 2026-10-07 (PR #28) — KR-15 на `/type`.
 - **Стоимость проверки родителя.** `checkSchema` для каждого типа цепочки (≤ 4, KR-15) на каждую запись — это дёшево для S0. Если на корпусе (S0-26) это заметно, кеш — не в ядре: только fold и проекции держат производные данные (PR-04, `closure-check.md`); решение — вопрос владельцу.
 - **Файлы ядра.** Новые и удалённые файлы — строки `test/structure/kernel-files.txt` (ST-05; по R9 не файл skeleton). Внутреннее деление `compare` (`compare-shown`) не трогается.
 - S0-08 и S0-13 зависят от этой задачи: S0-08 проверяет типы S0 этим входом, S0-13 — первый вызывающий фазы 2.

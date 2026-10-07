@@ -5,10 +5,13 @@
 // value — no `type`, `$ref`, `oneOf`, `enum` or `const` — is refused too. The
 // forms the rule leaves open are G-22. The check walks with its own stack, so
 // no depth of nesting overflows. Whether `$ref` names an abstract type needs
-// the type of its target: the Type check asks it (S0-07).
+// the type of its target: the Type check asks it (S0-07). What a schema holds
+// is read by read-schema.ts, as every other reader reads it.
 import { annotationRejections, isAnnotation, type Site } from "./annotations.js";
+import { FORMATS, isSchemaFormat } from "./formats.js";
 import type { Kind } from "./id.js";
 import { isJsonArray, isJsonObject, own, pointer, serialize, type JsonObject, type JsonValue } from "./json.js";
+import { childrenOf, isJsonType, isTypePair, propertiesOf, requiredOf, tagOf, typesOf, type Node } from "./read-schema.js";
 import { isPinned } from "./ref.js";
 import { reject, sortRejections, type Place, type Rejection } from "./rejection.js";
 import { KR_18 } from "./rules.js";
@@ -16,9 +19,7 @@ import { KR_18 } from "./rules.js";
 /** KR-18: a schema of the closed subset — a value `checkSchema` admits. */
 export type Schema = JsonObject;
 
-const TYPES: readonly JsonValue[] = ["string", "integer", "number", "boolean", "object", "array", "null"];
 const SCALARS: readonly string[] = ["string", "integer", "number", "boolean"];
-const FORMATS: readonly JsonValue[] = ["date-time", "date", "decimal", "ulid", "ref", "uri"];
 
 /** KR-23: a field name, so that a fragment can address it (G-22). */
 const FIELD = /^[a-z][a-z0-9_]*$/;
@@ -28,8 +29,6 @@ type Applies = "any" | "scalar" | readonly string[];
 
 type Keyword = { readonly applies: Applies; readonly expected: JsonValue; readonly fits: (v: JsonValue) => boolean };
 
-const isType = (v: JsonValue): boolean => TYPES.includes(v);
-const isTypePair = (v: JsonValue): boolean => isJsonArray(v) && v.length === 2 && v.every(isType) && v[0] !== v[1] && v.includes("null");
 const isCount = (v: JsonValue): boolean => typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
 const isScalar = (v: JsonValue): boolean => v === null || typeof v !== "object";
 const isEnum = (v: JsonValue): boolean => isJsonArray(v) && v.length > 0 && v.every(isScalar) && new Set(v).size === v.length;
@@ -43,7 +42,7 @@ const SUBSCHEMA = { expected: "a schema", fits: () => true } as const;
 
 /** KR-18: the keywords of the subset, where each applies and its form. */
 const KEYWORDS: { readonly [keyword: string]: Keyword } = {
-  type: { applies: "any", expected: "string, integer, number, boolean, object, array or null, or a pair of one with null", fits: (v) => isType(v) || isTypePair(v) },
+  type: { applies: "any", expected: "string, integer, number, boolean, object, array or null, or a pair of one with null", fits: (v) => isJsonType(v) || isTypePair(v) },
   properties: { applies: ["object"], expected: "an object of field schemas", fits: isJsonObject },
   required: { applies: ["object"], expected: "an array of field names", fits: (v) => isJsonArray(v) && v.every((s) => typeof s === "string") },
   values: { applies: ["object"], ...SUBSCHEMA },
@@ -52,7 +51,7 @@ const KEYWORDS: { readonly [keyword: string]: Keyword } = {
   maxItems: COUNT,
   minLength: LENGTH,
   maxLength: LENGTH,
-  format: { applies: ["string"], expected: FORMATS, fits: (v) => FORMATS.includes(v) },
+  format: { applies: ["string"], expected: FORMATS, fits: isSchemaFormat },
   minimum: BOUND,
   maximum: BOUND,
   enum: { applies: "scalar", expected: "a non-empty array of distinct scalars", fits: isEnum },
@@ -65,28 +64,21 @@ const KEYWORDS: { readonly [keyword: string]: Keyword } = {
 
 const isKeyword = (key: string): boolean => Object.hasOwn(KEYWORDS, key);
 
-/** The types a schema names, or `null` when `type` is broken — its own refusal says so. */
-function typesOf(schema: Schema): readonly JsonValue[] | null {
-  const { type } = schema;
-  if (type === undefined) return [];
-  if (isType(type)) return [type];
-  return isTypePair(type) && isJsonArray(type) ? type : null;
-}
-
-function applies(applied: Applies, types: readonly JsonValue[]): boolean {
+function applies(applied: Applies, types: readonly string[]): boolean {
   if (applied === "any") return true;
   const real = types.filter((t) => t !== "null");
-  if (applied === "scalar") return real.every((t) => typeof t === "string" && SCALARS.includes(t));
-  return real.length > 0 && real.every((t) => typeof t === "string" && applied.includes(t));
+  if (applied === "scalar") return real.every((t) => SCALARS.includes(t));
+  return real.length > 0 && real.every((t) => applied.includes(t));
 }
 
 /** KR-18: a keyword where it applies — the type of its schema — and in its form. */
 function keywordRejections(schema: Schema, key: string, path: string, intent: string | null): Rejection[] {
   const keyword = KEYWORDS[key];
   if (keyword === undefined) throw new Error(`bug: ${key} is not a keyword of KR-18`);
-  const types = typesOf(schema);
+  // A `type` out of its form is refused by its own key; no keyword is refused for where it sits beside it.
+  const typed = schema.type === undefined || isJsonType(schema.type) || isTypePair(schema.type);
   const at = pointer(path, key);
-  if (types !== null && !applies(keyword.applies, types)) {
+  if (typed && !applies(keyword.applies, typesOf(schema))) {
     const expected = keyword.applies === "scalar" ? "a scalar type, or no type" : keyword.applies;
     return [reject(KR_18, { intent, path: at, expected, got: schema.type ?? "absent" })];
   }
@@ -128,8 +120,8 @@ function shapeRejections(schema: Schema, path: string, intent: string | null): R
 
 /** G-22: a field is named `[a-z][a-z0-9_]*`; `required` names each field of `properties` once; a record of fields is no map. */
 function objectRejections(schema: Schema, path: string, intent: string | null): Rejection[] {
-  const properties = isJsonObject(schema.properties) ? schema.properties : {};
-  const required = isJsonArray(schema.required) ? schema.required : [];
+  const properties = propertiesOf(schema);
+  const required = requiredOf(schema);
   const names = Object.keys(properties)
     .filter((name) => !FIELD.test(name))
     .map((name) => reject(KR_18, { intent, path: pointer(pointer(path, "properties"), name), expected: "a field name [a-z][a-z0-9_]*", got: name }));
@@ -145,20 +137,14 @@ function objectRejections(schema: Schema, path: string, intent: string | null): 
 /** KR-18: one branch of a tagged union — an object whose discriminator field is required and holds a `const`. */
 function branchRejections(branch: Schema, discriminator: string, path: string, intent: string | null): Rejection[] {
   if (branch.type !== "object") return [reject(KR_18, { intent, path: pointer(path, "type"), expected: "object", got: branch.type ?? "absent" })];
-  const tag = isJsonObject(branch.properties) ? own(branch.properties, discriminator) : undefined;
-  const required = isJsonArray(branch.required) && branch.required.includes(discriminator);
+  const field = own(propertiesOf(branch), discriminator);
+  const required = requiredOf(branch).includes(discriminator);
   return [
-    ...(isJsonObject(tag) && tag.const !== undefined
+    ...(tagOf(branch, discriminator) !== undefined
       ? []
-      : [reject(KR_18, { intent, path: pointer(pointer(path, "properties"), discriminator), expected: "a field with const", got: tag ?? "absent" })]),
+      : [reject(KR_18, { intent, path: pointer(pointer(path, "properties"), discriminator), expected: "a field with const", got: field ?? "absent" })]),
     ...(required ? [] : [reject(KR_18, { intent, path: pointer(path, "required"), expected: `fields that name ${discriminator}`, got: branch.required ?? "absent" })]),
   ];
-}
-
-/** The `const` of the discriminator field of a branch; `undefined` when it has none. */
-function constOf(branch: JsonValue, discriminator: string): JsonValue | undefined {
-  const tag = isJsonObject(branch) && isJsonObject(branch.properties) ? own(branch.properties, discriminator) : undefined;
-  return isJsonObject(tag) ? tag.const : undefined;
 }
 
 /** KR-18: `oneOf` with `discriminator` is a tagged union — each branch an object whose discriminator is a distinct `const`. */
@@ -166,7 +152,7 @@ function unionRejections(schema: Schema, path: string, intent: string | null): R
   const { oneOf, discriminator } = schema;
   if (!isJsonArray(oneOf) || typeof discriminator !== "string" || !FIELD.test(discriminator)) return [];
   const tags = oneOf.map((b) => {
-    const tag = constOf(b, discriminator);
+    const tag = tagOf(b, discriminator);
     return tag === undefined ? null : serialize(tag);
   });
   return oneOf.flatMap((branch, i) => {
@@ -175,28 +161,9 @@ function unionRejections(schema: Schema, path: string, intent: string | null): R
     const tag = tags[i] ?? null;
     const repeated = tag !== null && tags.indexOf(tag) < i;
     const constPath = pointer(pointer(pointer(at, "properties"), discriminator), "const");
-    const repeat = reject(KR_18, { intent, path: constPath, expected: "a const no other branch holds", got: constOf(branch, discriminator) ?? null });
+    const repeat = reject(KR_18, { intent, path: constPath, expected: "a const no other branch holds", got: tagOf(branch, discriminator) ?? null });
     return [...branchRejections(branch, discriminator, at, intent), ...(repeated ? [repeat] : [])];
   });
-}
-
-/** A schema as the walk meets it, before it is known to be an object. */
-type Node = Omit<Site, "schema"> & { readonly schema: JsonValue };
-
-/** The schemas a schema holds: its fields, items, map values and branches. */
-function childrenOf(site: Site): Node[] {
-  const { schema, path } = site;
-  const required = isJsonArray(schema.required) ? schema.required : [];
-  const at = (key: string, inner: string | number) => pointer(pointer(path, key), inner);
-  const fields = isJsonObject(schema.properties)
-    ? Object.entries(schema.properties).map(([name, s]): Node => ({ schema: s, path: at("properties", name), site: "field", required: required.includes(name) }))
-    : [];
-  const inner = (["items", "values"] as const).flatMap((key): Node[] => {
-    const s = schema[key];
-    return s === undefined ? [] : [{ schema: s, path: pointer(path, key), site: key, required: false }];
-  });
-  const branches = isJsonArray(schema.oneOf) ? schema.oneOf.map((s, i): Node => ({ schema: s, path: at("oneOf", i), site: "branch", required: false })) : [];
-  return [...fields, ...inner, ...branches];
 }
 
 /** KR-18, KR-19: every key of one schema and its shape. */
@@ -208,19 +175,6 @@ function siteRejections(site: Site, kind: Kind, intent: string | null): Rejectio
     ...objectRejections(schema, path, intent),
     ...unionRejections(schema, path, intent),
   ];
-}
-
-/** Every schema object a schema holds, the root among them, with where each sits; a member that is no object is passed over. */
-export function sitesOf(schema: JsonValue, path: string): Site[] {
-  const out: Site[] = [];
-  const pending: Node[] = [{ schema, path, site: "root", required: false }];
-  for (let node = pending.pop(); node !== undefined; node = pending.pop()) {
-    if (!isJsonObject(node.schema)) continue;
-    const site: Site = { ...node, schema: node.schema };
-    out.push(site);
-    for (const child of childrenOf(site)) pending.push(child);
-  }
-  return out;
 }
 
 /**

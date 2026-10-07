@@ -5,12 +5,12 @@
       "type": "demo/note@1",
       "rev": 1,
       "body": {
-        "text": "a"
+        "text": "hello"
       }
     },
     "types": {
       "demo/note@1": {
-        "abstract": true,
+        "abstract": false,
         "kind": "entity",
         "schema": {
           "type": "object",
@@ -25,9 +25,5 @@
         }
       }
     }
-  },
-  "expect": {
-    "rule": "KR-16",
-    "path": "/type"
   }
 }

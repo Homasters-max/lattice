@@ -1,6 +1,24 @@
 {
-  "check": "type",
+  "check": "record",
   "input": {
-    "body": { "abstract": false, "kind": "entity", "schema": { "type": "object", "properties": { "text": { "type": "string" } }, "required": ["text"] } }
+    "record": {
+      "type": "core/type@1",
+      "rev": 1,
+      "body": {
+        "abstract": false,
+        "kind": "entity",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
+      }
+    }
   }
 }

@@ -7,7 +7,8 @@
 // moves the relation.
 import { broken, join, SAME, shown, type Aspect, type Shown } from "./compare-shown.js";
 import { isJsonObject, serialize, type JsonValue } from "./json.js";
-import { sitesOf, type Schema } from "./schema.js";
+import { sitesOf } from "./read-schema.js";
+import type { Schema } from "./schema.js";
 import { reaches, type ResolveType } from "./type.js";
 
 const differ = (a: JsonValue | undefined, b: JsonValue | undefined): boolean =>

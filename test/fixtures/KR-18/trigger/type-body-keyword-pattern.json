@@ -2,32 +2,28 @@
   "check": "record",
   "input": {
     "record": {
-      "type": "demo/note@1",
+      "type": "core/type@1",
       "rev": 1,
       "body": {
-        "text": "a"
-      }
-    },
-    "types": {
-      "demo/note@1": {
-        "abstract": true,
+        "abstract": false,
         "kind": "entity",
         "schema": {
           "type": "object",
           "properties": {
-            "text": {
-              "type": "string"
+            "title": {
+              "type": "string",
+              "pattern": "^[A-Z]"
             }
           },
           "required": [
-            "text"
+            "title"
           ]
         }
       }
     }
   },
   "expect": {
-    "rule": "KR-16",
-    "path": "/type"
+    "rule": "KR-18",
+    "path": "/body/schema/properties/title/pattern"
   }
 }

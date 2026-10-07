@@ -1,7 +1,28 @@
 {
-  "check": "type",
+  "check": "record",
   "input": {
-    "body": { "abstract": false, "kind": "record", "schema": { "type": "object", "properties": { "text": { "type": "string" } }, "required": ["text"] } }
+    "record": {
+      "type": "core/type@1",
+      "rev": 1,
+      "body": {
+        "abstract": false,
+        "kind": "record",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
+      }
+    }
   },
-  "expect": { "rule": "KR-14", "path": "/kind" }
+  "expect": {
+    "rule": "KR-14",
+    "path": "/body/kind"
+  }
 }

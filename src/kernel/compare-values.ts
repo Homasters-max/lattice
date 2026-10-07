@@ -7,14 +7,9 @@
 // and whatever cannot be shown that way is not shown: incomparable is the safe
 // side (R2).
 import { isJsonArray, type JsonValue } from "./json.js";
+import { numberOf, typesOf } from "./read-schema.js";
 import type { Schema } from "./schema.js";
 import { validate, type Resolve } from "./validate.js";
-
-/** The JSON types a schema names, its `null` among them; none for a schema of `enum` or `const` alone. */
-export function typesOf(s: Schema): readonly string[] {
-  const types = isJsonArray(s.type) ? s.type : [s.type];
-  return types.filter((t): t is string => typeof t === "string");
-}
 
 const FINITE: { readonly [type: string]: readonly JsonValue[] } = { null: [null], boolean: [true, false] };
 
@@ -26,14 +21,9 @@ function finiteValues(s: Schema, resolve: Resolve): readonly JsonValue[] | null 
   return candidates?.filter((v) => validate(v, s, resolve).ok) ?? null;
 }
 
-const number = (s: Schema, keyword: string, otherwise: number): number => {
-  const v = s[keyword];
-  return typeof v === "number" ? v : otherwise;
-};
-
 /** `[lo, hi]` of a schema between two keywords; an integer range is tightened to the integers in it. */
 function range(s: Schema, low: string, high: string, integer: boolean): readonly [number, number] {
-  const [lo, hi] = [number(s, low, -Infinity), number(s, high, Infinity)];
+  const [lo, hi] = [numberOf(s, low) ?? -Infinity, numberOf(s, high) ?? Infinity];
   return integer ? [Math.ceil(lo), Math.floor(hi)] : [lo, hi];
 }
 

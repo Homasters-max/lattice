@@ -1,17 +1,51 @@
 {
-  "check": "body",
+  "check": "record",
   "input": {
-    "schema": {
-      "type": "object",
-      "properties": {
-        "title": { "type": "string" },
-        "size": { "$ref": "demo/size@1" }
-      },
-      "required": ["title"]
+    "record": {
+      "type": "demo/note@1",
+      "rev": 1,
+      "body": {
+        "title": "a",
+        "size": {
+          "n": 3
+        }
+      }
     },
     "types": {
-      "demo/size@1": { "type": "object", "properties": { "n": { "type": "integer", "minimum": 0 } }, "required": ["n"] }
-    },
-    "body": { "title": "a", "size": { "n": 3 } }
+      "demo/note@1": {
+        "abstract": false,
+        "kind": "entity",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "size": {
+              "$ref": "demo/size@1"
+            }
+          },
+          "required": [
+            "title"
+          ]
+        }
+      },
+      "demo/size@1": {
+        "abstract": true,
+        "kind": "entity",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "n": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "n"
+          ]
+        }
+      }
+    }
   }
 }

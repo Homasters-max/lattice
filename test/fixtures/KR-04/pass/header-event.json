@@ -10,7 +10,6 @@
       "body": {
         "of": "demo/hello"
       }
-    },
-    "kind": "event"
+    }
   }
 }

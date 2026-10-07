@@ -3,11 +3,14 @@
 // (KR-21): the body of a type named by a pinned reference comes from the
 // caller — phase 2 resolves it over `after`, so a parent written in the same
 // commit is seen too (KR-15). A type has one parent or none (KR-17): `extends`
-// is one field.
+// is one field. The kernel trusts no body the caller gives: a type it reads is
+// one whose body is in form and whose schema `checkSchema` admits (Q-33), so
+// every reader of a schema takes only a schema of the subset.
 import type { Kind } from "./id.js";
 import { isJsonObject, type JsonValue } from "./json.js";
 import { isPinned } from "./ref.js";
-import type { Schema } from "./schema.js";
+import { checkSchema, type Schema } from "./schema.js";
+import type { Resolve } from "./validate.js";
 
 /** KR-14: the body of a type as the kernel reads it; `extends` absent means no parent (G-26). */
 export type Type = { readonly extends?: string; readonly abstract: boolean; readonly kind: Kind; readonly schema: Schema };
@@ -29,14 +32,33 @@ export function readType(body: JsonValue | null): Type | null {
   return typeof parent === "string" && isPinned(parent) ? { extends: parent, abstract, kind, schema } : null;
 }
 
+/** Why the kernel reads no type at a pinned reference: the caller knows none there, or what it gives is not admitted. */
+export type Missing = "a type resolve knows" | "an admitted type";
+
+/** KR-14, KR-18, Q-33: the type at a pinned reference — its body in form, its schema one `checkSchema` admits — or why there is none. */
+export function typeAt(ref: string, resolve: ResolveType): Type | Missing {
+  const body = resolve(ref);
+  if (body === null) return "a type resolve knows";
+  const type = readType(body);
+  return type !== null && checkSchema(type.schema, type.kind, { intent: null, path: "" }).length === 0 ? type : "an admitted type";
+}
+
+/** KR-21: the schema of the type at a pinned reference — a `$ref` target — as the kernel admits it, or `null`. */
+export const schemasOf =
+  (resolve: ResolveType): Resolve =>
+  (ref) => {
+    const type = typeAt(ref, resolve);
+    return typeof type === "string" ? null : type.schema;
+  };
+
 /** A type the chain reached, by the pinned reference it was reached at. */
 export type Parent = { readonly ref: string; readonly type: Type };
 
 /**
  * The chain of parents above a type, nearest first, as `resolve` gives them, and how it ends: at a root, at a
- * reference already met (a cycle), at a reference that is no type the caller knows, or past `MAX_DEPTH` links.
+ * reference already met (a cycle), past `MAX_DEPTH` links, or at a reference where the kernel reads no type.
  */
-export type Chain = { readonly parents: readonly Parent[]; readonly end: "root" | "cycle" | "unknown" | "deep"; readonly refs: readonly string[] };
+export type Chain = { readonly parents: readonly Parent[]; readonly end: "root" | "cycle" | "deep" | Missing; readonly refs: readonly string[] };
 
 /** KR-15: the parents of a type whose `extends` is `parent`, walked at most one link past `MAX_DEPTH`. */
 export function chainOf(parent: string | undefined, resolve: ResolveType): Chain {
@@ -46,8 +68,8 @@ export function chainOf(parent: string | undefined, resolve: ResolveType): Chain
     const end = refs.includes(ref) ? "cycle" : refs.length === MAX_DEPTH ? "deep" : null;
     refs.push(ref);
     if (end !== null) return { parents, end, refs };
-    const type = readType(resolve(ref));
-    if (type === null) return { parents, end: "unknown", refs };
+    const type = typeAt(ref, resolve);
+    if (typeof type === "string") return { parents, end: type, refs };
     parents.push({ ref, type });
     ref = type.extends;
   }
@@ -56,5 +78,7 @@ export function chainOf(parent: string | undefined, resolve: ResolveType): Chain
 
 /** KR-15, KR-19: whether the type at `from` is the type at `to` or reaches it by `extends` — a subtype. */
 export function reaches(from: string, to: string, resolve: ResolveType): boolean {
-  return from === to || chainOf(readType(resolve(from))?.extends, resolve).parents.some((l) => l.ref === to);
+  if (from === to) return true;
+  const type = typeAt(from, resolve);
+  return typeof type !== "string" && chainOf(type.extends, resolve).parents.some((l) => l.ref === to);
 }

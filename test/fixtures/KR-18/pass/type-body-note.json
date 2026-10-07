@@ -2,19 +2,25 @@
   "check": "record",
   "input": {
     "record": {
-      "type": "demo/note@1",
+      "type": "core/type@1",
       "rev": 1,
-      "body": {}
-    },
-    "types": {
-      "demo/note@1": {
+      "body": {
         "abstract": false,
         "kind": "entity",
         "schema": {
           "type": "object",
           "properties": {
             "title": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 8
             }
           },
           "required": [
@@ -23,9 +29,5 @@
         }
       }
     }
-  },
-  "expect": {
-    "rule": "KR-21",
-    "path": "/body/title"
   }
 }

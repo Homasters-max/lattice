@@ -1,16 +1,31 @@
 {
-  "check": "body",
+  "check": "record",
   "input": {
-    "schema": {
-      "type": "object",
-      "properties": {
-        "due": { "type": "string", "format": "date" }
+    "record": {
+      "type": "demo/note@1",
+      "rev": 1,
+      "body": {
+        "due": "06.10.2026"
       }
     },
-    "body": { "due": "06.10.2026" }
+    "types": {
+      "demo/note@1": {
+        "abstract": false,
+        "kind": "entity",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "due": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        }
+      }
+    }
   },
   "expect": {
     "rule": "KR-21",
-    "path": "/due"
+    "path": "/body/due"
   }
 }

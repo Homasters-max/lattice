@@ -2,12 +2,24 @@
 // A date is a proleptic Gregorian calendar date, years 0000…9999; a date-time
 // is that date with a time in UTC — hours 00…23, minutes and seconds 00…59,
 // no leap second (G-21) — and exactly six fraction digits; a ULID is at most
-// 128 bits, its first character at most `7` (G-07).
+// 128 bits, its first character at most `7` (G-07). The formats of a schema
+// (KR-18) are these and two more, each read by its own rule: `ref` — a
+// reference (KR-23) — and `uri` — an external link (KR-24).
 import type { JsonValue } from "./json.js";
 import { reject, type Place, type Rejection } from "./rejection.js";
 import { KR_11 } from "./rules.js";
 
-export type Format = "date-time" | "date" | "decimal" | "ulid";
+/** KR-11: a format with one canonical spelling. */
+export type CanonicalFormat = "date-time" | "date" | "decimal" | "ulid";
+
+/** KR-18: a `format` of a schema. */
+export type Format = CanonicalFormat | "ref" | "uri";
+
+/** KR-18: every `format` of a schema, in the order of the rule. */
+export const FORMATS: readonly Format[] = ["date-time", "date", "decimal", "ulid", "ref", "uri"];
+
+/** KR-18: whether a value names a `format` of a schema. */
+export const isSchemaFormat = (v: JsonValue | undefined): v is Format => FORMATS.some((f) => f === v);
 
 const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const TIME = /^([01]\d|2[0-3]):[0-5]\d:[0-5]\d\.\d{6}Z$/;
@@ -29,7 +41,7 @@ function isDate(s: string): boolean {
 /** `<date>T<time>Z` with exactly six fraction digits. */
 const isDateTime = (s: string): boolean => s.length === 27 && s[10] === "T" && isDate(s.slice(0, 10)) && TIME.test(s.slice(11));
 
-const SPELLINGS: { readonly [format in Format]: (s: string) => boolean } = {
+const SPELLINGS: { readonly [format in CanonicalFormat]: (s: string) => boolean } = {
   "date-time": isDateTime,
   date: isDate,
   decimal: (s) => DECIMAL.test(s) && s !== "-0",
@@ -37,12 +49,12 @@ const SPELLINGS: { readonly [format in Format]: (s: string) => boolean } = {
 };
 
 /** KR-11: whether a string is the canonical spelling of the format. */
-export const isFormat = (format: Format, s: string): boolean => SPELLINGS[format](s);
+export const isFormat = (format: CanonicalFormat, s: string): boolean => SPELLINGS[format](s);
 
 /** KR-06, KR-11: a ULID — 26 upper-case Crockford base32 characters, at most 128 bits (G-07). */
 export const isUlid = (s: string): boolean => isFormat("ulid", s);
 
 /** KR-11: a value of the format, refused at the place the caller names — a value that is not a string too. */
-export function checkFormat(format: Format, value: JsonValue, place: Place): Rejection[] {
+export function checkFormat(format: CanonicalFormat, value: JsonValue, place: Place): Rejection[] {
   return typeof value === "string" && isFormat(format, value) ? [] : [reject(KR_11, { ...place, expected: format, got: value })];
 }

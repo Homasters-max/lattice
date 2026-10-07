@@ -4,16 +4,19 @@
 // the chain (KR-19). A body of type `core/type` is read by this check, not by
 // `validate`: the subset cannot describe a schema — objects are closed and a
 // keyword is no field name (G-26). Several parents are no form of `extends`
-// (KR-17). The parents and targets come from the caller (KR-21); one that the
-// caller does not know as a type is refused, since the chain cannot be shown.
+// (KR-17). The parents and targets come from the caller (KR-21); one where the
+// kernel reads no type — unknown to the caller, or not admitted (Q-33) — is
+// refused, since the chain cannot be shown. A record is checked against its
+// type by against-type.ts, which calls this check for a type body.
 import { closedRejections, type Members } from "./closed-form.js";
 import { compare } from "./compare.js";
 import { compareText, isJsonObject, pointer, type JsonValue } from "./json.js";
 import { isPinned } from "./ref.js";
 import { reject, sortRejections, type Place, type Rejection } from "./rejection.js";
 import { KR_14, KR_15, KR_16, KR_19 } from "./rules.js";
-import { checkSchema, sitesOf, type Schema } from "./schema.js";
-import { chainOf, MAX_DEPTH, readType, type ResolveType, type Type } from "./type.js";
+import { sitesOf } from "./read-schema.js";
+import { checkSchema, type Schema } from "./schema.js";
+import { chainOf, MAX_DEPTH, readType, typeAt, type ResolveType, type Type } from "./type.js";
 
 /** KR-14, KR-17: the members of a type body; `extends` absent means no parent (G-26), and several parents are no form of it. */
 const MEMBERS: Members = {
@@ -23,14 +26,17 @@ const MEMBERS: Members = {
   schema: { expected: "a schema", fits: (v) => v !== undefined },
 };
 
-/** KR-16: every `$ref` of the schema names an abstract type the caller knows. */
+/** What a `$ref` wants of its target, by why the kernel reads no type there. */
+const TARGETS = { "a type resolve knows": "an abstract type resolve knows", "an admitted type": "an admitted abstract type" } as const;
+
+/** KR-16: every `$ref` of the schema names an abstract type the kernel admits. */
 function refRejections(schema: Schema, resolve: ResolveType, place: Place): Rejection[] {
   return sitesOf(schema, pointer(place.path, "schema")).flatMap(({ schema: s, path }) => {
     const ref = s.$ref;
     if (typeof ref !== "string") return [];
-    const target = readType(resolve(ref));
-    if (target?.abstract === true) return [];
-    return [reject(KR_16, { ...place, path: pointer(path, "$ref"), expected: target === null ? "an abstract type resolve knows" : "an abstract type", got: ref })];
+    const target = typeAt(ref, resolve);
+    if (typeof target !== "string" && target.abstract) return [];
+    return [reject(KR_16, { ...place, path: pointer(path, "$ref"), expected: typeof target === "string" ? TARGETS[target] : "an abstract type", got: ref })];
   });
 }
 
@@ -62,13 +68,13 @@ function cardRejections(types: readonly [Type, ...Type[]], place: Place): Reject
 
 const CHAIN_ENDS = { cycle: "a chain of parents without a cycle", deep: `at most ${MAX_DEPTH} parents` } as const;
 
-/** KR-15: one parent known as a type, no cycle, at most four deep; the kind kept and the schema narrowed or kept. */
+/** KR-15: one parent the kernel admits as a type, no cycle, at most four deep; the kind kept and the schema narrowed or kept. */
 function chainRejections(type: Type, resolve: ResolveType, place: Place): Rejection[] {
   const chain = chainOf(type.extends, resolve);
   const at = pointer(place.path, "extends");
   if (chain.end === "cycle" || chain.end === "deep") return [reject(KR_15, { ...place, path: at, expected: CHAIN_ENDS[chain.end], got: chain.refs })];
   const [parent, ...rest] = chain.parents.map((l) => l.type);
-  if (chain.end === "unknown" || parent === undefined) return [reject(KR_15, { ...place, path: at, expected: "a type resolve knows", got: chain.refs.at(-1) ?? null })];
+  if (chain.end !== "root" || parent === undefined) return [reject(KR_15, { ...place, path: at, expected: chain.end, got: chain.refs.at(-1) ?? null })];
   const { relation } = compare(type.schema, parent.schema, "extends", resolve);
   return [
     ...(parent.kind === type.kind ? [] : [reject(KR_15, { ...place, path: pointer(place.path, "kind"), expected: parent.kind, got: type.kind })]),
@@ -91,9 +97,4 @@ export function checkType(body: JsonValue, resolve: ResolveType, place: Place): 
   if (form.length > 0 || ofSchema.length > 0 || type === null) return sortRejections([...form, ...ofSchema]);
   const chain = type.extends === undefined ? cardRejections([type], place) : chainRejections(type, resolve, place);
   return sortRejections([...chain, ...refRejections(type.schema, resolve, place)]);
-}
-
-/** KR-16: an abstract type has no records — the type of a record, by its body, refused at the place the record names it. */
-export function checkRecordType(type: JsonValue, place: Place): Rejection[] {
-  return isJsonObject(type) && type.abstract === true ? [reject(KR_16, { ...place, expected: "a type that is not abstract", got: "an abstract type" })] : [];
 }

@@ -4,24 +4,26 @@
 // reverse — only where the subset lets it be shown structurally; anything else
 // is incomparable, the safe side (R2). Objects are closed in `revision` mode;
 // in `extends` mode A is compared with B on B's fields only, at every depth.
-// `$ref` is followed through the caller's `resolve` (KR-21); a pair of
+// `$ref` is followed through the caller's `resolve` (KR-21), to a type the
+// kernel admits (Q-33); a pair of
 // schemas met again on the way is assumed to hold — the values under it are
 // smaller, and a cycle of `$ref` that never descends admits no value. The
 // walk stops at a depth and a number of steps: past them nothing is shown
 // (G-27).
 import { annotationsShown, aspectsIn } from "./compare-annotations.js";
 import { ASPECTS, join, SAME, shown, UNSHOWN, type Aspect, type Shown } from "./compare-shown.js";
-import { isListed, typesOf, valuesWithin } from "./compare-values.js";
-import { isJsonArray, isJsonObject, own, serialize, type JsonObject, type JsonValue } from "./json.js";
+import { isListed, valuesWithin } from "./compare-values.js";
+import { isJsonObject, own, serialize, type JsonValue } from "./json.js";
+import { branchesOf, propertiesOf, requiredOf, typesOf, type Branch } from "./read-schema.js";
 import type { Schema } from "./schema.js";
-import { readType, type ResolveType } from "./type.js";
+import { schemasOf, type ResolveType } from "./type.js";
 import type { Resolve } from "./validate.js";
 
 /** KR-22: how the values of A stand to those of B. */
 export type Relation = "same" | "narrower" | "wider" | "incomparable";
 
 /** KR-22: the relation and the aspects that differ, in the order of the rule. */
-type Comparison = { readonly relation: Relation; readonly aspects: readonly Aspect[] };
+export type Comparison = { readonly relation: Relation; readonly aspects: readonly Aspect[] };
 
 /** KR-22: `revision` — objects are closed; `extends` — A on B's fields only. */
 export type Mode = "revision" | "extends";
@@ -61,20 +63,13 @@ function refs(a: Schema, b: Schema, walk: Walk): Shown {
 }
 
 /** The branches of a tagged union by the canonical text of their discriminator `const`. */
-function branchesOf(oneOf: readonly JsonValue[], discriminator: string): Map<string, JsonObject> {
-  return new Map(
-    oneOf.flatMap((branch) => {
-      const tag = isJsonObject(branch) && isJsonObject(branch.properties) ? own(branch.properties, discriminator) : undefined;
-      return isJsonObject(branch) && isJsonObject(tag) && tag.const !== undefined ? [[serialize(tag.const), branch] as const] : [];
-    }),
-  );
-}
+const byTag = (branches: readonly Branch[]): Map<string, Schema> => new Map(branches.map((b) => [b.key, b.schema]));
 
 /** `oneOf` with one discriminator on both sides: a branch only one side has is a value the other lacks; a common branch is compared. */
 function unions(a: Schema, b: Schema, walk: Walk): Shown {
   const { discriminator } = a;
-  if (!isJsonArray(a.oneOf) || !isJsonArray(b.oneOf) || typeof discriminator !== "string" || discriminator !== b.discriminator) return UNSHOWN;
-  const [ba, bb] = [branchesOf(a.oneOf, discriminator), branchesOf(b.oneOf, discriminator)];
+  if (a.oneOf === undefined || b.oneOf === undefined || typeof discriminator !== "string" || discriminator !== b.discriminator) return UNSHOWN;
+  const [ba, bb] = [byTag(branchesOf(a)), byTag(branchesOf(b))];
   const common = [...ba].flatMap(([tag, branch]) => {
     const other = bb.get(tag);
     return other === undefined ? [] : [node(branch, other, walk)];
@@ -87,9 +82,6 @@ function items(a: Schema, b: Schema, walk: Walk): Shown {
   if (a.items === undefined || b.items === undefined) return shown(b.items === undefined, a.items === undefined, "validity");
   return node(a.items, b.items, walk);
 }
-
-const propertiesOf = (s: Schema): JsonObject => (isJsonObject(s.properties) ? s.properties : {});
-const requiredOf = (s: Schema): readonly JsonValue[] => (isJsonArray(s.required) ? s.required : []);
 
 /**
  * A field of A against the same field of B. A field only one side has is a value the other refuses — objects are
@@ -146,7 +138,6 @@ function relationOf(s: Shown): Relation {
  */
 export function compare(a: Schema, b: Schema, mode: Mode, resolve: ResolveType): Comparison {
   if (serialize(a) === serialize(b)) return { relation: "same", aspects: [] };
-  const schemas: Resolve = (ref) => readType(resolve(ref))?.schema ?? null;
-  const s = node(a, b, { mode, resolve, schemas, pairs: [], depth: 0, steps: { left: MAX_STEPS } });
+  const s = node(a, b, { mode, resolve, schemas: schemasOf(resolve), pairs: [], depth: 0, steps: { left: MAX_STEPS } });
   return { relation: relationOf(s), aspects: ASPECTS.filter((x) => s.aspects.includes(x)) };
 }
