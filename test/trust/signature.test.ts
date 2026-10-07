@@ -51,11 +51,13 @@ describe("signing a hash (LG-06, LG-10)", () => {
 describe("spellings that are no signature or key (G-10)", () => {
   it("LG-06, LG-10, G-10: a text that is not a signature in the one spelling never verifies", () => {
     const body = RFC_SIG.slice("ed25519:".length);
+    expect(Buffer.from(`${body.slice(0, -1)}x`, "base64url")).toEqual(Buffer.from(body, "base64url"));
     const spellings = [
       body, // no prefix
       `ED25519:${body}`,
       `ed25519:${body}==`, // padding
       `ed25519:${body.slice(0, -1)}D`, // trailing bits that are not zero: another spelling of other bytes
+      `ed25519:${body.slice(0, -1)}x`, // "w" with a trailing bit set: the same 64 bytes in another spelling
       `ed25519:${body.slice(0, -2)}`, // 63 bytes
       `ed25519:${Buffer.from(RFC_SIG).toString("base64")}`,
       `ed25519:${body.replaceAll("-", "+")}`, // the standard alphabet
