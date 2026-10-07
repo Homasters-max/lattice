@@ -1,12 +1,33 @@
 // The form of a refusal (LG-17, CONVENTIONS.md §2–3, §5–6): a hard check
-// returns a Result; a rejection names its rule ID and is made only by
-// `reject` from a row of a rule registry.
+// returns a Result and takes the Place where its input sits; a rejection
+// names its rule ID and is made only by `reject` from a row of a rule
+// registry. The grammar of an ID (RM-02) is written here once, beside
+// `RuleId`: the codec reads `md` by it.
 import { compareText, serialize, type JsonValue } from "./json.js";
 
 type RulePrefix = "PR" | "KR" | "TY" | "RF" | "LG" | "TR" | "RT" | "DP" | "LN" | "BN" | "OB" | "AG" | "ST" | "SL" | "RM" | "GL";
 type Digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
-/** The ID of a row of a rule table; Z-blocks never name a rejection. */
+/** The ID of a row of a rule table; Z-blocks never name a rejection. Every `RuleId` is of the grammar `isRuleId` reads. */
 type RuleId = `${RulePrefix}-${Digit}${Digit}`;
+
+// RM-02: `<PREFIX>-<NN>` for a rule, `<PREFIX>-Z<NN>` for prose and examples. Whether the prefix is its document's
+// is checked by `lint-ids` on the text, where the file name is known (S0-01).
+const RULE_ID = /^[A-Z]{2}-\d{2}$/;
+const Z_BLOCK_ID = /^[A-Z]{2}-Z\d{2}$/;
+/** What an author meant as an ID: letters, a dash, maybe one letter, digits. */
+const ID_LIKE = /^[A-Za-z]+-[A-Za-z]?\d+$/;
+
+/** RM-02: the ID of a rule, `<PREFIX>-<NN>`. */
+export const isRuleId = (s: string): boolean => RULE_ID.test(s);
+
+/** RM-02: the ID of prose or an example — a Z-block, which never names a rejection — `<PREFIX>-Z<NN>`. */
+export const isZBlockId = (s: string): boolean => Z_BLOCK_ID.test(s);
+
+/** RM-01, RM-02: the ID of a paragraph, which is a rule or prose. */
+export const isId = (s: string): boolean => isRuleId(s) || isZBlockId(s);
+
+/** RM-02: whether a string was meant as an ID — refused by RM-02 when it is not of the grammar. */
+export const isIdLike = (s: string): boolean => ID_LIKE.test(s);
 
 /** Languages of message templates; S0 has only `en` (TR-40). */
 type Lang = "en";
@@ -32,6 +53,9 @@ export type Rejection = {
 
 /** Where a check refuses: the intent it is about, or `null`, and a JSON Pointer (G-13). */
 export type Place = Pick<Rejection, "intent" | "path">;
+
+/** The root of the checked input, outside any intent (G-13). */
+export const ROOT: Place = { intent: null, path: "" };
 
 export type Rejections = readonly [Rejection, ...Rejection[]];
 
@@ -70,3 +94,6 @@ export function refused<T>(rejections: readonly Rejection[]): Result<T> | null {
   const [first, ...rest] = rejections;
   return first === undefined ? null : refuse<T>(first, ...rest);
 }
+
+/** The rejections of a Result; none when it is ok. */
+export const rejectionsOf = (result: Result<unknown>): readonly Rejection[] => (result.ok ? [] : result.rejections);

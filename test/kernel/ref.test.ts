@@ -4,7 +4,7 @@
 // input crosses the module boundary frozen.
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { checkUri, formatRef, isUri, KR_23, KR_24, parseRef, reject, type Ref } from "../../src/kernel/index.js";
+import { checkUri, formatRef, isUri, KR_23, KR_24, parseRef, reject, rejectionsOf, type Ref } from "../../src/kernel/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
 const ULID = "01JB2X00000000000000000SES";
@@ -158,8 +158,8 @@ describe("external links (KR-24)", () => {
 
   it("KR-24: checkUri refuses with KR-24 at the place given — a value that is not a string too", () => {
     const place = deepFreeze({ intent: "demo/a", path: "/body/link" });
-    expect(checkUri("https://example.com", place)).toEqual([]);
-    expect(checkUri("example.com", place)).toEqual([reject(KR_24, { ...place, expected: "an absolute URI", got: "example.com" })]);
-    expect(checkUri(deepFreeze(["https://example.com"]), place).map((r) => [r.rule, r.got])).toEqual([["KR-24", ["https://example.com"]]]);
+    expect(rejectionsOf(checkUri("https://example.com", place))).toEqual([]);
+    expect(rejectionsOf(checkUri("example.com", place))).toEqual([reject(KR_24, { ...place, expected: "an absolute URI", got: "example.com" })]);
+    expect(rejectionsOf(checkUri(deepFreeze(["https://example.com"]), place)).map((r) => [r.rule, r.got])).toEqual([["KR-24", ["https://example.com"]]]);
   });
 });

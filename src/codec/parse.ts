@@ -1,24 +1,23 @@
 // The parse of canonical md into its model (RM-Z03, LG-42, G-25). Input that
 // is not canonical is refused, never repaired (LG-42); text that belongs to no
 // block, and a second block with the same ID, are refused by RM-01, an ID off
-// its grammar or of the other kind by RM-02. Every refusal is
+// its grammar or of the other kind by RM-02 — the grammar the kernel writes
+// once, beside `RuleId`. Every refusal is
 // outside any intent and names its line under `path`, where the document sits
 // in its input; all of them are found, not only the first.
-import { decodeUtf8, refused, reject, type Rejection, type Result, type Rule } from "../kernel/index.js";
-import { isId, isIdLike, isProseId, isRuleId } from "./ids.js";
+import { decodeUtf8, isId, isIdLike, isRuleId, isZBlockId, refused, reject, type Rejection, type Result, type Rule } from "../kernel/index.js";
 import { cut, notCanonical, type Chunk, type FenceChunk, type TextChunk } from "./lines.js";
 import type { Block, Field, Item, Section } from "./model.js";
 import { RM_01, RM_02 } from "./rules.js";
 import { readTable } from "./table.js";
 
 const HEADING = /^(#{1,6}) (.+)$/;
-const PROSE = /^([A-Za-z]+-[A-Za-z]?\d+)\. /;
 const OPEN = /^```([^ ]*)(?: (.*))?$/;
 const LANG = /^[a-z][a-z0-9-]*$/;
 const ITEM = /^- \S/;
 const GRAMMAR = "<PREFIX>-<NN> or <PREFIX>-Z<NN>";
 const RULE_ID = "<PREFIX>-<NN>: a row with an ID is a rule (RM-01)";
-const PROSE_ID = "<PREFIX>-Z<NN>: a fenced block with an ID is an example";
+const Z_BLOCK_ID = "<PREFIX>-Z<NN>: a fenced block with an ID is an example";
 
 /** A section being read: its items grow as chunks are read; the stack holds it and the sections around it. */
 type Open = { readonly level: number; readonly items: Item[] };
@@ -65,9 +64,16 @@ function readHeading(reader: Reader, chunk: TextChunk, level: number, heading: s
   reader.stack.push({ level, items });
 }
 
+/** The ID a paragraph starts with: what comes before its first ". ", when an author meant it as an ID. */
+function proseId(text: string): string | undefined {
+  const dot = text.indexOf(". ");
+  const id = dot < 0 ? undefined : text.slice(0, dot);
+  return id !== undefined && isIdLike(id) ? id : undefined;
+}
+
 function readProse(reader: Reader, chunk: TextChunk): void {
   const text = oneLine(reader, chunk);
-  const id = PROSE.exec(text)?.[1];
+  const id = proseId(text);
   if (id === undefined) return refuseAt(reader, RM_01, chunk.line, { expected: "a paragraph that starts with its ID and a dot", got: text });
   if (!isId(id)) return refuseAt(reader, RM_02, chunk.line, { expected: GRAMMAR, got: id });
   place(reader, { type: "prose", id, text }, chunk.line);
@@ -126,7 +132,7 @@ function readFence(reader: Reader, chunk: FenceChunk): void {
   const [, lang = "", id] = OPEN.exec(chunk.open) ?? [];
   if (id === undefined) return refuseAt(reader, RM_01, chunk.line, { expected: "a fenced block with an ID after its language", got: chunk.open });
   if (!LANG.test(lang) || !isIdLike(id)) return lg42(reader, chunk.line, "```<lang> <ID>", chunk.open);
-  if (!isProseId(id)) return refuseAt(reader, RM_02, chunk.line, { expected: PROSE_ID, got: id });
+  if (!isZBlockId(id)) return refuseAt(reader, RM_02, chunk.line, { expected: Z_BLOCK_ID, got: id });
   place(reader, { type: "example", id, lang, text: chunk.body.map((l) => `${l}\n`).join("") }, chunk.line);
 }
 
@@ -181,7 +187,7 @@ function distinct(found: readonly Rejection[]): Rejection[] {
  * `path`; every other at `path` and the number of its line.
  */
 export function parse(bytes: Uint8Array, path = ""): Result<Section> {
-  const text = decodeUtf8(bytes, path);
+  const text = decodeUtf8(bytes, { intent: null, path });
   if (!text.ok) return text;
   const { chunks, found, whole } = cut(text.value, path);
   const reader: Reader = { path, stack: [], found: [...found], ids: new Map() };

@@ -37,8 +37,8 @@ const PINS: readonly JsonValue[] = ["pinned", "floating", "any"];
 
 /** KR-19: `ref: {to, pin, label}` — every member present, nothing else. */
 const REF: Members = {
-  to: { expected: "a pinned reference to a type, type@n", fits: (v) => typeof v === "string" && isPinned(v) },
-  pin: { expected: PINS, fits: (v) => v !== undefined && PINS.includes(v) },
+  to: { expected: "a pinned reference to a type, type@n", fits: (v): v is string => typeof v === "string" && isPinned(v) },
+  pin: { expected: PINS, fits: (v): v is JsonValue => v !== undefined && PINS.includes(v) },
   label: { expected: "an edge label", fits: (v) => typeof v === "string" },
 };
 

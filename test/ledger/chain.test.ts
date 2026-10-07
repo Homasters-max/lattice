@@ -3,7 +3,7 @@
 // commit signed by its land session over its hash, computed without `sig`.
 // A broken commit here is the input of a refusal only (Q-23).
 import { describe, expect, it } from "vitest";
-import type { JsonValue } from "../../src/kernel/index.js";
+import { rejectionsOf, type JsonValue } from "../../src/kernel/index.js";
 import { commitHash, signCommit, verifyChain, type Commit } from "../../src/ledger/index.js";
 import { landedChain, LAND_KEY, keyOfLand } from "../support/chain.js";
 import { deepFreeze } from "../support/deep-freeze.js";
@@ -19,7 +19,7 @@ const proposal = (id: string): JsonValue => ({
 
 const chain = (): Commit[] => deepFreeze(landedChain([proposal("demo/a"), proposal("demo/b"), proposal("demo/c")]));
 
-const refusals = (commits: readonly Commit[]) => verifyChain(deepFreeze(commits), keyOfLand, ROOT).map((r) => [r.rule, r.path]);
+const refusals = (commits: readonly Commit[]) => rejectionsOf(verifyChain(deepFreeze(commits), keyOfLand, { intent: null, path: ROOT })).map((r) => [r.rule, r.path]);
 
 /** The chain with commit `n` (from 1) replaced. */
 const withCommit = (commits: readonly Commit[], n: number, c: Commit) => commits.map((old, i) => (i === n - 1 ? c : old));
@@ -110,7 +110,7 @@ describe("the signatures of knowledge commits (LG-06)", () => {
 
   it("LG-06: the rejection of a signature names the hash and the key it was expected of", () => {
     const commits = chain();
-    const [rejection] = verifyChain(withCommit(commits, 1, { ...commits[0]!, sig: null }), keyOfLand, ROOT);
+    const [rejection] = rejectionsOf(verifyChain(withCommit(commits, 1, { ...commits[0]!, sig: null }), keyOfLand, { intent: null, path: ROOT }));
     expect(rejection?.expected).toEqual({ hash: commitHash(commits[0]!), key: LAND_KEY.publicKey });
     expect(rejection?.got).toBeNull();
   });

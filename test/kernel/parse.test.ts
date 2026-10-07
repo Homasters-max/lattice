@@ -22,14 +22,14 @@ describe("the strict parse (KR-10)", () => {
 
   it("KR-10: refuses a text that is not JSON as a whole, at the path given", () => {
     const texts = ["", " ", "{", "[1,]", '{"a":1,}', "01", "1.", ".5", "+1", "-", "1e", "NaN", "Infinity", "'a'", '{a:1}', '"a', '"\t"', '"\\x"', '"\\u12"', "[1 2]", '{"a" 1}', "true false", "\uFEFF{}", "nul", "[1]]", "{}}"];
-    for (const text of texts) expect([text, where(parseJson(text, "/f"))]).toEqual([text, [["KR-10", "/f", "a JSON text", text]]]);
+    for (const text of texts) expect([text, where(parseJson(text, { intent: null, path: "/f" }))]).toEqual([text, [["KR-10", "/f", "a JSON text", text]]]);
   });
 
 });
 
 describe("the strict parse refuses inside the value (KR-10)", () => {
   it("KR-10: refuses a duplicate key at the member, never keeping one of them", () => {
-    expect(where(parseJson('{"a": 1, "b": {"c": 1, "c": 2}, "a": 3}', "/f"))).toEqual([
+    expect(where(parseJson('{"a": 1, "b": {"c": 1, "c": 2}, "a": 3}', { intent: null, path: "/f" }))).toEqual([
       ["KR-10", "/f/a", "a key once", "a"],
       ["KR-10", "/f/b/c", "a key once", "c"],
     ]);
@@ -60,7 +60,7 @@ describe("the strict parse refuses inside the value (KR-10)", () => {
   });
 
   it("KR-10: escapes a key into the JSON Pointer (RFC 6901)", () => {
-    expect(where(parseJson('{"a/b~c": -0}', "/f"))).toEqual([["KR-10", "/f/a~1b~0c", "a number other than -0", "-0"]]);
+    expect(where(parseJson('{"a/b~c": -0}', { intent: null, path: "/f" }))).toEqual([["KR-10", "/f/a~1b~0c", "a number other than -0", "-0"]]);
   });
 
   it("KR-10: reads a value nested deeper than the call stack without overflow", () => {
@@ -71,6 +71,6 @@ describe("the strict parse refuses inside the value (KR-10)", () => {
   });
 
   it("KR-10: the bytes go through UTF-8 first, then the same parse", () => {
-    expect(where(parseJsonBytes(new TextEncoder().encode('{"a": -0}'), "/f"))).toEqual([["KR-10", "/f/a", "a number other than -0", "-0"]]);
+    expect(where(parseJsonBytes(new TextEncoder().encode('{"a": -0}'), { intent: null, path: "/f" }))).toEqual([["KR-10", "/f/a", "a number other than -0", "-0"]]);
   });
 });

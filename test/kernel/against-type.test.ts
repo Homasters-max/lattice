@@ -6,7 +6,7 @@
 // out of the body itself and admits no type it has not checked (Q-33). Every
 // input crosses the module boundary frozen.
 import { describe, expect, it } from "vitest";
-import { checkAgainstType, KR_04, KR_15, KR_16, KR_21, reject, type JsonValue, type Place, type ResolveType } from "../../src/kernel/index.js";
+import { checkAgainstType, KR_04, KR_15, KR_16, KR_21, reject, rejectionsOf, type JsonValue, type Place, type ResolveType } from "../../src/kernel/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
 const ROOT: Place = { intent: null, path: "" };
@@ -28,7 +28,7 @@ const TYPES = typesOf({
 });
 
 const check = (record: { readonly type: string; readonly rev?: number; readonly body: JsonValue }, resolve: ResolveType = TYPES, place = ROOT) =>
-  checkAgainstType(deepFreeze(record), resolve, deepFreeze(place));
+  rejectionsOf(checkAgainstType(deepFreeze(record), resolve, deepFreeze(place)));
 
 const refusals = (record: Parameters<typeof check>[0], resolve?: ResolveType) => check(record, resolve).map((r) => [r.rule, r.path]);
 

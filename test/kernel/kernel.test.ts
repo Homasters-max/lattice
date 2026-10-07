@@ -5,7 +5,7 @@
 // record.test.ts, references and links in ref.test.ts. Every input crosses the
 // module boundary frozen.
 import { describe, expect, it } from "vitest";
-import { checkHeader, checkId, hashBytes, isEntityId, isUlid, KERNEL_VERSION, parseJson, parseJsonBytes, reject, sortRejections } from "../../src/kernel/index.js";
+import { checkHeader, checkId, hashBytes, isEntityId, isUlid, KERNEL_VERSION, parseJson, parseJsonBytes, reject, rejectionsOf, sortRejections } from "../../src/kernel/index.js";
 import { KR_04, KR_06, RULES } from "../../src/kernel/rules.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
@@ -30,8 +30,8 @@ describe("ids (KR-06)", () => {
 
   it("KR-06: checkId refuses with KR-06 at the place it is given", () => {
     const place = deepFreeze({ intent: "demo/hello", path: "/id" });
-    expect(checkId("entity", "demo/hello", place)).toEqual([]);
-    expect(checkId("event", "demo/hello", place)).toEqual([reject(KR_06, { ...place, expected: "a ULID", got: "demo/hello" })]);
+    expect(rejectionsOf(checkId("entity", "demo/hello", place))).toEqual([]);
+    expect(rejectionsOf(checkId("event", "demo/hello", place))).toEqual([reject(KR_06, { ...place, expected: "a ULID", got: "demo/hello" })]);
   });
 });
 
@@ -40,18 +40,18 @@ describe("the header of a record (KR-04)", () => {
 
   it("KR-04: takes a header with every field of its kind, rev absent for an event", () => {
     const { rev, ...event } = record;
-    expect([rev, checkHeader(record, "/records/0"), checkHeader(deepFreeze({ ...event, id: "01JB2X00000000000000000EVT" }), "/records/1")]).toEqual([1, [], []]);
+    expect([rev, rejectionsOf(checkHeader(record, { intent: null, path: "/records/0" })), rejectionsOf(checkHeader(deepFreeze({ ...event, id: "01JB2X00000000000000000EVT" }), { intent: null, path: "/records/1" }))]).toEqual([1, [], []]);
   });
 
   it("KR-04: refuses a field of the wrong kind or absent, and a record that is no object, at the path given, with the value that came", () => {
     const { hash, ...noHash } = record;
-    expect([hash, ...checkHeader(deepFreeze({ ...noHash, rev: "1" }), "/0").map((r) => [r.rule, r.path, r.got])]).toEqual([
+    expect([hash, ...rejectionsOf(checkHeader(deepFreeze({ ...noHash, rev: "1" }), { intent: null, path: "/0" })).map((r) => [r.rule, r.path, r.got])]).toEqual([
       "sha256:00",
       ["KR-04", "/0/hash", "absent"],
       ["KR-04", "/0/rev", "1"],
     ]);
-    expect(checkHeader(null, "/0")).toEqual([reject(KR_04, { intent: null, path: "/0", expected: "a record", got: null })]);
-    expect(checkHeader(deepFreeze([1]), "/0").map((r) => r.got)).toEqual([[1]]);
+    expect(rejectionsOf(checkHeader(null, { intent: null, path: "/0" }))).toEqual([reject(KR_04, { intent: null, path: "/0", expected: "a record", got: null })]);
+    expect(rejectionsOf(checkHeader(deepFreeze([1]), { intent: null, path: "/0" })).map((r) => r.got)).toEqual([[1]]);
   });
 });
 
@@ -89,8 +89,8 @@ describe("reading JSON (KR-10)", () => {
   // Q-19: bytes that are not UTF-8 are named by their hash.
   it("KR-10: refuses bytes that are not UTF-8 — named by their hash — and a text that is not JSON, at the place given", () => {
     const bytes = Uint8Array.from([0x7b, 0xff, 0x7d]);
-    expect(parseJsonBytes(bytes, "/store/proposals/a.json")).toMatchObject({ ok: false, rejections: [{ rule: "KR-10", path: "/store/proposals/a.json", got: hashBytes(bytes) }] });
-    expect(parseJson("{", "/3")).toMatchObject({ ok: false, rejections: [{ rule: "KR-10", path: "/3", intent: null, got: "{" }] });
+    expect(parseJsonBytes(bytes, { intent: null, path: "/store/proposals/a.json" })).toMatchObject({ ok: false, rejections: [{ rule: "KR-10", path: "/store/proposals/a.json", got: hashBytes(bytes) }] });
+    expect(parseJson("{", { intent: null, path: "/3" })).toMatchObject({ ok: false, rejections: [{ rule: "KR-10", path: "/3", intent: null, got: "{" }] });
     expect(parseJson('{"a":[1,"x"]}')).toEqual({ ok: true, value: { a: [1, "x"] } });
   });
 });

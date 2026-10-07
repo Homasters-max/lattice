@@ -29,6 +29,7 @@
   ```
 
   Список отказов не пуст. Значение успеха — то, что задаёт правило: apply — `commit` или `no-op` (LG-14), landing — свой исход (LG-25).
+- **Каждая экспортируемая жёсткая проверка** `kernel` и `ledger` (S0-37) возвращает `Result<T>`, и `T` — проверенное значение своего типа, где оно есть: `checkHeader` — `Record`, чтение commit и `readProposal` — `Commit` и `Proposal`, `checkSchema` — `Schema`, `checkAgainstType` — запись, которую ей дали, `verifyChain` — коммиты, `checkFormat`, `checkId`, `checkUri` — строку. Приведения типа после проверки (`as Commit`) нет: закрытую форму читает `closedForm` (раздел 3). Отказы отсортированы (раздел 5) — `refuse` и `refused` сортируют сами. Внутри модуля проверки складываются через `rejectionsOf(result)` — отказы `Result`, пустые у `ok`. Исключение — `validate` (ниже). Проверка, которая проверяет весь вход от корня — `apply`, `land`, `openLines` (место строк store задано LG-50 и Q-29), — места не берёт; остальные берут `Place` (раздел 3).
 - **Исключение — только ошибка программы**: нарушенный инвариант, который вход не мог нарушить, если код верен. Сообщение начинается с `bug:`. Сбой внешнего мира в адаптере (диск, сеть, процесс `git`) — тоже исключение: это не нарушение правила. Вход, который правило отклоняет, никогда не приходит исключением и никогда не исправляется молча (KR-10, LG-42).
 - **Нарушения `validate`** (KR-21) — свой тип, не отказ: `{ path, keyword, expected, got }`. Результат `validate` — `{ ok: true } | { ok: false, violations }`. Фаза 2 apply переводит каждое нарушение в отказ KR-21 одним входом ядра для одной записи — `checkAgainstType(record, resolve, place)` (S0-36): путь — `place.path` + `/body` + `path` нарушения (`/body/title`), `expected` — ключевое слово и что оно ждёт, `{"maxLength": 200}`, `got` — что пришло. Тот же вход проверяет `rev` по виду типа (KR-04), запись abstract типа (KR-16) и тело типа `core/type@1` с цепочкой `extends` (KR-14, KR-15). Резолвер у него один — тело типа по pinned ссылке (`ResolveType`); схему из тела ядро читает само, и тип, который не проходит `readType` и `checkSchema`, для ядра не тип: отказ KR-15, а не исключение (Q-33). Формат внутри схемы (`format: date`) — тоже нарушение KR-21, а не отказ KR-11: отказы правил формата — для проверок вне схемы.
 - **Чистые модули синхронны.** `Promise` появляется только на порту; функция, которая ждёт порт (landing, открытие store), асинхронна, всё, что она зовёт между портами, — нет (решение владельца Q-17: landing чист по ST-04 и достаёт git, acts, store, время и id только через порты LG-23).
@@ -60,6 +61,9 @@ type Rejection = {
   readonly id?: string;                                   // дубликат: id, с которым столкнулся (LG-17)
 };
 
+type Place = Pick<Rejection, "intent" | "path">;           // где лежит проверяемое (G-13)
+const ROOT: Place = { intent: null, path: "" };           // корень входа, вне intent
+
 type Rejections = readonly [Rejection, ...Rejection[]];
 type Result<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly rejections: Rejections };
 
@@ -67,10 +71,19 @@ function reject(rule: Rule, place: Omit<Rejection, "rule" | "message">): Rejecti
 function sortRejections(rejections: readonly Rejection[]): Rejection[];   // порядок раздела 5
 function refuse<T>(first: Rejection, ...rest: readonly Rejection[]): Result<T>;  // отказ, отсортированный
 function refused<T>(rejections: readonly Rejection[]): Result<T> | null;  // null — отказывать не в чем
+function rejectionsOf(result: Result<unknown>): readonly Rejection[];     // отказы; пусто у ok
+
+// RM-02, одна грамматика ID (S0-37): по ней читает `md` codec, по ней тест покрытия читает дизайн
+function isRuleId(s: string): boolean;                    // <PREFIX>-<NN>; каждый RuleId — такой
+function isZBlockId(s: string): boolean;                  // <PREFIX>-Z<NN> — проза и примеры
+function isId(s: string): boolean;                        // ID абзаца: одно из двух (RM-01)
+function isIdLike(s: string): boolean;                    // задумано как ID — вне грамматики отказ RM-02
 ```
 
+Тип `RuleId` уже грамматики: префиксы — документов, правила которых называют отказы; префикс документа сверяет `discussion/tools/lint-ids.mjs`, где известно имя файла.
+
 - **`intent` и `path`** (G-13). `intent` — значение `id`, записанное в intent, как есть, даже если оно неверно; так отказ не зависит от порядка intents (LG-11). `path` — JSON Pointer внутри этого intent: `/body/title`, `/expected`. Если у intent нет строкового `id` или отказ не про intent (подпись proposal, сессия, открытие store, загрузка библиотеки), `intent` — `null`, а `path` указывает от корня проверяемого входа: `/intents/3/id`, `/sig`. Корень целиком — `""`.
-- **Корень `path` в landing** (решение владельца Q-29). Вход landing — дерево change request: у отказа с `intent: null` `path` — путь файла в дереве, дальше JSON Pointer внутри него: `/store/proposals/cr-x.json/intents/0/op`, `/store/proposals` (LG-54), `/store/knowledge.jsonl` (LG-23). Строка `store/knowledge.jsonl` — её номер с 1, как `seq`: `/store/knowledge.jsonl/1/seq`; так же — при открытии store на tail `main`. Отказ про intent со строковым `id` остаётся внутри intent (`/op`). Функция, которая проверяет часть входа, берёт `path` — место этой части во входе — и строит отказы от него (`parseJson(text, path)`, `readProposal(value, path)`); готовые отказы не переписываются.
+- **Корень `path` в landing** (решение владельца Q-29). Вход landing — дерево change request: у отказа с `intent: null` `path` — путь файла в дереве, дальше JSON Pointer внутри него: `/store/proposals/cr-x.json/intents/0/op`, `/store/proposals` (LG-54), `/store/knowledge.jsonl` (LG-23). Строка `store/knowledge.jsonl` — её номер с 1, как `seq`: `/store/knowledge.jsonl/1/seq`; так же — при открытии store на tail `main`. Отказ про intent со строковым `id` остаётся внутри intent (`/op`). Функция, которая проверяет часть входа, берёт `place` — место этой части во входе, `Place` с `intent` и `path` — и строит отказы от него (`parseJson(text, place)`, `readProposal(value, place)`, `checkHeader(value, place)`); готовые отказы не переписываются. Корень входа — `ROOT`.
 - **`expected` и `got`** — JSON-значения: что правило ждало и что пришло. Описание вместо значения допустимо, когда значения нет: `expected: "a ULID"`, `got: "absent"` у поля, которого нет. У байтов JSON-значения нет — отказ называет их hash `sha256:…` (Q-19). Значение секрета туда не попадает (раздел 6).
 - **Отказ создаётся только `reject`** из ядра; `rule` и `message` берутся из строки реестра. Литерал `"KR-06"` вне реестра — нарушение соглашения.
 - **Реестр правил модуля** — файл `src/<module>/rules.ts` (у адаптера — `src/adapters/<adapter>/rules.ts`): плоский список констант, по одной на rule ID, который применяют жёсткие проверки модуля, и массив `RULES` из них. Не фреймворк (ST-02): ни классов, ни регистрации во время выполнения, ни поиска по строке.
@@ -89,7 +102,7 @@ function refused<T>(rejections: readonly Rejection[]): Result<T> | null;  // nul
 
   Имя константы — rule ID с `_` вместо `-`. Один rule ID может стоять в реестрах двух модулей, если правило велит проверять в двух местах (LG-20: landing и recording); повтор той же проверки в другом модуле — обход (`plan/closure-check.md`).
 - **Исключения genesis и store init** (LG-18) тоже называются rule ID — константами реестра `ledger` в отдельном списке `EXEMPTIONS`, не в `RULES`: исключение ничего не отклоняет, фикстур ST-17 у него нет; показывают его тесты init.
-- **Закрытая форма** — объект, у которого каждое поле названо и лишних нет (заголовок record KR-04, тело типа KR-14, `ref` KR-19, commit LG-06, proposal и intent LG-09), — это таблица `Members` по имени поля и вызов `closedRejections(value, members, rule, place)` из `src/kernel/closed-form.ts` (S0-35): лишнее поле — отказ с `expected: "absent"`, член, который не подошёл, — с `expected` из таблицы, путь — JSON Pointer. Общие члены — `STRING`, `NUMBER`, `STRING_OR_NULL`, `JSON_VALUE` того же файла; вложенное проверяет вызывающий отдельным вызовом. Hash подписанной формы берёт поля из той же таблицы — `unsigned(value, members)` в `src/ledger/commit.ts`, без `sig`. Новая закрытая форма (S0-08, S0-13, S0-16, S0-23) — новая таблица, не своя копия проверки полей.
+- **Закрытая форма** — объект, у которого каждое поле названо и лишних нет (заголовок record KR-04, тело типа KR-14, `ref` KR-19, commit LG-06, proposal и intent LG-09), — это таблица `MembersOf<T>` по имени поля и вызов `closedForm(value, members, rule, place)` из `src/kernel/closed-form.ts` (S0-35, S0-37): лишнее поле — отказ с `expected: "absent"`, член, который не подошёл, — с `expected` из таблицы, путь — JSON Pointer; принятое значение — `T`. Член таблицы — guard типа своего поля (`fits: (v) => v is V`), поэтому значение после проверки не приводится руками. Общие члены — `STRING`, `NUMBER`, `STRING_OR_NULL`, `JSON_VALUE` того же файла; вложенное проверяет вызывающий отдельным вызовом: в таблице commit и proposal `records` и `intents` — JSON-значения, каждое читает своя проверка, и значение собирает вызывающий. Ядро, которому нужно сложить отказы формы с другими (тело типа, `ref`), зовёт `closedRejections` того же файла. Hash подписанной формы берёт поля из той же таблицы — `unsigned(value, members)` в `src/ledger/commit.ts`, без `sig`. Новая закрытая форма (S0-08, S0-13, S0-16, S0-23) — новая таблица, не своя копия проверки полей.
 
 ## 4. Жёсткие проверки и фикстуры
 
@@ -126,14 +139,14 @@ test/fixtures/
 
 - Trigger проходит, когда проверка отклоняет вход и среди отказов есть отказ с `rule` и `path` из `expect` (и `intent`, если он указан). Другие отказы рядом допустимы, но фикстура строится так, чтобы ломать одно.
 - Pass проходит, когда проверка принимает вход целиком (`ok: true`). Pass — минимальный верный вход, а не «вход без этого нарушения».
-- Строка `checks.ts` — `{ enforces, run }`: `enforces` — rule IDs проверки из реестра, `run` превращает `input` фикстуры в вызов проверки. Вход готовится только публичными функциями модулей: предыдущее состояние store — список proposals, проведённых через apply по очереди; commit, собранный руками в обход apply, — обход (`plan/closure-check.md`, «запись знания»).
+- Строка `checks.ts` — `{ enforces, run }`: `enforces` — rule IDs проверки из реестра, `run` превращает `input` фикстуры в вызов проверки и отдаёт её `Result` как есть, место — `ROOT` ядра или путь от него (S0-37). Вход готовится только публичными функциями модулей: предыдущее состояние store — список proposals, проведённых через apply по очереди; commit, собранный руками в обход apply, — обход (`plan/closure-check.md`, «запись знания»).
 - Вход — JSON. Текстовый вход (`md` для `import-md`, LG-42) — JSON-строка: она хранит байты точно, включая `\r` и отсутствие `\n` в конце.
 - **Проверки landing — через `land`** (S0-33). Проверку со склейкой вокруг фикстура видит только целиком: строка `land` в `checks.ts` прогоняет `land(…, {dryRun: true})` на `git-fixture`, собранном тестовой сборкой из `input.branches`; `commit` и `no-op` — принят, `rejections` — отклонён, другой исход — ошибка фикстуры. Вход — `{ branches, request }`: ветки `{ from?, files }` в порядке записи, среди них `main`, и имя change request. Файл ветки — строка; `null` — удалён; `{ json }` — JSON-текст значения; `{ landed }` — `store/knowledge.jsonl`, который landing пишет для одного proposal на пустом store; `{ bytes }` — числа байтов не UTF-8. Сырое дерево и сырые строки store, которых не пишет landing, — только во входе trigger (Q-23). Чистые проверки без склейки — JSON-текст, значение proposal, apply, строки store — идут без `land`.
 - **Раннер асинхронный**: `run` строки `checks.ts` возвращает исход или `Promise` исхода — проверка, которая ждёт порт, асинхронна (раздел 2).
 
 **Fitness-тесты** (ST-12) в `test/fixtures/` держат это соглашение:
 
-- `coverage.test.ts` — у каждого rule ID из `RULES` всех реестров `src/**/rules.ts` есть `trigger/` и `pass/` хотя бы с одним `.json`; каждая папка — rule ID, который определён в `docs/design` и объявлен реестром; каждый файл — разбираемый JSON.
+- `coverage.test.ts` — у каждого rule ID из `RULES` всех реестров `src/**/rules.ts` есть `trigger/` и `pass/` хотя бы с одним `.json`; каждая папка — rule ID, который определён в `docs/design` (ID clauses, которые читает `parse` кодека, S0-37) и объявлен реестром; каждый файл — разбираемый JSON.
 - `run.test.ts` — каждая фикстура называет проверку из `checks.ts`, эта проверка применяет rule ID папки, trigger отклоняется с ожидаемым rule ID и путём, pass принимается.
 
 ## 5. Порядок

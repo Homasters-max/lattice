@@ -1,5 +1,7 @@
 // Fitness test of ST-17: every rule ID a hard check enforces has a fixture
 // that triggers it and one that passes it. Layout and format: CONVENTIONS.md.
+// The rule IDs of the design are read by the codec, as LATTICE reads it.
+import { parse, type Section } from "../../src/codec/index.js";
 
 /** One `<case>.json` under `trigger/` or `pass/`; `data` is the parsed JSON, or `undefined` if it did not parse. */
 export type FixtureCase = {
@@ -56,18 +58,23 @@ export function auditCoverage(input: CoverageInput): string[] {
   return [...new Set(problems)].sort();
 }
 
-const RULE_ROW = /^\|\s*([A-Z]{2}-\d{2})\s*\|/;
+/** A document of `docs/design`: its file name and its bytes. */
+export type DesignDocument = { readonly name: string; readonly bytes: Uint8Array };
 
-/** Rule IDs defined by the rows of the rule tables in the given md texts; fenced blocks are skipped. */
-export function designRuleIds(texts: readonly string[]): Set<string> {
-  const ids = new Set<string>();
-  for (const text of texts) {
-    let fence = false;
-    for (const line of text.split("\n")) {
-      if (line.startsWith("```")) fence = !fence;
-      const id = fence ? undefined : RULE_ROW.exec(line)?.[1];
-      if (id !== undefined) ids.add(id);
-    }
-  }
-  return ids;
+/** The clauses of a section and of its subsections — the table rows with a rule ID (RM-01). */
+const clausesOf = (section: Section): string[] =>
+  section.items.flatMap((item) => (item.type === "section" ? clausesOf(item) : item.type === "clause" ? [item.id] : []));
+
+/**
+ * Rule IDs defined in the design: the IDs of the clauses the codec reads from each document (RM-01, RM-02). A
+ * document the codec refuses is no design to audit against — named with its rejections.
+ */
+export function designRuleIds(documents: readonly DesignDocument[]): Set<string> {
+  return new Set(
+    documents.flatMap(({ name, bytes }) => {
+      const parsed = parse(bytes, `/${name}`);
+      if (!parsed.ok) throw new Error(`${name}: ${parsed.rejections.map((r) => `${r.rule} at ${r.path}`).join(", ")}`);
+      return clausesOf(parsed.value);
+    }),
+  );
 }

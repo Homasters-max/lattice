@@ -56,7 +56,7 @@ export function openLines(lines: readonly Uint8Array[]): Result<Opened> {
   let rows: Row[] = [];
   let opened: Opened = { view: viewOf(0, []), tail: null };
   for (const [index, line] of lines.entries()) {
-    const commit = decodeCommit(line, `/${KNOWLEDGE}/${index + 1}`);
+    const commit = decodeCommit(line, { intent: null, path: `/${KNOWLEDGE}/${index + 1}` });
     if (!commit.ok) return commit;
     rows = withDelta(rows, fold(opened.view, commit.value, []));
     opened = { view: viewOf(commit.value.seq, rows), tail: commit.value };

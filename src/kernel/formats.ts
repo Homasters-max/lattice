@@ -6,7 +6,7 @@
 // (KR-18) are these and two more, each read by its own rule: `ref` — a
 // reference (KR-23) — and `uri` — an external link (KR-24).
 import type { JsonValue } from "./json.js";
-import { reject, type Place, type Rejection } from "./rejection.js";
+import { refuse, reject, type Place, type Result } from "./rejection.js";
 import { KR_11 } from "./rules.js";
 
 /** KR-11: a format with one canonical spelling. */
@@ -54,7 +54,7 @@ export const isFormat = (format: CanonicalFormat, s: string): boolean => SPELLIN
 /** KR-06, KR-11: a ULID — 26 upper-case Crockford base32 characters, at most 128 bits (G-07). */
 export const isUlid = (s: string): boolean => isFormat("ulid", s);
 
-/** KR-11: a value of the format, refused at the place the caller names — a value that is not a string too. */
-export function checkFormat(format: CanonicalFormat, value: JsonValue, place: Place): Rejection[] {
-  return typeof value === "string" && isFormat(format, value) ? [] : [reject(KR_11, { ...place, expected: format, got: value })];
+/** KR-11: the string of a value of the format, or its refusal at the place the caller names — a value that is not a string too. */
+export function checkFormat(format: CanonicalFormat, value: JsonValue, place: Place): Result<string> {
+  return typeof value === "string" && isFormat(format, value) ? { ok: true, value } : refuse(reject(KR_11, { ...place, expected: format, got: value }));
 }

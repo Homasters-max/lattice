@@ -8,7 +8,7 @@
 // do.
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { checkSchema, compare, isJsonObject, validate, type JsonValue, type Schema } from "../../src/kernel/index.js";
+import { checkSchema, compare, isJsonObject, ROOT, validate, type JsonValue, type Schema } from "../../src/kernel/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
 /** The abstract shapes a `$ref` of the grammar names: a few that relate. */
@@ -180,7 +180,7 @@ function near(s: Schema): fc.Arbitrary<Schema> {
 /** Pairs of schemas the subset admits, each with values drawn from both sides. */
 const pairs = fc
   .oneof(fc.tuple(schema, schema), schema.chain((a) => fc.tuple(fc.constant(a), near(a))), schema.chain((b) => fc.tuple(near(b), fc.constant(b))))
-  .filter(([a, b]) => checkSchema(a, "entity", { intent: null, path: "" }).length === 0 && checkSchema(b, "entity", { intent: null, path: "" }).length === 0)
+  .filter(([a, b]) => checkSchema(a, "entity", ROOT).ok && checkSchema(b, "entity", ROOT).ok)
   .chain(([a, b]) => fc.tuple(fc.constant(deepFreeze(a)), fc.constant(deepFreeze(b)), fc.array(fc.oneof(valueOf(a), valueOf(b)), { minLength: 8, maxLength: 8 })));
 
 describe("compare is sound (KR-22, R2)", () => {

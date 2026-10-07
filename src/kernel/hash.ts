@@ -2,9 +2,9 @@
 // from the platform (KR-02, D-06). KR-13: a body is at most 256 KiB of
 // canonical UTF-8 bytes (G-05), a constant of the kernel version.
 import { createHash } from "node:crypto";
-import { canon, ROOT } from "./canon.js";
+import { canon } from "./canon.js";
 import { serialize, type JsonValue } from "./json.js";
-import { refuse, reject, type Place, type Result } from "./rejection.js";
+import { refuse, reject, ROOT, type Place, type Result } from "./rejection.js";
 import { KR_13 } from "./rules.js";
 
 /** KR-13, G-05: the size limit of a body in canonical UTF-8 bytes — 256 KiB, a constant of the kernel version. */

@@ -3,7 +3,7 @@
 // test/structure/kernel-files.txt (ST-05).
 export { checkAgainstType } from "./against-type.js";
 export { canon } from "./canon.js";
-export { closedRejections, JSON_VALUE, NUMBER, STRING, STRING_OR_NULL, type Member, type Members } from "./closed-form.js";
+export { closedForm, JSON_VALUE, NUMBER, STRING, STRING_OR_NULL, type Member, type Members, type MembersOf } from "./closed-form.js";
 export { compare, type Comparison, type Mode, type Relation } from "./compare.js";
 export type { Aspect } from "./compare-shown.js";
 export { checkFormat, isFormat, isUlid, type CanonicalFormat, type Format } from "./formats.js";
@@ -14,9 +14,15 @@ export { decodeUtf8, parseJson, parseJsonBytes } from "./parse.js";
 export { checkHeader, type Record } from "./record.js";
 export { formatRef, isPinned, parseRef, type Ref } from "./ref.js";
 export {
+  isId,
+  isIdLike,
+  isRuleId,
+  isZBlockId,
   refuse,
   refused,
   reject,
+  rejectionsOf,
+  ROOT,
   sortRejections,
   type Place,
   type Rejection,

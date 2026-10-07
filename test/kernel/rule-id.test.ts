@@ -4,7 +4,7 @@
 // The codec reads `md` by it; every rule ID a registry names is of it.
 import { describe, expect, it } from "vitest";
 import { RULES as CODEC } from "../../src/codec/index.js";
-import { isId, isIdLike, isProseId, isRuleId, RULES as KERNEL } from "../../src/kernel/index.js";
+import { isId, isIdLike, isRuleId, isZBlockId, RULES as KERNEL } from "../../src/kernel/index.js";
 import { RULES as LEDGER } from "../../src/ledger/index.js";
 
 describe("the grammar of an ID (RM-02)", () => {
@@ -13,12 +13,12 @@ describe("the grammar of an ID (RM-02)", () => {
     for (const id of ["KR-6", "KR-006", "kr-06", "KR-Z01", "K-06", "KRX-06", "KR-06 ", ""]) expect([id, isRuleId(id)]).toEqual([id, false]);
   });
 
-  it("RM-02: a prose ID is <PREFIX>-Z<NN>", () => {
-    for (const id of ["KR-Z01", "RM-Z03"]) expect([id, isProseId(id)]).toEqual([id, true]);
-    for (const id of ["KR-01", "KR-Z1", "KR-z01", "KR-ZZ01"]) expect([id, isProseId(id)]).toEqual([id, false]);
+  it("RM-02: the ID of prose or an example — a Z-block — is <PREFIX>-Z<NN>", () => {
+    for (const id of ["KR-Z01", "RM-Z03"]) expect([id, isZBlockId(id)]).toEqual([id, true]);
+    for (const id of ["KR-01", "KR-Z1", "KR-z01", "KR-ZZ01"]) expect([id, isZBlockId(id)]).toEqual([id, false]);
   });
 
-  it("RM-01, RM-02: the ID of a paragraph is a rule ID or a prose ID", () => {
+  it("RM-01, RM-02: the ID of a paragraph is a rule ID or a Z-block ID", () => {
     expect(["KR-06", "KR-Z01", "KR-6"].map(isId)).toEqual([true, true, false]);
   });
 

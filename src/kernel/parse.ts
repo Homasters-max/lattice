@@ -2,18 +2,18 @@
 // string in NFC, and is refused, never repaired. `parseJson` is the one
 // function that parses JSON in the code of LATTICE; `JSON.parse` keeps the last
 // of duplicate keys silently, so the parse is own code. It reads the grammar of
-// RFC 8259 — a text that is not JSON is refused as a whole at the path given —
-// and refuses inside the value, at the JSON Pointer under that path: a key met
+// RFC 8259 — a text that is not JSON is refused as a whole at the place given —
+// and refuses inside the value, at the JSON Pointer under that place: a key met
 // twice, and what canon refuses (canon.ts). It reads with its own stack, so no
 // depth of nesting overflows, and the values it gives are frozen.
 import { numberRejections, stringRejections } from "./canon.js";
 import { hashBytes } from "./hash.js";
 import { pointer, type JsonValue } from "./json.js";
-import { refuse, refused, reject, type Rejection, type Result } from "./rejection.js";
+import { refuse, refused, reject, ROOT, type Place, type Rejection, type Result } from "./rejection.js";
 import { KR_10 } from "./rules.js";
 
-/** The position in the text and the refusals found so far; local to one parse. */
-type Cursor = { readonly text: string; at: number; readonly found: Rejection[] };
+/** The position in the text, the intent the text sits in and the refusals found so far; local to one parse. */
+type Cursor = { readonly text: string; readonly intent: string | null; at: number; readonly found: Rejection[] };
 
 type OpenArray = { readonly kind: "array"; readonly path: string; readonly items: JsonValue[] };
 type OpenObject = { readonly kind: "object"; readonly path: string; readonly entries: [string, JsonValue][]; readonly keys: Set<string>; key: string };
@@ -82,7 +82,7 @@ function readNumber(c: Cursor, path: string): Read {
   const written = c.text.slice(start, c.at);
   if (!NUMBER.test(written)) return undefined;
   const x = Number(written);
-  c.found.push(...numberRejections(x, written, { intent: null, path }));
+  c.found.push(...numberRejections(x, written, { intent: c.intent, path }));
   return { value: x };
 }
 
@@ -103,7 +103,7 @@ function readLiteral(c: Cursor): Read {
 function readStringValue(c: Cursor, path: string): Read {
   const s = readString(c);
   if (s === undefined) return undefined;
-  c.found.push(...stringRejections(s, { intent: null, path }));
+  c.found.push(...stringRejections(s, { intent: c.intent, path }));
   return { value: s };
 }
 
@@ -113,7 +113,7 @@ function readKey(c: Cursor, open: OpenObject): boolean {
   const key = readString(c);
   if (key === undefined || skip(c) !== ":") return false;
   c.at++;
-  const place = { intent: null, path: pointer(open.path, key) };
+  const place = { intent: c.intent, path: pointer(open.path, key) };
   c.found.push(...(open.keys.has(key) ? [reject(KR_10, { ...place, expected: "a key once", got: key })] : stringRejections(key, place)));
   open.keys.add(key);
   open.key = key;
@@ -161,10 +161,10 @@ function after(c: Cursor, open: Open): "more" | "closed" | undefined {
 }
 
 /** The value of a whole JSON text and the refusals inside it, or `undefined` when the text is not JSON. */
-function readText(text: string, root: string): { readonly value: JsonValue; readonly found: readonly Rejection[] } | undefined {
-  const c: Cursor = { text, at: 0, found: [] };
+function readText(text: string, root: Place): { readonly value: JsonValue; readonly found: readonly Rejection[] } | undefined {
+  const c: Cursor = { text, intent: root.intent, at: 0, found: [] };
   const stack: Open[] = [];
-  let read = readValue(c, root);
+  let read = readValue(c, root.path);
   while (read !== undefined) {
     if ("open" in read) {
       stack.push(read.open);
@@ -182,30 +182,31 @@ function readText(text: string, root: string): { readonly value: JsonValue; read
 }
 
 /**
- * KR-10: the text of UTF-8 bytes, refused at `path` — where the bytes sit in their input — when they are not
- * UTF-8. Bytes are no JSON value: the refusal names them by their hash (CONVENTIONS.md §3, Q-19).
+ * KR-10: the text of UTF-8 bytes, refused at the place the caller names — where the bytes sit in their input — when
+ * they are not UTF-8. Bytes are no JSON value: the refusal names them by their hash (CONVENTIONS.md §3, Q-19).
  */
-export function decodeUtf8(bytes: Uint8Array, path = ""): Result<string> {
+export function decodeUtf8(bytes: Uint8Array, place: Place = ROOT): Result<string> {
   try {
     // `ignoreBOM` keeps a byte order mark in the text, where the parse refuses it: by default the decoder drops it — a repair.
     return { ok: true, value: new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes) };
   } catch {
-    return refuse(reject(KR_10, { intent: null, path, expected: "UTF-8", got: hashBytes(bytes) }));
+    return refuse(reject(KR_10, { ...place, expected: "UTF-8", got: hashBytes(bytes) }));
   }
 }
 
 /**
- * KR-10: the value of a JSON text, frozen, or its refusals: the text as a whole at `path` — where the text sits in its
- * input — when it is not JSON; inside it, at the JSON Pointer under `path`, what I-JSON in NFC does not admit.
+ * KR-10: the value of a JSON text, frozen, or its refusals: the text as a whole at the place the caller names — where
+ * the text sits in its input — when it is not JSON; inside it, at the JSON Pointer under that place, what I-JSON in
+ * NFC does not admit.
  */
-export function parseJson(text: string, path = ""): Result<JsonValue> {
-  const read = readText(text, path);
-  if (read === undefined) return refuse(reject(KR_10, { intent: null, path, expected: "a JSON text", got: text }));
+export function parseJson(text: string, place: Place = ROOT): Result<JsonValue> {
+  const read = readText(text, place);
+  if (read === undefined) return refuse(reject(KR_10, { ...place, expected: "a JSON text", got: text }));
   return refused<JsonValue>(read.found) ?? { ok: true, value: read.value };
 }
 
-/** KR-10: the value of JSON in UTF-8 bytes, refused at `path` as `decodeUtf8` and `parseJson` refuse. */
-export function parseJsonBytes(bytes: Uint8Array, path = ""): Result<JsonValue> {
-  const text = decodeUtf8(bytes, path);
-  return text.ok ? parseJson(text.value, path) : text;
+/** KR-10: the value of JSON in UTF-8 bytes, refused at the place the caller names as `decodeUtf8` and `parseJson` refuse. */
+export function parseJsonBytes(bytes: Uint8Array, place: Place = ROOT): Result<JsonValue> {
+  const text = decodeUtf8(bytes, place);
+  return text.ok ? parseJson(text.value, place) : text;
 }

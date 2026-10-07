@@ -13,7 +13,7 @@ import type { Kind } from "./id.js";
 import { isJsonArray, isJsonObject, own, pointer, serialize, type JsonObject, type JsonValue } from "./json.js";
 import { childrenOf, isJsonType, isTypePair, propertiesOf, requiredOf, tagOf, typesOf, type Node } from "./read-schema.js";
 import { isPinned } from "./ref.js";
-import { reject, sortRejections, type Place, type Rejection } from "./rejection.js";
+import { refuse, refused, reject, type Place, type Rejection, type Result } from "./rejection.js";
 import { KR_18 } from "./rules.js";
 
 /** KR-18: a schema of the closed subset — a value `checkSchema` admits. */
@@ -178,10 +178,11 @@ function siteRejections(site: Site, kind: Kind, intent: string | null): Rejectio
 }
 
 /**
- * KR-18, KR-19: the schema of a type of this kind, refused keyword by keyword at the place the caller names — where
- * the schema sits in its input; the rejections come sorted (CONVENTIONS.md §5).
+ * KR-18, KR-19: the schema of a type of this kind, admitted, or its rejections keyword by keyword at the place the
+ * caller names — where the schema sits in its input; the rejections come sorted (CONVENTIONS.md §5).
  */
-export function checkSchema(schema: JsonValue, kind: Kind, place: Place): Rejection[] {
+export function checkSchema(schema: JsonValue, kind: Kind, place: Place): Result<Schema> {
+  if (!isJsonObject(schema)) return refuse(reject(KR_18, { ...place, expected: "a schema object", got: schema }));
   const out: Rejection[] = [];
   const pending: Node[] = [{ schema, path: place.path, site: "root", required: false }];
   for (let node = pending.pop(); node !== undefined; node = pending.pop()) {
@@ -194,5 +195,5 @@ export function checkSchema(schema: JsonValue, kind: Kind, place: Place): Reject
     for (const r of siteRejections(site, kind, place.intent)) out.push(r);
     for (const child of childrenOf(site)) pending.push(child);
   }
-  return sortRejections(out);
+  return refused<Schema>(out) ?? { ok: true, value: schema };
 }

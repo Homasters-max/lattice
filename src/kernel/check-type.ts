@@ -12,7 +12,7 @@ import { closedRejections, type Members } from "./closed-form.js";
 import { compare } from "./compare.js";
 import { compareText, isJsonObject, pointer, type JsonValue } from "./json.js";
 import { isPinned } from "./ref.js";
-import { reject, sortRejections, type Place, type Rejection } from "./rejection.js";
+import { reject, rejectionsOf, sortRejections, type Place, type Rejection } from "./rejection.js";
 import { KR_14, KR_15, KR_16, KR_19 } from "./rules.js";
 import { sitesOf } from "./read-schema.js";
 import { checkSchema, type Schema } from "./schema.js";
@@ -20,7 +20,7 @@ import { chainOf, MAX_DEPTH, readType, typeAt, type ResolveType, type Type } fro
 
 /** KR-14, KR-17: the members of a type body; `extends` absent means no parent (G-26), and several parents are no form of it. */
 const MEMBERS: Members = {
-  extends: { expected: "a pinned reference to one parent type, type@n", fits: (v) => v === undefined || (typeof v === "string" && isPinned(v)) },
+  extends: { expected: "a pinned reference to one parent type, type@n", fits: (v): v is string | undefined => v === undefined || (typeof v === "string" && isPinned(v)) },
   abstract: { expected: "a boolean", fits: (v) => typeof v === "boolean" },
   kind: { expected: ["entity", "event"], fits: (v) => v === "entity" || v === "event" },
   schema: { expected: "a schema", fits: (v) => v !== undefined },
@@ -92,7 +92,7 @@ export function checkType(body: JsonValue, resolve: ResolveType, place: Place): 
   if (!isJsonObject(body)) return [reject(KR_14, { ...place, expected: "a type body {extends, abstract, kind, schema}", got: body })];
   const form = closedRejections(body, MEMBERS, KR_14, place);
   const { kind, schema } = body;
-  const ofSchema = (kind === "entity" || kind === "event") && schema !== undefined ? checkSchema(schema, kind, { ...place, path: pointer(place.path, "schema") }) : [];
+  const ofSchema = (kind === "entity" || kind === "event") && schema !== undefined ? rejectionsOf(checkSchema(schema, kind, { ...place, path: pointer(place.path, "schema") })) : [];
   const type = readType(body);
   if (form.length > 0 || ofSchema.length > 0 || type === null) return sortRejections([...form, ...ofSchema]);
   const chain = type.extends === undefined ? cardRejections([type], place) : chainRejections(type, resolve, place);

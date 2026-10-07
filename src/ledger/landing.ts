@@ -76,8 +76,9 @@ async function proposalOf(worktree: Worktree): Promise<Result<Found>> {
   if (!path.ok) return path;
   const bytes = await worktree.read(path.value);
   if (bytes === null) throw new Error(`bug: git listed ${path.value} and cannot read it`);
-  const value = parseJsonBytes(bytes, `/${path.value}`);
-  const proposal = value.ok ? readProposal(value.value, `/${path.value}`) : value;
+  const place = { intent: null, path: `/${path.value}` };
+  const value = parseJsonBytes(bytes, place);
+  const proposal = value.ok ? readProposal(value.value, place) : value;
   return proposal.ok ? { ok: true, value: { path: path.value, proposal: proposal.value } } : proposal;
 }
 
