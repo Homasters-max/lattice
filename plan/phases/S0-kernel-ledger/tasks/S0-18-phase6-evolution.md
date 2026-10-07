@@ -42,3 +42,4 @@ rules: [RF-12, RF-13, RF-14, RF-15, RF-16, RF-17, RF-18, RF-19, RF-22, TY-08, TR
 ## Риски и заметки
 
 - Если сверх L — делить на «типы и `migrate`» и «контракты и пины».
+- От S0-07: `compare(a, b, mode, resolve)` возвращает `{relation, aspects}`, `aspects` — список имён `validity`, `ref`, `edge`, `unique`, `key`, `card_order`, `description` в этом порядке (G-27); `same-shape` RF-15 — каждый аспект из `card_order`, `description`.
