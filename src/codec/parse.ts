@@ -1,10 +1,11 @@
 // The parse of canonical md into its model (RM-Z03, LG-42, G-24). Input that
 // is not canonical is refused, never repaired (LG-42); text that belongs to no
-// block is refused by RM-01, an ID off its grammar by RM-02. Every refusal is
+// block, and a second block with the same ID, are refused by RM-01, an ID off
+// its grammar or of the other kind by RM-02. Every refusal is
 // outside any intent and names its line under `path`, where the document sits
 // in its input; all of them are found, not only the first.
 import { decodeUtf8, refused, reject, type Rejection, type Result, type Rule } from "../kernel/index.js";
-import { isId, isIdLike } from "./ids.js";
+import { isId, isIdLike, isProseId, isRuleId } from "./ids.js";
 import { cut, notCanonical, type Chunk, type FenceChunk, type TextChunk } from "./lines.js";
 import type { Block, Field, Item, Section } from "./model.js";
 import { RM_01, RM_02 } from "./rules.js";
@@ -16,11 +17,14 @@ const OPEN = /^```([^ ]*)(?: (.*))?$/;
 const LANG = /^[a-z][a-z0-9-]*$/;
 const ITEM = /^- \S/;
 const GRAMMAR = "<PREFIX>-<NN> or <PREFIX>-Z<NN>";
+const RULE_ID = "<PREFIX>-<NN>: a row with an ID is a rule (RM-01)";
+const PROSE_ID = "<PREFIX>-Z<NN>: a fenced block with an ID is an example";
 
 /** A section being read: its items grow as chunks are read; the stack holds it and the sections around it. */
 type Open = { readonly level: number; readonly items: Item[] };
 
-type Reader = { readonly path: string; readonly stack: Open[]; readonly found: Rejection[] };
+/** `ids` — the line of the block of each ID read so far (RM-01). */
+type Reader = { readonly path: string; readonly stack: Open[]; readonly found: Rejection[]; readonly ids: Map<string, number> };
 
 /** What a refusal expected and what it got. */
 type Why = { readonly expected: string; readonly got: string };
@@ -35,6 +39,14 @@ function lg42(reader: Reader, line: number, expected: string, got: string): void
 
 /** The items of the innermost open section: the next item belongs to it. */
 const current = (reader: Reader): Item[] => reader.stack.at(-1)?.items ?? [];
+
+/** RM-01: one ID — one block; a block whose ID an earlier block has is refused at its line. */
+function place(reader: Reader, block: Block, line: number): void {
+  const first = reader.ids.get(block.id);
+  if (first !== undefined) return refuseAt(reader, RM_01, line, { expected: `one block per ID; ${block.id} is the block at line ${first}`, got: block.id });
+  reader.ids.set(block.id, line);
+  current(reader).push(block);
+}
 
 /** A chunk of one line; the line after it, with no blank line between, is refused (LG-42, G-24). */
 function oneLine(reader: Reader, chunk: TextChunk): string {
@@ -58,7 +70,7 @@ function readProse(reader: Reader, chunk: TextChunk): void {
   const id = PROSE.exec(text)?.[1];
   if (id === undefined) return refuseAt(reader, RM_01, chunk.line, { expected: "a paragraph that starts with its ID and a dot", got: text });
   if (!isId(id)) return refuseAt(reader, RM_02, chunk.line, { expected: GRAMMAR, got: id });
-  current(reader).push({ type: "prose", id, text });
+  place(reader, { type: "prose", id, text }, chunk.line);
 }
 
 /** The text that ends with ":" when a block takes a field (RM-Z03, G-24); an example's without its last newline. */
@@ -90,10 +102,10 @@ function readList(reader: Reader, chunk: TextChunk): void {
   attach(reader, { list: chunk.lines.map((l) => l.slice(2)) }, chunk);
 }
 
-function readRow(reader: Reader, items: Item[], line: number, cells: readonly string[]): void {
+function readRow(reader: Reader, line: number, cells: readonly string[]): void {
   const [id = ""] = cells;
-  if (isId(id)) items.push({ type: "clause", id, cells });
-  else if (isIdLike(id)) refuseAt(reader, RM_02, line, { expected: GRAMMAR, got: id });
+  if (isRuleId(id)) place(reader, { type: "clause", id, cells }, line);
+  else if (isIdLike(id)) refuseAt(reader, RM_02, line, { expected: RULE_ID, got: id });
   else refuseAt(reader, RM_01, line, { expected: "a row whose first cell is its ID", got: id });
 }
 
@@ -105,9 +117,8 @@ function readTableChunk(reader: Reader, chunk: TextChunk): void {
   if ("found" in read) return void reader.found.push(...read.found);
   const { header, rows } = read.table;
   if (!rows.some((r) => isIdLike(r.cells[0] ?? ""))) return attach(reader, { table: { header, rows: rows.map((r) => r.cells) } }, chunk);
-  const items = current(reader);
-  items.push({ type: "header", cells: header });
-  for (const r of rows) readRow(reader, items, r.line, r.cells);
+  current(reader).push({ type: "header", cells: header });
+  for (const r of rows) readRow(reader, r.line, r.cells);
 }
 
 /** RM-Z03, G-24: a fenced block opened by ```<lang> <ID> is an example; its text is the lines inside, verbatim. */
@@ -115,8 +126,8 @@ function readFence(reader: Reader, chunk: FenceChunk): void {
   const [, lang = "", id] = OPEN.exec(chunk.open) ?? [];
   if (id === undefined) return refuseAt(reader, RM_01, chunk.line, { expected: "a fenced block with an ID after its language", got: chunk.open });
   if (!LANG.test(lang) || !isIdLike(id)) return lg42(reader, chunk.line, "```<lang> <ID>", chunk.open);
-  if (!isId(id)) return refuseAt(reader, RM_02, chunk.line, { expected: GRAMMAR, got: id });
-  current(reader).push({ type: "example", id, lang, text: chunk.body.map((l) => `${l}\n`).join("") });
+  if (!isProseId(id)) return refuseAt(reader, RM_02, chunk.line, { expected: PROSE_ID, got: id });
+  place(reader, { type: "example", id, lang, text: chunk.body.map((l) => `${l}\n`).join("") }, chunk.line);
 }
 
 function readChunk(reader: Reader, chunk: Chunk): void {
@@ -173,7 +184,7 @@ export function parse(bytes: Uint8Array, path = ""): Result<Section> {
   const text = decodeUtf8(bytes, path);
   if (!text.ok) return text;
   const { chunks, found, whole } = cut(text.value, path);
-  const reader: Reader = { path, stack: [], found: [...found] };
+  const reader: Reader = { path, stack: [], found: [...found], ids: new Map() };
   const document = whole ? null : readDocument(reader, chunks);
   const refusal = refused<Section>(distinct(reader.found));
   if (refusal !== null) return refusal;

@@ -169,6 +169,13 @@ describe("every block has an ID (RM-01)", () => {
     expect(rules(md("# Doc", "", "| ID | Rule |", "|---|---|", "| AA-01 | x |", "| note | y |"))).toEqual([["RM-01", "/6"]]);
     for (const open of ["```", "```json"]) expect([open, rules(md("# Doc", "", open, "{}", "```"))]).toEqual([open, [["RM-01", "/3"]]]);
   });
+
+  it("RM-01: refuses a second block with the same ID — a paragraph, a row, an example — at the line of the second", () => {
+    expect(rules(md("# Doc", "", "AA-Z01. x", "", "AA-Z01. y"))).toEqual([["RM-01", "/5"]]);
+    expect(rules(md("# Doc", "", "| ID | Rule |", "|---|---|", "| AA-01 | x |", "| AA-01 | y |"))).toEqual([["RM-01", "/6"]]);
+    expect(rules(md("# Doc", "", "AA-Z01. x", "", "```json AA-Z01", "```"))).toEqual([["RM-01", "/5"]]);
+    expect(rules(md("# Doc", "", "## A", "", "AA-01. x", "", "## B", "", "| ID | Rule |", "|---|---|", "| AA-01 | y |"))).toEqual([["RM-01", "/11"]]);
+  });
 });
 
 describe("an ID follows its grammar (RM-02)", () => {
@@ -178,5 +185,11 @@ describe("an ID follows its grammar (RM-02)", () => {
       expect([id, rules(md("# Doc", "", "| ID | Rule |", "|---|---|", `| ${id} | x |`))]).toEqual([id, [["RM-02", "/5"]]]);
       expect([id, rules(md("# Doc", "", `\`\`\`json ${id}`, "```"))]).toEqual([id, [["RM-02", "/3"]]]);
     }
+  });
+
+  it("RM-02: a row is a rule and takes <PREFIX>-<NN>, an example takes <PREFIX>-Z<NN>, a paragraph either", () => {
+    expect(rules(md("# Doc", "", "| ID | Rule |", "|---|---|", "| AA-Z01 | x |"))).toEqual([["RM-02", "/5"]]);
+    expect(rules(md("# Doc", "", "```json AA-01", "```"))).toEqual([["RM-02", "/3"]]);
+    expect(rules(md("# Doc", "", "AA-01. x", "", "AA-Z01. y"))).toEqual([]);
   });
 });

@@ -5,8 +5,10 @@ import { describe, expect, it } from "vitest";
 import { parse, print, type Block, type Field, type Item, type Section, type Table } from "../../src/codec/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
+const PREFIXES = ["AA", "KR", "LG", "RM"] as const;
+
 const id = fc
-  .tuple(fc.constantFrom("AA", "KR", "LG", "RM"), fc.boolean(), fc.integer({ min: 0, max: 99 }))
+  .tuple(fc.constantFrom(...PREFIXES), fc.boolean(), fc.integer({ min: 0, max: 99 }))
   .map(([prefix, z, n]) => `${prefix}-${z ? "Z" : ""}${String(n).padStart(2, "0")}`);
 
 /** Words of inline text as the corpus has them: inline code, an escaped pipe, links, ranges, typography. */
@@ -61,10 +63,41 @@ function section(level: number, depth: number): fc.Arbitrary<Section> {
     .map(([heading, items, inner]): Section => ({ type: "section", heading, level, items: [...items.flat(), ...inner] }));
 }
 
+/**
+ * RM-01, RM-02: every block its own ID, of its kind — a row a rule's, an example a `Z` one, a paragraph keeps the kind
+ * it was generated with. The k-th block takes the prefix k mod 4 and the number k div 4, so no two blocks share one.
+ */
+function renumber(doc: Section): Section {
+  let k = 0;
+  const next = (z: boolean): string => {
+    const n = k++;
+    return `${PREFIXES[n % PREFIXES.length] ?? ""}-${z ? "Z" : ""}${String(Math.floor(n / PREFIXES.length)).padStart(2, "0")}`;
+  };
+  const item = (i: Item): Item => {
+    switch (i.type) {
+      case "section":
+        return { ...i, items: i.items.map(item) };
+      case "header":
+        return i;
+      case "prose": {
+        const fresh = next(i.id.includes("-Z"));
+        return { ...i, id: fresh, text: `${fresh}${i.text.slice(i.id.length)}` };
+      }
+      case "clause": {
+        const fresh = next(false);
+        return { ...i, id: fresh, cells: [fresh, ...i.cells.slice(1)] };
+      }
+      case "example":
+        return { ...i, id: next(true) };
+    }
+  };
+  return { ...doc, items: doc.items.map(item) };
+}
+
 describe("the codec both ways (LG-42)", () => {
   it("LG-42: parse(print(d)) is d for generated documents", () => {
     fc.assert(
-      fc.property(section(1, 3), (doc) => {
+      fc.property(section(1, 3).map(renumber), (doc) => {
         expect(parse(print(deepFreeze(doc)))).toEqual({ ok: true, value: doc });
       }),
       { numRuns: 300 },
