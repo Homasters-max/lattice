@@ -1,19 +1,20 @@
 #!/usr/bin/env node
 // plan-check: согласованность плана работ с дизайном LATTICE и между файлами плана.
-//   node plan/tools/plan-check.mjs [--rules]
+//   node plan/tools/plan-check.mjs [--rules] [--root <каталог с docs/ и plan/>]
 // Состав фазы — правила по таблице SL-Z04 (срез документа, полные и частичные исключения).
 // Ошибки (выход 1): frontmatter задачи; зависимость не существует или цикл; доска и файлы задач расходятся;
-// неизвестный статус; ✅ при незавершённой зависимости; фаза ✅ при незавершённых задачах;
+// неизвестный статус; ✅ при незавершённой зависимости; ✅ при неотмеченном или пустом «Готово, когда»; фаза ✅ при незавершённых задачах;
 // правило из `rules` не существует в дизайне; правило фазы не отнесено ни к одной задаче.
 // Предупреждения: правило другой фазы в `rules`; название на доске не совпадает с файлом; задачи сданы,
-// а фаза ещё не в работе; RULES.md устарел.
+// а фаза ещё не в работе; отметки «Готово, когда» у задачи без ✅; RULES.md устарел.
 // Доска хранит только итог задачи (⬜, ✅, ✖); что в работе — открытые PR, их инструмент не читает.
 // --rules — переписать phases/<фаза>/RULES.md.
 import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const rootAt = process.argv.indexOf("--root");
+const ROOT = rootAt > 0 ? process.argv[rootAt + 1] : join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const DESIGN = join(ROOT, "docs", "design");
 const PLAN = join(ROOT, "plan");
 const WRITE_RULES = process.argv.includes("--rules");
@@ -158,11 +159,19 @@ function loadPhases() {
   });
 }
 
+// Пункты «Готово, когда» файла задачи: сколько отмечено [x] и сколько нет.
+function doneMarks(text) {
+  const section = /^## Готово, когда\n([\s\S]*?)(?=^## |(?![\s\S]))/m.exec(text)?.[1] ?? "";
+  const items = section.split("\n").map((l) => /^- \[([ xX])\]/.exec(l)?.[1]).filter(Boolean);
+  return { checked: items.filter((m) => m !== " ").length, unchecked: items.filter((m) => m === " ").length };
+}
+
 function loadTasks(phase, design) {
   const dir = join(PLAN, "phases", phase.dir, "tasks");
   const tasks = new Map();
   for (const f of existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith(".md")).sort() : []) {
-    const fm = frontmatter(read(join(dir, f)));
+    const text = read(join(dir, f));
+    const fm = frontmatter(text);
     const at = `${phase.dir}/tasks/${f}`;
     if (!fm) { err(`${at}: нет frontmatter`); continue; }
     for (const k of ["id", "title", "phase", "stage", "size", "modules", "depends", "rules"]) {
@@ -173,7 +182,7 @@ function loadTasks(phase, design) {
     if (!WEIGHT[fm.size]) err(`${at}: size «${fm.size}» — не S, M или L`);
     for (const m of fm.modules ?? []) if (!design.modules.has(m)) err(`${at}: модуль ${m} не из матрицы ST-01`);
     for (const r of fm.rules ?? []) if (!design.docOf.has(r)) err(`${at}: правило ${r} не определено в дизайне`);
-    tasks.set(fm.id, { ...fm, file: f, at });
+    tasks.set(fm.id, { ...fm, file: f, at, marks: doneMarks(text) });
   }
   return tasks;
 }
@@ -224,6 +233,9 @@ function checkStatuses(phase, tasks, status, statusOf) {
   for (const t of tasks.values()) {
     const s = status.get(t.id), waiting = t.depends.filter(open);
     if (s === "✅" && waiting.length) err(`${t.id} ✅, но не завершены зависимости: ${waiting.join(", ")}`);
+    if (s === "✅" && t.marks.unchecked) err(`${t.at}: ✅ на доске, но в «Готово, когда» не отмечено пунктов: ${t.marks.unchecked}`);
+    if (s === "✅" && !t.marks.checked && !t.marks.unchecked) err(`${t.at}: ✅ на доске, но в «Готово, когда» нет пунктов [x]`);
+    if (s === "⬜" && t.marks.checked) warn(`${t.at}: в «Готово, когда» отмечено ${t.marks.checked}, а на доске ⬜`);
   }
   const unfinished = [...status].filter(([, s]) => !CLOSED.has(s)).map(([id]) => id);
   if (phase.status === "✅" && unfinished.length) err(`${phase.code} ✅, но не завершены: ${unfinished.join(", ")}`);
