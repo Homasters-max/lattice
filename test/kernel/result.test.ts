@@ -95,6 +95,18 @@ describe("a hard check of the kernel returns a Result (CONVENTIONS.md §2, LG-17
   });
 });
 
+describe("the rejections of checkHeader carry the intent of its place (CONVENTIONS.md §3, G-13)", () => {
+  it("LG-17: the rejections of the grammar of checkHeader's fields carry the intent of the place too", () => {
+    const out = checkHeader(deepFreeze({ ...ENTITY, id: "Demo/A", type: "demo/note", by: "x", at: "2026-10-06" }), PLACE);
+    expect(rejectionsOf(out).map((r) => [r.rule, r.intent, r.path])).toEqual([
+      ["KR-11", "demo/a", "/records/0/at"],
+      ["KR-08", "demo/a", "/records/0/by"],
+      ["KR-06", "demo/a", "/records/0/id"],
+      ["KR-07", "demo/a", "/records/0/type"],
+    ]);
+  });
+});
+
 describe("the strict parse takes a place (CONVENTIONS.md §3, G-13)", () => {
   const AT = deepFreeze({ intent: "demo/a", path: "/body" });
 
@@ -102,6 +114,13 @@ describe("the strict parse takes a place (CONVENTIONS.md §3, G-13)", () => {
     expect(rejectionsOf(parseJson("{", AT)).map((r) => [r.rule, r.intent, r.path])).toEqual([["KR-10", "demo/a", "/body"]]);
     expect(rejectionsOf(parseJson('{"a": -0}', AT)).map((r) => [r.rule, r.intent, r.path])).toEqual([["KR-10", "demo/a", "/body/a"]]);
     expect(parseJson("[1]", AT)).toEqual({ ok: true, value: [1] });
+  });
+
+  it("KR-10: parseJson refuses a key met twice and a string not in NFC inside the text, with the intent of the place", () => {
+    const decomposed = "e\u0301"; // e and a combining accent: not in NFC
+    expect(rejectionsOf(parseJson('{"a": 1, "a": 2}', AT)).map((r) => [r.rule, r.intent, r.path])).toEqual([["KR-10", "demo/a", "/body/a"]]);
+    expect(rejectionsOf(parseJson(`{"b": "${decomposed}"}`, AT)).map((r) => [r.rule, r.intent, r.path])).toEqual([["KR-10", "demo/a", "/body/b"]]);
+    expect(rejectionsOf(parseJson(`{"${decomposed}": 1}`, AT)).map((r) => [r.rule, r.intent, r.path])).toEqual([["KR-10", "demo/a", `/body/${decomposed}`]]);
   });
 
   it("KR-10: decodeUtf8 and parseJsonBytes refuse bytes that are not UTF-8 at the place given", () => {
