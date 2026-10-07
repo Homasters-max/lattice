@@ -1,0 +1,6 @@
+{
+  "check": "md",
+  "input": {
+    "text": "# Doc\n\nAA-Z01. x\n"
+  }
+}
