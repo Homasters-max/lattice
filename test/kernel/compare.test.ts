@@ -120,4 +120,11 @@ describe("compare (KR-22)", () => {
     expect(run(deep(5000, { type: "string", maxLength: 1 }), deep(5000, S)).relation).toBe("incomparable");
     expect(run(deep(5000, S), deep(5000, S)).relation).toBe("same");
   });
+
+  it("KR-22: a schema wider than the steps the walk takes is incomparable", () => {
+    const wide = (n: number, field: Schema): Schema => object(Object.fromEntries(Array.from({ length: n }, (_, i) => [`f${i}`, field])));
+    const short: Schema = { type: "string", maxLength: 1 };
+    expect(run(wide(1000, short), wide(1000, S)).relation).toBe("narrower");
+    expect(run(wide(20_000, short), wide(20_000, S)).relation).toBe("incomparable");
+  });
 });
