@@ -57,6 +57,9 @@ describe("the body against the schema of its type (KR-21)", () => {
     expect(check({ type: "demo/note@1", rev: 1, body: { text: "abcdef" } }, TYPES, { intent: "demo/a", path: "" })).toEqual([
       reject(KR_21, { intent: "demo/a", path: "/body/text", expected: { maxLength: 5 }, got: 6 }),
     ]);
+    expect(check({ type: "demo/note@1", rev: 1, body: { text: 1 } }, TYPES, { intent: "demo/a", path: "" })).toEqual([
+      reject(KR_21, { intent: "demo/a", path: "/body/text", expected: { type: "string" }, got: 1 }),
+    ]);
   });
 
   it("KR-21: a $ref of the schema is read out of the body of its abstract type", () => {
