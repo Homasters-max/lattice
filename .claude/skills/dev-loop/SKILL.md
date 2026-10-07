@@ -33,7 +33,7 @@ argument-hint: "[S0-NN | PR <n>]"
 | `ask` | «Эскалация», п. 3, с `questions` из вывода |
 | `executor` | «Исполнитель» |
 | `stop` | цикл окончен; PR остаётся draft с `blocked` |
-| `end` | сообщи владельцу, что цикл завершён |
+| `end` | PR открыт и `git merge-base --is-ancestor origin/main HEAD` ложно — «Сдать» заново; иначе сообщи владельцу, что цикл завершён |
 
 ## Начать или продолжить
 
@@ -62,11 +62,13 @@ argument-hint: "[S0-NN | PR <n>]"
 - Зелёный — `dl wave --worktree <work>`, дальше по `next`.
 - Красный — `dl brief fixer --worktree <work> --job verify-red --log <папка>/verify.log` → агент `fixer` → `dl check <out>` → «Ворота». Круг на это не тратится; третий красный подряд — «Эскалация» с `--why "verify красный трижды"`.
 
+Ветка, от которой ушёл `main`, до «Сдать» не пересобирается: ревью считает diff от merge-base, а пересборка посреди цикла делает следующий круг полным. Исключение — текстовый конфликт с `main` (`gh pr view <n> --json mergeStateStatus` — `DIRTY`): `dl brief fixer --worktree <work> --job rebase` → агент `fixer` → `dl check <out>` → «Ворота».
+
 ## Сдать
 
 - `git merge-base --is-ancestor origin/main HEAD` ложно — `dl brief fixer --worktree <work> --job rebase` → агент `fixer` → `dl check <out>` → verify. `conflicts` задевают `src/` или `test/` — `dl wave --worktree <work> --conflicts <файлы через запятую>`, дальше по `next`. Иначе — к следующему пункту.
 - `dl final` → пост. `gh pr ready <n>`; метка `blocked` на PR есть (`gh pr view <n> --json labels`) — `gh pr edit <n> --remove-label blocked`.
-- Владельцу: задача, число кругов, ссылка на PR; что отложено в план и куда, что отклонено, что решить до merge — по разделам итога, без пересказа. Merge делает владелец.
+- Владельцу: задача, число кругов, ссылка на PR; что отложено в план и куда, что отклонено, что решить до merge — по разделам итога, без пересказа. Merge делает владелец. Ruleset `main` пускает merge, только когда PR стоит на tail `main` и CI зелёный; ушёл `main` после «Сдать» — «Update branch» с rebase в PR, а при конфликте — `/dev-loop PR <n>`.
 
 ## Эскалация
 
