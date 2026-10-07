@@ -76,6 +76,30 @@ describe("the chain of knowledge commits (LG-04, LG-05, LG-06)", () => {
 });
 
 describe("the signatures of knowledge commits (LG-06)", () => {
+  it("LG-06: the signature covers every header field but sig — one changed and not signed again is refused at sig", () => {
+    const commits = chain();
+    const last = commits[2]!;
+    const changes: readonly Partial<Commit>[] = [
+      { kernel: `${last.kernel}.1` },
+      { base: last.base + 1 },
+      { proposal: `sha256:${"0".repeat(64)}` },
+      { proposal_sig: signCommit(last, LAND_KEY.key).sig },
+      { request: "refs/heads/cr/other" },
+      { at: "2026-10-06T12:00:00.000001Z" },
+    ];
+    for (const fields of changes) {
+      expect(refusals(withCommit(commits, 3, { ...last, ...fields })), JSON.stringify(fields)).toEqual([["LG-06", `${ROOT}/3/sig`]]);
+    }
+    expect(refusals(withCommit(commits, 3, { ...last, seq: 4 }))).toEqual([
+      ["LG-04", `${ROOT}/3/seq`],
+      ["LG-06", `${ROOT}/3/sig`],
+    ]);
+    expect(refusals(withCommit(commits, 3, { ...last, prev: `sha256:${"0".repeat(64)}` }))).toEqual([
+      ["LG-05", `${ROOT}/3/prev`],
+      ["LG-06", `${ROOT}/3/sig`],
+    ]);
+  });
+
   it("LG-06: refuses a commit signed by another key, one not signed and one of a session with no known key", () => {
     const mallory = testKey("mallory");
     const commits = chain();
