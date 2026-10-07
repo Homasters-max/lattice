@@ -32,6 +32,7 @@ ST-Z01. Where code may live, what it may import, which tests keep the split hone
 | ST-06 | Only `assembly` imports adapters. Only `assembly` and `cli` import `codec` and `generate`. |
 | ST-07 | One set of contract tests per port runs against every adapter and every recording mode. Fixtures are keyed by meaning — the request's operation and content — never by a prompt hash. Deterministic adapters exist for tests: `clock-fixed`, `ids-counter`. |
 | ST-08 | TS types and validators are generated from types into `gen/`, which git ignores; `export` writes them on demand from the tail or from the `after` of a dry run, and they are never edited by hand. Implementations and test sets import them; the code hash excludes them (RT-12). CI generates them before the type check. |
+| ST-18 | At run time a test reads only the files its test set owns (ST-10), `knowledge` (LG-01) and what it has written itself in that run; the only programs it starts are programs of its project, run as the code under test, and the tools its environment names. A structure test checks it on every change request (ST-12). |
 
 ## Quality
 

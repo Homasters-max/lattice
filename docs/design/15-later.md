@@ -36,6 +36,8 @@ LT-Z01. What is deliberately not in the design yet, and what is never taken. A d
 | LT-28 | An answer of a `read` operation given by reference to an immutable snapshot with its hash; replay needs the snapshot. | the first `read` answer above 1 MiB, or the first source with personal data |
 | LT-29 | A scheduled re-run of a sample of `holdout` for every live pipeline with a judge, compared as a regression (BN-16), to catch drift of a vendor's model. | the first live pipeline with a judge of an outside vendor |
 | LT-30 | Metrics declared by a project. | the first project whose targets the closed set of metrics does not cover |
+| LT-31 | A measure of the strength of a test set by mutation: mutants of the code under test run through `std/verify` (RT-21), and the share that ends `failed` says how much an `ok` run of the test set shows. | the first delegation by evidence (TR-18), in S3 |
+| LT-32 | The environments in which the policy requires an `ok` run of `std/verify` (RT-21) before binding (RT-11) or delegation (TR-18) counts it; a run records its environment beside its execution tuple (RT-14). | the first project whose runners run in several environments |
 
 ## Not taken
 

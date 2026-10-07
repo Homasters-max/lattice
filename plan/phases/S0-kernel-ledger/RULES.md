@@ -2,7 +2,7 @@
 
 Генерируется командой `node plan/tools/plan-check.mjs --rules` из frontmatter задач и таблицы SL-Z04; руками не правится.
 
-Правил фазы — 191: полностью — 177, частично — 14. Частичность здесь — по SL-Z04; что в S0 делается частично сверх неё, — в PLAN.md, раздел 2.
+Правил фазы — 192: полностью — 178, частично — 14. Частичность здесь — по SL-Z04; что в S0 делается частично сверх неё, — в PLAN.md, раздел 2.
 
 ## 00-glossary.md
 
@@ -215,6 +215,7 @@
 | ST-06 | полностью | [S0-03](tasks/S0-03-walking-skeleton.md) |
 | ST-07 | полностью | [S0-03](tasks/S0-03-walking-skeleton.md), [S0-11](tasks/S0-11-store-port.md), [S0-34](tasks/S0-34-worktree-release.md) |
 | ST-08 | полностью | [S0-28](tasks/S0-28-generate.md) |
+| ST-18 | полностью | [S0-42](tasks/S0-42-verify-levels.md) |
 | ST-09 | полностью | [S0-28](tasks/S0-28-generate.md) |
 | ST-11 | полностью | [S0-30](tasks/S0-30-architecture-audit.md) |
 | ST-12 | полностью | [S0-29](tasks/S0-29-e2e-acceptance.md), [S0-39](tasks/S0-39-proof-loop-design.md), [S0-40](tasks/S0-40-tools-tests.md), [S0-41](tasks/S0-41-deterministic-tests.md), [S0-42](tasks/S0-42-verify-levels.md), [S0-43](tasks/S0-43-dl-gate.md) |

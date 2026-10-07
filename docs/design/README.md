@@ -89,7 +89,7 @@ RM-Z04. The mechanisms of LATTICE. Everything else is data, `std` capabilities, 
 | metrics, splits and reports | BN-04, BN-07, BN-10, BN-11, BN-13…BN-17 | ledger, measure |
 | trace and git links | OB-01…OB-10, OB-13…OB-15 | ledger, runtime |
 | generation | ST-08, ST-09 | generate |
-| structure and fitness tests | ST-04…ST-06, ST-10, ST-12, ST-17 | `test/` |
+| structure and fitness tests | ST-04…ST-06, ST-10, ST-12, ST-17, ST-18 | `test/` |
 
 | ID | Rule |
 |---|---|
