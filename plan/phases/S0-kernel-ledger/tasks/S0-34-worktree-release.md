@@ -26,7 +26,7 @@ rules: [LG-23, ST-07]
 - **`Worktree.release()`** (LG-23, D206, Q-30). Повторный вызов ничего не делает; `push` освобождает worktree, который пушит.
 - **Landing и `openTail` освобождают каждый worktree, который подготовили**, на любом исходе: `commit`, `no-op`, `rejections`, `moved`, `conflict`, dry-run, исключение.
 - **Контракт-тест `test/contract/git.test.ts`**: после `release` и после `push` каталога worktree нет; повторный `release` безопасен.
-- **Тест landing**: после каждого исхода в каталоге `git-fixture` не остаётся worktree.
+- **Тест landing** `test/ledger/worktrees.test.ts`: после каждого исхода landing и открытия store на tail в каталоге `git-fixture` не остаётся worktree. Отдельным файлом: `landing.test.ts` с ним выходит за 300 строк профиля качества (Q-08); общие хелперы `onMain`, `moveMain`, `refusals` переехали в `test/support/landing.ts`.
 - **Комментарий к `Worktree.list`**: каталог задаётся со слешем в конце (`store/proposals/`).
 
 Не входит:
@@ -43,8 +43,8 @@ interface Worktree { …; release(): Promise<void> }   // LG-23: каждый wo
 ## Шаги
 
 1. Контракт-тест `release` и тест landing «ничего не осталось» — красные.
-2. `release` в порту и в `git-fixture`; `finally` в landing и `openTail`.
-3. Тест-хелперы, которые оборачивают `git` (`recording`, сдвиг `main` в `landing.test.ts`), передают `release`.
+2. `release` в порту и в `git-fixture`; `finally` в landing и `openTail`. Проверки landing до apply разделены на те, что до worktree (`opened`: LG-54, store на tail), и те, что на нём (`checkOn`), — между ними `prepare`, за ним `try … finally`; порядок G-19 прежний.
+3. Тест-хелперы, которые оборачивают `git` (`recording`, сдвиг `main` в `landing.test.ts`), отдают worktree внутреннего `git` как есть — `release` у него уже есть, правка не нужна. Хелпер, который сам готовит worktree и не пушит его (`filesOnMain`), освобождает его.
 
 ## Тесты и фикстуры
 
@@ -52,10 +52,10 @@ interface Worktree { …; release(): Promise<void> }   // LG-23: каждый wo
 
 ## Готово, когда
 
-- [ ] у `Worktree` есть `release`, LG-23 в дизайне это говорит (D206)
-- [ ] ни один исход landing и чтения view не оставляет worktree; тест это показывает
-- [ ] контракт-сюита `git` проверяет `release`
-- [ ] `npm run verify` зелёный
+- [x] у `Worktree` есть `release`, LG-23 в дизайне это говорит (D206)
+- [x] ни один исход landing и чтения view не оставляет worktree; тест это показывает
+- [x] контракт-сюита `git` проверяет `release`
+- [x] `npm run verify` зелёный
 
 ## Риски и заметки
 
