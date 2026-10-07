@@ -1,0 +1,10 @@
+{
+  "check": "md",
+  "input": {
+    "text": "# Doc\r\n"
+  },
+  "expect": {
+    "rule": "LG-42",
+    "path": "/1"
+  }
+}

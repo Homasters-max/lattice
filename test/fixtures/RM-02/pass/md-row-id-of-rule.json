@@ -1,0 +1,6 @@
+{
+  "check": "md",
+  "input": {
+    "text": "# Doc\n\n| ID | Rule |\n|---|---|\n| AA-01 | x |\n"
+  }
+}
