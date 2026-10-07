@@ -3,14 +3,29 @@
 // it finds A `wider` or `same`, every value valid under B is valid under A. In
 // extends mode a value of A is first restricted to B's fields (KR-15).
 // `incomparable` is always allowed: it is the safe side. The schemas come from
-// a small grammar over a few values, so that pairs often relate; a sample
-// shows they do.
+// a small grammar over a few values — `$ref` to a few abstract shapes and
+// tagged unions among them — so that pairs often relate; a sample shows they
+// do.
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { checkSchema, compare, isJsonObject, validate, type JsonValue, type Schema } from "../../src/kernel/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
-const NONE = () => null;
+/** The abstract shapes a `$ref` of the grammar names: a few that relate. */
+const SHAPES: { readonly [ref: string]: Schema } = {
+  "demo/small@1": { type: "object", properties: { n: { type: "integer", maximum: 1 } }, required: ["n"] },
+  "demo/small@2": { type: "object", properties: { n: { type: "integer", maximum: 1 } }, required: ["n"] },
+  "demo/large@1": { type: "object", properties: { n: { type: "number" } }, required: ["n"] },
+  "demo/open@1": { type: "object", properties: { n: { type: "number" } } },
+};
+
+const shapeOf = (ref: string): Schema | null => (Object.hasOwn(SHAPES, ref) ? (SHAPES[ref] ?? null) : null);
+
+/** The type bodies compare resolves: each shape as an abstract type. */
+const TYPES = (ref: string): JsonValue | null => {
+  const shape = shapeOf(ref);
+  return shape === null ? null : { abstract: true, kind: "entity", schema: shape };
+};
 
 const optional = <T>(arb: fc.Arbitrary<T>) => fc.option(arb, { nil: undefined });
 
@@ -32,6 +47,7 @@ const leaf: fc.Arbitrary<Schema> = fc.oneof(
   fc.constantFrom<Schema>({ type: "boolean" }, { type: "null" }),
   fc.uniqueArray(fc.constantFrom(...SCALARS), { minLength: 1, maxLength: 4 }).map((e): Schema => ({ enum: e })),
   fc.constantFrom(...SCALARS).map((c): Schema => ({ const: c })),
+  fc.constantFrom(...Object.keys(SHAPES)).map((ref): Schema => ({ $ref: ref })),
 );
 
 const NAMES = ["a", "b", "c"] as const;
@@ -48,6 +64,19 @@ const { schema } = fc.letrec<{ schema: Schema; container: Schema }>((tie) => ({
         properties: Object.fromEntries(Object.entries(fields).map(([k, [s]]) => [k, s])),
         required: Object.entries(fields).flatMap(([k, [, req]]) => (req ? [k] : [])),
       })),
+    fc
+      .uniqueArray(fc.constantFrom("x", "y"), { minLength: 1, maxLength: 2 })
+      .chain((tags) => fc.tuple(...tags.map((t) => fc.tuple(fc.constant(t), optional(tie("schema")), fc.boolean()))))
+      .map(
+        (branches): Schema => ({
+          oneOf: branches.map(([t, n, required]) => ({
+            type: "object",
+            properties: n === undefined ? { kind: { const: t } } : { kind: { const: t }, n },
+            required: required && n !== undefined ? ["kind", "n"] : ["kind"],
+          })),
+          discriminator: "kind",
+        }),
+      ),
   ),
 }));
 
@@ -56,6 +85,8 @@ function valueOf(s: JsonValue): fc.Arbitrary<JsonValue> {
   if (!isJsonObject(s)) return fc.constant(null);
   if (Array.isArray(s.enum)) return fc.constantFrom(...(s.enum as JsonValue[]));
   if (s.const !== undefined) return fc.constant(s.const);
+  if (typeof s.$ref === "string") return valueOf(shapeOf(s.$ref));
+  if (Array.isArray(s.oneOf)) return fc.oneof(...(s.oneOf as JsonValue[]).map(valueOf));
   const types = (Array.isArray(s.type) ? s.type : [s.type]) as string[];
   return fc.oneof(...types.map((t) => typed(s, t)), fc.constantFrom(...SCALARS));
 }
@@ -79,9 +110,17 @@ function objectOf(properties: { readonly [k: string]: JsonValue }, required: rea
   return fc.tuple(fc.record(fields), optional(fc.constantFrom(...SCALARS))).map(([o, extra]) => json(extra === undefined ? o : { ...o, c: extra }));
 }
 
+/** The branch of a union a value takes, by its `kind`. */
+function branchOf(value: JsonValue, branches: readonly JsonValue[]): JsonValue {
+  const kind = isJsonObject(value) ? value.kind : undefined;
+  return branches.find((b) => isJsonObject(b) && isJsonObject(b.properties) && isJsonObject(b.properties.kind) && b.properties.kind.const === kind) ?? null;
+}
+
 /** A value restricted to the fields of B, at every depth (KR-15). */
 function restrict(value: JsonValue, b: JsonValue): JsonValue {
   if (!isJsonObject(b)) return value;
+  if (typeof b.$ref === "string") return restrict(value, shapeOf(b.$ref));
+  if (Array.isArray(b.oneOf)) return restrict(value, branchOf(value, b.oneOf as JsonValue[]));
   if (Array.isArray(value) && b.items !== undefined) return value.map((v: JsonValue) => restrict(v, b.items ?? null));
   if (!isJsonObject(value)) return value;
   if (b.values !== undefined) return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, restrict(v, b.values ?? null)]));
@@ -89,7 +128,7 @@ function restrict(value: JsonValue, b: JsonValue): JsonValue {
   return Object.fromEntries(Object.entries(value).flatMap(([k, v]) => (Object.hasOwn(properties, k) ? [[k, restrict(v, properties[k] ?? null)]] : [])));
 }
 
-const valid = (v: JsonValue, s: Schema) => validate(v, s, NONE).ok;
+const valid = (v: JsonValue, s: Schema) => validate(v, s, shapeOf).ok;
 
 const BOUNDS: { readonly [type: string]: readonly [string, string] } = {
   string: ["minLength", "maxLength"],
@@ -147,7 +186,7 @@ describe("compare is sound (KR-22, R2)", () => {
   it("KR-22: revision — narrower or same keeps every value of A valid under B; wider or same, every value of B under A", () => {
     fc.assert(
       fc.property(pairs, ([a, b, values]) => {
-        const { relation } = compare(a, b, "revision", NONE);
+        const { relation } = compare(a, b, "revision", TYPES);
         for (const v of values) {
           if (relation === "narrower" || relation === "same") expect([v, valid(v, a) && !valid(v, b)]).toEqual([v, false]);
           if (relation === "wider" || relation === "same") expect([v, valid(v, b) && !valid(v, a)]).toEqual([v, false]);
@@ -160,7 +199,7 @@ describe("compare is sound (KR-22, R2)", () => {
   it("KR-22, KR-15: extends — narrower or same keeps every value of A, restricted to B's fields, valid under B", () => {
     fc.assert(
       fc.property(pairs, ([a, b, values]) => {
-        const { relation } = compare(a, b, "extends", NONE);
+        const { relation } = compare(a, b, "extends", TYPES);
         if (relation !== "narrower" && relation !== "same") return;
         for (const v of values) expect([v, valid(v, a) && !valid(restrict(v, b), b)]).toEqual([v, false]);
       }),
@@ -169,10 +208,10 @@ describe("compare is sound (KR-22, R2)", () => {
   });
 
   it("the grammar gives pairs that relate, not only incomparable ones", () => {
-    const relations = fc.sample(pairs, { numRuns: 1000, seed: 7 }).map(([a, b]) => compare(a, b, "revision", NONE).relation);
+    const relations = fc.sample(pairs, { numRuns: 1000, seed: 7 }).map(([a, b]) => compare(a, b, "revision", TYPES).relation);
     const containers = fc
       .sample(pairs, { numRuns: 1000, seed: 7 })
-      .filter(([a, b]) => a.type === "object" && b.type === "object" && compare(a, b, "revision", NONE).relation !== "incomparable");
+      .filter(([a, b]) => a.type === "object" && b.type === "object" && compare(a, b, "revision", TYPES).relation !== "incomparable");
     expect(relations.filter((r) => r === "narrower").length).toBeGreaterThan(50);
     expect(relations.filter((r) => r === "wider").length).toBeGreaterThan(50);
     expect(relations.filter((r) => r === "same").length).toBeGreaterThan(20);
