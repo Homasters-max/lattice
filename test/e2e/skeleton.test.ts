@@ -7,22 +7,16 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Assembly, View } from "../../src/assembly/index.js";
 import { run } from "../../src/cli/run.js";
-import { hashRecord, type JsonValue } from "../../src/kernel/index.js";
+import type { JsonValue } from "../../src/kernel/index.js";
 import { proposalHash, readProposal } from "../../src/ledger/index.js";
 import { assembleForTests, type FixtureConfig } from "../support/assembly.js";
+import { hashOf } from "../support/hash-of.js";
 
 const fixtures = join(import.meta.dirname, "../fixtures/KR-06");
 const proposalOf = (file: string) => (JSON.parse(readFileSync(join(fixtures, file), "utf8")) as { input: { proposal: JsonValue } }).input.proposal;
 const bad = proposalOf("trigger/entity-id-uppercase.json");
 const good = proposalOf("pass/entity-id.json");
 const AT = "2026-10-06T12:30:00.000000Z";
-
-/** KR-12: the hash of a record the test knows canonical. */
-function hashOf(type: string, body: JsonValue): string {
-  const h = hashRecord(type, body);
-  if (!h.ok) throw new Error(`bug: the test record is not canonical: ${h.rejections[0].message}`);
-  return h.value;
-}
 
 function approve(proposal: JsonValue, request: string) {
   const read = readProposal(proposal);

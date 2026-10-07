@@ -3,7 +3,7 @@
 // the next seq, rev and hash, the land session's `by` and `at` (LG-22), and
 // its records in canonical order (LG-06, LG-10).
 import { describe, expect, it } from "vitest";
-import { BODY_LIMIT, hashRecord, KERNEL_VERSION, type JsonValue } from "../../src/kernel/index.js";
+import { BODY_LIMIT, KERNEL_VERSION, type JsonValue } from "../../src/kernel/index.js";
 import {
   apply,
   createView,
@@ -17,13 +17,7 @@ import {
   type Proposal,
 } from "../../src/ledger/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
-
-/** KR-12: the hash of a record the test knows canonical. */
-function hashOf(type: string, body: JsonValue): string {
-  const h = hashRecord(type, body);
-  if (!h.ok) throw new Error(`bug: the test record is not canonical: ${h.rejections[0].message}`);
-  return h.value;
-}
+import { hashOf } from "../support/hash-of.js";
 
 const AT = "2026-10-06T12:00:00.000000Z";
 const LAND: LandActs = deepFreeze({ session: { id: "01JB2X00000000000000000LND", at: "2026-10-06T12:30:00.000000Z" }, events: [] });
