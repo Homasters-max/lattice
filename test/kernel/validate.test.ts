@@ -4,7 +4,7 @@
 // validate are in validate-order.test.ts. Every input crosses the module
 // boundary frozen.
 import { describe, expect, it } from "vitest";
-import { validate, type JsonValue, type Schema } from "../../src/kernel/index.js";
+import { validate, type JsonValue, type Resolve, type Schema, type Violation } from "../../src/kernel/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
 const NONE = () => null;
@@ -54,6 +54,32 @@ describe("each keyword (KR-21)", () => {
     });
   });
 
+  it("KR-21: each violation names what its keyword wants and what came", () => {
+    const loop = () => ({ $ref: "demo/loop@1" });
+    const union = { oneOf: [{ type: "object", properties: { kind: { const: "a" } }, required: ["kind"] }], discriminator: "kind" };
+    const cases: readonly (readonly [JsonValue, Schema, Violation, Resolve?])[] = [
+      ["a", { type: "string", minLength: 2 }, { path: "", keyword: "minLength", expected: 2, got: 1 }],
+      ["\u{1F600}\u{1F600}", { type: "string", maxLength: 1 }, { path: "", keyword: "maxLength", expected: 1, got: 2 }],
+      [-0.5, { type: "number", minimum: 0 }, { path: "", keyword: "minimum", expected: 0, got: -0.5 }],
+      [11, { type: "integer", maximum: 10 }, { path: "", keyword: "maximum", expected: 10, got: 11 }],
+      [[], { type: "array", minItems: 1 }, { path: "", keyword: "minItems", expected: 1, got: 0 }],
+      [[1, 2, 3], { type: "array", maxItems: 2 }, { path: "", keyword: "maxItems", expected: 2, got: 3 }],
+      ["b", { enum: ["a", 1, null] }, { path: "", keyword: "enum", expected: ["a", 1, null], got: "b" }],
+      ["facts", { const: "fact" }, { path: "", keyword: "const", expected: "fact", got: "facts" }],
+      ["2026-02-30", { type: "string", format: "date" }, { path: "", keyword: "format", expected: "date", got: "2026-02-30" }],
+      [{ extra: true }, { type: "object" }, { path: "/extra", keyword: "properties", expected: "absent", got: true }],
+      [{}, { type: "object", properties: { title: { type: "string" } }, required: ["title"] }, { path: "/title", keyword: "required", expected: "present", got: "absent" }],
+      [{ Bad: 1 }, { type: "object", values: { type: "integer" } }, { path: "/Bad", keyword: "values", expected: "a key [a-z0-9][a-z0-9._@-]*", got: "Bad" }],
+      ["a", union, { path: "", keyword: "oneOf", expected: "an object", got: "a" }],
+      [{ kind: "c" }, union, { path: "/kind", keyword: "discriminator", expected: ["a"], got: "c" }],
+      [1, { $ref: "demo/other@1" }, { path: "", keyword: "$ref", expected: "a schema resolve knows", got: "demo/other@1" }],
+      [1, { $ref: "demo/loop@1" }, { path: "", keyword: "$ref", expected: "a schema, not a cycle of $ref", got: "demo/loop@1" }, loop],
+    ];
+    for (const [value, schema, violation, resolve = NONE] of cases) {
+      expect([schema, validate(deepFreeze(value), deepFreeze(schema), resolve)]).toEqual([schema, { ok: false, violations: [violation] }]);
+    }
+  });
+
   it("KR-21: a string is measured in code points; a value of the wrong type meets no other keyword", () => {
     expect(violations("\u{1F600}\u{1F600}", { type: "string", maxLength: 1 })).toEqual([["", "maxLength"]]);
     expect(violations(5, { type: "string", minLength: 2, format: "date" })).toEqual([["", "type"]]);
@@ -101,7 +127,7 @@ describe("objects, maps and arrays (KR-21, KR-20)", () => {
 });
 
 describe("oneOf and $ref (KR-21)", () => {
-  const branch = (tag: string, properties: object = {}) => ({ type: "object", properties: { kind: { const: tag }, ...properties }, required: ["kind"] });
+  const branch = (tag: JsonValue, properties: object = {}) => ({ type: "object", properties: { kind: { const: tag }, ...properties }, required: ["kind"] });
   const union = { oneOf: [branch("a", { x: { type: "string" } }), branch("b")], discriminator: "kind" };
 
   it("KR-21: oneOf picks the branch its discriminator names and checks the value against it", () => {
@@ -110,6 +136,12 @@ describe("oneOf and $ref (KR-21)", () => {
     expect(violations({ kind: "c" }, union)).toEqual([["/kind", "discriminator"]]);
     expect(violations({}, union)).toEqual([["/kind", "discriminator"]]);
     expect(violations("a", union)).toEqual([["", "oneOf"]]);
+  });
+
+  it("KR-21: a tag picks the branch whose const it is, not one that only reads the same — 1 is not \"1\"", () => {
+    const typed = { oneOf: [branch(1, { x: { type: "string" } }), branch("1"), branch(true), branch("true")], discriminator: "kind" };
+    expect([violations({ kind: 1, x: "a" }, typed), violations({ kind: "1", x: "a" }, typed)]).toEqual([[], [["/x", "properties"]]]);
+    expect([violations({ kind: true }, typed), violations({ kind: "true" }, typed)]).toEqual([[], []]);
   });
 
   it("KR-21: reads only the value's own members — a discriminator named constructor is absent from {}", () => {

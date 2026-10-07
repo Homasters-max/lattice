@@ -30,6 +30,8 @@ describe("ref and edge (KR-19)", () => {
     const broken: readonly (readonly [JsonValue, string])[] = [
       ["about", "/properties/a/ref"],
       [{ to: TO.to, pin: TO.pin }, "/properties/a/ref/label"],
+      [{ pin: TO.pin, label: TO.label }, "/properties/a/ref/to"],
+      [{ to: TO.to, label: TO.label }, "/properties/a/ref/pin"],
       [{ ...TO, to: "demo/shape" }, "/properties/a/ref/to"],
       [{ ...TO, to: "demo/shape@1#a" }, "/properties/a/ref/to"],
       [{ ...TO, pin: "loose" }, "/properties/a/ref/pin"],
@@ -48,6 +50,17 @@ describe("ref and edge (KR-19)", () => {
   it("KR-19: refuses with where the annotation belongs and where it sits", () => {
     expect(checkSchema(deepFreeze(field({ ...URI, ref: TO }, false)), "entity", ROOT)).toEqual([
       reject(KR_19, { intent: null, path: "/properties/a/ref", expected: "a format: ref schema", got: "an optional field of an entity type, format: uri" }),
+    ]);
+  });
+
+  it("KR-19: refuses for the caller's intent, at its place — an annotation out of place and one out of form", () => {
+    const place = deepFreeze({ intent: "demo/t", path: "/body/schema" });
+    const at = (schema: JsonValue) => checkSchema(deepFreeze(schema), "entity", place);
+    expect(at(field({ type: "string", unique: true }, false))).toEqual([
+      reject(KR_19, { intent: "demo/t", path: "/body/schema/properties/a/unique", expected: "a required field", got: "an optional field of an entity type" }),
+    ]);
+    expect(at(field({ ...REF, ref: { ...TO, pin: "loose" } }))).toEqual([
+      reject(KR_19, { intent: "demo/t", path: "/body/schema/properties/a/ref/pin", expected: ["pinned", "floating", "any"], got: "loose" }),
     ]);
   });
 });

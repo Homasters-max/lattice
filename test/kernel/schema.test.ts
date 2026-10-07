@@ -4,7 +4,7 @@
 // Annotations (KR-19) are in schema-annotations.test.ts. Every input crosses
 // the module boundary frozen.
 import { describe, expect, it } from "vitest";
-import { checkSchema, KR_18, reject, type JsonValue, type Kind } from "../../src/kernel/index.js";
+import { checkSchema, KR_18, reject, type JsonValue, type Kind, type Rejection } from "../../src/kernel/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
 const ROOT = { intent: null, path: "" } as const;
@@ -172,6 +172,12 @@ describe("tagged unions (KR-18)", () => {
     expect(union(branch("a"), branch("a"))).toEqual([["KR-18", "/oneOf/1/properties/kind/const"]]);
   });
 
+  it("KR-18: consts of other types are distinct even when they read alike — 1 and \"1\", true and \"true\", null and \"null\"", () => {
+    const union = (...branches: JsonValue[]) => refusals({ oneOf: branches, discriminator: "kind" });
+    expect(union(branch(1), branch("1"), branch(true), branch("true"), branch(null), branch("null"))).toEqual([]);
+    expect(union(branch(1), branch("1"), branch(1))).toEqual([["KR-18", "/oneOf/2/properties/kind/const"]]);
+  });
+
   it("KR-18: reads only the schema's own members — a discriminator named constructor is absent from a branch without it", () => {
     const out = checkSchema(deepFreeze({ oneOf: [{ type: "object", properties: {}, required: [] }], discriminator: "constructor" }), "entity", ROOT);
     expect(out.map((r) => [r.path, r.got])).toEqual([
@@ -187,6 +193,44 @@ describe("cardinality (KR-20)", () => {
     for (const keyword of ["cardinality", "minProperties", "maxProperties", "minContains", "maxContains", "uniqueItems"]) {
       expect([keyword, refusals({ type: "array", items: { type: "string" }, [keyword]: 1 })]).toEqual([keyword, [["KR-18", `/${keyword}`]]]);
     }
+  });
+});
+
+describe("what a rejection names (KR-18, LG-17)", () => {
+  const place = deepFreeze({ intent: "demo/t", path: "/body/schema" });
+  const refuse = (path: string, expected: JsonValue, got: JsonValue) => reject(KR_18, { intent: "demo/t", path: `/body/schema${path}`, expected, got });
+  const branch = (tag: JsonValue) => ({ type: "object", properties: { kind: { const: tag } }, required: ["kind"] });
+
+  /** One schema per kind of refusal of KR-18, and its rejections. */
+  const FAMILIES: readonly (readonly [string, JsonValue, readonly Rejection[]])[] = [
+    ["no schema object at the root", true, [refuse("", "a schema object", true)]],
+    ["no schema object inside", { type: "array", items: 1 }, [refuse("/items", "a schema object", 1)]],
+    ["a keyword outside the subset", { type: "string", pattern: "^a" }, [refuse("/pattern", "a keyword or an annotation of the closed subset", "pattern")]],
+    ["a keyword out of its type", { type: "string", minItems: 1 }, [refuse("/minItems", ["array"], "string")]],
+    ["a scalar keyword on an object", { type: "object", enum: ["a"] }, [refuse("/enum", "a scalar type, or no type", "object")]],
+    ["a keyword out of form", { type: "text" }, [refuse("/type", "string, integer, number, boolean, object, array or null, or a pair of one with null", "text")]],
+    ["a schema that admits any value", {}, [refuse("", "a schema with type, $ref, oneOf, enum or const", "absent")]],
+    ["oneOf without discriminator", { oneOf: [branch("a")] }, [refuse("/discriminator", "the name of a field", "absent")]],
+    ["discriminator without oneOf", { type: "string", discriminator: "kind" }, [refuse("/discriminator", "absent without oneOf", "kind")]],
+    ["a keyword beside $ref", { $ref: SHAPE, type: "object" }, [refuse("/type", "absent beside $ref", "object")]],
+    ["a field name out of grammar", object({ Title: { type: "string" } }), [refuse("/properties/Title", "a field name [a-z][a-z0-9_]*", "Title")]],
+    [
+      "required naming an unknown field, and one twice",
+      { type: "object", properties: { a: { type: "string" } }, required: ["b", "a", "a"] },
+      [refuse("/required/0", "a field of properties", "b"), refuse("/required/2", "a field named once", "a")],
+    ],
+    ["properties beside values", { type: "object", properties: {}, values: { type: "string" } }, [refuse("/values", "absent beside properties", { type: "string" })]],
+    ["a branch that is no object", { oneOf: [branch("a"), { type: "string" }], discriminator: "kind" }, [refuse("/oneOf/1/type", "object", "string")]],
+    [
+      "a branch without its discriminator",
+      { oneOf: [branch("a"), { type: "object", properties: { other: { type: "string" } } }], discriminator: "kind" },
+      [refuse("/oneOf/1/properties/kind", "a field with const", "absent"), refuse("/oneOf/1/required", "fields that name kind", "absent")],
+    ],
+    ["a repeated const", { oneOf: [branch("a"), branch("a")], discriminator: "kind" }, [refuse("/oneOf/1/properties/kind/const", "a const no other branch holds", "a")]],
+  ];
+
+  it("KR-18: each refusal is for the caller's intent, at its place, with what the subset wants and what came", () => {
+    for (const [name, schema, rejections] of FAMILIES) expect([name, checkSchema(deepFreeze(schema), "entity", place)]).toEqual([name, rejections]);
   });
 });
 
