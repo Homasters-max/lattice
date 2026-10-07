@@ -77,7 +77,9 @@ const rows: readonly Row[] = [
   ["graph: an unrelated ref.to is incomparable", REF({ to: "demo/other@1" }), REF({ to: "demo/base@1" }), "revision", { relation: "incomparable", aspects: ["ref"] }],
   ["graph: added unique is narrower", object({ a: { type: "string", unique: true } }), object({ a: S }), "revision", { relation: "narrower", aspects: ["unique"] }],
   ["graph: removed unique is wider", object({ a: S }), object({ a: { type: "string", unique: true } }), "revision", { relation: "wider", aspects: ["unique"] }],
-  ["aspects: validity and presentation together", { type: "string", maxLength: 1, description: "x" }, S, "revision", { relation: "narrower", aspects: ["validity", "description"] }],
+  ["aspects: an added field brings its annotations", object({ a: S, b: { type: "string", card_order: 1 } }, ["b"]), object({ a: S }), "revision", { relation: "wider", aspects: ["validity", "card_order"] }],
+  ["aspects: an added required unique field brings unique", object({ a: S, b: { type: "string", unique: true } }), object({ a: S }), "revision", { relation: "incomparable", aspects: ["validity", "unique"] }],
+  ["aspects: validity and presentation together",{ type: "string", maxLength: 1, description: "x" }, S, "revision", { relation: "narrower", aspects: ["validity", "description"] }],
   // $ref through resolve
   ["$ref: the same reference is the same", { $ref: "demo/span@1" }, { $ref: "demo/span@1" }, "revision", { relation: "same", aspects: [] }],
   ["$ref: another revision with an equal schema is the same", { $ref: "demo/span@3" }, { $ref: "demo/span@1" }, "revision", { relation: "same", aspects: [] }],
