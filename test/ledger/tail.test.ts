@@ -68,6 +68,6 @@ describe("a broken store on main (LG-23, LG-06)", () => {
     // A trigger: a raw line on main that no landing writes, as a broken repository holds it.
     const ports = portsOf({ ...BRANCHES, main: { files: { "store/knowledge.jsonl": "{}\n" } } });
     const opened = await openTail(ports);
-    expect(opened.ok ? [] : opened.rejections.map((r) => [r.rule, r.path])).toContainEqual(["LG-06", "/0/seq"]);
+    expect(opened.ok ? [] : opened.rejections.map((r) => [r.rule, r.path])).toContainEqual(["LG-06", "/store/knowledge.jsonl/1/seq"]);
   });
 });

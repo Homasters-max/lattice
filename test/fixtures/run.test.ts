@@ -14,61 +14,69 @@ const id: FixtureCheck = {
   enforces: ["KR-06"],
   run: (input) => (input === "bad" ? refuse("KR-06", "/id", "x") : { ok: true }),
 };
-const checks = { id };
+/** The same check, waiting before it answers, as a check that waits on a port does. */
+const waiting: FixtureCheck = { enforces: id.enforces, run: async (input) => id.run(input) };
+const checks = { id, waiting };
 const trigger = (over: object = {}) => ({ check: "id", input: "bad", expect: { rule: "KR-06", path: "/id" }, ...over });
 
 describe("rule fixture runner", () => {
-  it("ST-17: passes a trigger refused with its rule at its path and a pass accepted", () => {
-    expect(runFixture(checks, "KR-06", "trigger", trigger())).toBeNull();
-    expect(runFixture(checks, "KR-06", "trigger", trigger({ expect: { rule: "KR-06", path: "/id", intent: "x" } }))).toBeNull();
-    expect(runFixture(checks, "KR-06", "pass", { check: "id", input: "good" })).toBeNull();
+  it("ST-17: passes a trigger refused with its rule at its path and a pass accepted", async () => {
+    expect(await runFixture(checks, "KR-06", "trigger", trigger())).toBeNull();
+    expect(await runFixture(checks, "KR-06", "trigger", trigger({ expect: { rule: "KR-06", path: "/id", intent: "x" } }))).toBeNull();
+    expect(await runFixture(checks, "KR-06", "pass", { check: "id", input: "good" })).toBeNull();
   });
 
-  it("ST-17: refuses a case whose check is not in the table", () => {
-    expect(runFixture(checks, "KR-06", "pass", { check: "nope", input: 1 })).toBe('check "nope" is not in test/fixtures/checks.ts');
-    expect(runFixture(checks, "KR-06", "pass", { input: 1 })).toBe("a case names its check and has an input");
-    expect(runFixture(checks, "KR-06", "pass", { check: "id" })).toBe("a case names its check and has an input");
+  it("ST-17: runs a check that waits as it runs one that answers at once", async () => {
+    expect(await runFixture(checks, "KR-06", "trigger", trigger({ check: "waiting" }))).toBeNull();
+    expect(await runFixture(checks, "KR-06", "pass", { check: "waiting", input: "good" })).toBeNull();
+    expect(await runFixture(checks, "KR-06", "trigger", trigger({ check: "waiting", input: "good" }))).toBe("accepted; expected KR-06 at /id");
+    expect(await runFixture(checks, "KR-06", "pass", { check: "waiting", input: "bad" })).toBe('refused: KR-06 at /id (intent "x")');
   });
 
-  it("ST-17: refuses a case whose check does not enforce the folder's rule", () => {
-    expect(runFixture(checks, "KR-10", "pass", { check: "id", input: "good" })).toBe('check "id" does not enforce KR-10');
+  it("ST-17: refuses a case whose check is not in the table", async () => {
+    expect(await runFixture(checks, "KR-06", "pass", { check: "nope", input: 1 })).toBe('check "nope" is not in test/fixtures/checks.ts');
+    expect(await runFixture(checks, "KR-06", "pass", { input: 1 })).toBe("a case names its check and has an input");
+    expect(await runFixture(checks, "KR-06", "pass", { check: "id" })).toBe("a case names its check and has an input");
   });
 
-  it("ST-17: refuses a trigger whose expect is missing or names another rule", () => {
-    expect(runFixture(checks, "KR-06", "trigger", trigger({ expect: undefined }))).toBe(
+  it("ST-17: refuses a case whose check does not enforce the folder's rule", async () => {
+    expect(await runFixture(checks, "KR-10", "pass", { check: "id", input: "good" })).toBe('check "id" does not enforce KR-10');
+  });
+
+  it("ST-17: refuses a trigger whose expect is missing or names another rule", async () => {
+    expect(await runFixture(checks, "KR-06", "trigger", trigger({ expect: undefined }))).toBe(
       "a trigger expects {rule, path} with the folder's rule",
     );
-    expect(runFixture(checks, "KR-06", "trigger", trigger({ expect: { rule: "KR-10", path: "/id" } }))).toBe(
+    expect(await runFixture(checks, "KR-06", "trigger", trigger({ expect: { rule: "KR-10", path: "/id" } }))).toBe(
       "a trigger expects {rule, path} with the folder's rule",
     );
   });
 
-  it("ST-17: refuses a pass case that carries an expect", () => {
-    expect(runFixture(checks, "KR-06", "pass", { check: "id", input: "good", expect: {} })).toBe("a pass case has no expect");
+  it("ST-17: refuses a pass case that carries an expect", async () => {
+    expect(await runFixture(checks, "KR-06", "pass", { check: "id", input: "good", expect: {} })).toBe("a pass case has no expect");
   });
 
-  it("ST-17: refuses a trigger the check accepts or refuses elsewhere", () => {
-    expect(runFixture(checks, "KR-06", "trigger", trigger({ input: "good" }))).toBe("accepted; expected KR-06 at /id");
-    expect(runFixture(checks, "KR-06", "trigger", trigger({ expect: { rule: "KR-06", path: "/at" } }))).toBe(
+  it("ST-17: refuses a trigger the check accepts or refuses elsewhere", async () => {
+    expect(await runFixture(checks, "KR-06", "trigger", trigger({ input: "good" }))).toBe("accepted; expected KR-06 at /id");
+    expect(await runFixture(checks, "KR-06", "trigger", trigger({ expect: { rule: "KR-06", path: "/at" } }))).toBe(
       'no rejection KR-06 at /at; got KR-06 at /id (intent "x")',
     );
-    expect(runFixture(checks, "KR-06", "trigger", trigger({ expect: { rule: "KR-06", path: "/id", intent: "y" } }))).toBe(
+    expect(await runFixture(checks, "KR-06", "trigger", trigger({ expect: { rule: "KR-06", path: "/id", intent: "y" } }))).toBe(
       'no rejection KR-06 at /id (intent "y"); got KR-06 at /id (intent "x")',
     );
   });
 
-  it("ST-17: refuses a pass case the check refuses", () => {
-    expect(runFixture(checks, "KR-06", "pass", { check: "id", input: "bad" })).toBe('refused: KR-06 at /id (intent "x")');
+  it("ST-17: refuses a pass case the check refuses", async () => {
+    expect(await runFixture(checks, "KR-06", "pass", { check: "id", input: "bad" })).toBe('refused: KR-06 at /id (intent "x")');
   });
 
-  it("ST-17: holds for every fixture of this repository", () => {
-    const problems = loadFolders().flatMap((f) =>
-      (["trigger", "pass"] as const).flatMap((kind) =>
-        (f[kind] ?? []).map((c) => {
-          const p = runFixture(CHECKS, f.name, kind, c.data);
-          return p === null ? null : `${f.name}/${kind}/${c.name}: ${p}`;
-        }),
-      ),
+  it("ST-17: holds for every fixture of this repository", async () => {
+    const cases = loadFolders().flatMap((f) => (["trigger", "pass"] as const).flatMap((kind) => (f[kind] ?? []).map((c) => ({ at: `${f.name}/${kind}/${c.name}`, rule: f.name, kind, data: c.data }))));
+    const problems = await Promise.all(
+      cases.map(async (c) => {
+        const p = await runFixture(CHECKS, c.rule, c.kind, c.data);
+        return p === null ? null : `${c.at}: ${p}`;
+      }),
     );
     expect(problems.filter((p) => p !== null)).toEqual([]);
   });

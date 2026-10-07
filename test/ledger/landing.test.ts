@@ -18,7 +18,7 @@ import {
   type Push,
   type Store,
 } from "../../src/ledger/index.js";
-import { gitForTests, landingPortsForTests, type GitFixtureBranch, type GitFixtureOptions } from "../support/assembly.js";
+import { AT, gitForTests, landingPortsForTests, type GitFixtureBranch, type GitFixtureOptions } from "../support/assembly.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 import { proposal, storeTextOf, text } from "../support/landing.js";
 
@@ -194,6 +194,27 @@ describe("the store a change request brings (LG-14, LG-23)", () => {
     expect(await storeTextOnMain(ports)).toBe(file);
   });
 
+  // Q-28: main holds store/knowledge.jsonl only as landing wrote it, so a conflict there is the change request's own change.
+  it("LG-23: refuses a change request that changed store/knowledge.jsonl on a main that moved and wrote it too — a conflict at it is no conflict outcome — dry run or not", async () => {
+    // A trigger: cr/x brings a store file no landing wrote, forked from main before cr/a landed.
+    const git = gitForTests({ dir, branches: { ...BRANCHES, "cr/x": { from: "main", files: { [KNOWLEDGE]: "forged\n", "store/proposals/x.json": proposal("demo/x") } } } });
+    const ports = portsOf({ git });
+    await landed(ports, "cr/a");
+    const file = await storeTextOnMain(ports);
+    const refusal = { rule: "LG-23", intent: null, path: "/store/knowledge.jsonl", expected: hashBytes(utf8(file)), got: { conflict: [KNOWLEDGE] } };
+    for (const options of [DRY_RUN, LAND]) expect(await land(ports, "cr/x", options)).toMatchObject({ outcome: "rejections", rejections: [refusal] });
+    expect(await storeTextOnMain(ports)).toBe(file);
+  });
+
+  it("LG-23: refuses a change request that put a directory where main, moved since, has store/knowledge.jsonl: the clash is a conflict at the file", async () => {
+    // A trigger: cr/x puts a directory where main, moved since, has the file landing wrote.
+    const git = gitForTests({ dir, branches: { ...BRANCHES, "cr/x": { from: "main", files: { [`${KNOWLEDGE}/x`]: "x\n", "store/proposals/x.json": proposal("demo/x") } } } });
+    const ports = portsOf({ git });
+    await landed(ports, "cr/a");
+    const out = await land(ports, "cr/x", DRY_RUN);
+    expect(out.outcome === "rejections" ? out.rejections.map((r) => [r.rule, r.path, r.got]) : out).toEqual([["LG-23", "/store/knowledge.jsonl", { conflict: [KNOWLEDGE] }]]);
+  });
+
   it("LG-14, LG-23: lands on a store the change request brings unchanged, with before at the tail of main", async () => {
     const { ports } = await fromLanded(() => ({}));
     const commit = await landed(ports, "cr/x");
@@ -210,7 +231,7 @@ describe("the store a change request brings (LG-14, LG-23)", () => {
   it("LG-06: a store on main whose line is no commit is refused on opening, never thrown", async () => {
     // A trigger: a raw line on main that no landing writes, as a broken repository holds it.
     const ports = portsOf({}, { ...BRANCHES, main: { files: { "store/knowledge.jsonl": "{}\n" } } });
-    expect(refusals(await land(ports, "cr/a", DRY_RUN))).toContainEqual(["LG-06", "/0/seq"]);
+    expect(refusals(await land(ports, "cr/a", DRY_RUN))).toContainEqual(["LG-06", "/store/knowledge.jsonl/1/seq"]);
     expect((await openTail(ports)).ok).toBe(false);
   });
 });
@@ -250,22 +271,86 @@ describe("landing outcomes (LG-24, LG-25, LG-54)", () => {
     expect(await land(ports, "cr/clash", LAND)).toEqual({ outcome: "conflict", paths: ["README.md"] });
   });
 
-  // G-19, accepted by the owner: the store at the tail of main opens before the change request is prepared;
-  // the whole order of the outcomes is S0-33's.
-  it("LG-23: refuses a main whose store does not open before it prepares the change request, even one whose code conflicts with main", async () => {
-    // A trigger: a raw tree on main that no landing writes, as a broken repository holds it.
-    const ports = portsOf({}, { ...BRANCHES, main: { files: { "README.md": "one\n", "store/knowledge.jsonl/x": "x\n" } } });
-    await moveMain(ports.git, "cr/readme");
-    const onto = await ports.git.tail("main");
-    // The code of cr/clash does conflict with main: on a main whose store opens, landing ends conflict.
-    expect(onto === null ? null : await ports.git.prepare({ request: "cr/clash", onto })).toMatchObject({ kind: "conflict", paths: ["README.md"] });
-    expect(refusals(await land(ports, "cr/clash", DRY_RUN))).toEqual([["LG-23", "/store/knowledge.jsonl"]]);
-  });
-
   it("LG-54, KR-10: refuses a change request that does not exist, one without a proposal and a proposal that is not JSON", async () => {
     const ports = portsOf();
     expect(refusals(await land(ports, "cr/typo", DRY_RUN))).toEqual([["LG-54", ""]]);
     expect(refusals(await land(ports, "cr/none", DRY_RUN))).toEqual([["LG-54", "/store/proposals"]]);
     expect(refusals(await land(ports, "cr/broken", DRY_RUN))).toEqual([["KR-10", "/store/proposals/cr-x.json"]]);
+  });
+});
+
+describe("the order of the outcomes of landing (G-19)", () => {
+  /** What is wrong at once with cr/x and the main it lands on; each step of the ladder mends the earliest. */
+  type Faults = {
+    /** Main holds a directory in place of store/knowledge.jsonl, so its store does not open. */
+    readonly brokenMain?: boolean;
+    /** Main moved past the fork of cr/x and changed README.md, as cr/x did. */
+    readonly codeConflicts?: boolean;
+    /** cr/x brings its own store/knowledge.jsonl. */
+    readonly storeChanged?: boolean;
+    /** Main moved past the fork of cr/x by a landing, which wrote store/knowledge.jsonl too. */
+    readonly mainLanded?: boolean;
+    /** The proposal file of cr/x is no JSON. */
+    readonly proposalBroken?: boolean;
+  };
+
+  /** A dry run of cr/x with these faults. Triggers: a raw tree on main and a store file no landing wrote. */
+  async function dryRunWith(f: Faults, request = "cr/x"): Promise<LandingOutcome> {
+    const main = { "README.md": "one\n", ...(f.brokenMain === true ? { "store/knowledge.jsonl/x": "x\n" } : {}) };
+    const own = {
+      ...(f.codeConflicts === true ? { "README.md": "three\n" } : {}),
+      ...(f.storeChanged === true ? { "store/knowledge.jsonl": "forged\n" } : {}),
+      "store/proposals/cr-x.json": f.proposalBroken === true ? "{" : proposal("demo/x"),
+    };
+    const ports = portsOf({}, { ...BRANCHES, main: { files: main }, "cr/x": { from: "main", files: own } });
+    if (f.codeConflicts === true) await moveMain(ports.git, "cr/readme");
+    if (f.mainLanded === true) await landed(ports, "cr/a");
+    return land(ports, request, DRY_RUN);
+  }
+
+  const all: Faults = { brokenMain: true, codeConflicts: true, storeChanged: true, proposalBroken: true };
+  const forged = hashBytes(utf8("forged\n"));
+
+  it("LG-54: a change request that does not exist is refused first, even on a main whose store does not open", async () => {
+    expect(refusals(await dryRunWith(all, "cr/typo"))).toEqual([["LG-54", ""]]);
+  });
+
+  it("LG-23: then the store at the tail of main: one that does not open refuses a change request whose code conflicts with main", async () => {
+    expect(await dryRunWith(all)).toMatchObject({ outcome: "rejections", rejections: [{ rule: "LG-23", path: "/store/knowledge.jsonl", expected: "a file or none" }] });
+  });
+
+  it("LG-24, LG-23: then the merge: a conflict of code ends conflict, a conflict at store/knowledge.jsonl is refused LG-23 (Q-28)", async () => {
+    const mended = { ...all, brokenMain: false };
+    expect(await dryRunWith(mended)).toEqual({ outcome: "conflict", paths: ["README.md"] });
+    expect(await dryRunWith({ ...mended, mainLanded: true })).toMatchObject({
+      outcome: "rejections",
+      rejections: [{ rule: "LG-23", path: "/store/knowledge.jsonl", got: { conflict: ["store/knowledge.jsonl"] } }],
+    });
+  });
+
+  it("KR-10, LG-23: then the proposal, then the bytes of the store the change request brings", async () => {
+    const merged = { ...all, brokenMain: false, codeConflicts: false };
+    expect(refusals(await dryRunWith(merged))).toEqual([["KR-10", "/store/proposals/cr-x.json"]]);
+    const read = { ...merged, proposalBroken: false };
+    expect(await dryRunWith(read)).toMatchObject({ outcome: "rejections", rejections: [{ rule: "LG-23", path: "/store/knowledge.jsonl", expected: null, got: forged }] });
+    expect((await dryRunWith({ ...read, storeChanged: false })).outcome).toBe("commit");
+  });
+});
+
+describe("time and ids of landing (LG-23)", () => {
+  it("LG-23: the land session takes its id from ids and the commit its at from clock — of the test assembly, ids-counter and clock-fixed", async () => {
+    // The intent is written a day before the clock of the tests, so the commit's at can come only from the clock.
+    const written = "2026-10-05T09:00:00.000000Z";
+    const own = JSON.stringify({ session: { id: "01JB2X00000000000000000SES" }, intents: [{ op: "entity", id: "demo/t", type: "demo/note@1", expected: null, at: written, body: {} }], sig: null });
+    const ports = portsOf({}, { ...BRANCHES, "cr/t": { from: "main", files: { "store/proposals/t.json": own } } });
+    const first = await landed(ports, "cr/a");
+    const second = await landed(ports, "cr/t");
+    expect([first.by, first.at, second.by, second.at, second.records.map((r) => [r.by, r.at])]).toEqual([
+      "00000000000000000000000001",
+      AT,
+      "00000000000000000000000002",
+      AT,
+      [["01JB2X00000000000000000SES", written]],
+    ]);
   });
 });

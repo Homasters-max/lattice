@@ -10,24 +10,11 @@
       "cr/x": {
         "from": "main",
         "files": {
-          "store/knowledge.jsonl/x": "x\n",
           "store/proposals/cr-x.json": {
             "json": {
               "session": {
                 "id": "01JB2X00000000000000000SES"
               },
-              "intents": [
-                {
-                  "op": "entity",
-                  "id": "demo/x",
-                  "type": "demo/note@1",
-                  "expected": null,
-                  "at": "2026-10-06T12:00:00.000000Z",
-                  "body": {
-                    "text": "x"
-                  }
-                }
-              ],
               "sig": null
             }
           }
@@ -37,7 +24,7 @@
     "request": "cr/x"
   },
   "expect": {
-    "rule": "LG-23",
-    "path": "/store/knowledge.jsonl"
+    "rule": "LG-09",
+    "path": "/store/proposals/cr-x.json/intents"
   }
 }
