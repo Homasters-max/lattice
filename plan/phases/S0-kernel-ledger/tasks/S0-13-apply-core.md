@@ -5,7 +5,7 @@ phase: S0
 stage: F
 size: L
 modules: [ledger]
-depends: [S0-12, S0-06, S0-07]
+depends: [S0-12, S0-06, S0-07, S0-36]
 rules: [LG-11, LG-12, LG-13, LG-14, LG-15, LG-16, LG-17, LG-18, PR-02, GL-05]
 ---
 
@@ -26,7 +26,8 @@ Apply — единственный путь в `knowledge` (PR-02, LG-14). Ка�
 - **фаза 3 Commit** (`before`): `expected` равен latest (LG-11), одна intent на `id` и на ключ факта, `at` не убывает (LG-06), события не меняются;
 - **no-op** (LG-12, LG-13): proposal с уже известным hash — тот же commit (поиск — G-04); тело равно latest и latest в силе — no-op; ревизия не в силе подтверждается новой ревизией с тем же телом и act; пустой commit не пишется;
 - **исключения genesis и init** (LG-18): именованы rule ID в реестре apply, никогда не выводятся из ключа;
-- **форма отказа** (LG-17) из S0-02.
+- **форма отказа** (LG-17) из S0-02;
+- **исход apply несёт hash proposal** (разбор волны 2) — и для commit, и для no-op: landing берёт trailer `Lattice-Proposal` из исхода и не пересчитывает hash сам; ключ факта (`KeyOf`) apply выводит из типов `before` внутри себя, а не получает от вызывающего.
 
 Не входит: фазы 4–6, полный in force (S0-14 — до неё «в силе» = latest).
 
@@ -53,4 +54,5 @@ Apply — единственный путь в `knowledge` (PR-02, LG-14). Ка�
 - От S0-05: функции заголовка в ядре — `checkHeader(value, path)` (KR-04 ровно поля, KR-06 `id` по виду, который заявляет `rev`, KR-07 `type@n` через `parseRef`, KR-08 `by` — ULID, KR-11 `at`) и `checkRev(kind, rev, place)` (KR-04, KR-05) для фазы 2. Фаза 1 пока проверяет у intent только `id` (KR-06): `type` floating или `at` не в каноне apply пропустит, а открытие store следующим landing эту запись отклонит — фаза 1 закрывает это проверкой `type`, `at` и `by` (id сессии) каждой intent.
 - От S0-06: тело по схеме — `checkBody(body, schema, resolve, {intent, path: "/body"})` ядра: отказ KR-21 на каждое нарушение `validate`, `expected` — `{keyword: …}` (CONVENTIONS §2). `resolve` даёт схему abstract типа по `$ref` из `after` (LG-11: тип может прийти в том же коммите); схема — та, что прошла `checkSchema` в теле типа (S0-07), с учётом цепочки `extends`. Фикстуры KR-21 через `checkBody` уже есть (`test/fixtures/KR-21/`); фикстура этой задачи — KR-21 в фазе 2 через apply.
 - От S0-10: канонический порядок intents и records (G-03) и hash proposal берут `KeyOf` — ключ факта по аннотации `key` его типа (KR-19, TR-28); apply (`candidate`) и landing (trailer `Lattice-Proposal`) пока передают `NO_FACTS`. Задача заменяет его функцией по типам из `before` в обоих местах. Форма proposal (LG-09) закрыта: лишнее поле proposal или intent — отказ; `expected` — число или `null`, что это последняя ревизия, проверяет фаза 3 (LG-11).
+- От архитектурного разбора, волна 2 (2026-10-07): фаза 2 одной записи — один вход ядра из S0-36 с одним резолвером тел типов из `after`; заметки от S0-05 (`checkRev`), S0-06 (`checkBody`, `resolve` схем) и S0-07 (`checkType`, `checkRecordType`) ниже описывают состояние до S0-36 — эти функции внутренние, недопущенный тип в цепочке — отказ KR-15 (Q-33). Закрытая форма заголовков и тел — функция ядра из S0-35; результат проверок — `Result` (S0-37). Hash proposal сейчас считается дважды и независимо — `proposalHash(proposal, NO_FACTS)` в `apply.ts:37` и в `landing.ts:146`: задача заменяет `NO_FACTS` в одном месте — внутри apply, а landing берёт hash из исхода, так что trailer и `commit.proposal` совпадают по построению.
 - От S0-07: тело записи типа `core/type@1` проверяет `checkType(body, resolve, {intent, path: "/body"})`, а не `checkBody`: подмножество не описывает схему (G-26). `resolve` — `ResolveType`: тело типа по pinned ссылке из `after`. Запись abstract типа отклоняет `checkRecordType(typeBody, {intent, path: "/type"})` (KR-16). Схема ребёнка по `extends` полная — тело проверяется схемой своего типа без слияния с предками (G-26). Мета-тип в `after` до genesis (S0-23) берётся из `META_TYPE` ядра.

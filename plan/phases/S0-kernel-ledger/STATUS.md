@@ -14,6 +14,9 @@
 | [S0-05](tasks/S0-05-record-ref.md) | Record и Ref | C | ✅ | [#17](https://github.com/Homasters-max/lattice/pull/17) | G-06, G-12 |
 | [S0-06](tasks/S0-06-schema-validate.md) | Schema — закрытое подмножество и validate | C | ✅ | [#19](https://github.com/Homasters-max/lattice/pull/19) | G-22, G-23 |
 | [S0-07](tasks/S0-07-type-compare.md) | Type и compare | C | ✅ | [#22](https://github.com/Homasters-max/lattice/pull/22) | G-26, G-27 |
+| [S0-35](tasks/S0-35-closed-form.md) | Закрытая форма объекта — одна функция ядра | C | ⬜ | | разбор волны 2, Q-31, Q-32 |
+| [S0-36](tasks/S0-36-record-against-type.md) | Запись против своего типа — один вход фазы 2 и чтение схемы | C | ⬜ | | разбор волны 2, Q-33 |
+| [S0-37](tasks/S0-37-check-result.md) | Одна форма результата жёсткой проверки и одна грамматика rule ID | C | ⬜ | | разбор волны 2 |
 | [S0-08](tasks/S0-08-std-types-s0.md) | core и std — типы S0 как данные | D | ⬜ | | |
 | [S0-09](tasks/S0-09-std-schemas-drafts.md) | Черновики всех схем std — проверка подмножества до заморозки ядра | D | ⬜ | | может перейти в SW |
 | [S0-10](tasks/S0-10-proposal-commit.md) | Proposal и commit — форматы, hash, подписи, цепочка | E | ✅ | [#21](https://github.com/Homasters-max/lattice/pull/21) | G-03, G-10, G-24 |
@@ -32,6 +35,7 @@
 | [S0-23](tasks/S0-23-genesis-init.md) | Genesis, store init и команда init | G | ⬜ | | |
 | [S0-24](tasks/S0-24-std-ledger.md) | Ledger std — воспроизводимая сборка и загрузка в проект | G | ⬜ | | |
 | [S0-25](tasks/S0-25-codec-md-model.md) | Codec — модель md, разбор и канонический вывод | H | ✅ | [#20](https://github.com/Homasters-max/lattice/pull/20) | G-25 |
+| [S0-38](tasks/S0-38-md-model-tables.md) | Модель md с целыми таблицами — документ, который печатается обратно | H | ⬜ | | разбор волны 2 |
 | [S0-26](tasks/S0-26-codec-import.md) | Codec — import md в proposal | H | ⬜ | | |
 | [S0-27](tasks/S0-27-codec-export.md) | Codec — export blocks в md и команда export | H | ⬜ | | |
 | [S0-28](tasks/S0-28-generate.md) | Generate — TS-типы, валидаторы и конфиг линтера из типов | H | ⬜ | | |
