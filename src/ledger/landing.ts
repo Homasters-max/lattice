@@ -8,7 +8,7 @@
 // of the change request (Q-29). Rebuilds on a moved `main`,
 // `awaiting-act`, the land session event, acts as events, the trailers of
 // OB-07 and `request` arrive with S0-19 and S0-20.
-import { parseJsonBytes, refuse, reject, type Rejections, type Result } from "../kernel/index.js";
+import { parseJsonBytes, refuse, reject, ROOT, type Rejections, type Result } from "../kernel/index.js";
 import { apply, type LandActs } from "./apply.js";
 import { chainTo, encodeCommit, type Commit } from "./commit.js";
 import { fold } from "./fold.js";
@@ -45,7 +45,7 @@ const PROPOSALS = "store/proposals/";
 /** LG-54: the head of the change request named; one that does not exist carries no proposal. */
 function changeRequest(head: string | null): Result<string> {
   if (head !== null) return { ok: true, value: head };
-  return refuse(reject(LG_54, { intent: null, path: "", expected: "a change request", got: null }));
+  return refuse(reject(LG_54, { ...ROOT, expected: "a change request", got: null }));
 }
 
 /** LG-54: the one proposal file of a change request, given the files under `store/proposals/`. */

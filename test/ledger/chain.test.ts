@@ -9,7 +9,7 @@ import { landedChain, LAND_KEY, keyOfLand } from "../support/chain.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 import { testKey } from "../support/keys.js";
 
-const ROOT = "/store/knowledge.jsonl";
+const STORE = "/store/knowledge.jsonl";
 
 const proposal = (id: string): JsonValue => ({
   session: { id: "01JB2X00000000000000000SES" },
@@ -19,7 +19,7 @@ const proposal = (id: string): JsonValue => ({
 
 const chain = (): Commit[] => deepFreeze(landedChain([proposal("demo/a"), proposal("demo/b"), proposal("demo/c")]));
 
-const refusals = (commits: readonly Commit[]) => rejectionsOf(verifyChain(deepFreeze(commits), keyOfLand, { intent: null, path: ROOT })).map((r) => [r.rule, r.path]);
+const refusals = (commits: readonly Commit[]) => rejectionsOf(verifyChain(deepFreeze(commits), keyOfLand, { intent: null, path: STORE })).map((r) => [r.rule, r.path]);
 
 /** The chain with commit `n` (from 1) replaced. */
 const withCommit = (commits: readonly Commit[], n: number, c: Commit) => commits.map((old, i) => (i === n - 1 ? c : old));
@@ -42,16 +42,16 @@ describe("the chain of knowledge commits (LG-04, LG-05, LG-06)", () => {
   });
 
   it("LG-04: refuses a hole in seq and a seq that does not start at 1", () => {
-    expect(refusals(resigned(chain(), 3, { seq: 4 }))).toEqual([["LG-04", `${ROOT}/3/seq`]]);
+    expect(refusals(resigned(chain(), 3, { seq: 4 }))).toEqual([["LG-04", `${STORE}/3/seq`]]);
     const [first] = chain();
-    expect(refusals(resigned([first!], 1, { seq: 2 }))).toEqual([["LG-04", `${ROOT}/1/seq`]]);
+    expect(refusals(resigned([first!], 1, { seq: 2 }))).toEqual([["LG-04", `${STORE}/1/seq`]]);
   });
 
   it("LG-05: refuses a broken prev, and a genesis commit with one", () => {
-    expect(refusals(resigned(chain(), 3, { prev: `sha256:${"0".repeat(64)}` }))).toEqual([["LG-05", `${ROOT}/3/prev`]]);
+    expect(refusals(resigned(chain(), 3, { prev: `sha256:${"0".repeat(64)}` }))).toEqual([["LG-05", `${STORE}/3/prev`]]);
     expect(refusals(resigned(chain(), 1, { prev: `sha256:${"0".repeat(64)}` }))).toEqual([
-      ["LG-05", `${ROOT}/1/prev`],
-      ["LG-05", `${ROOT}/2/prev`],
+      ["LG-05", `${STORE}/1/prev`],
+      ["LG-05", `${STORE}/2/prev`],
     ]);
   });
 
@@ -60,15 +60,15 @@ describe("the chain of knowledge commits (LG-04, LG-05, LG-06)", () => {
     const [record] = commits[0]!.records;
     const changed = { ...commits[0]!, records: [{ ...record!, body: { text: "demo/A" } }] };
     expect(refusals(withCommit(commits, 1, changed))).toEqual([
-      ["LG-06", `${ROOT}/1/sig`],
-      ["LG-05", `${ROOT}/2/prev`],
+      ["LG-06", `${STORE}/1/sig`],
+      ["LG-05", `${STORE}/2/prev`],
     ]);
     // Signed again by the land key, the changed commit still breaks the chain after it.
-    expect(refusals(resigned(commits, 1, { records: changed.records }))).toEqual([["LG-05", `${ROOT}/2/prev`]]);
+    expect(refusals(resigned(commits, 1, { records: changed.records }))).toEqual([["LG-05", `${STORE}/2/prev`]]);
   });
 
   it("LG-06: refuses an at earlier than the predecessor's, and takes an equal one", () => {
-    expect(refusals(resigned(chain(), 3, { at: "2026-10-06T11:59:59.999999Z" }))).toEqual([["LG-06", `${ROOT}/3/at`]]);
+    expect(refusals(resigned(chain(), 3, { at: "2026-10-06T11:59:59.999999Z" }))).toEqual([["LG-06", `${STORE}/3/at`]]);
     const [first, second] = chain();
     expect(first!.at).toBe(second!.at);
   });
@@ -88,29 +88,29 @@ describe("the signatures of knowledge commits (LG-06)", () => {
       { at: "2026-10-06T12:00:00.000001Z" },
     ];
     for (const fields of changes) {
-      expect(refusals(withCommit(commits, 3, { ...last, ...fields })), JSON.stringify(fields)).toEqual([["LG-06", `${ROOT}/3/sig`]]);
+      expect(refusals(withCommit(commits, 3, { ...last, ...fields })), JSON.stringify(fields)).toEqual([["LG-06", `${STORE}/3/sig`]]);
     }
     expect(refusals(withCommit(commits, 3, { ...last, seq: 4 }))).toEqual([
-      ["LG-04", `${ROOT}/3/seq`],
-      ["LG-06", `${ROOT}/3/sig`],
+      ["LG-04", `${STORE}/3/seq`],
+      ["LG-06", `${STORE}/3/sig`],
     ]);
     expect(refusals(withCommit(commits, 3, { ...last, prev: `sha256:${"0".repeat(64)}` }))).toEqual([
-      ["LG-05", `${ROOT}/3/prev`],
-      ["LG-06", `${ROOT}/3/sig`],
+      ["LG-05", `${STORE}/3/prev`],
+      ["LG-06", `${STORE}/3/sig`],
     ]);
   });
 
   it("LG-06: refuses a commit signed by another key, one not signed and one of a session with no known key", () => {
     const mallory = testKey("mallory");
     const commits = chain();
-    expect(refusals(withCommit(commits, 3, signCommit(commits[2]!, mallory.key)))).toEqual([["LG-06", `${ROOT}/3/sig`]]);
-    expect(refusals(withCommit(commits, 3, { ...commits[2]!, sig: null }))).toEqual([["LG-06", `${ROOT}/3/sig`]]);
-    expect(refusals(resigned(commits, 3, { by: "01JB2X00000000000000000XXX" }))).toEqual([["LG-06", `${ROOT}/3/sig`]]);
+    expect(refusals(withCommit(commits, 3, signCommit(commits[2]!, mallory.key)))).toEqual([["LG-06", `${STORE}/3/sig`]]);
+    expect(refusals(withCommit(commits, 3, { ...commits[2]!, sig: null }))).toEqual([["LG-06", `${STORE}/3/sig`]]);
+    expect(refusals(resigned(commits, 3, { by: "01JB2X00000000000000000XXX" }))).toEqual([["LG-06", `${STORE}/3/sig`]]);
   });
 
   it("LG-06: the rejection of a signature names the hash and the key it was expected of", () => {
     const commits = chain();
-    const [rejection] = rejectionsOf(verifyChain(withCommit(commits, 1, { ...commits[0]!, sig: null }), keyOfLand, { intent: null, path: ROOT }));
+    const [rejection] = rejectionsOf(verifyChain(withCommit(commits, 1, { ...commits[0]!, sig: null }), keyOfLand, { intent: null, path: STORE }));
     expect(rejection?.expected).toEqual({ hash: commitHash(commits[0]!), key: LAND_KEY.publicKey });
     expect(rejection?.got).toBeNull();
   });

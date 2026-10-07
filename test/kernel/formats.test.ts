@@ -2,7 +2,7 @@
 // `checkFormat` refuses with KR-11 at the place it is given. Every spelling of
 // the vectors is in test/kernel/vectors.test.ts; here — the refusal itself.
 import { describe, expect, it } from "vitest";
-import { checkFormat, isFormat, isUlid, KR_11, reject, rejectionsOf } from "../../src/kernel/index.js";
+import { checkFormat, isFormat, isUlid, KR_11, reject, rejectionsOf, ROOT } from "../../src/kernel/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
 describe("formats (KR-11)", () => {
@@ -15,7 +15,7 @@ describe("formats (KR-11)", () => {
 
   it("KR-11: refuses a value that is not a string", () => {
     for (const value of [0.5, null, ["2026-10-06"], { a: 1 }]) {
-      expect(rejectionsOf(checkFormat("date", deepFreeze(value), { intent: null, path: "" })).map((r) => [r.rule, r.got])).toEqual([["KR-11", value]]);
+      expect(rejectionsOf(checkFormat("date", deepFreeze(value), ROOT)).map((r) => [r.rule, r.got])).toEqual([["KR-11", value]]);
     }
   });
 

@@ -4,10 +4,8 @@
 // Annotations (KR-19) are in schema-annotations.test.ts. Every input crosses
 // the module boundary frozen.
 import { describe, expect, it } from "vitest";
-import { checkSchema, KR_18, reject, rejectionsOf, type JsonValue, type Kind, type Rejection } from "../../src/kernel/index.js";
+import { checkSchema, KR_18, reject, rejectionsOf, ROOT, type JsonValue, type Kind, type Rejection } from "../../src/kernel/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
-
-const ROOT = { intent: null, path: "" } as const;
 
 /** The rule and path of every rejection of a schema checked from the root. */
 const refusals = (schema: JsonValue, kind: Kind = "entity") => rejectionsOf(checkSchema(deepFreeze(schema), kind, ROOT)).map((r) => [r.rule, r.path]);

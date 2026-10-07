@@ -16,13 +16,12 @@ import {
   META_TYPE,
   reject,
   rejectionsOf,
+  ROOT,
   type JsonValue,
   type Place,
   type ResolveType,
 } from "../../src/kernel/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
-
-const ROOT: Place = { intent: null, path: "" };
 
 /** The type bodies a test knows by pinned reference, as phase 2 resolves them over `after`. */
 const typesOf =

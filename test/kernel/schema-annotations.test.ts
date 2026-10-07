@@ -3,10 +3,8 @@
 // root, `items`, `values` and the branches of `oneOf` are not fields. Every
 // input crosses the module boundary frozen.
 import { describe, expect, it } from "vitest";
-import { checkSchema, KR_19, reject, rejectionsOf, type JsonValue, type Kind } from "../../src/kernel/index.js";
+import { checkSchema, KR_19, reject, rejectionsOf, ROOT, type JsonValue, type Kind } from "../../src/kernel/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
-
-const ROOT = { intent: null, path: "" } as const;
 
 const refusals = (schema: JsonValue, kind: Kind = "entity") => rejectionsOf(checkSchema(deepFreeze(schema), kind, ROOT)).map((r) => [r.rule, r.path]);
 
