@@ -1,48 +1,41 @@
 // The canonical print of the md model (LG-42, G-25): blocks separated by one
-// blank line, a table as its header, a `|---|` separator per column and its
-// rows, headings by level, a field right after its block, a final newline.
-// What `parse` accepts, `print` writes back byte for byte.
-import type { Block, Item, Section, Table } from "./model.js";
+// blank line, a table of clauses as its header, its separator and its rows,
+// headings by level, a field right after its block, a final newline. Every
+// element is written by `form.ts`; a document is built only by the builders,
+// which refuse what would not read back, so print refuses nothing: what it
+// writes, `parse` reads back as the same document.
+import { FENCE, fenceOpen, headingLine, itemLine, rowLine, separator } from "./form.js";
+import type { Block, Document, Item, Section } from "./model.js";
 
-/** A row of a table: every cell padded by one space (G-25). */
-const tableRow = (cells: readonly string[]): string => `| ${cells.join(" | ")} |`;
-
-const separator = (columns: number): string => `|${"---|".repeat(columns)}`;
-
-const tableLines = (table: Table): string[] => [tableRow(table.header), separator(table.header.length), ...table.rows.map(tableRow)];
+const tableLines = (header: readonly string[], rows: readonly (readonly string[])[]): string[] => [rowLine(header), separator(header.length), ...rows.map(rowLine)];
 
 /** The field of a block as its own group of lines, or none (RM-Z03). */
-function field(block: Block): string[][] {
-  if (block.table !== undefined) return [tableLines(block.table)];
-  if (block.list !== undefined) return [block.list.map((item) => `- ${item}`)];
+function field(block: Block | undefined): string[][] {
+  if (block?.table !== undefined) return [tableLines(block.table.header, block.table.rows)];
+  if (block?.list !== undefined) return [block.list.map(itemLine)];
   return [];
 }
 
-/** The groups of lines of an item; a clause continues the table of the group before it. */
-function groups(item: Item, before: string[] | undefined): string[][] {
+/** The groups of lines of an item; a table of clauses is one group, the field of its last row the next. */
+function groups(item: Item): string[][] {
   switch (item.type) {
     case "section":
       return sectionGroups(item);
-    case "header":
-      return [[tableRow(item.cells), separator(item.cells.length)]];
-    case "clause":
-      before?.push(tableRow(item.cells));
-      return field(item);
+    case "clauses":
+      return [tableLines(item.header, item.rows.map((r) => r.cells)), ...field(item.rows.at(-1))];
     case "prose":
       return [[item.text], ...field(item)];
     case "example":
-      return [[`\`\`\`${item.lang} ${item.id}\n${item.text}\`\`\``], ...field(item)];
+      return [[`${fenceOpen(item.lang, item.id)}\n${item.text}${FENCE}`], ...field(item)];
   }
 }
 
 function sectionGroups(section: Section): string[][] {
-  const out: string[][] = [[`${"#".repeat(section.level)} ${section.heading}`]];
-  for (const item of section.items) out.push(...groups(item, out.at(-1)));
-  return out;
+  return [[headingLine(section.level, section.heading)], ...section.items.flatMap(groups)];
 }
 
 /** The canonical bytes of a document (LG-42): groups of lines joined by one blank line, and a final newline. */
-export function print(document: Section): Uint8Array {
+export function print(document: Document): Uint8Array {
   const text = sectionGroups(document)
     .map((lines) => lines.join("\n"))
     .join("\n\n");

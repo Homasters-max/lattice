@@ -4,7 +4,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parse, print, type Item, type Section } from "../../src/codec/index.js";
+import { idOf, parse, print, type Block, type Document, type Section } from "../../src/codec/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
 const DESIGN = join(import.meta.dirname, "../../docs/design");
@@ -12,16 +12,16 @@ const FILES = readdirSync(DESIGN)
   .filter((f) => f.endsWith(".md"))
   .sort();
 
-function parsed(file: string): Section {
-  const out = parse(readFileSync(join(DESIGN, file)), `/${file}`);
+function parsed(file: string): Document {
+  const out = parse(readFileSync(join(DESIGN, file)), { intent: null, path: `/${file}` });
   if (!out.ok) throw new Error(`${file}: ${out.rejections.map((r) => `${r.rule} ${r.path} ${JSON.stringify(r.got)}`).join("; ")}`);
   return out.value;
 }
 
-/** Every item of a section and of its subsections, in document order. */
-const flat = (s: Section): Item[] => s.items.flatMap((i) => (i.type === "section" ? [i, ...flat(i)] : [i]));
+/** Every block of a section and of its subsections, the rows of its tables of clauses among them, in document order. */
+const blocks = (s: Section): Block[] => s.items.flatMap((i): readonly Block[] => (i.type === "section" ? blocks(i) : i.type === "clauses" ? i.rows : [i]));
 
-const find = (file: string, id: string): Item | undefined => flat(parsed(file)).find((i) => "id" in i && i.id === id);
+const find = (file: string, id: string): Block | undefined => blocks(parsed(file)).find((b) => idOf(b) === id);
 
 describe("the reference: docs/design round-trips byte for byte (LG-42, RM-07)", () => {
   it("LG-42: reads the whole corpus — README and every document its table RM-Z02 names, 17 files today", () => {

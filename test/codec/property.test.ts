@@ -1,104 +1,112 @@
 // The property of the codec (LG-42): on generated documents, `parse` reads
 // back exactly what `print` wrote — the model is the md format, both ways.
+// The generator knows the model only through its builders: it offers blocks,
+// tables of clauses and documents of any shape and keeps what the builders
+// accept. Which block may carry a field, which ID a block takes, how many
+// cells a row has, that a field ends its table, that text is one line, that a
+// section's blocks come before its subsections, which levels they take and
+// that no two blocks share an ID are the model's to say (RM-01, RM-02,
+// LG-42), not the generator's. A check that `parse` makes through the same
+// builders — the ID of a paragraph, the line that opens an example — a round
+// trip cannot show; `model.test.ts` and the fixtures show it.
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { parse, print, type Block, type Field, type Item, type Section, type Table } from "../../src/codec/index.js";
+import { clause, clauses, document, example, parse, print, prose, type Clause, type Field, type Item, type Section, type Table } from "../../src/codec/index.js";
+import type { Result } from "../../src/kernel/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
+
+type Ok<T> = Extract<Result<T>, { readonly ok: true }>;
+
+/** What a builder accepts is kept, what it refuses is dropped: the model decides. */
+const built = <T>(arb: fc.Arbitrary<Result<T>>): fc.Arbitrary<T> => arb.filter((out): out is Ok<T> => out.ok).map((out) => out.value);
 
 const PREFIXES = ["AA", "KR", "LG", "RM"] as const;
 
-const id = fc
-  .tuple(fc.constantFrom(...PREFIXES), fc.boolean(), fc.integer({ min: 0, max: 99 }))
-  .map(([prefix, z, n]) => `${prefix}-${z ? "Z" : ""}${String(n).padStart(2, "0")}`);
+/** An ID of either kind, and now and then one off the grammar. */
+const id = fc.oneof(
+  { weight: 12, arbitrary: fc.tuple(fc.constantFrom(...PREFIXES), fc.boolean(), fc.integer({ min: 0, max: 99 })).map(([prefix, z, n]) => `${prefix}-${z ? "Z" : ""}${String(n).padStart(2, "0")}`) },
+  { weight: 1, arbitrary: fc.constantFrom("AA-1", "aa-01", "AA-Z1") },
+);
 
 /** Words of inline text as the corpus has them: inline code, an escaped pipe, links, ranges, typography. */
 const word = fc.constantFrom("a", "rule", "`KR-10`", "\\|", "`a \\| b`", "[x](y.md#z)", "KR-04…KR-13", "…", "—", "→", "**b**", "x:", "#", "-", "1.");
-const inline = fc.array(word, { minLength: 1, maxLength: 5 }).map((ws) => ws.join(" "));
-const cells = (n: number) => fc.array(inline, { minLength: n, maxLength: n });
+/** Now and then a word md does not keep as it is: a line break, a space at an end. */
+const breaking = fc.constantFrom("a\nb", "a ", " a");
+const inline = fc.array(fc.oneof({ weight: 40, arbitrary: word }, { weight: 1, arbitrary: breaking }), { minLength: 1, maxLength: 5 }).map((ws) => ws.join(" "));
+/** A cell: text, or now and then an ID — a row of which is a clause, not a row of a field table. */
+const cell = fc.oneof({ weight: 8, arbitrary: inline }, { weight: 1, arbitrary: id });
+const cells = (n: number) => fc.array(cell, { minLength: n, maxLength: n });
+const columns = fc.integer({ min: 1, max: 3 });
+/** How many cells a row of a table of `n` columns has: most often `n`, now and then any — how many a table keeps is the model's to say. */
+const width = (n: number) => fc.oneof({ weight: 6, arbitrary: fc.constant(n) }, { weight: 1, arbitrary: columns });
 
-const table: fc.Arbitrary<Table> = fc
-  .integer({ min: 1, max: 3 })
-  .chain((n) => fc.record({ header: cells(n), rows: fc.array(cells(n), { maxLength: 2 }) }));
+/** The end of the text of a block, whatever field it carries. */
+const ending = fc.constantFrom("", ":");
+
+const table: fc.Arbitrary<Table> = columns.chain((n) => fc.record({ header: cells(n), rows: fc.array(width(n).chain(cells), { maxLength: 2 }) }));
 const field: fc.Arbitrary<Field | undefined> = fc.option(
   fc.oneof(
     table.map((t) => ({ table: t })),
-    fc.array(inline, { minLength: 1, maxLength: 3 }).map((l) => ({ list: l })),
+    fc.array(inline, { maxLength: 3 }).map((l) => ({ list: l })),
   ),
-  { nil: undefined },
+  { nil: undefined, freq: 2 },
 );
 
-/** A block that carries a field ends its text with ":" (RM-Z03, G-25). */
-const colon = (f: Field | undefined): string => (f === undefined ? "" : ":");
+/** A paragraph: its ID and a dot, now and then none, then its text. */
+const start = fc.option(id.map((i) => `${i}. `), { nil: "", freq: 12 });
+const proseItem: fc.Arbitrary<Item> = built(fc.tuple(start, inline, ending, field).map(([s, t, e, f]) => prose({ text: `${s}${t}${e}`, field: f })));
 
-const prose = fc.tuple(id, inline, field).map(([i, t, f]): Block => ({ type: "prose", id: i, text: `${i}. ${t}${colon(f)}`, ...f }));
+const line = fc.constantFrom("", "{ }", "a  ", "```json", "```", "| x |", "# h", "\t", "- a");
+const last = fc.constantFrom([], ["k"], ["k:"]);
+/** The language of an example, now and then one md does not keep. */
+const language = fc.oneof({ weight: 8, arbitrary: fc.constantFrom("json", "text", "ts") }, { weight: 1, arbitrary: fc.constant("Text") });
+const exampleItem: fc.Arbitrary<Item> = built(
+  fc
+    .tuple(id, language, fc.array(line, { maxLength: 4 }), last, field)
+    .map(([i, lang, lines, end, f]) => example({ lang, id: i, text: [...lines, ...end].map((l) => `${l}\n`).join(""), field: f })),
+);
 
-const line = fc.constantFrom("", "{ }", "a  ", "```json", "| x |", "# h", "\t", "- a");
-const example = fc
-  .tuple(id, fc.constantFrom("json", "text", "ts"), fc.array(line, { maxLength: 4 }), field)
-  .map(([i, lang, lines, f]): Block => ({ type: "example", id: i, lang, text: [...lines, ...(f === undefined ? [] : ["k:"])].map((l) => `${l}\n`).join(""), ...f }));
-
-/** A header and its clauses; only the last clause may carry a field — the table ends there. */
-const clauses: fc.Arbitrary<Item[]> = fc.integer({ min: 2, max: 3 }).chain((n) =>
-  fc.tuple(cells(n), fc.array(fc.tuple(id, cells(n - 1)), { minLength: 1, maxLength: 3 }), field).map(([header, rows, f]) => [
-    { type: "header", cells: header },
-    ...rows.map(([i, rest], k): Item => {
-      const last = k === rows.length - 1 && f !== undefined;
-      const body = last ? [...rest.slice(0, -1), `${rest.at(-1) ?? ""}:`] : rest;
-      return { type: "clause", id: i, cells: [i, ...body], ...(last ? f : {}) };
+/** A row of `n` cells: its ID, then cells, the last of them with its ending. */
+const row = (n: number): fc.Arbitrary<Clause> =>
+  built(
+    fc.tuple(id, cells(n - 1), ending, field).map(([i, rest, e, f]) => {
+      const all = [i, ...rest];
+      return clause({ cells: [...all.slice(0, -1), `${all.at(-1) ?? ""}${e}`], field: f });
     }),
-  ]),
+  );
+
+const clausesItem: fc.Arbitrary<Item> = columns.chain((n) =>
+  built(fc.tuple(cells(n), fc.array(width(n).chain(row), { maxLength: 3 })).map(([header, rows]) => clauses({ header, rows }))),
 );
 
-const chunk: fc.Arbitrary<Item[]> = fc.oneof(
-  prose.map((b) => [b]),
-  example.map((b) => [b]),
-  clauses,
-);
-
-/** A section: its blocks and tables first, then its subsections, one level deeper. */
-function section(level: number, depth: number): fc.Arbitrary<Section> {
-  const subs = depth === 0 ? fc.constant([]) : fc.array(section(level + 1, depth - 1), { maxLength: 2 });
-  return fc
-    .tuple(inline, fc.array(chunk, { maxLength: 4 }), subs)
-    .map(([heading, items, inner]): Section => ({ type: "section", heading, level, items: [...items.flat(), ...inner] }));
-}
+const block: fc.Arbitrary<Item> = fc.oneof(proseItem, exampleItem, clausesItem);
 
 /**
- * RM-01, RM-02: every block its own ID, of its kind — a row a rule's, an example a `Z` one, a paragraph keeps the kind
- * it was generated with. The k-th block takes the prefix k mod 4 and the number k div 4, so no two blocks share one.
+ * A section: its blocks and tables, its subsections — one or two levels
+ * deeper, now and then at its own level — and now and then more blocks among
+ * or after the subsections. Which order and which levels md keeps is the
+ * model's to say; strays are a few, not a shuffle of all items, so that the
+ * documents the model keeps stay large.
  */
-function renumber(doc: Section): Section {
-  let k = 0;
-  const next = (z: boolean): string => {
-    const n = k++;
-    return `${PREFIXES[n % PREFIXES.length] ?? ""}-${z ? "Z" : ""}${String(Math.floor(n / PREFIXES.length)).padStart(2, "0")}`;
-  };
-  const item = (i: Item): Item => {
-    switch (i.type) {
-      case "section":
-        return { ...i, items: i.items.map(item) };
-      case "header":
-        return i;
-      case "prose": {
-        const fresh = next(i.id.includes("-Z"));
-        return { ...i, id: fresh, text: `${fresh}${i.text.slice(i.id.length)}` };
-      }
-      case "clause": {
-        const fresh = next(false);
-        return { ...i, id: fresh, cells: [fresh, ...i.cells.slice(1)] };
-      }
-      case "example":
-        return { ...i, id: next(true) };
-    }
-  };
-  return { ...doc, items: doc.items.map(item) };
+function section(level: number, depth: number): fc.Arbitrary<Section> {
+  const deeper = fc.oneof({ weight: 1, arbitrary: fc.constant(0) }, { weight: 6, arbitrary: fc.integer({ min: 1, max: 2 }) });
+  const sub = deeper.chain((k) => section(level + k, depth - 1));
+  const subs = depth === 0 ? fc.constant([]) : fc.array(sub, { maxLength: 2 });
+  const strays = fc.oneof({ weight: 3, arbitrary: fc.constant([]) }, { weight: 1, arbitrary: fc.array(block, { minLength: 1, maxLength: 2 }) });
+  return fc.tuple(inline, fc.array(block, { maxLength: 4 }), subs, strays, fc.nat()).map(([heading, blocks, inner, more, at]): Section => {
+    const k = at % (inner.length + 1);
+    return { type: "section", heading, level, items: [...blocks, ...inner.slice(0, k), ...more, ...inner.slice(k)] };
+  });
 }
 
-describe("the codec both ways (LG-42)", () => {
+const doc = built(section(1, 3).map((s) => document({ heading: s.heading, items: s.items })));
+
+/** The generator offers what the builders refuse and keeps what they accept: a run takes seconds, longer than the timeout of a test. */
+describe("the codec both ways (LG-42)", { timeout: 30_000 }, () => {
   it("LG-42: parse(print(d)) is d for generated documents", () => {
     fc.assert(
-      fc.property(section(1, 3).map(renumber), (doc) => {
-        expect(parse(print(deepFreeze(doc)))).toEqual({ ok: true, value: doc });
+      fc.property(doc, (d) => {
+        expect(parse(print(deepFreeze(d)))).toEqual({ ok: true, value: d });
       }),
       { numRuns: 300 },
     );

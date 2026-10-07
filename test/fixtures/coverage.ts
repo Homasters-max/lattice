@@ -1,7 +1,8 @@
 // Fitness test of ST-17: every rule ID a hard check enforces has a fixture
 // that triggers it and one that passes it. Layout and format: CONVENTIONS.md.
 // The rule IDs of the design are read by the codec, as LATTICE reads it.
-import { parse, type Section } from "../../src/codec/index.js";
+import { idOf, parse, type Section } from "../../src/codec/index.js";
+import { ROOT } from "../../src/kernel/index.js";
 
 /** One `<case>.json` under `trigger/` or `pass/`; `data` is the parsed JSON, or `undefined` if it did not parse. */
 export type FixtureCase = {
@@ -63,7 +64,7 @@ export type DesignDocument = { readonly name: string; readonly bytes: Uint8Array
 
 /** The clauses of a section and of its subsections — the table rows with a rule ID (RM-01). */
 const clausesOf = (section: Section): string[] =>
-  section.items.flatMap((item) => (item.type === "section" ? clausesOf(item) : item.type === "clause" ? [item.id] : []));
+  section.items.flatMap((item) => (item.type === "section" ? clausesOf(item) : item.type === "clauses" ? item.rows.map(idOf) : []));
 
 /**
  * Rule IDs defined in the design: the IDs of the clauses the codec reads from each document (RM-01, RM-02). A
@@ -72,7 +73,7 @@ const clausesOf = (section: Section): string[] =>
 export function designRuleIds(documents: readonly DesignDocument[]): Set<string> {
   return new Set(
     documents.flatMap(({ name, bytes }) => {
-      const parsed = parse(bytes, `/${name}`);
+      const parsed = parse(bytes, { ...ROOT, path: `/${name}` });
       if (!parsed.ok) throw new Error(`${name}: ${parsed.rejections.map((r) => `${r.rule} at ${r.path}`).join(", ")}`);
       return clausesOf(parsed.value);
     }),
