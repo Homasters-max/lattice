@@ -5,6 +5,8 @@
 // The checks of landing run through `land` itself, as a dry run on a
 // `git-fixture` of the fixture's branches; the checks with no glue around them
 // — a JSON text, a proposal value, apply, the lines of a store — run alone.
+// A row hands on the Result of its check as it is (CONVENTIONS.md §2); a
+// check placed by its caller is placed at the root of the input, `ROOT`.
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -35,7 +37,7 @@ import {
   parseJson,
   parseJsonBytes,
   parseRef,
-  refused,
+  ROOT,
   type CanonicalFormat,
   type JsonValue,
   type Kind,
@@ -83,13 +85,13 @@ const json: FixtureCheck = {
 /** `input`: `{ format, value }` — a format of KR-11 and a JSON value, checked from the root. */
 const format: FixtureCheck = {
   enforces: [KR_11.id],
-  run: (input) => refused(checkFormat(field(input, "format") as CanonicalFormat, field(input, "value") as JsonValue, { intent: null, path: "" })) ?? { ok: true },
+  run: (input) => checkFormat(field(input, "format") as CanonicalFormat, field(input, "value") as JsonValue, ROOT),
 };
 
 /** `input`: `{ record }` — the header of a record, checked from the root as a store opens. */
 const header: FixtureCheck = {
   enforces: [KR_04.id, KR_06.id, KR_07.id, KR_08.id, KR_11.id],
-  run: (input) => refused(checkHeader(field(input, "record") as JsonValue, "")) ?? { ok: true },
+  run: (input) => checkHeader(field(input, "record") as JsonValue, ROOT),
 };
 
 /** `input`: `{ ref }` — a string parsed as a reference from the root. */
@@ -101,13 +103,13 @@ const ref: FixtureCheck = {
 /** `input`: `{ value }` — a JSON value checked as an external link from the root. */
 const uri: FixtureCheck = {
   enforces: [KR_24.id],
-  run: (input) => refused(checkUri(field(input, "value") as JsonValue, { intent: null, path: "" })) ?? { ok: true },
+  run: (input) => checkUri(field(input, "value") as JsonValue, ROOT),
 };
 
 /** `input`: `{ schema, kind }` — the schema of a type of this kind, checked from the root (KR-18, KR-19). */
 const schema: FixtureCheck = {
   enforces: [KR_18.id, KR_19.id],
-  run: (input) => refused(checkSchema(field(input, "schema") as JsonValue, field(input, "kind") as Kind, { intent: null, path: "" })) ?? { ok: true },
+  run: (input) => checkSchema(field(input, "schema") as JsonValue, field(input, "kind") as Kind, ROOT),
 };
 
 /** The type bodies `types` gives by pinned reference, as phase 2 resolves them over `after` (LG-11, KR-15); `null` for others. */
@@ -123,18 +125,18 @@ function typesFrom(types: unknown): ResolveType {
  */
 const record: FixtureCheck = {
   enforces: [KR_04.id, KR_14.id, KR_15.id, KR_16.id, KR_18.id, KR_19.id, KR_21.id],
-  run: (input) => refused(checkAgainstType(field(input, "record") as Parameters<typeof checkAgainstType>[0], typesFrom(field(input, "types")), { intent: null, path: "" })) ?? { ok: true },
+  run: (input) => checkAgainstType(field(input, "record") as Parameters<typeof checkAgainstType>[0], typesFrom(field(input, "types")), ROOT),
 };
 
 /** `input`: `{ proposal }`, read as a proposal value, refused from its root. */
 const proposal: FixtureCheck = {
   enforces: [LG_09.id],
-  run: (input) => readProposal(field(input, "proposal") as JsonValue),
+  run: (input) => readProposal(field(input, "proposal") as JsonValue, ROOT),
 };
 
 /** A proposal applied on an empty ledger. */
 function applied(value: JsonValue) {
-  const read = readProposal(value);
+  const read = readProposal(value, ROOT);
   return read.ok ? apply(createView(0, []), read.value, LAND, []) : read;
 }
 
@@ -171,11 +173,11 @@ const store: FixtureCheck = {
 const signature: FixtureCheck = {
   enforces: [LG_10.id],
   run: (input) => {
-    const read = readProposal(field(input, "proposal") as JsonValue);
+    const read = readProposal(field(input, "proposal") as JsonValue, ROOT);
     if (!read.ok) return read;
     const by = field(input, "signedBy");
     const p = typeof by === "string" ? signProposal(read.value, testKey(by).key, NO_FACTS) : read.value;
-    return refused(verifyProposal(p, testKey(String(field(input, "session"))).publicKey, NO_FACTS)) ?? { ok: true };
+    return verifyProposal(p, testKey(String(field(input, "session"))).publicKey, NO_FACTS, ROOT);
   },
 };
 
@@ -206,7 +208,7 @@ const chain: FixtureCheck = {
   run: (input) => {
     const edits = (field(input, "edits") ?? []) as readonly Edit[];
     const commits = landedChain(field(input, "proposals") as readonly JsonValue[]).map((c, i) => edits.filter((e) => e.line === i + 1).reduce(edited, c));
-    return refused(verifyChain(commits, keyOfLand, "/store/knowledge.jsonl")) ?? { ok: true };
+    return verifyChain(commits, keyOfLand, { ...ROOT, path: "/store/knowledge.jsonl" });
   },
 };
 

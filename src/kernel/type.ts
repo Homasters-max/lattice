@@ -9,6 +9,7 @@
 import type { Kind } from "./id.js";
 import { isJsonObject, type JsonValue } from "./json.js";
 import { isPinned } from "./ref.js";
+import { ROOT } from "./rejection.js";
 import { checkSchema, type Schema } from "./schema.js";
 import type { Resolve } from "./validate.js";
 
@@ -40,7 +41,7 @@ export function typeAt(ref: string, resolve: ResolveType): Type | Missing {
   const body = resolve(ref);
   if (body === null) return "a type resolve knows";
   const type = readType(body);
-  return type !== null && checkSchema(type.schema, type.kind, { intent: null, path: "" }).length === 0 ? type : "an admitted type";
+  return type !== null && checkSchema(type.schema, type.kind, ROOT).ok ? type : "an admitted type";
 }
 
 /** KR-21: the schema of the type at a pinned reference — a `$ref` target — as the kernel admits it, or `null`. */

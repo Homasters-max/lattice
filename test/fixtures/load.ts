@@ -3,7 +3,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import type { FixtureCase, FixtureFolder } from "./coverage.js";
+import type { DesignDocument, FixtureCase, FixtureFolder } from "./coverage.js";
 
 const root = join(import.meta.dirname, "../..");
 export const fixturesDir = join(root, "test/fixtures");
@@ -58,11 +58,11 @@ export function loadFolders(): FixtureFolder[] {
     }));
 }
 
-/** The text of every document of `docs/design`. */
-export function loadDesignTexts(): string[] {
+/** Every document of `docs/design`, by file name, as bytes — the codec reads them. */
+export function loadDesign(): DesignDocument[] {
   const dir = join(root, "docs/design");
   return readdirSync(dir)
     .filter((f) => f.endsWith(".md"))
     .sort()
-    .map((f) => readFileSync(join(dir, f), "utf8"));
+    .map((name) => ({ name, bytes: new Uint8Array(readFileSync(join(dir, name))) }));
 }

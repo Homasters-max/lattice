@@ -3,12 +3,10 @@
 // root, `items`, `values` and the branches of `oneOf` are not fields. Every
 // input crosses the module boundary frozen.
 import { describe, expect, it } from "vitest";
-import { checkSchema, KR_19, reject, type JsonValue, type Kind } from "../../src/kernel/index.js";
+import { checkSchema, KR_19, reject, rejectionsOf, ROOT, type JsonValue, type Kind } from "../../src/kernel/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
-const ROOT = { intent: null, path: "" } as const;
-
-const refusals = (schema: JsonValue, kind: Kind = "entity") => checkSchema(deepFreeze(schema), kind, ROOT).map((r) => [r.rule, r.path]);
+const refusals = (schema: JsonValue, kind: Kind = "entity") => rejectionsOf(checkSchema(deepFreeze(schema), kind, ROOT)).map((r) => [r.rule, r.path]);
 
 /** A closed object with one field `a` of this schema, required or not. */
 const field = (a: JsonValue, required = true) => ({ type: "object", properties: { a }, required: required ? ["a"] : [] });
@@ -48,14 +46,14 @@ describe("ref and edge (KR-19)", () => {
   });
 
   it("KR-19: refuses with where the annotation belongs and where it sits", () => {
-    expect(checkSchema(deepFreeze(field({ ...URI, ref: TO }, false)), "entity", ROOT)).toEqual([
+    expect(rejectionsOf(checkSchema(deepFreeze(field({ ...URI, ref: TO }, false)), "entity", ROOT))).toEqual([
       reject(KR_19, { intent: null, path: "/properties/a/ref", expected: "a format: ref schema", got: "an optional field of an entity type, format: uri" }),
     ]);
   });
 
   it("KR-19: refuses for the caller's intent, at its place — an annotation out of place and one out of form", () => {
     const place = deepFreeze({ intent: "demo/t", path: "/body/schema" });
-    const at = (schema: JsonValue) => checkSchema(deepFreeze(schema), "entity", place);
+    const at = (schema: JsonValue) => rejectionsOf(checkSchema(deepFreeze(schema), "entity", place));
     expect(at(field({ type: "string", unique: true }, false))).toEqual([
       reject(KR_19, { intent: "demo/t", path: "/body/schema/properties/a/unique", expected: "a required field", got: "an optional field of an entity type" }),
     ]);

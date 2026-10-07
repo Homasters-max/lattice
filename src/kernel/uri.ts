@@ -3,7 +3,7 @@
 // is required and a fragment is allowed (G-06). Nothing is resolved,
 // normalised or fetched.
 import type { JsonValue } from "./json.js";
-import { reject, type Place, type Rejection } from "./rejection.js";
+import { refuse, reject, type Place, type Result } from "./rejection.js";
 import { KR_24 } from "./rules.js";
 
 // RFC 3986 §2: unreserved, sub-delims and a percent-encoded octet.
@@ -72,7 +72,7 @@ export function isUri(s: string): boolean {
   return isHierPart(hier) && QUERY.test(query ?? "") && QUERY.test(fragment ?? "");
 }
 
-/** KR-24: an absolute URI, refused at the place the caller names — a value that is not a string too. */
-export function checkUri(value: JsonValue, place: Place): Rejection[] {
-  return typeof value === "string" && isUri(value) ? [] : [reject(KR_24, { ...place, expected: "an absolute URI", got: value })];
+/** KR-24: an absolute URI, or its refusal at the place the caller names — a value that is not a string too. */
+export function checkUri(value: JsonValue, place: Place): Result<string> {
+  return typeof value === "string" && isUri(value) ? { ok: true, value } : refuse(reject(KR_24, { ...place, expected: "an absolute URI", got: value }));
 }

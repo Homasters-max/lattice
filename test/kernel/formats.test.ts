@@ -2,20 +2,20 @@
 // `checkFormat` refuses with KR-11 at the place it is given. Every spelling of
 // the vectors is in test/kernel/vectors.test.ts; here — the refusal itself.
 import { describe, expect, it } from "vitest";
-import { checkFormat, isFormat, isUlid, KR_11, reject } from "../../src/kernel/index.js";
+import { checkFormat, isFormat, isUlid, KR_11, reject, rejectionsOf, ROOT } from "../../src/kernel/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
 describe("formats (KR-11)", () => {
   it("KR-11: checkFormat takes a canonical spelling and refuses another, with the format expected and the value that came", () => {
     const place = deepFreeze({ intent: "demo/a", path: "/at" });
-    expect(checkFormat("date-time", "2026-10-06T12:00:00.000000Z", place)).toEqual([]);
-    expect(checkFormat("date-time", "2026-10-06T12:00:00Z", place)).toEqual([reject(KR_11, { ...place, expected: "date-time", got: "2026-10-06T12:00:00Z" })]);
-    expect(checkFormat("decimal", "-0", { intent: null, path: "/body/price" })).toEqual([reject(KR_11, { intent: null, path: "/body/price", expected: "decimal", got: "-0" })]);
+    expect(rejectionsOf(checkFormat("date-time", "2026-10-06T12:00:00.000000Z", place))).toEqual([]);
+    expect(rejectionsOf(checkFormat("date-time", "2026-10-06T12:00:00Z", place))).toEqual([reject(KR_11, { ...place, expected: "date-time", got: "2026-10-06T12:00:00Z" })]);
+    expect(rejectionsOf(checkFormat("decimal", "-0", { intent: null, path: "/body/price" }))).toEqual([reject(KR_11, { intent: null, path: "/body/price", expected: "decimal", got: "-0" })]);
   });
 
   it("KR-11: refuses a value that is not a string", () => {
     for (const value of [0.5, null, ["2026-10-06"], { a: 1 }]) {
-      expect(checkFormat("date", deepFreeze(value), { intent: null, path: "" }).map((r) => [r.rule, r.got])).toEqual([["KR-11", value]]);
+      expect(rejectionsOf(checkFormat("date", deepFreeze(value), ROOT)).map((r) => [r.rule, r.got])).toEqual([["KR-11", value]]);
     }
   });
 

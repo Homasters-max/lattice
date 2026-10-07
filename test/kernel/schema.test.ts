@@ -4,13 +4,11 @@
 // Annotations (KR-19) are in schema-annotations.test.ts. Every input crosses
 // the module boundary frozen.
 import { describe, expect, it } from "vitest";
-import { checkSchema, KR_18, reject, type JsonValue, type Kind, type Rejection } from "../../src/kernel/index.js";
+import { checkSchema, KR_18, reject, rejectionsOf, ROOT, type JsonValue, type Kind, type Rejection } from "../../src/kernel/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
-const ROOT = { intent: null, path: "" } as const;
-
 /** The rule and path of every rejection of a schema checked from the root. */
-const refusals = (schema: JsonValue, kind: Kind = "entity") => checkSchema(deepFreeze(schema), kind, ROOT).map((r) => [r.rule, r.path]);
+const refusals = (schema: JsonValue, kind: Kind = "entity") => rejectionsOf(checkSchema(deepFreeze(schema), kind, ROOT)).map((r) => [r.rule, r.path]);
 
 /** A closed object of these fields, every one optional. */
 const object = (properties: { readonly [name: string]: JsonValue }) => ({ type: "object", properties });
@@ -62,7 +60,7 @@ describe("the schema subset (KR-18)", () => {
   });
 
   it("KR-18: refuses the keyword itself, with the subset as expected and the keyword as got", () => {
-    expect(checkSchema(deepFreeze({ type: "string", pattern: "^a" }), "entity", { intent: "demo/t", path: "/body/schema" })).toEqual([
+    expect(rejectionsOf(checkSchema(deepFreeze({ type: "string", pattern: "^a" }), "entity", { intent: "demo/t", path: "/body/schema" }))).toEqual([
       reject(KR_18, { intent: "demo/t", path: "/body/schema/pattern", expected: "a keyword or an annotation of the closed subset", got: "pattern" }),
     ]);
   });
@@ -83,7 +81,7 @@ describe("the schema subset (KR-18)", () => {
       [{ type: ["array", "null"], const: 1 }, "/const"],
     ];
     for (const [schema, path] of misplaced) expect([schema, refusals(schema)]).toEqual([schema, [["KR-18", path]]]);
-    expect(checkSchema(deepFreeze({ type: "string", minItems: 1 }), "entity", ROOT)[0]).toMatchObject({ expected: ["array"], got: "string" });
+    expect(rejectionsOf(checkSchema(deepFreeze({ type: "string", minItems: 1 }), "entity", ROOT))[0]).toMatchObject({ expected: ["array"], got: "string" });
   });
 });
 
@@ -184,7 +182,7 @@ describe("tagged unions (KR-18)", () => {
   });
 
   it("KR-18: reads only the schema's own members — a discriminator named constructor is absent from a branch without it", () => {
-    const out = checkSchema(deepFreeze({ oneOf: [{ type: "object", properties: {}, required: [] }], discriminator: "constructor" }), "entity", ROOT);
+    const out = rejectionsOf(checkSchema(deepFreeze({ oneOf: [{ type: "object", properties: {}, required: [] }], discriminator: "constructor" }), "entity", ROOT));
     expect(out.map((r) => [r.path, r.got])).toEqual([
       ["/oneOf/0/properties/constructor", "absent"],
       ["/oneOf/0/required", []],
@@ -240,7 +238,7 @@ describe("what a rejection names (KR-18, LG-17)", () => {
   ];
 
   it("KR-18: each refusal is for the caller's intent, at its place, with what the subset wants and what came", () => {
-    for (const [name, schema, rejections] of FAMILIES) expect([name, checkSchema(deepFreeze(schema), "entity", place)]).toEqual([name, rejections]);
+    for (const [name, schema, rejections] of FAMILIES) expect([name, rejectionsOf(checkSchema(deepFreeze(schema), "entity", place))]).toEqual([name, rejections]);
   });
 });
 

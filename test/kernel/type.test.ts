@@ -15,13 +15,13 @@ import {
   KR_19,
   META_TYPE,
   reject,
+  rejectionsOf,
+  ROOT,
   type JsonValue,
   type Place,
   type ResolveType,
 } from "../../src/kernel/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
-
-const ROOT: Place = { intent: null, path: "" };
 
 /** The type bodies a test knows by pinned reference, as phase 2 resolves them over `after`. */
 const typesOf =
@@ -33,7 +33,7 @@ const NONE = typesOf({});
 
 /** A type body as the record of a type, `core/type@1`, checked against the meta-type at the place given. */
 const ofType = (body: JsonValue, resolve: ResolveType = NONE, place: Place = ROOT) =>
-  checkAgainstType(deepFreeze({ type: "core/type@1", rev: 1, body }), resolve, deepFreeze(place));
+  rejectionsOf(checkAgainstType(deepFreeze({ type: "core/type@1", rev: 1, body }), resolve, deepFreeze(place)));
 
 const refusals = (body: JsonValue, resolve: ResolveType = NONE) => ofType(body, resolve).map((r) => [r.rule, r.path]);
 
@@ -58,7 +58,7 @@ describe("the meta-type (KR-14)", () => {
   it("KR-14: its body is a type body the check of a type body admits", () => {
     const { schema } = META_TYPE.body as { readonly schema: JsonValue };
     expect(refusals(META_TYPE.body)).toEqual([]);
-    expect(checkSchema(schema, "entity", ROOT)).toEqual([]);
+    expect(rejectionsOf(checkSchema(schema, "entity", ROOT))).toEqual([]);
   });
 });
 
@@ -213,8 +213,8 @@ describe("abstract types (KR-16)", () => {
   it("KR-16: an abstract type has no records", () => {
     const place = deepFreeze({ intent: "demo/hello", path: "" });
     const record = deepFreeze({ type: "demo/period@1", rev: 1, body: { at: "a" } });
-    expect(checkAgainstType(record, typesOf({ "demo/period@1": shape(false) }), place)).toEqual([]);
-    expect(checkAgainstType(record, typesOf({ "demo/period@1": shape(true) }), place)).toEqual([
+    expect(rejectionsOf(checkAgainstType(record, typesOf({ "demo/period@1": shape(false) }), place))).toEqual([]);
+    expect(rejectionsOf(checkAgainstType(record, typesOf({ "demo/period@1": shape(true) }), place))).toEqual([
       reject(KR_16, { intent: "demo/hello", path: "/type", expected: "a type that is not abstract", got: "an abstract type" }),
     ]);
   });

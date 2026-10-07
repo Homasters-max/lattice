@@ -4,7 +4,7 @@
 // a fragment exists — belongs to the ledger (KR-25).
 import { isUlid } from "./formats.js";
 import { isEntityId } from "./id.js";
-import { refuse, reject, type Place, type Result } from "./rejection.js";
+import { refuse, reject, ROOT, type Place, type Result } from "./rejection.js";
 import { KR_23 } from "./rules.js";
 
 /** KR-23: a reference to an entity, floating or pinned at `rev`, or to an event, either with a fragment of segments. */
@@ -14,8 +14,6 @@ export type Ref =
 
 /** The reference without its fragment. */
 type Target = { readonly kind: "entity"; readonly id: string; readonly rev?: number } | { readonly kind: "event"; readonly id: string };
-
-const ROOT: Place = { intent: null, path: "" };
 
 /** G-12: a revision is an integer from 1 without leading zeros; G-20: a safe integer, as every JSON integer. */
 const REV = /^[1-9][0-9]*$/;

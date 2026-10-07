@@ -2,7 +2,7 @@
 // order (LG-10, LG-06, G-03) and its signature by the session key (LG-10).
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import type { JsonValue } from "../../src/kernel/index.js";
+import { rejectionsOf, type JsonValue } from "../../src/kernel/index.js";
 import {
   canonicalIntents,
   NO_FACTS,
@@ -138,20 +138,20 @@ describe("the signature of a proposal (LG-10)", () => {
   it("LG-10: a proposal signed by its session key verifies, in any order of its intents", () => {
     const signed = signProposal(proposal([entity("demo/a"), entity("demo/b")]), alice.key, NO_FACTS);
     const reordered = proposal([entity("demo/b"), entity("demo/a")], signed.sig);
-    expect(verifyProposal(signed, alice.publicKey, NO_FACTS)).toEqual([]);
-    expect(verifyProposal(reordered, alice.publicKey, NO_FACTS)).toEqual([]);
+    expect(rejectionsOf(verifyProposal(signed, alice.publicKey, NO_FACTS))).toEqual([]);
+    expect(rejectionsOf(verifyProposal(reordered, alice.publicKey, NO_FACTS))).toEqual([]);
   });
 
   it("LG-10: refuses a signature by another key, a changed proposal and no signature at /sig", () => {
     const signed = signProposal(proposal([entity("demo/a")]), mallory.key, NO_FACTS);
     const changed = proposal([entity("demo/b")], signProposal(proposal([entity("demo/a")]), alice.key, NO_FACTS).sig);
-    const paths = (p: Proposal) => verifyProposal(p, alice.publicKey, NO_FACTS, "/store/proposals/cr.json").map((r) => [r.rule, r.intent, r.path]);
+    const paths = (p: Proposal) => rejectionsOf(verifyProposal(p, alice.publicKey, NO_FACTS, { intent: null, path: "/store/proposals/cr.json" })).map((r) => [r.rule, r.intent, r.path]);
     for (const p of [signed, changed, proposal([entity("demo/a")])]) expect(paths(p)).toEqual([["LG-10", null, "/store/proposals/cr.json/sig"]]);
   });
 
   it("LG-10: the rejection names the hash and the key the signature was expected of", () => {
     const p = proposal([entity("demo/a")]);
-    const [rejection] = verifyProposal(p, alice.publicKey, NO_FACTS);
+    const [rejection] = rejectionsOf(verifyProposal(p, alice.publicKey, NO_FACTS));
     expect(rejection?.expected).toEqual({ hash: proposalHash(p, NO_FACTS), key: alice.publicKey });
     expect(rejection?.got).toBeNull();
   });
@@ -160,8 +160,8 @@ describe("the signature of a proposal (LG-10)", () => {
     const intents = [entity("demo/a")];
     const signed = signProposal(proposal(intents), alice.key, NO_FACTS);
     const other = proposal(intents, signed.sig, { id: "01JB2X00000000000000000OTH" });
-    expect(verifyProposal(signed, alice.publicKey, NO_FACTS)).toEqual([]);
-    expect(verifyProposal(other, alice.publicKey, NO_FACTS).map((r) => [r.rule, r.path])).toEqual([["LG-10", "/sig"]]);
+    expect(rejectionsOf(verifyProposal(signed, alice.publicKey, NO_FACTS))).toEqual([]);
+    expect(rejectionsOf(verifyProposal(other, alice.publicKey, NO_FACTS)).map((r) => [r.rule, r.path])).toEqual([["LG-10", "/sig"]]);
   });
 
   it("LG-10, G-03: the signed hash is the one of intents in the order the fact keys give, and the rejection names it", () => {
@@ -171,14 +171,14 @@ describe("the signature of a proposal (LG-10)", () => {
     expect(byKeys).not.toBe(byIds);
     const signed = signProposal(p, alice.key, MARKS);
     expect(verifyHash(byKeys, signed.sig!, alice.publicKey)).toBe(true);
-    expect(verifyProposal(signed, alice.publicKey, MARKS)).toEqual([]);
-    expect(verifyProposal(signed, alice.publicKey, NO_FACTS).map((r) => r.rule)).toEqual(["LG-10"]);
-    const [rejection] = verifyProposal(p, alice.publicKey, MARKS);
+    expect(rejectionsOf(verifyProposal(signed, alice.publicKey, MARKS))).toEqual([]);
+    expect(rejectionsOf(verifyProposal(signed, alice.publicKey, NO_FACTS)).map((r) => r.rule)).toEqual(["LG-10"]);
+    const [rejection] = rejectionsOf(verifyProposal(p, alice.publicKey, MARKS));
     expect(rejection?.expected).toEqual({ hash: byKeys, key: alice.publicKey });
   });
 
   it("LG-54: a proposal without intents is signed and verified as any other", () => {
     const signed = signProposal(proposal([]), alice.key, NO_FACTS);
-    expect(verifyProposal(signed, alice.publicKey, NO_FACTS)).toEqual([]);
+    expect(rejectionsOf(verifyProposal(signed, alice.publicKey, NO_FACTS))).toEqual([]);
   });
 });

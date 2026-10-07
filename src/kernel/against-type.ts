@@ -12,7 +12,7 @@ import { checkType } from "./check-type.js";
 import { pointer } from "./json.js";
 import { META_TYPE } from "./meta-type.js";
 import { checkRev, type Record } from "./record.js";
-import { reject, sortRejections, type Place, type Rejection } from "./rejection.js";
+import { refuse, refused, reject, type Place, type Result } from "./rejection.js";
 import { KR_15, KR_16 } from "./rules.js";
 import { schemasOf, typeAt, type ResolveType } from "./type.js";
 import { checkBody } from "./validate.js";
@@ -24,17 +24,17 @@ const withMetaType =
     ref === META_TYPE.type ? META_TYPE.body : resolve(ref);
 
 /**
- * LG-16, phase 2: a record against its type, refused at the place the caller names — where the record sits in its
- * input; `rev` at `/rev`, the type at `/type`, the body under `/body`. `resolve` gives the body of a type by pinned
- * reference: the type of the record, its parents and the targets of `$ref`. The rejections come sorted
- * (CONVENTIONS.md §5).
+ * LG-16, phase 2: the record it is given, admitted against its type, or its rejections at the place the caller names
+ * — where the record sits in its input; `rev` at `/rev`, the type at `/type`, the body under `/body`. `resolve` gives
+ * the body of a type by pinned reference: the type of the record, its parents and the targets of `$ref`. The
+ * rejections come sorted (CONVENTIONS.md §5).
  */
-export function checkAgainstType(record: Pick<Record, "type" | "rev" | "body">, resolve: ResolveType, place: Place): Rejection[] {
+export function checkAgainstType<R extends Pick<Record, "type" | "rev" | "body">>(record: R, resolve: ResolveType, place: Place): Result<R> {
   const known = withMetaType(resolve);
   const type = typeAt(record.type, known);
   const at = (name: string): Place => ({ intent: place.intent, path: pointer(place.path, name) });
-  if (typeof type === "string") return [reject(KR_15, { ...at("type"), expected: type, got: record.type })];
+  if (typeof type === "string") return refuse(reject(KR_15, { ...at("type"), expected: type, got: record.type }));
   const abstract = type.abstract ? [reject(KR_16, { ...at("type"), expected: "a type that is not abstract", got: "an abstract type" })] : [];
   const body = record.type === META_TYPE.type ? checkType(record.body, known, at("body")) : checkBody(record.body, type.schema, schemasOf(known), at("body"));
-  return sortRejections([...checkRev(type.kind, record.rev, at("rev")), ...abstract, ...body]);
+  return refused<R>([...checkRev(type.kind, record.rev, at("rev")), ...abstract, ...body]) ?? { ok: true, value: record };
 }

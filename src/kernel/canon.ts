@@ -5,11 +5,8 @@
 // The strict parse (parse.ts) refuses the same through the same checks; canon
 // checks again because a value can be built in code, not only parsed.
 import { isJsonObject, pointer, serialize, type JsonValue } from "./json.js";
-import { refused, reject, type Place, type Rejection, type Result } from "./rejection.js";
+import { refused, reject, ROOT, type Place, type Rejection, type Result } from "./rejection.js";
 import { KR_10 } from "./rules.js";
-
-/** The root of the checked input, outside any intent (G-13). */
-export const ROOT: Place = { intent: null, path: "" };
 
 const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
 const NONCHARACTER = /\p{Noncharacter_Code_Point}/u;
