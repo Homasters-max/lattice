@@ -10,14 +10,14 @@
       "cr/x": {
         "from": "main",
         "files": {
-          "src/x.ts": "x\n"
+          "store/proposals/cr-x.json": "{"
         }
       }
     },
     "request": "cr/x"
   },
   "expect": {
-    "rule": "LG-54",
-    "path": "/store/proposals"
+    "rule": "KR-10",
+    "path": "/store/proposals/cr-x.json"
   }
 }

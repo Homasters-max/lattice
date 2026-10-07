@@ -7,6 +7,6 @@
   },
   "expect": {
     "rule": "KR-04",
-    "path": "/0/records/0"
+    "path": "/store/knowledge.jsonl/1/records/0"
   }
 }

@@ -9,8 +9,8 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promis
 import { dirname, join } from "node:path";
 import { sortPaths, type Conflict, type Git, type Prepare, type Push, type Worktree } from "../../ledger/ports/git.js";
 
-/** A branch: a commit on `from` (or a root) that writes these files; `null` removes one. */
-export type GitFixtureBranch = { readonly from?: string; readonly files: { readonly [path: string]: string | null } };
+/** A branch: a commit on `from` (or a root) that writes these files — text as UTF-8, or bytes as they are; `null` removes one. */
+export type GitFixtureBranch = { readonly from?: string; readonly files: { readonly [path: string]: string | Uint8Array | null } };
 export type GitFixtureOptions = { readonly dir: string; readonly branches: { readonly [name: string]: GitFixtureBranch } };
 /** The git of tests: the port, and a branch added at any moment from where its `from` is then. */
 interface GitFixture extends Git {
@@ -25,9 +25,9 @@ const same = (a: Uint8Array | undefined, b: Uint8Array | undefined) =>
 
 function overlay(base: Tree, files: GitFixtureBranch["files"]): Tree {
   const tree = new Map(base);
-  for (const [path, text] of Object.entries(files)) {
-    if (text === null) tree.delete(path);
-    else tree.set(path, new TextEncoder().encode(text));
+  for (const [path, file] of Object.entries(files)) {
+    if (file === null) tree.delete(path);
+    else tree.set(path, typeof file === "string" ? new TextEncoder().encode(file) : file);
   }
   return tree;
 }

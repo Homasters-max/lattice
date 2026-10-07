@@ -1,7 +1,14 @@
 {
-  "check": "change-request",
+  "check": "land",
   "input": {
-    "head": null
+    "branches": {
+      "main": {
+        "files": {
+          "README.md": "one\n"
+        }
+      }
+    },
+    "request": "cr/x"
   },
   "expect": {
     "rule": "LG-54",

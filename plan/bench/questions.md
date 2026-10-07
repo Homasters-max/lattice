@@ -26,3 +26,5 @@
 | 18 | How does landing end for a change request that does not exist? | — | blank | S0-03, Q-16 (LG-25 и LG-54 молчат; решено: отказ LG-54) | 2026-10-06 |
 | 19 | Must the code of another project that LATTICE imports be pinned to one version? | lattice/st-04, lattice/pr-13, lattice/lg-44 | normal | S0-03, ревью волна 2 | 2026-10-06 |
 | 20 | How does landing end for a change request whose proposal has no intents? | lattice/lg-54, lattice/lg-25, lattice/lg-12 | normal | S0-03, ревью волна 3 | 2026-10-06 |
+| 21 | How does landing end for a change request that edited store/knowledge.jsonl when main has moved and the merge conflicts at that file? | — | blank | S0-33, Q-28 (LG-23 и LG-24 молчат; решено: отказ LG-23) | 2026-10-07 |
+| 22 | From which root is the path of a rejection of landing counted? | — | blank | S0-33, Q-29 (G-13 — «от корня входа», вход landing не назван; решено: дерево change request) | 2026-10-07 |

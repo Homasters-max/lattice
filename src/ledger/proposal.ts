@@ -45,26 +45,29 @@ const PROPOSAL: { readonly [field in keyof Proposal]: Field } = {
 const refusal = (intent: string | null, path: string, expected: string, got: JsonValue | undefined) =>
   reject(LG_09, { intent, path, expected, got: gotOf(got) });
 
-/** G-13: inside an intent with a string `id` the path is the intent's own; otherwise from the root. */
-function intentRejections(v: JsonValue, i: number): Rejection[] {
-  if (!isJsonObject(v)) return [refusal(null, `/intents/${i}`, "an intent", v)];
+/** G-13: inside an intent with a string `id` the path is the intent's own; otherwise from `root`, where the proposal sits. */
+function intentRejections(v: JsonValue, i: number, root: string): Rejection[] {
+  if (!isJsonObject(v)) return [refusal(null, `${root}/intents/${i}`, "an intent", v)];
   const id = typeof v.id === "string" ? v.id : null;
   return Object.entries(INTENT).flatMap(([name, field]) =>
-    field.fits(v[name]) ? [] : [refusal(id, id === null ? `/intents/${i}/${name}` : `/${name}`, field.expected, v[name])],
+    field.fits(v[name]) ? [] : [refusal(id, id === null ? `${root}/intents/${i}/${name}` : `/${name}`, field.expected, v[name])],
   );
 }
 
-function proposalRejections(value: JsonValue): Rejection[] {
-  if (!isJsonObject(value)) return [refusal(null, "", "a proposal", value)];
-  const own = Object.entries(PROPOSAL).flatMap(([name, field]) => (field.fits(value[name]) ? [] : [refusal(null, `/${name}`, field.expected, value[name])]));
+function proposalRejections(value: JsonValue, root: string): Rejection[] {
+  if (!isJsonObject(value)) return [refusal(null, root, "a proposal", value)];
+  const own = Object.entries(PROPOSAL).flatMap(([name, field]) => (field.fits(value[name]) ? [] : [refusal(null, `${root}/${name}`, field.expected, value[name])]));
   const intents = Array.isArray(value.intents) ? (value.intents as readonly JsonValue[]) : [];
-  return [...own, ...intents.flatMap(intentRejections)];
+  return [...own, ...intents.flatMap((v, i) => intentRejections(v, i, root))];
 }
 
-/** LG-09: the proposal a JSON value holds, or the rejections of its form. */
-export function readProposal(value: JsonValue): Result<Proposal> {
+/**
+ * LG-09: the proposal a JSON value holds, or the rejections of its form, refused at `path` — where the proposal
+ * sits in its input: landing names its file in the tree of the change request (Q-29).
+ */
+export function readProposal(value: JsonValue, path = ""): Result<Proposal> {
   // Every field was checked against its kind above, so the value has the shape of Proposal.
-  return refused<Proposal>(proposalRejections(value)) ?? { ok: true, value: value as Proposal };
+  return refused<Proposal>(proposalRejections(value, path)) ?? { ok: true, value: value as Proposal };
 }
 
 const order = (a: Intent, b: Intent) => (a.op === b.op ? compareText(a.id, b.id) : a.op === "entity" ? -1 : 1);

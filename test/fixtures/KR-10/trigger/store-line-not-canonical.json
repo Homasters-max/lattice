@@ -8,6 +8,6 @@
   },
   "expect": {
     "rule": "KR-10",
-    "path": "/1"
+    "path": "/store/knowledge.jsonl/2"
   }
 }

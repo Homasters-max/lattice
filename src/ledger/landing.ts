@@ -1,12 +1,12 @@
 // Landing (LG-22…LG-26): a `knowledge` commit is born in git. It reaches git,
 // acts, the store, time and ids only through ports (LG-23, ST-04). The walking
-// skeleton takes `before` from the store at the tail of `main` (LG-14, tail.ts),
-// prepares the change request onto that tail, refuses one that changed the
-// bytes of `store/knowledge.jsonl` itself (LG-23), appends the commit to the
-// `jsonl` store on the worktree — nothing for a no-op (LG-25) — removes the
-// proposal and pushes. Rebuilds on a moved `main`, `awaiting-act`, the land
-// session event, acts as events, the trailers of OB-07 and `request` arrive
-// with S0-19 and S0-20.
+// skeleton checks the change request before apply in the order of G-19, takes
+// `before` from the store at the tail of `main` (LG-14, tail.ts), appends the
+// commit to the `jsonl` store on the worktree — nothing for a no-op (LG-25) —
+// removes the proposal and pushes. Every refusal is placed from the root of
+// the tree of the change request (Q-29). Rebuilds on a moved `main`,
+// `awaiting-act`, the land session event, acts as events, the trailers of
+// OB-07 and `request` arrive with S0-19 and S0-20.
 import { parseJsonBytes, refuse, reject, type Rejections, type Result } from "../kernel/index.js";
 import { apply, type LandActs } from "./apply.js";
 import { commitHash, encodeCommit, type Commit } from "./commit.js";
@@ -42,13 +42,13 @@ export type LandingOutcome =
 const PROPOSALS = "store/proposals/";
 
 /** LG-54: the head of the change request named; one that does not exist carries no proposal. */
-export function changeRequest(head: string | null): Result<string> {
+function changeRequest(head: string | null): Result<string> {
   if (head !== null) return { ok: true, value: head };
   return refuse(reject(LG_54, { intent: null, path: "", expected: "a change request", got: null }));
 }
 
 /** LG-54: the one proposal file of a change request, given the files under `store/proposals/`. */
-export function proposalPath(files: readonly string[]): Result<string> {
+function proposalPath(files: readonly string[]): Result<string> {
   const [only, ...more] = files;
   if (only !== undefined && more.length === 0) return { ok: true, value: only };
   return refuse(reject(LG_54, { intent: null, path: "/store/proposals", expected: "one proposal file", got: [...files] }));
@@ -62,7 +62,7 @@ const same = (a: Uint8Array | null, b: AtPath) =>
  * request brings the file byte for byte as at the tail of `main`, or both lack it; a directory in its place
  * changed it too. What main holds there `openTail` has checked.
  */
-export function keptKnowledge(tail: Uint8Array | null, request: AtPath): Result<AtPath> {
+function keptKnowledge(tail: Uint8Array | null, request: AtPath): Result<AtPath> {
   if (same(tail, request)) return { ok: true, value: request };
   return refuse(reject(LG_23, { intent: null, path: `/${KNOWLEDGE}`, expected: nameOf(tail), got: nameOf(request) }));
 }
@@ -76,11 +76,22 @@ async function proposalOf(worktree: Worktree): Promise<Result<Found>> {
   const bytes = await worktree.read(path.value);
   if (bytes === null) throw new Error(`bug: git listed ${path.value} and cannot read it`);
   const value = parseJsonBytes(bytes, `/${path.value}`);
-  const proposal = value.ok ? readProposal(value.value) : value;
+  const proposal = value.ok ? readProposal(value.value, `/${path.value}`) : value;
   return proposal.ok ? { ok: true, value: { path: path.value, proposal: proposal.value } } : proposal;
 }
 
 const rejected = (r: { readonly rejections: Rejections }): LandingOutcome => ({ outcome: "rejections", rejections: r.rejections });
+
+/**
+ * LG-24, Q-28: a change request whose code conflicts with main ends `conflict` — unless the conflict is at
+ * `store/knowledge.jsonl` or under it. Main holds that file only as landing wrote it (LG-23), so a conflict there is
+ * the change request's own change of it, refused LG-23 as on a main that did not move.
+ */
+function conflicted(tail: Uint8Array | null, paths: readonly string[]): LandingOutcome {
+  const store = paths.filter((p) => p === KNOWLEDGE || p.startsWith(`${KNOWLEDGE}/`));
+  if (store.length === 0) return { outcome: "conflict", paths };
+  return { outcome: "rejections", rejections: [reject(LG_23, { intent: null, path: `/${KNOWLEDGE}`, expected: nameOf(tail), got: { conflict: store } })] };
+}
 
 /** What landing checked before apply: the worktree of the change request, its store and proposal, and `before`. */
 type Checked = Found & {
@@ -91,6 +102,11 @@ type Checked = Found & {
   readonly tail: Commit | null;
 };
 
+/**
+ * The checks of a change request before apply, in the order of G-19: it exists (LG-54); the store at the tail of
+ * main opens (LG-23, LG-06) — without it there is no `before` (LG-14) and no `onto` to merge onto; it merges (LG-24,
+ * Q-28); its proposal (LG-54, KR-10, LG-09); the bytes of the store it brings (LG-23).
+ */
 async function check(ports: LandingPorts, request: string): Promise<LandingOutcome | Checked> {
   const head = changeRequest(await ports.git.tail(request));
   if (!head.ok) return rejected(head);
@@ -99,7 +115,7 @@ async function check(ports: LandingPorts, request: string): Promise<LandingOutco
   if (!before.ok) return rejected(before);
   const { onto, view, tail, file } = before.value;
   const worktree = await ports.git.prepare({ request, onto });
-  if (worktree.kind === "conflict") return { outcome: "conflict", paths: worktree.paths };
+  if (worktree.kind === "conflict") return conflicted(file, worktree.paths);
   const found = await proposalOf(worktree);
   if (!found.ok) return rejected(found);
   const kept = keptKnowledge(file, await atPath(worktree, KNOWLEDGE));

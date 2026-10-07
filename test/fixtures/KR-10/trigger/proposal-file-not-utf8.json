@@ -1,0 +1,35 @@
+{
+  "check": "land",
+  "input": {
+    "branches": {
+      "main": {
+        "files": {
+          "README.md": "one\n"
+        }
+      },
+      "cr/x": {
+        "from": "main",
+        "files": {
+          "store/proposals/cr-x.json": {
+            "bytes": [
+              123,
+              34,
+              120,
+              34,
+              58,
+              34,
+              255,
+              34,
+              125
+            ]
+          }
+        }
+      }
+    },
+    "request": "cr/x"
+  },
+  "expect": {
+    "rule": "KR-10",
+    "path": "/store/proposals/cr-x.json"
+  }
+}

@@ -38,7 +38,7 @@ export async function atPath(worktree: Worktree, path: string): Promise<AtPath> 
 export const nameOf = (at: AtPath) => (at === null ? null : at instanceof Uint8Array ? hashBytes(at) : [...at.files]);
 
 /** LG-23: only the `jsonl` adapter writes `store/knowledge.jsonl`, so main holds it as a file or not at all. */
-export function fileOnMain(tail: AtPath): Result<Uint8Array | null> {
+function fileOnMain(tail: AtPath): Result<Uint8Array | null> {
   if (tail === null || tail instanceof Uint8Array) return { ok: true, value: tail };
   return refuse(reject(LG_23, { intent: null, path: `/${KNOWLEDGE}`, expected: "a file or none", got: nameOf(tail) }));
 }
@@ -47,14 +47,15 @@ export function fileOnMain(tail: AtPath): Result<Uint8Array | null> {
 type Opened = { readonly view: View & Rows; readonly tail: Commit | null };
 
 /**
- * LG-02: opening a store folds its commits from genesis; a line that is not a commit is refused
- * at its index (KR-10, LG-06, KR-04). The walking skeleton keeps the rows in the view (Q-25).
+ * LG-02: opening a store folds its commits from genesis; a line that is not a commit is refused (KR-10, LG-06,
+ * KR-04) at the line of `store/knowledge.jsonl`, counted from 1 as `seq` is (Q-29). The walking skeleton keeps
+ * the rows in the view (Q-25).
  */
 export function openLines(lines: readonly Uint8Array[]): Result<Opened> {
   let rows: Row[] = [];
   let opened: Opened = { view: viewOf(0, []), tail: null };
   for (const [index, line] of lines.entries()) {
-    const commit = decodeCommit(line, index);
+    const commit = decodeCommit(line, `/${KNOWLEDGE}/${index + 1}`);
     if (!commit.ok) return commit;
     rows = withDelta(rows, fold(opened.view, commit.value, []));
     opened = { view: viewOf(commit.value.seq, rows), tail: commit.value };
