@@ -7,10 +7,10 @@ import { reject, type Rejection } from "../kernel/index.js";
 import { LG_42 } from "./rules.js";
 
 /** A run of lines between blank lines; `line` is the number of its first line. */
-export type TextChunk = { readonly kind: "text"; readonly line: number; readonly lines: string[] };
+export type TextChunk = { readonly kind: "text"; readonly line: number; readonly lines: readonly string[] };
 
 /** A fenced block: its opening line and the lines between its fences, verbatim. */
-export type FenceChunk = { readonly kind: "fence"; readonly line: number; readonly open: string; readonly body: string[] };
+export type FenceChunk = { readonly kind: "fence"; readonly line: number; readonly open: string; readonly body: readonly string[] };
 
 export type Chunk = TextChunk | FenceChunk;
 
@@ -33,22 +33,32 @@ function wholeText(text: string, path: string): Rejection[] {
   return text.endsWith("\n") ? [] : [notCanonical(path, lines.length, "a final newline", lines.at(-1) ?? "")];
 }
 
-/** The state of the cut: the chunk being read and whether the line before was blank. */
-type Cut = { chunks: Chunk[]; found: Rejection[]; text: TextChunk | null; fence: FenceChunk | null; blank: boolean };
+/** A chunk being read: its first line and its lines so far; it becomes a chunk when it ends. */
+type OpenText = { readonly line: number; readonly lines: string[] };
+type OpenFence = { readonly line: number; readonly open: string; readonly body: string[] };
 
-function readFenced(cut: Cut, fence: FenceChunk, line: string): void {
+/** The state of the cut: the chunk being read and whether the line before was blank. */
+type Cut = { chunks: Chunk[]; found: Rejection[]; text: OpenText | null; fence: OpenFence | null; blank: boolean };
+
+/** The run of lines being read ends: it becomes a chunk. */
+function endText(cut: Cut): void {
+  if (cut.text !== null) cut.chunks.push({ kind: "text", line: cut.text.line, lines: cut.text.lines });
+  cut.text = null;
+}
+
+function readFenced(cut: Cut, fence: OpenFence, line: string): void {
   if (line !== FENCE) {
     fence.body.push(line);
     return;
   }
-  cut.chunks.push(fence);
+  cut.chunks.push({ kind: "fence", line: fence.line, open: fence.open, body: fence.body });
   cut.fence = null;
   cut.blank = false;
 }
 
 function readBlank(cut: Cut, n: number, path: string): void {
   if (cut.blank) cut.found.push(notCanonical(path, n, "one blank line between blocks", ""));
-  cut.text = null;
+  endText(cut);
   cut.blank = true;
 }
 
@@ -56,12 +66,10 @@ function readLine(cut: Cut, line: string, n: number, path: string): void {
   if (!cut.blank && cut.text === null) cut.found.push(notCanonical(path, n, "a blank line after a fenced block", line));
   if (line.startsWith(FENCE)) {
     if (!cut.blank && cut.text !== null) cut.found.push(notCanonical(path, n, "a blank line before a fenced block", line));
-    cut.fence = { kind: "fence", line: n, open: line, body: [] };
-    cut.text = null;
-  } else if (cut.text === null) {
-    cut.text = { kind: "text", line: n, lines: [line] };
-    cut.chunks.push(cut.text);
-  } else cut.text.lines.push(line);
+    endText(cut);
+    cut.fence = { line: n, open: line, body: [] };
+  } else if (cut.text === null) cut.text = { line: n, lines: [line] };
+  else cut.text.lines.push(line);
   cut.blank = false;
 }
 
@@ -80,6 +88,7 @@ export function cut(text: string, path: string): Chunks {
   // A document starts with its heading: a blank first line is refused like a second blank line.
   const state: Cut = { chunks: [], found: [], text: null, fence: null, blank: true };
   lines.forEach((raw, i) => readOne(state, raw, i + 1, path));
+  endText(state);
   if (state.fence !== null) state.found.push(notCanonical(path, state.fence.line, "a closing line ```", "absent"));
   if (state.blank) state.found.push(notCanonical(path, lines.length, "no blank line at the end", ""));
   return { chunks: state.chunks, found: state.found, whole: false };
