@@ -35,13 +35,15 @@ const breaking = fc.constantFrom("a\nb", "a ", " a");
 const inline = fc.array(fc.oneof({ weight: 40, arbitrary: word }, { weight: 1, arbitrary: breaking }), { minLength: 1, maxLength: 5 }).map((ws) => ws.join(" "));
 /** A cell: text, or now and then an ID — a row of which is a clause, not a row of a field table. */
 const cell = fc.oneof({ weight: 8, arbitrary: inline }, { weight: 1, arbitrary: id });
-/** Cells of a row or a header, as many as they come — how many a table keeps is the model's to say. */
-const cells = fc.array(cell, { minLength: 1, maxLength: 3 });
+const cells = (n: number) => fc.array(cell, { minLength: n, maxLength: n });
+const columns = fc.integer({ min: 1, max: 3 });
+/** How many cells a row of a table of `n` columns has: most often `n`, now and then any — how many a table keeps is the model's to say. */
+const width = (n: number) => fc.oneof({ weight: 6, arbitrary: fc.constant(n) }, { weight: 1, arbitrary: columns });
 
 /** The end of the text of a block, whatever field it carries. */
 const ending = fc.constantFrom("", ":");
 
-const table: fc.Arbitrary<Table> = fc.record({ header: cells, rows: fc.array(cells, { maxLength: 2 }) });
+const table: fc.Arbitrary<Table> = columns.chain((n) => fc.record({ header: cells(n), rows: fc.array(width(n).chain(cells), { maxLength: 2 }) }));
 const field: fc.Arbitrary<Field | undefined> = fc.option(
   fc.oneof(
     table.map((t) => ({ table: t })),
@@ -56,21 +58,26 @@ const proseItem: fc.Arbitrary<Item> = built(fc.tuple(start, inline, ending, fiel
 
 const line = fc.constantFrom("", "{ }", "a  ", "```json", "```", "| x |", "# h", "\t", "- a");
 const last = fc.constantFrom([], ["k"], ["k:"]);
+/** The language of an example, now and then one md does not keep. */
+const language = fc.oneof({ weight: 8, arbitrary: fc.constantFrom("json", "text", "ts") }, { weight: 1, arbitrary: fc.constant("Text") });
 const exampleItem: fc.Arbitrary<Item> = built(
   fc
-    .tuple(id, fc.constantFrom("json", "text", "ts", "Text"), fc.array(line, { maxLength: 4 }), last, field)
+    .tuple(id, language, fc.array(line, { maxLength: 4 }), last, field)
     .map(([i, lang, lines, end, f]) => example({ lang, id: i, text: [...lines, ...end].map((l) => `${l}\n`).join(""), field: f })),
 );
 
-/** A row: its ID, then cells, the last of them with its ending. */
-const row: fc.Arbitrary<Clause> = built(
-  fc.tuple(id, fc.array(cell, { maxLength: 2 }), ending, field).map(([i, rest, e, f]) => {
-    const all = [i, ...rest];
-    return clause({ cells: [...all.slice(0, -1), `${all.at(-1) ?? ""}${e}`], field: f });
-  }),
-);
+/** A row of `n` cells: its ID, then cells, the last of them with its ending. */
+const row = (n: number): fc.Arbitrary<Clause> =>
+  built(
+    fc.tuple(id, cells(n - 1), ending, field).map(([i, rest, e, f]) => {
+      const all = [i, ...rest];
+      return clause({ cells: [...all.slice(0, -1), `${all.at(-1) ?? ""}${e}`], field: f });
+    }),
+  );
 
-const clausesItem: fc.Arbitrary<Item> = built(fc.tuple(cells, fc.array(row, { maxLength: 3 })).map(([header, rows]) => clauses({ header, rows })));
+const clausesItem: fc.Arbitrary<Item> = columns.chain((n) =>
+  built(fc.tuple(cells(n), fc.array(width(n).chain(row), { maxLength: 3 })).map(([header, rows]) => clauses({ header, rows }))),
+);
 
 const block: fc.Arbitrary<Item> = fc.oneof(proseItem, exampleItem, clausesItem);
 
@@ -94,7 +101,8 @@ function section(level: number, depth: number): fc.Arbitrary<Section> {
 
 const doc = built(section(1, 3).map((s) => document({ heading: s.heading, items: s.items })));
 
-describe("the codec both ways (LG-42)", () => {
+/** The generator offers what the builders refuse and keeps what they accept: a run takes seconds, longer than the timeout of a test. */
+describe("the codec both ways (LG-42)", { timeout: 30_000 }, () => {
   it("LG-42: parse(print(d)) is d for generated documents", () => {
     fc.assert(
       fc.property(doc, (d) => {
