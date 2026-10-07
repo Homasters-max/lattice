@@ -1,9 +1,10 @@
-// The thin kernel of the walking skeleton: the kernel version (KR-03), the
-// grammar of ids (KR-06), the header on the surface (KR-04) and the form of a
-// rejection (LG-17, CONVENTIONS.md §3). Canon, hash and the full header arrive
-// with S0-04 and S0-05. Every input crosses the module boundary frozen.
+// The kernel version (KR-03), the grammar of ids (KR-06), the header on the
+// surface (KR-04), the form of a rejection (LG-17, CONVENTIONS.md §3) and the
+// hash of bytes (LG-30). Canon, hash and formats are in canon.test.ts,
+// parse.test.ts, formats.test.ts and vectors.test.ts; the full header arrives
+// with S0-05. Every input crosses the module boundary frozen.
 import { describe, expect, it } from "vitest";
-import { canon, checkHeader, checkId, hashBytes, hashRecord, isEntityId, isUlid, KERNEL_VERSION, parseJson, parseJsonBytes, reject, sortRejections } from "../../src/kernel/index.js";
+import { checkHeader, checkId, hashBytes, isEntityId, isUlid, KERNEL_VERSION, parseJson, parseJsonBytes, reject, sortRejections } from "../../src/kernel/index.js";
 import { KR_04, KR_06, RULES } from "../../src/kernel/rules.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
@@ -72,18 +73,11 @@ describe("rejections (LG-17)", () => {
   });
 
   it("ST-17: registers every rule the kernel enforces once", () => {
-    expect(RULES.map((r) => r.id)).toEqual(["KR-04", "KR-06", "KR-10"]);
+    expect(RULES.map((r) => r.id)).toEqual(["KR-04", "KR-06", "KR-10", "KR-11", "KR-13"]);
   });
 });
 
-describe("thin canon and hash", () => {
-  it("KR-12: sorts keys by UTF-16 code units and hashes canon({type, body})", () => {
-    expect(canon(deepFreeze({ b: [1, "x"], a: null, "é": true, Z: {} }))).toBe('{"Z":{},"a":null,"b":[1,"x"],"é":true}');
-    const body = deepFreeze({ text: "hello" });
-    expect(hashRecord("demo/note@1", body)).toMatch(/^sha256:[0-9a-f]{64}$/);
-    expect(hashRecord("demo/note@1", body)).not.toBe(hashRecord("demo/note@2", body));
-  });
-
+describe("the hash of bytes (LG-30)", () => {
   it("LG-30: hashes raw bytes in the form of KR-12", () => {
     expect(hashBytes(new TextEncoder().encode("abc"))).toBe("sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     expect(hashBytes(Uint8Array.from([0xff]))).not.toBe(hashBytes(Uint8Array.from([0xfe])));
@@ -97,10 +91,5 @@ describe("reading JSON (KR-10)", () => {
     expect(parseJsonBytes(bytes, "/store/proposals/a.json")).toMatchObject({ ok: false, rejections: [{ rule: "KR-10", path: "/store/proposals/a.json", got: hashBytes(bytes) }] });
     expect(parseJson("{", "/3")).toMatchObject({ ok: false, rejections: [{ rule: "KR-10", path: "/3", intent: null, got: "{" }] });
     expect(parseJson('{"a":[1,"x"]}')).toEqual({ ok: true, value: { a: [1, "x"] } });
-  });
-
-  // G-16: KR-10 does not hold here yet; S0-04 replaces parseJson with the strict parser (D-04).
-  it("the parse still takes duplicate keys — a known limit, not hidden", () => {
-    expect(parseJson('{"a":1,"a":2}')).toEqual({ ok: true, value: { a: 2 } });
   });
 });

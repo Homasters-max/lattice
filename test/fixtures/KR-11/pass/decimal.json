@@ -1,0 +1,7 @@
+{
+  "check": "format",
+  "input": {
+    "format": "decimal",
+    "value": "-12.25"
+  }
+}

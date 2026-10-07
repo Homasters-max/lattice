@@ -1,0 +1,7 @@
+{
+  "check": "format",
+  "input": {
+    "format": "ulid",
+    "value": "01JB2X00000000000000000SES"
+  }
+}

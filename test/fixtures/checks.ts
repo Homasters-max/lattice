@@ -9,7 +9,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileOf } from "../../src/adapters/store-jsonl/index.js";
-import { KR_04, KR_06, KR_10, parseJson, parseJsonBytes, type JsonValue } from "../../src/kernel/index.js";
+import { checkFormat, KR_04, KR_06, KR_10, KR_11, KR_13, parseJson, parseJsonBytes, refused, type Format, type JsonValue } from "../../src/kernel/index.js";
 import { apply, createView, encodeCommit, land, LG_06, LG_09, LG_23, LG_54, openLines, readProposal, type LandActs } from "../../src/ledger/index.js";
 import { landingPortsForTests, type GitFixtureOptions } from "../support/assembly.js";
 import type { CheckOutcome, FixtureCheck } from "./run.js";
@@ -28,6 +28,12 @@ const json: FixtureCheck = {
   },
 };
 
+/** `input`: `{ format, value }` — a format of KR-11 and a JSON value, checked from the root. */
+const format: FixtureCheck = {
+  enforces: [KR_11.id],
+  run: (input) => refused(checkFormat(field(input, "format") as Format, field(input, "value") as JsonValue, { intent: null, path: "" })) ?? { ok: true },
+};
+
 /** `input`: `{ proposal }`, read as a proposal value, refused from its root. */
 const proposal: FixtureCheck = {
   enforces: [LG_09.id],
@@ -40,9 +46,9 @@ function applied(value: JsonValue) {
   return read.ok ? apply(createView(0, []), read.value, LAND, []) : read;
 }
 
-/** `input`: `{ proposal }`, applied on an empty ledger. */
+/** `input`: `{ proposal }`, applied on an empty ledger: phase 1 checks ids, canon and the body limit. */
 const applyCheck: FixtureCheck = {
-  enforces: [KR_06.id],
+  enforces: [KR_06.id, KR_10.id, KR_13.id],
   run: (input) => applied(field(input, "proposal") as JsonValue),
 };
 
@@ -120,6 +126,7 @@ const landCheck: FixtureCheck = {
 
 export const CHECKS: { readonly [check: string]: FixtureCheck } = {
   json,
+  format,
   proposal,
   apply: applyCheck,
   store,

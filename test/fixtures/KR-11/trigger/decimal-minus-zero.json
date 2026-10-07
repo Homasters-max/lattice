@@ -1,0 +1,11 @@
+{
+  "check": "format",
+  "input": {
+    "format": "decimal",
+    "value": "-0"
+  },
+  "expect": {
+    "rule": "KR-11",
+    "path": ""
+  }
+}

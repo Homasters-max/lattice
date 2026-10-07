@@ -17,6 +17,13 @@ const bad = proposalOf("trigger/entity-id-uppercase.json");
 const good = proposalOf("pass/entity-id.json");
 const AT = "2026-10-06T12:30:00.000000Z";
 
+/** KR-12: the hash of a record the test knows canonical. */
+function hashOf(type: string, body: JsonValue): string {
+  const h = hashRecord(type, body);
+  if (!h.ok) throw new Error(`bug: the test record is not canonical: ${h.rejections[0].message}`);
+  return h.value;
+}
+
 function approve(proposal: JsonValue, request: string) {
   const read = readProposal(proposal);
   if (!read.ok) throw new Error("bug: the fixture proposal has the form of LG-09");
@@ -79,7 +86,7 @@ describe("walking skeleton (SL-05)", () => {
       id: "demo/hello",
       rev: 1,
       type: "demo/note@1",
-      hash: hashRecord("demo/note@1", { text: "hello" }),
+      hash: hashOf("demo/note@1", { text: "hello" }),
       by: "01JB2X00000000000000000SES",
       at: "2026-10-06T12:00:00.000000Z",
       body: { text: "hello" },

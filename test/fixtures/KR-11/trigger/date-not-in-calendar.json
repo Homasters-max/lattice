@@ -1,0 +1,11 @@
+{
+  "check": "format",
+  "input": {
+    "format": "date",
+    "value": "2025-02-29"
+  },
+  "expect": {
+    "rule": "KR-11",
+    "path": ""
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "check": "format",
+  "input": {
+    "format": "ulid",
+    "value": "01jb2x00000000000000000ses"
+  },
+  "expect": {
+    "rule": "KR-11",
+    "path": ""
+  }
+}

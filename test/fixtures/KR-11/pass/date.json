@@ -1,0 +1,7 @@
+{
+  "check": "format",
+  "input": {
+    "format": "date",
+    "value": "2024-02-29"
+  }
+}

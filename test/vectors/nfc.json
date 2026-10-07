@@ -1,0 +1,93 @@
+{
+  "about": "text: a string; nfc: whether it is in NFC (KR-10). Written with the ICU and Unicode versions below; the normalisation of assigned characters is stable across Unicode versions, and CI runs on ubuntu and windows (D-09)",
+  "icu": "77.1",
+  "unicode": "16.0",
+  "node": "v22.17.0",
+  "cases": [
+    {
+      "text": "hello",
+      "nfc": true,
+      "note": "ASCII"
+    },
+    {
+      "text": "\u00e9",
+      "nfc": true,
+      "note": "e with acute, precomposed"
+    },
+    {
+      "text": "e\u0301",
+      "nfc": false,
+      "note": "e and combining acute"
+    },
+    {
+      "text": "\u00c5",
+      "nfc": true,
+      "note": "A with ring above"
+    },
+    {
+      "text": "A\u030a",
+      "nfc": false,
+      "note": "A and combining ring above"
+    },
+    {
+      "text": "\u212b",
+      "nfc": false,
+      "note": "Angstrom sign, a singleton"
+    },
+    {
+      "text": "\u2126",
+      "nfc": false,
+      "note": "Ohm sign, a singleton"
+    },
+    {
+      "text": "\u03a9",
+      "nfc": true,
+      "note": "Greek capital omega"
+    },
+    {
+      "text": "\uac00",
+      "nfc": true,
+      "note": "Hangul syllable GA"
+    },
+    {
+      "text": "\u1100\u1161",
+      "nfc": false,
+      "note": "Hangul jamo KIYEOK and A"
+    },
+    {
+      "text": "\ufb33",
+      "nfc": false,
+      "note": "Hebrew dalet with dagesh, a composition exclusion"
+    },
+    {
+      "text": "\u05d3\u05bc",
+      "nfc": true,
+      "note": "dalet and dagesh"
+    },
+    {
+      "text": "\ud83d\ude00",
+      "nfc": true,
+      "note": "grinning face, outside the BMP"
+    },
+    {
+      "text": "a\u0323\u0301",
+      "nfc": false,
+      "note": "a, dot below and acute"
+    },
+    {
+      "text": "\u1ea1\u0301",
+      "nfc": true,
+      "note": "a with dot below, and acute"
+    },
+    {
+      "text": "a\u0301\u0323",
+      "nfc": false,
+      "note": "a, acute and dot below: marks out of canonical order"
+    },
+    {
+      "text": "\u0344",
+      "nfc": false,
+      "note": "combining dialytika tonos, a singleton"
+    }
+  ]
+}

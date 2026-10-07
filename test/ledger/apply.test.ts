@@ -18,6 +18,13 @@ import {
 } from "../../src/ledger/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
+/** KR-12: the hash of a record the test knows canonical. */
+function hashOf(type: string, body: JsonValue): string {
+  const h = hashRecord(type, body);
+  if (!h.ok) throw new Error(`bug: the test record is not canonical: ${h.rejections[0].message}`);
+  return h.value;
+}
+
 const AT = "2026-10-06T12:00:00.000000Z";
 const LAND: LandActs = deepFreeze({ session: { id: "01JB2X00000000000000000LND", at: "2026-10-06T12:30:00.000000Z" }, events: [] });
 const intent = (id: string, body: JsonValue = { text: id }, op = "entity"): JsonValue => ({ op, id, type: "demo/note@1", expected: null, at: AT, body });
@@ -64,7 +71,7 @@ describe("apply, the candidate commit", () => {
     const { records, ...header } = landed(empty(), proposal(intent("demo/a")));
     expect(header).toMatchObject({ seq: 1, base: 0, kernel: KERNEL_VERSION, by: LAND.session.id, at: LAND.session.at, prev: null, request: null });
     expect(records).toEqual([
-      { id: "demo/a", rev: 1, type: "demo/note@1", hash: hashRecord("demo/note@1", { text: "demo/a" }), by: "01JB2X00000000000000000SES", at: AT, body: { text: "demo/a" } },
+      { id: "demo/a", rev: 1, type: "demo/note@1", hash: hashOf("demo/note@1", { text: "demo/a" }), by: "01JB2X00000000000000000SES", at: AT, body: { text: "demo/a" } },
     ]);
   });
 
