@@ -1,6 +1,7 @@
 // Signatures and keys as LATTICE writes them (G-10, TR-10): Ed25519 by
 // `node:crypto` (D-06), checked against RFC 8032 §7.1, test 1; what is signed
 // is the UTF-8 text of a hash (G-24).
+import { sign } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { publicKeyOf, signHash, verifyHash } from "../../src/trust/index.js";
 import { keyOfSeed, testKey } from "../support/keys.js";
@@ -13,15 +14,23 @@ const RFC_SIG = "ed25519:5VZDAMNgrHKQhuLMgG6CioSHfx645dl02HPgZSJJAVVfuIIVkKM7rMY
 const HASH = `sha256:${"ab".repeat(32)}`;
 
 describe("signatures and keys (G-10)", () => {
-  it("G-10: a public key is an OpenSSH line and a signature ed25519:<base64url without =>, as RFC 8032 test 1 gives them", () => {
+  it("TR-10, LG-10, G-10: a public key is an OpenSSH line and a signature ed25519:<base64url without =>, as RFC 8032 test 1 gives them", () => {
     const key = keyOfSeed(RFC_SEED);
     expect(publicKeyOf(key)).toBe(RFC_KEY);
     expect(signHash("", key)).toBe(RFC_SIG);
     expect(verifyHash("", RFC_SIG, RFC_KEY)).toBe(true);
   });
 
-  it("G-10: an OpenSSH line with a comment is the same key", () => {
+  it("TR-10, G-10: an OpenSSH line with a comment is the same key", () => {
     expect(verifyHash("", RFC_SIG, `${RFC_KEY} owner@example`)).toBe(true);
+  });
+
+});
+
+describe("signing a hash (LG-06, LG-10)", () => {
+  it("LG-06, LG-10, G-24: what is signed is the UTF-8 text of the hash, sha256:<hex>", () => {
+    const { key } = testKey("alice");
+    expect(signHash(HASH, key)).toBe(`ed25519:${sign(null, Buffer.from(HASH, "utf8"), key).toString("base64url")}`);
   });
 
   it("LG-06, LG-10: Ed25519 is deterministic — the same key and hash give the same signature", () => {
@@ -37,7 +46,10 @@ describe("signatures and keys (G-10)", () => {
     expect(verifyHash(`sha256:${"cd".repeat(32)}`, sig, alice.publicKey)).toBe(false);
   });
 
-  it("G-10: a text that is not a signature in the one spelling never verifies", () => {
+});
+
+describe("spellings that are no signature or key (G-10)", () => {
+  it("LG-06, LG-10, G-10: a text that is not a signature in the one spelling never verifies", () => {
     const body = RFC_SIG.slice("ed25519:".length);
     const spellings = [
       body, // no prefix
@@ -52,7 +64,7 @@ describe("signatures and keys (G-10)", () => {
     for (const sig of spellings) expect(verifyHash("", sig, RFC_KEY), sig).toBe(false);
   });
 
-  it("G-10: a text that is not an OpenSSH Ed25519 key never verifies", () => {
+  it("TR-10, G-10: a text that is not an OpenSSH Ed25519 key never verifies", () => {
     const blob = RFC_KEY.slice("ssh-ed25519 ".length);
     const keys = [
       blob,

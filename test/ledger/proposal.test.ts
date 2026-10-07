@@ -66,7 +66,7 @@ describe("the form of a proposal (LG-09)", () => {
 });
 
 describe("canonical order and the hash of a proposal (LG-06, LG-10, G-03)", () => {
-  it("G-03: entities by id, then facts by the canonical JSON of their key, then the other events by id", () => {
+  it("LG-06, G-03: entities by id, then facts by the canonical JSON of their key, then the other events by id", () => {
     const intents = proposal([
       event("01JB2X0000000000000000000A", "demo/z"),
       event("01JB2X0000000000000000000B", "demo/x", "demo/seen@1"),

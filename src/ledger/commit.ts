@@ -80,8 +80,8 @@ function linkRejections(c: Commit, n: number, before: Commit | null, path: strin
  */
 export function verifyChain(commits: readonly Commit[], keyOfSession: KeyOfSession, path: string): Rejection[] {
   return commits.flatMap((c, i) => {
-    const at = `${path}/${i + 1}`;
-    return [...linkRejections(c, i + 1, commits[i - 1] ?? null, at), ...signatureRejections(c, keyOfSession, at)];
+    const line = `${path}/${i + 1}`;
+    return [...linkRejections(c, i + 1, commits[i - 1] ?? null, line), ...signatureRejections(c, keyOfSession, line)];
   });
 }
 
