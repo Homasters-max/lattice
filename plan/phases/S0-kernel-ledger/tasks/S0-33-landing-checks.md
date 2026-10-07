@@ -22,11 +22,12 @@ rules: [LG-09, LG-17, LG-23, LG-24, LG-54, KR-10, ST-17]
 ## Объём
 
 Входит:
-- **Конфликт на файле store — отказ LG-23** (Q-28). Если среди путей `conflict` из `prepare` есть `store/knowledge.jsonl` или путь под ним, landing отклоняет change request LG-23, а не кончается `conflict`. Порт `git` не меняется.
-- **Один корень `path`** у отказов landing (Q-29): от корня дерева change request. Файл — путь в дереве, дальше JSON Pointer внутри него: `/store/proposals/cr-x.json/intents/0/op`. Строка store — номер строки с 1: `/store/knowledge.jsonl/1/seq`. То же — при открытии store на tail (`openTail`, S0-32).
+- **Конфликт на файле store — отказ LG-23** (Q-28). Если среди путей `conflict` из `prepare` есть `store/knowledge.jsonl` или путь под ним, landing отклоняет change request LG-23, а не кончается `conflict`. Порт `git` не меняется. Отказ — как у байтов store: `path` `/store/knowledge.jsonl`, `expected` — что на tail `main` (hash файла или `null`); `got` — `{conflict: [пути store]}`: worktree нет, байтов change request landing не видит.
+- **Один корень `path`** у отказов landing (Q-29): от корня дерева change request. Файл — путь в дереве, дальше JSON Pointer внутри него: `/store/proposals/cr-x.json/intents/0/op`. Строка store — номер строки с 1: `/store/knowledge.jsonl/1/seq`. То же — при открытии store на tail (`openTail`, S0-32). Отказ про intent со строковым `id` остаётся внутри intent (G-13): `/op`. Место части входа передаётся в проверку параметром `path` — `readProposal(value, path)`, `decodeCommit(line, path)`, — а не дописывается к готовым отказам.
 - **Проверка change request до apply — один модуль.** `changeRequest`, `proposalPath` и `keptKnowledge` уходят внутрь и пропадают из входа `src/ledger/index.ts`; с ними — `fileOnMain` из `src/ledger/tail.ts` (S0-32), когда её строка `tail` в `checks.ts` переходит на `land`.
 - **Фикстуры через `land`** (`CONVENTIONS.md` §4 дописывается):
-  - строки `checks.ts` для LG-54, LG-23 (`knowledge` и `tail`) и KR-10/LG-09 proposal прогоняют `land(…, {dryRun: true})` на `git-fixture`, собранном из `input.branches`;
+  - фикстуры LG-54, LG-23 (бывшие строки `change-request`, `knowledge` и `tail`) и KR-10/LG-09 для файла proposal прогоняет одна строка `land` в `checks.ts`: `land(…, {dryRun: true})` на `git-fixture`, собранном тестовой сборкой из `input.branches`; вход — `{ branches, request }`, файл ветки — текст, `null`, `{ json }`, `{ landed }` или `{ bytes }`;
+  - `git-fixture` принимает файл ветки байтами (`Uint8Array`) — для trigger LG-23 и KR-10 с байтами не UTF-8;
   - раннер `test/fixtures/run.ts` становится асинхронным;
   - сырые деревья trigger разрешены решением Q-23;
   - строки `json`, `proposal` и `store` для KR-10, LG-06 и KR-04 остаются чистыми: склейки там нет.
@@ -57,17 +58,18 @@ rules: [LG-09, LG-17, LG-23, LG-24, LG-54, KR-10, ST-17]
 - Переписываются фикстуры LG-23, LG-54 и KR-10 для proposal (`test/fixtures/{LG-23,LG-54,KR-10}/`) и ожидания `path` в KR-10, LG-06 и KR-04 для строк store.
 - Новые trigger:
   - `LG-23/trigger/conflict-on-moved-main`;
-  - `LG-09/trigger/…` с `path` от корня дерева через `land`.
+  - `LG-09/trigger/proposal-file-intent-id-not-string`, `LG-09/trigger/proposal-file-intents-missing` с `path` от корня дерева через `land`;
+  - `KR-10/trigger/proposal-file-not-json`, `KR-10/trigger/proposal-file-not-utf8`; pass через `land` — `KR-10/pass/proposal-file`, `LG-09/pass/proposal-file`.
 - Fitness-тесты `coverage.test.ts` и `run.test.ts` остаются зелёными на асинхронном раннере.
 
 ## Готово, когда
 
-- [ ] change request, который правит файл store, получает отказ LG-23 при любом положении `main`
-- [ ] у всех отказов landing один корень `path`; строки store нумеруются с 1
-- [ ] фикстуры LG-54, LG-23 и KR-10 proposal идут через `land`; `changeRequest`, `proposalPath`, `keptKnowledge`, `fileOnMain` вне входа `ledger`
-- [ ] порядок исходов landing задан по G-19 и показан тестом, в том числе `conflict` на `main`, где store не открывается
-- [ ] тест показывает `ids` и `clock` в коммите
-- [ ] `npm run verify` зелёный
+- [x] change request, который правит файл store, получает отказ LG-23 при любом положении `main`
+- [x] у всех отказов landing один корень `path`; строки store нумеруются с 1
+- [x] фикстуры LG-54, LG-23 и KR-10 proposal идут через `land`; `changeRequest`, `proposalPath`, `keptKnowledge`, `fileOnMain` вне входа `ledger`
+- [x] порядок исходов landing задан по G-19 и показан тестом, в том числе `conflict` на `main`, где store не открывается
+- [x] тест показывает `ids` и `clock` в коммите
+- [x] `npm run verify` зелёный
 
 ## Риски и заметки
 
