@@ -3,8 +3,9 @@
 // The generator knows the model only through its builders: it offers blocks,
 // tables of clauses and documents of any shape and keeps what the builders
 // accept. Which block may carry a field, which ID a row or an example takes,
-// that a field ends its table and that no two blocks share an ID are the
-// model's to say (RM-01, RM-02, LG-42), not the generator's.
+// that a field ends its table, that a section's blocks come before its
+// subsections, which levels they take and that no two blocks share an ID are
+// the model's to say (RM-01, RM-02, LG-42), not the generator's.
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { clause, clauses, document, example, parse, print, prose, type Clause, type Field, type Item, type Section, type Table } from "../../src/codec/index.js";
@@ -61,13 +62,22 @@ const clausesItem: fc.Arbitrary<Item> = fc
 
 const block: fc.Arbitrary<Item> = fc.oneof(proseItem, exampleItem, clausesItem);
 
-/** A section: its blocks and tables, then its subsections, each one or two levels deeper — which levels md keeps is the model's to say. */
+/**
+ * A section: its blocks and tables, its subsections — one or two levels
+ * deeper, now and then at its own level — and now and then more blocks among
+ * or after the subsections. Which order and which levels md keeps is the
+ * model's to say; strays are a few, not a shuffle of all items, so that the
+ * documents the model keeps stay large.
+ */
 function section(level: number, depth: number): fc.Arbitrary<Section> {
-  const sub = fc.integer({ min: 1, max: 2 }).chain((k) => section(level + k, depth - 1));
+  const deeper = fc.oneof({ weight: 1, arbitrary: fc.constant(0) }, { weight: 6, arbitrary: fc.integer({ min: 1, max: 2 }) });
+  const sub = deeper.chain((k) => section(level + k, depth - 1));
   const subs = depth === 0 ? fc.constant([]) : fc.array(sub, { maxLength: 2 });
-  return fc
-    .tuple(inline, fc.array(block, { maxLength: 4 }), subs)
-    .map(([heading, items, inner]): Section => ({ type: "section", heading, level, items: [...items, ...inner] }));
+  const strays = fc.oneof({ weight: 3, arbitrary: fc.constant([]) }, { weight: 1, arbitrary: fc.array(block, { minLength: 1, maxLength: 2 }) });
+  return fc.tuple(inline, fc.array(block, { maxLength: 4 }), subs, strays, fc.nat()).map(([heading, blocks, inner, more, at]): Section => {
+    const k = at % (inner.length + 1);
+    return { type: "section", heading, level, items: [...blocks, ...inner.slice(0, k), ...more, ...inner.slice(k)] };
+  });
 }
 
 const doc = built(section(1, 3).map((s) => document({ heading: s.heading, items: s.items })));
