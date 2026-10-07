@@ -218,7 +218,7 @@ const chain: FixtureCheck = {
  */
 const md: FixtureCheck = {
   enforces: [LG_42.id, RM_01.id, RM_02.id, KR_10.id],
-  run: (input) => parse(bytesOf(field(input, "bytes") ?? field(input, "text"))),
+  run: (input) => parse(bytesOf(field(input, "bytes") ?? field(input, "text")), ROOT),
 };
 
 type FixtureFile = string | Uint8Array | null;

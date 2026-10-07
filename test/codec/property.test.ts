@@ -1,9 +1,20 @@
 // The property of the codec (LG-42): on generated documents, `parse` reads
 // back exactly what `print` wrote — the model is the md format, both ways.
+// The generator knows the model only through its builders: it offers blocks,
+// tables of clauses and documents of any shape and keeps what the builders
+// accept. Which block may carry a field, which ID a row or an example takes,
+// that a field ends its table and that no two blocks share an ID are the
+// model's to say (RM-01, RM-02, LG-42), not the generator's.
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { parse, print, type Block, type Field, type Item, type Section, type Table } from "../../src/codec/index.js";
+import { clause, clauses, document, example, parse, print, prose, type Clause, type Field, type Item, type Section, type Table } from "../../src/codec/index.js";
+import type { Result } from "../../src/kernel/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
+
+type Ok<T> = Extract<Result<T>, { readonly ok: true }>;
+
+/** What a builder accepts is kept, what it refuses is dropped: the model decides. */
+const built = <T>(arb: fc.Arbitrary<Result<T>>): fc.Arbitrary<T> => arb.filter((out): out is Ok<T> => out.ok).map((out) => out.value);
 
 const PREFIXES = ["AA", "KR", "LG", "RM"] as const;
 
@@ -16,6 +27,9 @@ const word = fc.constantFrom("a", "rule", "`KR-10`", "\\|", "`a \\| b`", "[x](y.
 const inline = fc.array(word, { minLength: 1, maxLength: 5 }).map((ws) => ws.join(" "));
 const cells = (n: number) => fc.array(inline, { minLength: n, maxLength: n });
 
+/** The end of the text of a block, whatever field it carries. */
+const ending = fc.constantFrom("", ":");
+
 const table: fc.Arbitrary<Table> = fc
   .integer({ min: 1, max: 3 })
   .chain((n) => fc.record({ header: cells(n), rows: fc.array(cells(n), { maxLength: 2 }) }));
@@ -24,81 +38,44 @@ const field: fc.Arbitrary<Field | undefined> = fc.option(
     table.map((t) => ({ table: t })),
     fc.array(inline, { minLength: 1, maxLength: 3 }).map((l) => ({ list: l })),
   ),
-  { nil: undefined },
+  { nil: undefined, freq: 2 },
 );
 
-/** A block that carries a field ends its text with ":" (RM-Z03, G-25). */
-const colon = (f: Field | undefined): string => (f === undefined ? "" : ":");
+const proseItem: fc.Arbitrary<Item> = built(fc.tuple(id, inline, ending, field).map(([i, t, e, f]) => prose({ text: `${i}. ${t}${e}`, field: f })));
 
-const prose = fc.tuple(id, inline, field).map(([i, t, f]): Block => ({ type: "prose", id: i, text: `${i}. ${t}${colon(f)}`, ...f }));
-
-const line = fc.constantFrom("", "{ }", "a  ", "```json", "| x |", "# h", "\t", "- a");
-const example = fc
-  .tuple(id, fc.constantFrom("json", "text", "ts"), fc.array(line, { maxLength: 4 }), field)
-  .map(([i, lang, lines, f]): Block => ({ type: "example", id: i, lang, text: [...lines, ...(f === undefined ? [] : ["k:"])].map((l) => `${l}\n`).join(""), ...f }));
-
-/** A header and its clauses; only the last clause may carry a field — the table ends there. */
-const clauses: fc.Arbitrary<Item[]> = fc.integer({ min: 2, max: 3 }).chain((n) =>
-  fc.tuple(cells(n), fc.array(fc.tuple(id, cells(n - 1)), { minLength: 1, maxLength: 3 }), field).map(([header, rows, f]) => [
-    { type: "header", cells: header },
-    ...rows.map(([i, rest], k): Item => {
-      const last = k === rows.length - 1 && f !== undefined;
-      const body = last ? [...rest.slice(0, -1), `${rest.at(-1) ?? ""}:`] : rest;
-      return { type: "clause", id: i, cells: [i, ...body], ...(last ? f : {}) };
-    }),
-  ]),
+const line = fc.constantFrom("", "{ }", "a  ", "```json", "```", "| x |", "# h", "\t", "- a");
+const last = fc.constantFrom([], ["k"], ["k:"]);
+const exampleItem: fc.Arbitrary<Item> = built(
+  fc
+    .tuple(id, fc.constantFrom("json", "text", "ts"), fc.array(line, { maxLength: 4 }), last, field)
+    .map(([i, lang, lines, end, f]) => example({ lang, id: i, text: [...lines, ...end].map((l) => `${l}\n`).join(""), field: f })),
 );
 
-const chunk: fc.Arbitrary<Item[]> = fc.oneof(
-  prose.map((b) => [b]),
-  example.map((b) => [b]),
-  clauses,
-);
+/** A row of `n` cells: its ID, then cells, the last of them with its ending. */
+const row = (n: number): fc.Arbitrary<Clause> =>
+  built(fc.tuple(id, cells(n - 1), ending, field).map(([i, rest, e, f]) => clause({ cells: [i, ...rest.slice(0, -1), `${rest.at(-1) ?? ""}${e}`], field: f })));
 
-/** A section: its blocks and tables first, then its subsections, one level deeper. */
+const clausesItem: fc.Arbitrary<Item> = fc
+  .integer({ min: 2, max: 3 })
+  .chain((n) => built(fc.tuple(cells(n), fc.array(row(n), { minLength: 1, maxLength: 3 })).map(([header, rows]) => clauses({ header, rows }))));
+
+const block: fc.Arbitrary<Item> = fc.oneof(proseItem, exampleItem, clausesItem);
+
+/** A section: its blocks and tables, then its subsections, one level deeper. */
 function section(level: number, depth: number): fc.Arbitrary<Section> {
   const subs = depth === 0 ? fc.constant([]) : fc.array(section(level + 1, depth - 1), { maxLength: 2 });
   return fc
-    .tuple(inline, fc.array(chunk, { maxLength: 4 }), subs)
-    .map(([heading, items, inner]): Section => ({ type: "section", heading, level, items: [...items.flat(), ...inner] }));
+    .tuple(inline, fc.array(block, { maxLength: 4 }), subs)
+    .map(([heading, items, inner]): Section => ({ type: "section", heading, level, items: [...items, ...inner] }));
 }
 
-/**
- * RM-01, RM-02: every block its own ID, of its kind — a row a rule's, an example a `Z` one, a paragraph keeps the kind
- * it was generated with. The k-th block takes the prefix k mod 4 and the number k div 4, so no two blocks share one.
- */
-function renumber(doc: Section): Section {
-  let k = 0;
-  const next = (z: boolean): string => {
-    const n = k++;
-    return `${PREFIXES[n % PREFIXES.length] ?? ""}-${z ? "Z" : ""}${String(Math.floor(n / PREFIXES.length)).padStart(2, "0")}`;
-  };
-  const item = (i: Item): Item => {
-    switch (i.type) {
-      case "section":
-        return { ...i, items: i.items.map(item) };
-      case "header":
-        return i;
-      case "prose": {
-        const fresh = next(i.id.includes("-Z"));
-        return { ...i, id: fresh, text: `${fresh}${i.text.slice(i.id.length)}` };
-      }
-      case "clause": {
-        const fresh = next(false);
-        return { ...i, id: fresh, cells: [fresh, ...i.cells.slice(1)] };
-      }
-      case "example":
-        return { ...i, id: next(true) };
-    }
-  };
-  return { ...doc, items: doc.items.map(item) };
-}
+const doc = built(section(1, 3).map((s) => document({ heading: s.heading, items: s.items })));
 
 describe("the codec both ways (LG-42)", () => {
   it("LG-42: parse(print(d)) is d for generated documents", () => {
     fc.assert(
-      fc.property(section(1, 3).map(renumber), (doc) => {
-        expect(parse(print(deepFreeze(doc)))).toEqual({ ok: true, value: doc });
+      fc.property(doc, (d) => {
+        expect(parse(print(deepFreeze(d)))).toEqual({ ok: true, value: d });
       }),
       { numRuns: 300 },
     );

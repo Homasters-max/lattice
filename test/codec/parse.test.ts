@@ -1,11 +1,12 @@
 // The parse of canonical md (LG-42, RM-01, RM-02, G-25): a document becomes
 // the model, and input that is not canonical is refused, never repaired, at
-// the number of its line under the path given.
+// the number of its line under the place given.
 import { describe, expect, it } from "vitest";
 import { parse } from "../../src/codec/index.js";
+import { ROOT, type Place } from "../../src/kernel/index.js";
 
 const md = (...lines: string[]): string => `${lines.join("\n")}\n`;
-const read = (text: string, path = "") => parse(new TextEncoder().encode(text), path);
+const read = (text: string, place: Place = ROOT) => parse(new TextEncoder().encode(text), place);
 const refusals = (text: string): (string | null)[][] => {
   const out = read(text);
   return out.ok ? [] : out.rejections.map((r) => [r.rule, r.path, r.intent]);
@@ -22,19 +23,24 @@ describe("the model of md (RM-Z03)", () => {
         heading: "Doc",
         level: 1,
         items: [
-          { type: "prose", id: "AA-Z01", text: "AA-Z01. Intro." },
+          { type: "prose", text: "AA-Z01. Intro." },
           {
             type: "section",
             heading: "One",
             level: 2,
             items: [
-              { type: "header", cells: ["ID", "Rule"] },
-              { type: "clause", id: "AA-01", cells: ["AA-01", "First."] },
-              { type: "clause", id: "AA-02", cells: ["AA-02", "Second."] },
+              {
+                type: "clauses",
+                header: ["ID", "Rule"],
+                rows: [
+                  { type: "clause", cells: ["AA-01", "First."] },
+                  { type: "clause", cells: ["AA-02", "Second."] },
+                ],
+              },
               { type: "section", heading: "Deep", level: 3, items: [{ type: "example", id: "AA-Z02", lang: "json", text: "{ }\n\n" }] },
             ],
           },
-          { type: "section", heading: "Two", level: 2, items: [{ type: "prose", id: "AA-Z03", text: "AA-Z03. Last." }] },
+          { type: "section", heading: "Two", level: 2, items: [{ type: "prose", text: "AA-Z03. Last." }] },
         ],
       },
     });
@@ -47,16 +53,15 @@ describe("fields and verbatim text of the model (RM-Z03, LG-42)", () => {
     const text = md("# Doc", "", "AA-Z01. Formats:", "", "| Name | Form |", "|---|---|", "| a | b |", "", "| ID | Rule |", "|---|---|", "| AA-01 | Kinds: |", "", "- one", "- two `x`");
     const out = read(text);
     expect(out.ok && out.value.items).toEqual([
-      { type: "prose", id: "AA-Z01", text: "AA-Z01. Formats:", table: { header: ["Name", "Form"], rows: [["a", "b"]] } },
-      { type: "header", cells: ["ID", "Rule"] },
-      { type: "clause", id: "AA-01", cells: ["AA-01", "Kinds:"], list: ["one", "two `x`"] },
+      { type: "prose", text: "AA-Z01. Formats:", table: { header: ["Name", "Form"], rows: [["a", "b"]] } },
+      { type: "clauses", header: ["ID", "Rule"], rows: [{ type: "clause", cells: ["AA-01", "Kinds:"], list: ["one", "two `x`"] }] },
     ]);
   });
 
   it("LG-42: keeps cell text verbatim — \\|, inline code, links, …, —, →, and an empty cell", () => {
     const row = "| AA-01 | `a \\| b` [x](y.md#z) AA-01…AA-03 — → |  |";
     const out = read(md("# Doc", "", "| ID | Rule | Note |", "|---|---|---|", row));
-    expect(out.ok && out.value.items[1]).toEqual({ type: "clause", id: "AA-01", cells: ["AA-01", "`a \\| b` [x](y.md#z) AA-01…AA-03 — →", ""] });
+    expect(out.ok && out.value.items[0]).toEqual({ type: "clauses", header: ["ID", "Rule", "Note"], rows: [{ type: "clause", cells: ["AA-01", "`a \\| b` [x](y.md#z) AA-01…AA-03 — →", ""] }] });
   });
 
   it("LG-42: an example keeps blank lines, trailing spaces and fences of other forms verbatim", () => {
@@ -138,8 +143,8 @@ describe("non-canonical blocks are refused (LG-42)", () => {
     for (const item of ["-a", "-  a", "- "]) expect([item, rules(md("# Doc", "", "AA-Z01. x:", "", "- a", item))]).toEqual([item, [["LG-42", "/6"]]]);
   });
 
-  it("LG-42: refuses with the line under the path given, outside any intent, all refusals sorted", () => {
-    const out = read(md("# Doc ", "", "", "x"), "/docs/design/x.md");
+  it("LG-42: refuses with the line under the place given, outside any intent, all refusals sorted", () => {
+    const out = read(md("# Doc ", "", "", "x"), { intent: null, path: "/docs/design/x.md" });
     expect(out.ok ? [] : out.rejections.map((r) => [r.rule, r.path, r.intent])).toEqual([
       ["LG-42", "/docs/design/x.md/1", null],
       ["LG-42", "/docs/design/x.md/3", null],
@@ -147,8 +152,16 @@ describe("non-canonical blocks are refused (LG-42)", () => {
     ]);
   });
 
-  it("KR-10: refuses bytes that are not UTF-8 by the kernel's decode, at the path given", () => {
-    const out = parse(Uint8Array.from([0x23, 0x20, 0xff, 0x0a]), "/x.md");
+  it("LG-42: refuses from the place given, with its intent", () => {
+    const out = read(md("# Doc ", "", "x"), { intent: "Demo/Hello", path: "/body/text" });
+    expect(out.ok ? [] : out.rejections.map((r) => [r.rule, r.path, r.intent])).toEqual([
+      ["LG-42", "/body/text/1", "Demo/Hello"],
+      ["RM-01", "/body/text/3", "Demo/Hello"],
+    ]);
+  });
+
+  it("KR-10: refuses bytes that are not UTF-8 by the kernel's decode, at the place given", () => {
+    const out = parse(Uint8Array.from([0x23, 0x20, 0xff, 0x0a]), { intent: null, path: "/x.md" });
     expect(out.ok ? [] : out.rejections.map((r) => [r.rule, r.path])).toEqual([["KR-10", "/x.md"]]);
   });
 });
