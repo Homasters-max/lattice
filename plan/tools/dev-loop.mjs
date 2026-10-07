@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // dev-loop: инструмент оркестратора /dev-loop (plan/dev-loop.md). Каждая команда печатает одну строку JSON.
 //   scope <base> [<head>] [--delta] [--main <ref>]          режим и оси круга
+//   start (--task T | --pr N) [--root R]                      старт или продолжение: PR, worktree, npm ci, следующий шаг
 //   brief executor --dir D --task T --worktree W [--owner текст]
 //   init --dir D --task T (--from executor.out.json | --pr N --branch B)
 //   wave --dir D --worktree W [--conflicts a,b]               следующий круг: briefs агентов
@@ -11,7 +12,7 @@
 //   escalate --dir D --why текст [--from файл.out.json]       вопрос владельцу: комментарий и questions
 //   owner --dir D (--answers файл.json | --text текст)        решение владельца → состояние, комментарий
 //   final --dir D                                             итоговый комментарий
-//   restore --dir D --comments файл.json                      состояние из `gh pr view --json comments`
+//   restore --dir D --comments файл.json                      состояние из `gh pr view --json comments` (отладка; start делает сам)
 // Файлы цикла в D: state.json, waves/<n>/<агент>.in.json и .out.json, waves/<n>/scope.json, comments/<NN>-<вид>.md.
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -216,18 +217,77 @@ function init() {
   print({ ok: true, state: statePath(), existed: false });
 }
 
-function restore() {
-  const comments = read(need("comments")).comments ?? [];
+// Состояние из комментариев PR → {entry, next, …}; entry none — заголовков цикла нет.
+function restoreFrom(comments) {
   const last = comments.map((c) => parseHeader(c.body)).filter(Boolean).at(-1);
-  if (!last) return print({ ok: true, entry: "none" });
+  if (!last) return { entry: "none" };
   mkdirSync(dir(), { recursive: true });
   save(last.state);
-  const entry = entryOf(last.kind, last.state);
   const qfile = last.state.pending ? writeQuestions(last.state, join(dir(), "questions.json")) : undefined;
-  print({ ok: true, entry: last.kind, wave: last.state.wave, ...entry, questions: qfile });
+  return { entry: last.kind, wave: last.state.wave, ...entryOf(last.kind, last.state), questions: qfile };
+}
+
+function restore() {
+  print({ ok: true, ...restoreFrom(read(need("comments")).comments ?? []) });
+}
+
+const gh = (...args) => {
+  const fake = process.env.DEV_LOOP_GH;
+  const [cmd, argv] = fake ? [process.execPath, [fake, ...args]] : ["gh", args];
+  return JSON.parse(execFileSync(cmd, argv, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }));
+};
+const PR_FIELDS = "number,title,headRefName,isDraft";
+
+function findPr() {
+  if (flags.pr) return gh("pr", "view", flags.pr, "--json", PR_FIELDS);
+  const task = need("task");
+  return gh("pr", "list", "--state", "open", "--search", `${task} in:title`, "--json", PR_FIELDS).find((p) => p.title.startsWith(`${task} `)) ?? null;
+}
+
+// Последний brief цикла — поручение агента, который мог оборваться.
+function lastBrief(loop) {
+  const found = [];
+  const walk = (d) => {
+    for (const f of existsSync(d) ? readdirSync(d, { withFileTypes: true }) : []) {
+      if (f.isDirectory()) walk(join(d, f.name));
+      else if (f.name.endsWith(".in.json") && !existsSync(join(d, f.name.replace(".in.json", ".out.json")))) found.push(join(d, f.name));
+    }
+  };
+  walk(loop);
+  return found.length === 1 ? found[0] : null;
+}
+
+// Старт или продолжение цикла: PR задачи, worktree, зависимости, состояние и следующий шаг.
+function start() {
+  const repo = git(".", "rev-parse", "--show-toplevel");
+  git(repo, "fetch", "-q", "origin");
+  const pr = findPr();
+  const task = flags.task ?? /^(S\d-\d{2})\b/.exec(pr?.title ?? "")?.[1] ?? null;
+  const loop = flags.dir ?? join(flags.root ?? join("D:/tmp", repo.split("/").at(-1), "dev-loop"), task ?? `pr-${pr.number}`);
+  flags.dir = loop;
+  const work = join(loop, "work");
+  const ref = pr ? `origin/${pr.headRefName}` : "origin/main";
+  const created = !existsSync(work);
+  if (created) {
+    mkdirSync(loop, { recursive: true });
+    git(repo, "worktree", "add", "--detach", work, ref);
+  }
+  const interrupted = !created && (git(work, "status", "--porcelain") !== "" || (pr !== null && git(work, "rev-list", "--count", `${ref}..HEAD`) !== "0"));
+  if (existsSync(join(work, "package.json")) && !existsSync(join(work, "node_modules")))
+    execFileSync("npm", ["ci"], { cwd: work, shell: process.platform === "win32", stdio: ["ignore", "ignore", "pipe"] });
+  let route = { entry: "none", next: "executor" };
+  if (pr) {
+    route = restoreFrom(gh("pr", "view", String(pr.number), "--json", "comments").comments ?? []);
+    if (route.entry === "none" && !pr.isDraft) {
+      if (!existsSync(statePath())) save(initial({ pr: pr.number, task, branch: pr.headRefName }));
+      route = { entry: "none", next: "gate" };
+    } else if (route.entry === "none") route = { entry: "none", next: "executor" };
+  }
+  print({ ok: true, task, pr: pr?.number ?? null, branch: pr?.headRefName ?? null, dir: loop, work, created, interrupted, brief: interrupted ? lastBrief(loop) : null, ...route });
 }
 
 const commands = {
+  start,
   scope: () => print(scope({ base: positional[0] ?? fail("нужен base"), head: positional[1], delta: flags.delta === true, main: flags.main })),
   brief,
   init,
