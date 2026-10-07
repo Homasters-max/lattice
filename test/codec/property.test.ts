@@ -2,10 +2,13 @@
 // back exactly what `print` wrote — the model is the md format, both ways.
 // The generator knows the model only through its builders: it offers blocks,
 // tables of clauses and documents of any shape and keeps what the builders
-// accept. Which block may carry a field, which ID a row or an example takes,
-// that a field ends its table, that a section's blocks come before its
-// subsections, which levels they take and that no two blocks share an ID are
-// the model's to say (RM-01, RM-02, LG-42), not the generator's.
+// accept. Which block may carry a field, which ID a block takes, how many
+// cells a row has, that a field ends its table, that text is one line, that a
+// section's blocks come before its subsections, which levels they take and
+// that no two blocks share an ID are the model's to say (RM-01, RM-02,
+// LG-42), not the generator's. A check that `parse` makes through the same
+// builders — the ID of a paragraph, the line that opens an example — a round
+// trip cannot show; `model.test.ts` and the fixtures show it.
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { clause, clauses, document, example, parse, print, prose, type Clause, type Field, type Item, type Section, type Table } from "../../src/codec/index.js";
@@ -19,46 +22,55 @@ const built = <T>(arb: fc.Arbitrary<Result<T>>): fc.Arbitrary<T> => arb.filter((
 
 const PREFIXES = ["AA", "KR", "LG", "RM"] as const;
 
-const id = fc
-  .tuple(fc.constantFrom(...PREFIXES), fc.boolean(), fc.integer({ min: 0, max: 99 }))
-  .map(([prefix, z, n]) => `${prefix}-${z ? "Z" : ""}${String(n).padStart(2, "0")}`);
+/** An ID of either kind, and now and then one off the grammar. */
+const id = fc.oneof(
+  { weight: 12, arbitrary: fc.tuple(fc.constantFrom(...PREFIXES), fc.boolean(), fc.integer({ min: 0, max: 99 })).map(([prefix, z, n]) => `${prefix}-${z ? "Z" : ""}${String(n).padStart(2, "0")}`) },
+  { weight: 1, arbitrary: fc.constantFrom("AA-1", "aa-01", "AA-Z1") },
+);
 
 /** Words of inline text as the corpus has them: inline code, an escaped pipe, links, ranges, typography. */
 const word = fc.constantFrom("a", "rule", "`KR-10`", "\\|", "`a \\| b`", "[x](y.md#z)", "KR-04…KR-13", "…", "—", "→", "**b**", "x:", "#", "-", "1.");
-const inline = fc.array(word, { minLength: 1, maxLength: 5 }).map((ws) => ws.join(" "));
-const cells = (n: number) => fc.array(inline, { minLength: n, maxLength: n });
+/** Now and then a word md does not keep as it is: a line break, a space at an end. */
+const breaking = fc.constantFrom("a\nb", "a ", " a");
+const inline = fc.array(fc.oneof({ weight: 40, arbitrary: word }, { weight: 1, arbitrary: breaking }), { minLength: 1, maxLength: 5 }).map((ws) => ws.join(" "));
+/** A cell: text, or now and then an ID — a row of which is a clause, not a row of a field table. */
+const cell = fc.oneof({ weight: 8, arbitrary: inline }, { weight: 1, arbitrary: id });
+/** Cells of a row or a header, as many as they come — how many a table keeps is the model's to say. */
+const cells = fc.array(cell, { minLength: 1, maxLength: 3 });
 
 /** The end of the text of a block, whatever field it carries. */
 const ending = fc.constantFrom("", ":");
 
-const table: fc.Arbitrary<Table> = fc
-  .integer({ min: 1, max: 3 })
-  .chain((n) => fc.record({ header: cells(n), rows: fc.array(cells(n), { maxLength: 2 }) }));
+const table: fc.Arbitrary<Table> = fc.record({ header: cells, rows: fc.array(cells, { maxLength: 2 }) });
 const field: fc.Arbitrary<Field | undefined> = fc.option(
   fc.oneof(
     table.map((t) => ({ table: t })),
-    fc.array(inline, { minLength: 1, maxLength: 3 }).map((l) => ({ list: l })),
+    fc.array(inline, { maxLength: 3 }).map((l) => ({ list: l })),
   ),
   { nil: undefined, freq: 2 },
 );
 
-const proseItem: fc.Arbitrary<Item> = built(fc.tuple(id, inline, ending, field).map(([i, t, e, f]) => prose({ text: `${i}. ${t}${e}`, field: f })));
+/** A paragraph: its ID and a dot, now and then none, then its text. */
+const start = fc.option(id.map((i) => `${i}. `), { nil: "", freq: 12 });
+const proseItem: fc.Arbitrary<Item> = built(fc.tuple(start, inline, ending, field).map(([s, t, e, f]) => prose({ text: `${s}${t}${e}`, field: f })));
 
 const line = fc.constantFrom("", "{ }", "a  ", "```json", "```", "| x |", "# h", "\t", "- a");
 const last = fc.constantFrom([], ["k"], ["k:"]);
 const exampleItem: fc.Arbitrary<Item> = built(
   fc
-    .tuple(id, fc.constantFrom("json", "text", "ts"), fc.array(line, { maxLength: 4 }), last, field)
+    .tuple(id, fc.constantFrom("json", "text", "ts", "Text"), fc.array(line, { maxLength: 4 }), last, field)
     .map(([i, lang, lines, end, f]) => example({ lang, id: i, text: [...lines, ...end].map((l) => `${l}\n`).join(""), field: f })),
 );
 
-/** A row of `n` cells: its ID, then cells, the last of them with its ending. */
-const row = (n: number): fc.Arbitrary<Clause> =>
-  built(fc.tuple(id, cells(n - 1), ending, field).map(([i, rest, e, f]) => clause({ cells: [i, ...rest.slice(0, -1), `${rest.at(-1) ?? ""}${e}`], field: f })));
+/** A row: its ID, then cells, the last of them with its ending. */
+const row: fc.Arbitrary<Clause> = built(
+  fc.tuple(id, fc.array(cell, { maxLength: 2 }), ending, field).map(([i, rest, e, f]) => {
+    const all = [i, ...rest];
+    return clause({ cells: [...all.slice(0, -1), `${all.at(-1) ?? ""}${e}`], field: f });
+  }),
+);
 
-const clausesItem: fc.Arbitrary<Item> = fc
-  .integer({ min: 2, max: 3 })
-  .chain((n) => built(fc.tuple(cells(n), fc.array(row(n), { minLength: 1, maxLength: 3 })).map(([header, rows]) => clauses({ header, rows }))));
+const clausesItem: fc.Arbitrary<Item> = built(fc.tuple(cells, fc.array(row, { maxLength: 3 })).map(([header, rows]) => clauses({ header, rows })));
 
 const block: fc.Arbitrary<Item> = fc.oneof(proseItem, exampleItem, clausesItem);
 
