@@ -10,7 +10,7 @@
 | [S0-32](tasks/S0-32-open-tail.md) | Открытие store на tail main | B | ✅ | [#8](https://github.com/Homasters-max/lattice/pull/8) | разбор S0-03 |
 | [S0-33](tasks/S0-33-landing-checks.md) | Проверки landing до apply | B | ✅ | [#10](https://github.com/Homasters-max/lattice/pull/10) | разбор S0-03, Q-28, Q-29 |
 | [S0-34](tasks/S0-34-worktree-release.md) | Жизненный цикл worktree | B | ✅ | [#12](https://github.com/Homasters-max/lattice/pull/12) | разбор S0-03, Q-30, D206 |
-| [S0-04](tasks/S0-04-canon-hash.md) | Canon, hash и канонические форматы | C | ⬜ | | |
+| [S0-04](tasks/S0-04-canon-hash.md) | Canon, hash и канонические форматы | C | ✅ | [#15](https://github.com/Homasters-max/lattice/pull/15) | G-20, G-21 |
 | [S0-05](tasks/S0-05-record-ref.md) | Record и Ref | C | ⬜ | | |
 | [S0-06](tasks/S0-06-schema-validate.md) | Schema — закрытое подмножество и validate | C | ⬜ | | |
 | [S0-07](tasks/S0-07-type-compare.md) | Type и compare | C | ⬜ | | |
