@@ -8,6 +8,16 @@
 import { canon, checkHeader, gotOf, hash, hashBytes, isJsonObject, KR_10, parseJsonBytes, refuse, refused, reject, type JsonValue, type Record, type Rejection, type Result } from "../kernel/index.js";
 import { LG_06 } from "./rules.js";
 
+/**
+ * KR-10: the canonical text or hash of what the ledger knows canonical — a commit apply formed from a proposal phase 1
+ * found canonical, a commit read from its canonical line, a proposal the strict parse read. A refusal here is a bug.
+ */
+export function known(result: Result<string>, what: string): string {
+  if (result.ok) return result.value;
+  const [first] = result.rejections;
+  throw new Error(`bug: ${what} is not canonical: ${first.rule} at ${first.path}`);
+}
+
 export type Commit = {
   readonly seq: number;
   readonly prev: string | null;
@@ -31,11 +41,11 @@ export type Evidence = {
 /** LG-06: the hash of a commit, computed without `sig`. */
 export function commitHash(c: Commit): string {
   const { seq, prev, kernel, base, proposal, proposal_sig, by, at, request, records } = c;
-  return hash({ seq, prev, kernel, base, proposal, proposal_sig, by, at, request, records });
+  return known(hash({ seq, prev, kernel, base, proposal, proposal_sig, by, at, request, records }), "a commit");
 }
 
 /** The line a store keeps for a commit: its canonical JSON. */
-export const encodeCommit = (c: Commit): string => canon(c);
+export const encodeCommit = (c: Commit): string => known(canon(c), "a commit");
 
 type Field = { readonly expected: string; readonly fits: (v: JsonValue | undefined) => boolean };
 

@@ -1,0 +1,162 @@
+{
+  "source": "RFC 8785, Appendix B: Number Serialization Samples",
+  "about": "ieee: the IEEE 754 binary64 value in hex; json: its RFC 8785 serialisation, null where JSON has none (NaN, Infinity); admitted: whether KR-10 admits the value into canon (-0, non-finite numbers and integers outside +-(2^53-1) are refused, G-20)",
+  "numbers": [
+    {
+      "ieee": "0000000000000000",
+      "json": "0",
+      "comment": "Zero",
+      "admitted": true
+    },
+    {
+      "ieee": "8000000000000000",
+      "json": "0",
+      "comment": "Minus zero",
+      "admitted": false
+    },
+    {
+      "ieee": "0000000000000001",
+      "json": "5e-324",
+      "comment": "Min pos number",
+      "admitted": true
+    },
+    {
+      "ieee": "8000000000000001",
+      "json": "-5e-324",
+      "comment": "Min neg number",
+      "admitted": true
+    },
+    {
+      "ieee": "7fefffffffffffff",
+      "json": "1.7976931348623157e+308",
+      "comment": "Max pos number",
+      "admitted": false
+    },
+    {
+      "ieee": "ffefffffffffffff",
+      "json": "-1.7976931348623157e+308",
+      "comment": "Max neg number",
+      "admitted": false
+    },
+    {
+      "ieee": "4340000000000000",
+      "json": "9007199254740992",
+      "comment": "Max pos int (1)",
+      "admitted": false
+    },
+    {
+      "ieee": "c340000000000000",
+      "json": "-9007199254740992",
+      "comment": "Max neg int (1)",
+      "admitted": false
+    },
+    {
+      "ieee": "4430000000000000",
+      "json": "295147905179352830000",
+      "comment": "~2**68 (2)",
+      "admitted": false
+    },
+    {
+      "ieee": "7fffffffffffffff",
+      "json": null,
+      "comment": "NaN (3)",
+      "admitted": false
+    },
+    {
+      "ieee": "7ff0000000000000",
+      "json": null,
+      "comment": "Infinity (3)",
+      "admitted": false
+    },
+    {
+      "ieee": "44b52d02c7e14af5",
+      "json": "9.999999999999997e+22",
+      "comment": "",
+      "admitted": false
+    },
+    {
+      "ieee": "44b52d02c7e14af6",
+      "json": "1e+23",
+      "comment": "",
+      "admitted": false
+    },
+    {
+      "ieee": "44b52d02c7e14af7",
+      "json": "1.0000000000000001e+23",
+      "comment": "",
+      "admitted": false
+    },
+    {
+      "ieee": "444b1ae4d6e2ef4e",
+      "json": "999999999999999700000",
+      "comment": "",
+      "admitted": false
+    },
+    {
+      "ieee": "444b1ae4d6e2ef4f",
+      "json": "999999999999999900000",
+      "comment": "",
+      "admitted": false
+    },
+    {
+      "ieee": "444b1ae4d6e2ef50",
+      "json": "1e+21",
+      "comment": "",
+      "admitted": false
+    },
+    {
+      "ieee": "3eb0c6f7a0b5ed8c",
+      "json": "9.999999999999997e-7",
+      "comment": "",
+      "admitted": true
+    },
+    {
+      "ieee": "3eb0c6f7a0b5ed8d",
+      "json": "0.000001",
+      "comment": "",
+      "admitted": true
+    },
+    {
+      "ieee": "41b3de4355555553",
+      "json": "333333333.3333332",
+      "comment": "",
+      "admitted": true
+    },
+    {
+      "ieee": "41b3de4355555554",
+      "json": "333333333.33333325",
+      "comment": "",
+      "admitted": true
+    },
+    {
+      "ieee": "41b3de4355555555",
+      "json": "333333333.3333333",
+      "comment": "",
+      "admitted": true
+    },
+    {
+      "ieee": "41b3de4355555556",
+      "json": "333333333.3333334",
+      "comment": "",
+      "admitted": true
+    },
+    {
+      "ieee": "41b3de4355555557",
+      "json": "333333333.33333343",
+      "comment": "",
+      "admitted": true
+    },
+    {
+      "ieee": "becbf647612f3696",
+      "json": "-0.0000033333333333333333",
+      "comment": "",
+      "admitted": true
+    },
+    {
+      "ieee": "43143ff3c1cb0959",
+      "json": "1424953923781206.2",
+      "comment": "Round to even (4)",
+      "admitted": true
+    }
+  ]
+}

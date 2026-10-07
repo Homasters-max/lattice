@@ -7,9 +7,10 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Assembly, View } from "../../src/assembly/index.js";
 import { run } from "../../src/cli/run.js";
-import { hashRecord, type JsonValue } from "../../src/kernel/index.js";
+import type { JsonValue } from "../../src/kernel/index.js";
 import { proposalHash, readProposal } from "../../src/ledger/index.js";
 import { assembleForTests, type FixtureConfig } from "../support/assembly.js";
+import { hashOf } from "../support/hash-of.js";
 
 const fixtures = join(import.meta.dirname, "../fixtures/KR-06");
 const proposalOf = (file: string) => (JSON.parse(readFileSync(join(fixtures, file), "utf8")) as { input: { proposal: JsonValue } }).input.proposal;
@@ -79,7 +80,7 @@ describe("walking skeleton (SL-05)", () => {
       id: "demo/hello",
       rev: 1,
       type: "demo/note@1",
-      hash: hashRecord("demo/note@1", { text: "hello" }),
+      hash: hashOf("demo/note@1", { text: "hello" }),
       by: "01JB2X00000000000000000SES",
       at: "2026-10-06T12:00:00.000000Z",
       body: { text: "hello" },

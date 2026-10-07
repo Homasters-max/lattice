@@ -1,0 +1,10 @@
+{
+  "check": "json",
+  "input": {
+    "text": "{\"s\":\"\\ud800\"}"
+  },
+  "expect": {
+    "rule": "KR-10",
+    "path": "/s"
+  }
+}

@@ -1,12 +1,185 @@
-// Reading JSON (KR-10): input must be I-JSON — UTF-8, and JSON — and is
-// refused, never repaired. `parseJson` is the one function that parses JSON in
-// the code of LATTICE; until the strict parser of S0-04 replaces it, it still
-// takes duplicate keys, integers outside ±2^53, strings not in NFC and -0
-// (G-16).
+// The strict parse (KR-10, D-04): input must be I-JSON in UTF-8 with every
+// string in NFC, and is refused, never repaired. `parseJson` is the one
+// function that parses JSON in the code of LATTICE; `JSON.parse` keeps the last
+// of duplicate keys silently, so the parse is own code. It reads the grammar of
+// RFC 8259 — a text that is not JSON is refused as a whole at the path given —
+// and refuses inside the value, at the JSON Pointer under that path: a key met
+// twice, and what canon refuses (canon.ts). It reads with its own stack, so no
+// depth of nesting overflows, and the values it gives are frozen.
+import { numberRejections, stringRejections } from "./canon.js";
 import { hashBytes } from "./hash.js";
-import type { JsonValue } from "./json.js";
-import { refuse, reject, type Result } from "./rejection.js";
+import { pointer, type JsonValue } from "./json.js";
+import { refuse, refused, reject, type Rejection, type Result } from "./rejection.js";
 import { KR_10 } from "./rules.js";
+
+/** The position in the text and the refusals found so far; local to one parse. */
+type Cursor = { readonly text: string; at: number; readonly found: Rejection[] };
+
+type OpenArray = { readonly kind: "array"; readonly path: string; readonly items: JsonValue[] };
+type OpenObject = { readonly kind: "object"; readonly path: string; readonly entries: [string, JsonValue][]; readonly keys: Set<string>; key: string };
+
+/** An array or an object being read: its JSON Pointer and what it holds so far. */
+type Open = OpenArray | OpenObject;
+
+/** What reading at a position gives: a value, a container opened, or `undefined` — the text is not JSON there. */
+type Read = { readonly value: JsonValue } | { readonly open: Open } | undefined;
+
+const isSpace = (c: string | undefined): boolean => c === " " || c === "\t" || c === "\n" || c === "\r";
+
+/** RFC 8259 §2: skips whitespace; the next character, if any. */
+function skip(c: Cursor): string | undefined {
+  while (isSpace(c.text[c.at])) c.at++;
+  return c.text[c.at];
+}
+
+const ESCAPES: { readonly [e: string]: string } = { '"': '"', "\\": "\\", "/": "/", b: "\b", f: "\f", n: "\n", r: "\r", t: "\t" };
+const HEX4 = /^[0-9a-fA-F]{4}$/;
+
+/** RFC 8259 §7: the escape at the backslash at `c.at`; a lone surrogate escaped is read as it is, and canon refuses it. */
+function readEscape(c: Cursor): string | undefined {
+  const e = c.text[c.at + 1];
+  if (e === "u") {
+    const hex = c.text.slice(c.at + 2, c.at + 6);
+    if (!HEX4.test(hex)) return undefined;
+    c.at += 6;
+    return String.fromCharCode(Number.parseInt(hex, 16));
+  }
+  const s = e === undefined ? undefined : ESCAPES[e];
+  if (s !== undefined) c.at += 2;
+  return s;
+}
+
+/** RFC 8259 §7: the string at the quote at `c.at`; a control character unescaped is not JSON. */
+function readString(c: Cursor): string | undefined {
+  const parts: string[] = [];
+  c.at++;
+  for (let start = c.at; ; ) {
+    const code = c.text.charCodeAt(c.at);
+    if (Number.isNaN(code) || code < 0x20) return undefined;
+    if (code !== 0x22 && code !== 0x5c) {
+      c.at++;
+      continue;
+    }
+    parts.push(c.text.slice(start, c.at));
+    if (code === 0x22) {
+      c.at++;
+      return parts.join("");
+    }
+    const escaped = readEscape(c);
+    if (escaped === undefined) return undefined;
+    parts.push(escaped);
+    start = c.at;
+  }
+}
+
+const NUMBER = /^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$/;
+const NUMBER_CHAR = /^[-+.eE0-9]$/;
+
+/** RFC 8259 §6: the number at `c.at`; KR-10 refusals name it as written. */
+function readNumber(c: Cursor, path: string): Read {
+  const start = c.at;
+  while (NUMBER_CHAR.test(c.text[c.at] ?? "")) c.at++;
+  const written = c.text.slice(start, c.at);
+  if (!NUMBER.test(written)) return undefined;
+  const x = Number(written);
+  c.found.push(...numberRejections(x, written, { intent: null, path }));
+  return { value: x };
+}
+
+const LITERALS: readonly (readonly [string, JsonValue])[] = [
+  ["true", true],
+  ["false", false],
+  ["null", null],
+];
+
+/** RFC 8259 §3: `true`, `false` or `null` at `c.at`. */
+function readLiteral(c: Cursor): Read {
+  const hit = LITERALS.find(([word]) => c.text.startsWith(word, c.at));
+  if (hit === undefined) return undefined;
+  c.at += hit[0].length;
+  return { value: hit[1] };
+}
+
+function readStringValue(c: Cursor, path: string): Read {
+  const s = readString(c);
+  if (s === undefined) return undefined;
+  c.found.push(...stringRejections(s, { intent: null, path }));
+  return { value: s };
+}
+
+/** RFC 8259 §4: a member name and its colon; KR-10 refuses a name met twice, and a name canon refuses. */
+function readKey(c: Cursor, open: OpenObject): boolean {
+  if (skip(c) !== '"') return false;
+  const key = readString(c);
+  if (key === undefined || skip(c) !== ":") return false;
+  c.at++;
+  const place = { intent: null, path: pointer(open.path, key) };
+  c.found.push(...(open.keys.has(key) ? [reject(KR_10, { ...place, expected: "a key once", got: key })] : stringRejections(key, place)));
+  open.keys.add(key);
+  open.key = key;
+  return true;
+}
+
+/** The value of a container read to its end, frozen; an object holds each key once, as its own property. */
+const closed = (open: Open): JsonValue =>
+  open.kind === "array" ? Object.freeze(open.items) : Object.freeze(Object.fromEntries(open.entries));
+
+/** After `[` or `{` at `c.at`: the container closed at once, or open for its first member. */
+function opened(c: Cursor, open: Open): Read {
+  c.at++;
+  if (skip(c) === (open.kind === "array" ? "]" : "}")) {
+    c.at++;
+    return { value: closed(open) };
+  }
+  return open.kind === "array" || readKey(c, open) ? { open } : undefined;
+}
+
+/** The value at `c.at`, whose JSON Pointer is `path`. */
+function readValue(c: Cursor, path: string): Read {
+  const first = skip(c);
+  if (first === "[") return opened(c, { kind: "array", path, items: [] });
+  if (first === "{") return opened(c, { kind: "object", path, entries: [], keys: new Set(), key: "" });
+  if (first === '"') return readStringValue(c, path);
+  return first === "-" || (first !== undefined && first >= "0" && first <= "9") ? readNumber(c, path) : readLiteral(c);
+}
+
+/** The JSON Pointer of the next member or item of a container. */
+const childPath = (open: Open): string => (open.kind === "array" ? pointer(open.path, open.items.length) : pointer(open.path, open.key));
+
+function add(open: Open, value: JsonValue): void {
+  if (open.kind === "array") open.items.push(value);
+  else open.entries.push([open.key, value]);
+}
+
+/** After a member or an item: `,` and the next one, or the close of the container. */
+function after(c: Cursor, open: Open): "more" | "closed" | undefined {
+  const sep = skip(c);
+  c.at++;
+  if (sep === (open.kind === "array" ? "]" : "}")) return "closed";
+  if (sep !== ",") return undefined;
+  return open.kind === "array" || readKey(c, open) ? "more" : undefined;
+}
+
+/** The value of a whole JSON text and the refusals inside it, or `undefined` when the text is not JSON. */
+function readText(text: string, root: string): { readonly value: JsonValue; readonly found: readonly Rejection[] } | undefined {
+  const c: Cursor = { text, at: 0, found: [] };
+  const stack: Open[] = [];
+  let read = readValue(c, root);
+  while (read !== undefined) {
+    if ("open" in read) {
+      stack.push(read.open);
+      read = readValue(c, childPath(read.open));
+      continue;
+    }
+    const top = stack.at(-1);
+    if (top === undefined) return skip(c) === undefined ? { value: read.value, found: c.found } : undefined;
+    add(top, read.value);
+    const next = after(c, top);
+    if (next === "closed") stack.pop();
+    read = next === "more" ? readValue(c, childPath(top)) : next === "closed" ? { value: closed(top) } : undefined;
+  }
+  return undefined;
+}
 
 /**
  * KR-10: the text of UTF-8 bytes, refused at `path` — where the bytes sit in their input — when they are not
@@ -21,13 +194,14 @@ export function decodeUtf8(bytes: Uint8Array, path = ""): Result<string> {
   }
 }
 
-/** KR-10: the value of a JSON text, refused at `path` — where the text sits in its input — when it is not JSON. */
+/**
+ * KR-10: the value of a JSON text, frozen, or its refusals: the text as a whole at `path` — where the text sits in its
+ * input — when it is not JSON; inside it, at the JSON Pointer under `path`, what I-JSON in NFC does not admit.
+ */
 export function parseJson(text: string, path = ""): Result<JsonValue> {
-  try {
-    return { ok: true, value: JSON.parse(text) as JsonValue };
-  } catch {
-    return refuse(reject(KR_10, { intent: null, path, expected: "a JSON text", got: text }));
-  }
+  const read = readText(text, path);
+  if (read === undefined) return refuse(reject(KR_10, { intent: null, path, expected: "a JSON text", got: text }));
+  return refused<JsonValue>(read.found) ?? { ok: true, value: read.value };
 }
 
 /** KR-10: the value of JSON in UTF-8 bytes, refused at `path` as `decodeUtf8` and `parseJson` refuse. */

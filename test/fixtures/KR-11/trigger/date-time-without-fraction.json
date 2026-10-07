@@ -1,0 +1,11 @@
+{
+  "check": "format",
+  "input": {
+    "format": "date-time",
+    "value": "2026-10-06T12:00:00Z"
+  },
+  "expect": {
+    "rule": "KR-11",
+    "path": ""
+  }
+}

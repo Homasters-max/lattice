@@ -1,9 +1,11 @@
 // Records (KR-04…KR-08). The walking skeleton checks the grammar of ids
 // (KR-06) and the header on the surface — its fields and their JSON kinds — as
-// a store opens (KR-04); exactly these fields, the formats and `rev` against
-// the kind of the type arrive with S0-04, S0-05 and S0-13.
+// a store opens (KR-04); exactly these fields, the format of `at` (KR-11,
+// checked by `checkFormat`) and `rev` against the kind of the type arrive with
+// S0-05 and S0-13.
+import { isUlid } from "./formats.js";
 import { gotOf, isJsonObject, type JsonValue } from "./json.js";
-import { reject, type Rejection } from "./rejection.js";
+import { reject, type Place, type Rejection } from "./rejection.js";
 import { KR_04, KR_06 } from "./rules.js";
 
 /** Whether a record is an entity or an event: the `kind` of its type (KR-05, KR-14). */
@@ -19,9 +21,6 @@ export type Record = {
   readonly at: string;
   readonly body: JsonValue;
 };
-
-/** Where a check refuses: the intent it is about, or `null`, and a JSON Pointer (G-13). */
-type Place = { readonly intent: string | null; readonly path: string };
 
 type Field = { readonly expected: string; readonly fits: (v: JsonValue | undefined) => boolean };
 
@@ -46,14 +45,9 @@ export function checkHeader(value: JsonValue, path: string): Rejection[] {
 }
 
 const ENTITY_ID = /^[a-z][a-z0-9-]*\/[a-z0-9][a-z0-9.-]*$/;
-// KR-11: 26 upper-case Crockford base32 characters; G-07: at most 128 bits.
-const ULID = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/;
 
 /** KR-06: `namespace/slug`. */
 export const isEntityId = (id: string): boolean => ENTITY_ID.test(id);
-
-/** KR-06, KR-11: a ULID. */
-export const isUlid = (id: string): boolean => ULID.test(id);
 
 /** KR-06: the id of a record of this kind, refused at the place the caller names. */
 export function checkId(kind: Kind, id: JsonValue, place: Place): Rejection[] {

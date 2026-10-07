@@ -1,0 +1,10 @@
+{
+  "check": "json",
+  "input": {
+    "text": "{\"n\":-0}"
+  },
+  "expect": {
+    "rule": "KR-10",
+    "path": "/n"
+  }
+}
