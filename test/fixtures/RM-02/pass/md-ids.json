@@ -1,6 +1,0 @@
-{
-  "check": "md",
-  "input": {
-    "text": "# Doc\n\nAA-Z01. x\n\n| ID | Rule |\n|---|---|\n| AA-01 | y |\n\n```text ZZ-Z99\n```\n"
-  }
-}

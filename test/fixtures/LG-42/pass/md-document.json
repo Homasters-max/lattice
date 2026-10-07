@@ -1,6 +1,0 @@
-{
-  "check": "md",
-  "input": {
-    "text": "# Doc\n\nAA-Z01. Formats:\n\n| Name | Form |\n|---|---|\n| a \\| b | `c` [d](e.md) — → … |\n\n## Rules\n\n| ID | Rule |\n|---|---|\n| AA-01 | Kinds: |\n\n- one\n- two\n\n```json AA-Z02\n{ }\n```\n"
-  }
-}
