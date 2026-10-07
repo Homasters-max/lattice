@@ -16,7 +16,7 @@
 | [S0-07](tasks/S0-07-type-compare.md) | Type и compare | C | ✅ | [#22](https://github.com/Homasters-max/lattice/pull/22) | G-26, G-27 |
 | [S0-35](tasks/S0-35-closed-form.md) | Закрытая форма объекта — одна функция ядра | C | ✅ | [#27](https://github.com/Homasters-max/lattice/pull/27) | разбор волны 2, Q-31, Q-32 |
 | [S0-36](tasks/S0-36-record-against-type.md) | Запись против своего типа — один вход фазы 2 и чтение схемы | C | ✅ | [#28](https://github.com/Homasters-max/lattice/pull/28) | разбор волны 2, Q-33, G-28 |
-| [S0-37](tasks/S0-37-check-result.md) | Одна форма результата жёсткой проверки и одна грамматика rule ID | C | ⬜ | | разбор волны 2 |
+| [S0-37](tasks/S0-37-check-result.md) | Одна форма результата жёсткой проверки и одна грамматика rule ID | C | ✅ | [#29](https://github.com/Homasters-max/lattice/pull/29) | разбор волны 2 |
 | [S0-08](tasks/S0-08-std-types-s0.md) | core и std — типы S0 как данные | D | ⬜ | | |
 | [S0-09](tasks/S0-09-std-schemas-drafts.md) | Черновики всех схем std — проверка подмножества до заморозки ядра | D | ⬜ | | может перейти в SW |
 | [S0-10](tasks/S0-10-proposal-commit.md) | Proposal и commit — форматы, hash, подписи, цепочка | E | ✅ | [#21](https://github.com/Homasters-max/lattice/pull/21) | G-03, G-10, G-24 |
