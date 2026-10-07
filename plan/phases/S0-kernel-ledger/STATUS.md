@@ -14,7 +14,7 @@
 | [S0-05](tasks/S0-05-record-ref.md) | Record и Ref | C | ✅ | [#17](https://github.com/Homasters-max/lattice/pull/17) | G-06, G-12 |
 | [S0-06](tasks/S0-06-schema-validate.md) | Schema — закрытое подмножество и validate | C | ✅ | [#19](https://github.com/Homasters-max/lattice/pull/19) | G-22, G-23 |
 | [S0-07](tasks/S0-07-type-compare.md) | Type и compare | C | ✅ | [#22](https://github.com/Homasters-max/lattice/pull/22) | G-26, G-27 |
-| [S0-35](tasks/S0-35-closed-form.md) | Закрытая форма объекта — одна функция ядра | C | ⬜ | | разбор волны 2, Q-31, Q-32 |
+| [S0-35](tasks/S0-35-closed-form.md) | Закрытая форма объекта — одна функция ядра | C | ✅ | [#27](https://github.com/Homasters-max/lattice/pull/27) | разбор волны 2, Q-31, Q-32 |
 | [S0-36](tasks/S0-36-record-against-type.md) | Запись против своего типа — один вход фазы 2 и чтение схемы | C | ⬜ | | разбор волны 2, Q-33 |
 | [S0-37](tasks/S0-37-check-result.md) | Одна форма результата жёсткой проверки и одна грамматика rule ID | C | ⬜ | | разбор волны 2 |
 | [S0-08](tasks/S0-08-std-types-s0.md) | core и std — типы S0 как данные | D | ⬜ | | |
