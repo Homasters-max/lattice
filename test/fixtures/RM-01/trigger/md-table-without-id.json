@@ -1,0 +1,10 @@
+{
+  "check": "md",
+  "input": {
+    "text": "# Doc\n\n| A | B |\n|---|---|\n| a | b |\n"
+  },
+  "expect": {
+    "rule": "RM-01",
+    "path": "/3"
+  }
+}

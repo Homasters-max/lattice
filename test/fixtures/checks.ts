@@ -9,6 +9,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileOf } from "../../src/adapters/store-jsonl/index.js";
+import { LG_42, parse, RM_01, RM_02 } from "../../src/codec/index.js";
 import {
   checkBody,
   checkFormat,
@@ -218,6 +219,12 @@ const chain: FixtureCheck = {
   },
 };
 
+/** `input`: `{ text }` — a document in md, parsed as the codec reads it, refused from the root by line (LG-42, RM-01, RM-02). */
+const md: FixtureCheck = {
+  enforces: [LG_42.id, RM_01.id, RM_02.id],
+  run: (input) => parse(bytesOf(field(input, "text"))),
+};
+
 type FixtureFile = string | Uint8Array | null;
 
 /**
@@ -281,4 +288,5 @@ export const CHECKS: { readonly [check: string]: FixtureCheck } = {
   signature,
   chain,
   land: landCheck,
+  md,
 };
