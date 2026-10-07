@@ -8,7 +8,7 @@
 | [S0-02](tasks/S0-02-code-conventions.md) | Соглашения кода, отказов и фикстур правил | A | ✅ | [#3](https://github.com/Homasters-max/lattice/pull/3) | |
 | [S0-03](tasks/S0-03-walking-skeleton.md) | Walking skeleton | B | ✅ | [#5](https://github.com/Homasters-max/lattice/pull/5) | G-14…G-18, Q-09…Q-27 |
 | [S0-32](tasks/S0-32-open-tail.md) | Открытие store на tail main | B | ✅ | [#8](https://github.com/Homasters-max/lattice/pull/8) | разбор S0-03 |
-| [S0-33](tasks/S0-33-landing-checks.md) | Проверки landing до apply | B | ⬜ | | разбор S0-03, Q-28, Q-29 |
+| [S0-33](tasks/S0-33-landing-checks.md) | Проверки landing до apply | B | ✅ | [#10](https://github.com/Homasters-max/lattice/pull/10) | разбор S0-03, Q-28, Q-29 |
 | [S0-34](tasks/S0-34-worktree-release.md) | Жизненный цикл worktree | B | ⬜ | | разбор S0-03, Q-30, D206 |
 | [S0-04](tasks/S0-04-canon-hash.md) | Canon, hash и канонические форматы | C | ⬜ | | |
 | [S0-05](tasks/S0-05-record-ref.md) | Record и Ref | C | ⬜ | | |
