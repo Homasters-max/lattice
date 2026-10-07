@@ -63,7 +63,7 @@ describe("the schema subset (KR-18)", () => {
 
   it("KR-18: refuses the keyword itself, with the subset as expected and the keyword as got", () => {
     expect(checkSchema(deepFreeze({ type: "string", pattern: "^a" }), "entity", { intent: "demo/t", path: "/body/schema" })).toEqual([
-      reject(KR_18, { intent: "demo/t", path: "/body/schema/pattern", expected: "a keyword of KR-18 or an annotation of KR-19", got: "pattern" }),
+      reject(KR_18, { intent: "demo/t", path: "/body/schema/pattern", expected: "a keyword or an annotation of the closed subset", got: "pattern" }),
     ]);
   });
 

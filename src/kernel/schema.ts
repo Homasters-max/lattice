@@ -43,7 +43,7 @@ const SUBSCHEMA = { expected: "a schema", fits: () => true } as const;
 
 /** KR-18: the keywords of the subset, where each applies and its form. */
 const KEYWORDS: { readonly [keyword: string]: Keyword } = {
-  type: { applies: "any", expected: "a type of KR-18, or a pair of one with null", fits: (v) => isType(v) || isTypePair(v) },
+  type: { applies: "any", expected: "string, integer, number, boolean, object, array or null, or a pair of one with null", fits: (v) => isType(v) || isTypePair(v) },
   properties: { applies: ["object"], expected: "an object of field schemas", fits: isJsonObject },
   required: { applies: ["object"], expected: "an array of field names", fits: (v) => isJsonArray(v) && v.every((s) => typeof s === "string") },
   values: { applies: ["object"], ...SUBSCHEMA },
@@ -98,7 +98,7 @@ function keywordRejections(schema: Schema, key: string, path: string, intent: st
 function keyRejections(site: Site, key: string, context: Context): Rejection[] {
   if (isKeyword(key)) return keywordRejections(site.schema, key, site.path, context.intent);
   if (isAnnotation(key)) return annotationRejections(site, key, context);
-  return [reject(KR_18, { intent: context.intent, path: pointer(site.path, key), expected: "a keyword of KR-18 or an annotation of KR-19", got: key })];
+  return [reject(KR_18, { intent: context.intent, path: pointer(site.path, key), expected: "a keyword or an annotation of the closed subset", got: key })];
 }
 
 /** What a schema may hold beside `$ref` or `oneOf`, annotations aside (G-22). */
