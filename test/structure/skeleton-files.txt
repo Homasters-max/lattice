@@ -1,23 +1,18 @@
 # ST-15: the files the walking skeleton owns (SL-05, R9 of the plan) — the
-# port interfaces, the command table, the structure test and the entries of
-# the modules; a change of one of them is a trigger of the architecture audit.
-# kernel-files.txt is not here: every task of the kernel adds to it (ST-05).
+# port interfaces, the command table, the bin, the kernel version and the
+# structure test with the matrix of ST-01; a change of one of them is a
+# trigger of the architecture audit. Files every task fills by the plan are
+# not here: kernel-files.txt (ST-05), the entries src/<module>/index.ts and
+# the stubs of the command table.
 # One path per line, sorted.
-src/assembly/index.ts
 src/cli/commands.ts
 src/cli/main.ts
-src/cli/stubs.ts
-src/codec/index.ts
-src/generate/index.ts
-src/kernel/index.ts
 src/kernel/version.ts
-src/ledger/index.ts
 src/ledger/ports/acts.ts
 src/ledger/ports/clock.ts
 src/ledger/ports/git.ts
 src/ledger/ports/ids.ts
 src/ledger/ports/store.ts
-src/trust/index.ts
 test/structure/audit-imports.ts
 test/structure/audit-kernel.ts
 test/structure/audit-purity.ts

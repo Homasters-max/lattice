@@ -94,16 +94,13 @@ describe("lists of the structure test", () => {
     });
   }
 
-  /** R9 of the plan: the entries of the modules, the port interfaces, the command table and its stubs, the bin, the kernel version and the structure test — kernel-files.txt aside, which every task of the kernel adds to (ST-05). */
+  /** R9 of the plan: the port interfaces, the command table, the bin, the kernel version and the structure test — what SL-05 makes the skeleton create. Files every task fills by the plan are aside: kernel-files.txt (ST-05), the entries of the modules and the stubs of the command table. */
   function skeletonFiles(): string[] {
     const under = (dir: string) => readdirSync(join(repoRoot, dir)).map((f) => `${dir}/${f}`);
-    // `adapters` has a folder per adapter, and the entry of `cli` is the bin.
     return [
-      ...SLICE_MODULES.filter((m) => m !== "adapters" && m !== "cli").map((m) => `src/${m}/index.ts`),
       ...under("src/ledger/ports"),
       "src/cli/commands.ts",
       "src/cli/main.ts",
-      "src/cli/stubs.ts",
       "src/kernel/version.ts",
       ...under("test/structure").filter((f) => f !== "test/structure/kernel-files.txt"),
     ].sort();

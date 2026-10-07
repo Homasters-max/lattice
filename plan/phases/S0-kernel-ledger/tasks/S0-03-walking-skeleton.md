@@ -92,7 +92,7 @@ run(argv, { out, err, assembled }): Promise<number>                        // cl
 - **`prev` коммита** дописывает landing, `request` — `null` до S0-20 (G-14, Q-12).
 - **Канонический порядок** (LG-06, LG-10): hash proposal и records коммита — по сущностям, затем событиям, по `id`; группа фактов по ключу — S0-10.
 - **`acts-fixture`** отдаёт acts из конфигурации по change request, а не «всегда approve»: e2e даёт `approve` на каждый change request, apply acts не читает до S0-17; разрешающего умолчания у адаптера нет.
-- **Файлы skeleton** (ST-15) — по R9 плана: интерфейсы портов, таблица команд с `stubs.ts`, `src/cli/main.ts`, `src/kernel/version.ts`, точки входа `src/<module>/index.ts` и весь тест структуры. `kernel-files.txt` в список не входит: его дополняет каждая задача ядра (ST-05).
+- **Файлы skeleton** (ST-15) — по R9 плана: интерфейсы портов, таблица команд с `stubs.ts`, `src/cli/main.ts`, `src/kernel/version.ts`, точки входа `src/<module>/index.ts` и весь тест структуры. `kernel-files.txt` в список не входит: его дополняет каждая задача ядра (ST-05). Пересмотрено 2026-10-07 (R9): точки входа и `stubs.ts` из списка убраны — их пополняет каждая задача.
 - **Заглушки команд** — `src/cli/stubs.ts`, отдельно от таблицы `src/cli/commands.ts`.
 - **Исправленный proposal** e2e — второй change request `cr/good` с фикстурой `pass`, а не правка первого.
 - **KR-01** ловит строковые литералы, называющие `std` или его тип, и идентификаторы, названные по типу `std` (`Requirement`, `reviewNote`, `NAMESPACE`).
