@@ -3,7 +3,7 @@
 // store at the tail of main (LG-14), the commit is appended to the store on the
 // worktree and pushed with it, chained to the tail; a change request never
 // writes the store itself (LG-23).
-import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -20,7 +20,7 @@ import {
 } from "../../src/ledger/index.js";
 import { AT, gitForTests, landingPortsForTests, type GitFixtureBranch, type GitFixtureOptions } from "../support/assembly.js";
 import { deepFreeze } from "../support/deep-freeze.js";
-import { proposal, storeTextOf, text } from "../support/landing.js";
+import { moveMain, onMain, proposal, refusals, storeTextOf, text } from "../support/landing.js";
 
 const BRANCHES: GitFixtureOptions["branches"] = {
   main: { files: { "README.md": "one\n" } },
@@ -65,14 +65,6 @@ async function storeOnMain(ports: LandingPorts) {
 /** The store on main as text: `store/knowledge.jsonl` as `openTail` read it, `""` where main has none. */
 const storeTextOnMain = async (ports: LandingPorts) => text((await storeOnMain(ports)).file);
 
-/** The tail of main and a worktree of `request` prepared onto it; without `request`, of the tail commit alone. */
-async function onMain(git: Git, request?: string) {
-  const onto = await git.tail("main");
-  const worktree = onto === null ? null : await git.prepare({ request: request ?? onto, onto });
-  if (onto === null || worktree?.kind !== "worktree") throw new Error(`bug: ${request ?? "main"} of the fixture prepares onto main`);
-  return { onto, worktree };
-}
-
 /** The paths of the files under `under` on main: the tree of its tail commit, code and proposals, which the store does not answer. */
 async function filesOnMain(git: Git, under: string): Promise<readonly string[]> {
   const { worktree } = await onMain(git);
@@ -83,19 +75,11 @@ async function filesOnMain(git: Git, under: string): Promise<readonly string[]> 
   }
 }
 
-/** Someone else moves main: the code of `request` pushed onto its tail, with its own message and no trailers of landing. */
-async function moveMain(git: Git, request: string): Promise<void> {
-  const { onto, worktree } = await onMain(git, request);
-  await git.push({ worktree, ref: "main", expected: onto, message: "m", trailers: [] });
-}
-
 const landed = async (ports: LandingPorts, request: string) => {
   const out = await land(ports, request, LAND);
   if (out.outcome !== "commit") throw new Error(`bug: ${request} ended ${out.outcome}`);
   return out.commit;
 };
-
-const refusals = (out: LandingOutcome) => (out.outcome === "rejections" ? out.rejections.map((r) => [r.rule, r.path]) : out.outcome);
 
 /** The git of the fixture, every push it was given kept in `pushes`. */
 function recording(branches = BRANCHES): { readonly git: Git; readonly pushes: Push[] } {
@@ -370,59 +354,5 @@ describe("time and ids of landing (LG-23)", () => {
       AT,
       [["01JB2X00000000000000000SES", written]],
     ]);
-  });
-});
-
-describe("the worktrees landing prepares (LG-23, D206)", () => {
-  const empty = JSON.stringify({ session: { id: "01JB2X00000000000000000SES" }, intents: [], sig: null });
-  // A trigger: cr/forged brings a store file no landing wrote.
-  const branches = {
-    ...BRANCHES,
-    "cr/code": { from: "main", files: { "src/y.ts": "y\n", "store/proposals/code.json": empty } },
-    "cr/forged": { from: "main", files: { [KNOWLEDGE]: "forged\n", "store/proposals/f.json": proposal("demo/f") } },
-  };
-
-  /** A git whose push finds main moved: someone else pushed cr/readme just before it. */
-  function movingMain(): Git {
-    const inner = portsOf({}, branches).git;
-    const push = async (p: Push) => {
-      await moveMain(inner, "cr/readme");
-      return inner.push(p);
-    };
-    return { tail: (ref) => inner.tail(ref), prepare: (p) => inner.prepare(p), push };
-  }
-
-  const fails = (): never => {
-    throw new Error("acts unreachable");
-  };
-
-  // Each outcome of landing and of opening the store at the tail, with what it ends with.
-  const OUTCOMES: readonly (readonly [string, () => Promise<unknown>, unknown])[] = [
-    ["commit", async () => (await land(portsOf({}, branches), "cr/a", LAND)).outcome, "commit"],
-    ["commit, dry run", async () => (await land(portsOf({}, branches), "cr/a", DRY_RUN)).outcome, "commit"],
-    ["no-op", async () => land(portsOf({}, branches), "cr/code", LAND), { outcome: "no-op", pushed: true }],
-    ["no-op, dry run", async () => land(portsOf({}, branches), "cr/code", DRY_RUN), { outcome: "no-op", pushed: false }],
-    ["rejections: no proposal (LG-54)", async () => refusals(await land(portsOf({}, branches), "cr/none", LAND)), [["LG-54", "/store/proposals"]]],
-    ["rejections: no JSON (KR-10)", async () => refusals(await land(portsOf({}, branches), "cr/broken", LAND)), [["KR-10", "/store/proposals/cr-x.json"]]],
-    ["rejections: the store brought (LG-23)", async () => refusals(await land(portsOf({}, branches), "cr/forged", LAND)), [["LG-23", "/store/knowledge.jsonl"]]],
-    ["rejections of apply", async () => {
-      const ports = portsOf({}, branches);
-      await landed(ports, "cr/a");
-      return (await land(ports, "cr/a", LAND)).outcome;
-    }, "rejections"],
-    ["moved", async () => land(portsOf({ git: movingMain() }, branches), "cr/a", LAND), { outcome: "moved" }],
-    ["conflict", async () => {
-      const ports = portsOf({}, branches);
-      await moveMain(ports.git, "cr/readme");
-      return land(ports, "cr/clash", LAND);
-    }, { outcome: "conflict", paths: ["README.md"] }],
-    ["an exception", async () => land(portsOf({ acts: { read: fails } }, branches), "cr/a", LAND).catch((e: Error) => e.message), "acts unreachable"],
-    ["the store at the tail opened", async () => (await openTail(portsOf({}, branches))).ok, true],
-    ["the store at the tail refused", async () => (await openTail(portsOf({}, { ...branches, main: { files: { [`${KNOWLEDGE}/x`]: "x\n" } } }))).ok, false],
-  ];
-
-  it.each(OUTCOMES)("LG-23: no worktree is left in the directory of git-fixture after %s", async (_, run, ends) => {
-    expect(await run()).toEqual(ends);
-    expect(readdirSync(dir)).toEqual([]);
   });
 });
