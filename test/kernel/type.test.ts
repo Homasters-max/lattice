@@ -167,6 +167,15 @@ describe("positions of the card along the chain (KR-19)", () => {
     ]);
   });
 
+  it("KR-19: refuses a position a field of a farther parent holds, though the nearer parent dropped it", () => {
+    const grand = type(card(1), { abstract: true });
+    const parent = type(NOTE, { abstract: true, extends: "demo/grand@1" });
+    const child = type({ ...NOTE, properties: { text: { type: "string" }, more: { type: "string", card_order: 1 } } }, { extends: "demo/base@1" });
+    expect(checkType(deepFreeze(child), typesOf({ "demo/base@1": parent, "demo/grand@1": grand }), ROOT)).toEqual([
+      reject(KR_19, { intent: null, path: "/schema/properties/more/card_order", expected: "a position no other field holds along the extends chain", got: 1 }),
+    ]);
+  });
+
   it("KR-19: refuses two fields of one type at one position", () => {
     const twice = { type: "object", properties: { a: { type: "string", card_order: 1 }, b: { type: "string", card_order: 1 } } };
     expect(refusals(type(twice))).toEqual([["KR-19", "/schema/properties/b/card_order"]]);
