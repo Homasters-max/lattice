@@ -103,10 +103,11 @@ describe("a block that print does not write back is not built (LG-42)", () => {
     expect(refusals(document({ heading: "a\nb", items: [] }))).toEqual([["LG-42", "/heading"]]);
   });
 
-  it("LG-42: refuses text md does not keep — a space at the end, an unescaped |, a padded cell, an empty list item", () => {
+  it("LG-42: refuses text md does not keep — a space at the end, an unescaped |, a padded cell, an empty list item, a list without items", () => {
     expect(refusals(prose({ text: "AA-Z01. x " }))).toEqual([["LG-42", ""]]);
     for (const cell of ["a | b", " a", "a ", "a\r"]) expect([cell, refusals(clause({ cells: ["AA-01", cell] }))]).toEqual([cell, [["LG-42", ""]]]);
     for (const item of ["", " a"]) expect([item, refusals(prose({ text: "AA-Z01. Kinds:", field: { list: [item] } }))]).toEqual([item, [["LG-42", ""]]]);
+    expect(refusals(prose({ text: "AA-Z01. Kinds:", field: { list: [] } }))).toEqual([["LG-42", ""]]);
     expect(refusals(clauses({ header: ["ID", "a | b"], rows: [row(["AA-01", "x"])] }))).toEqual([["LG-42", "/header"]]);
   });
 
