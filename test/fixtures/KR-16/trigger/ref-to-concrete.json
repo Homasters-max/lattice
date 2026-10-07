@@ -1,8 +1,46 @@
 {
-  "check": "type",
+  "check": "record",
   "input": {
-    "body": { "abstract": false, "kind": "entity", "schema": { "type": "object", "properties": { "period": { "$ref": "demo/period@1" } }, "required": ["period"] } },
-    "types": { "demo/period@1": { "abstract": false, "kind": "entity", "schema": { "type": "object", "properties": { "from": { "type": "string", "format": "date" } }, "required": ["from"] } } }
+    "record": {
+      "type": "core/type@1",
+      "rev": 1,
+      "body": {
+        "abstract": false,
+        "kind": "entity",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "period": {
+              "$ref": "demo/period@1"
+            }
+          },
+          "required": [
+            "period"
+          ]
+        }
+      }
+    },
+    "types": {
+      "demo/period@1": {
+        "abstract": false,
+        "kind": "entity",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "from": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          "required": [
+            "from"
+          ]
+        }
+      }
+    }
   },
-  "expect": { "rule": "KR-16", "path": "/schema/properties/period/$ref" }
+  "expect": {
+    "rule": "KR-16",
+    "path": "/body/schema/properties/period/$ref"
+  }
 }

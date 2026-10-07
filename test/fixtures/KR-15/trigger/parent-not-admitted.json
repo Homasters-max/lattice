@@ -1,0 +1,37 @@
+{
+  "check": "record",
+  "input": {
+    "record": {
+      "type": "core/type@1",
+      "rev": 1,
+      "body": {
+        "extends": "demo/base@1",
+        "abstract": false,
+        "kind": "entity",
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "types": {
+      "demo/base@1": {
+        "abstract": true,
+        "kind": "entity",
+        "schema": {
+          "type": "array",
+          "const": [
+            1
+          ],
+          "items": 5
+        }
+      }
+    }
+  },
+  "expect": {
+    "rule": "KR-15",
+    "path": "/body/extends"
+  }
+}

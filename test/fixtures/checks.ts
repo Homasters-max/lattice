@@ -11,13 +11,10 @@ import { join } from "node:path";
 import { fileOf } from "../../src/adapters/store-jsonl/index.js";
 import { LG_42, parse, RM_01, RM_02 } from "../../src/codec/index.js";
 import {
-  checkBody,
+  checkAgainstType,
   checkFormat,
   checkHeader,
-  checkRecordType,
-  checkRev,
   checkSchema,
-  checkType,
   checkUri,
   isJsonObject,
   KR_04,
@@ -39,12 +36,10 @@ import {
   parseJsonBytes,
   parseRef,
   refused,
-  type Format,
+  type CanonicalFormat,
   type JsonValue,
   type Kind,
-  type Rejection,
   type ResolveType,
-  type Schema,
 } from "../../src/kernel/index.js";
 import {
   apply,
@@ -88,24 +83,13 @@ const json: FixtureCheck = {
 /** `input`: `{ format, value }` — a format of KR-11 and a JSON value, checked from the root. */
 const format: FixtureCheck = {
   enforces: [KR_11.id],
-  run: (input) => refused(checkFormat(field(input, "format") as Format, field(input, "value") as JsonValue, { intent: null, path: "" })) ?? { ok: true },
+  run: (input) => refused(checkFormat(field(input, "format") as CanonicalFormat, field(input, "value") as JsonValue, { intent: null, path: "" })) ?? { ok: true },
 };
 
-/** `rev` against the kind of the record's type, when the fixture gives the kind (KR-05). */
-function revOf(record: JsonValue, kind: Kind | undefined): readonly Rejection[] {
-  return kind === undefined ? [] : checkRev(kind, isJsonObject(record) ? record.rev : undefined, { intent: null, path: "/rev" });
-}
-
-/**
- * `input`: `{ record, kind? }` — the header of a record, checked from the root as a store opens; with `kind`, the kind
- * of its type, `rev` against it too, as phase 2 of apply will (KR-05).
- */
+/** `input`: `{ record }` — the header of a record, checked from the root as a store opens. */
 const header: FixtureCheck = {
   enforces: [KR_04.id, KR_06.id, KR_07.id, KR_08.id, KR_11.id],
-  run: (input) => {
-    const record = field(input, "record") as JsonValue;
-    return refused([...checkHeader(record, ""), ...revOf(record, field(input, "kind") as Kind | undefined)]) ?? { ok: true };
-  },
+  run: (input) => refused(checkHeader(field(input, "record") as JsonValue, "")) ?? { ok: true },
 };
 
 /** `input`: `{ ref }` — a string parsed as a reference from the root. */
@@ -126,37 +110,20 @@ const schema: FixtureCheck = {
   run: (input) => refused(checkSchema(field(input, "schema") as JsonValue, field(input, "kind") as Kind, { intent: null, path: "" })) ?? { ok: true },
 };
 
-/** The schema `types` gives a pinned reference, as the caller of validate resolves `$ref` (KR-21); `null` when it gives none. */
-function resolveFrom(types: unknown): (ref: string) => Schema | null {
-  const known = (types ?? {}) as { readonly [ref: string]: Schema };
-  return (ref) => (Object.hasOwn(known, ref) ? (known[ref] ?? null) : null);
-}
-
-/** `input`: `{ body, schema, types? }` — a body against a schema, checked from the root; `$ref` resolved from `types`. */
-const body: FixtureCheck = {
-  enforces: [KR_21.id],
-  run: (input) => {
-    const resolve = resolveFrom(field(input, "types"));
-    return refused(checkBody(field(input, "body") as JsonValue, field(input, "schema") as Schema, resolve, { intent: null, path: "" })) ?? { ok: true };
-  },
-};
-
-/** The type bodies `types` gives by pinned reference, as phase 2 resolves them over `after` (KR-15, KR-16); `null` for others. */
+/** The type bodies `types` gives by pinned reference, as phase 2 resolves them over `after` (LG-11, KR-15); `null` for others. */
 function typesFrom(types: unknown): ResolveType {
   const known = (types ?? {}) as { readonly [ref: string]: JsonValue };
   return (ref) => (Object.hasOwn(known, ref) ? (known[ref] ?? null) : null);
 }
 
-/** `input`: `{ body, types? }` — the body of a type, checked from the root; its parents and `$ref` targets resolved from `types`. */
-const type: FixtureCheck = {
-  enforces: [KR_14.id, KR_15.id, KR_16.id, KR_18.id, KR_19.id],
-  run: (input) => refused(checkType(field(input, "body") as JsonValue, typesFrom(field(input, "types")), { intent: null, path: "" })) ?? { ok: true },
-};
-
-/** `input`: `{ type }` — the body of the type of a record, checked at `/type`, where the record names it (KR-16). */
-const recordType: FixtureCheck = {
-  enforces: [KR_16.id],
-  run: (input) => refused(checkRecordType(field(input, "type") as JsonValue, { intent: null, path: "/type" })) ?? { ok: true },
+/**
+ * `input`: `{ record, types? }` — a record `{type, rev?, body}` against its type, checked from the root as phase 2 of
+ * apply checks one record (LG-16): its type, the parents and the `$ref` targets resolved from `types`; a record of
+ * `core/type@1` is a type body.
+ */
+const record: FixtureCheck = {
+  enforces: [KR_04.id, KR_14.id, KR_15.id, KR_16.id, KR_18.id, KR_19.id, KR_21.id],
+  run: (input) => refused(checkAgainstType(field(input, "record") as Parameters<typeof checkAgainstType>[0], typesFrom(field(input, "types")), { intent: null, path: "" })) ?? { ok: true },
 };
 
 /** `input`: `{ proposal }`, read as a proposal value, refused from its root. */
@@ -308,9 +275,7 @@ export const CHECKS: { readonly [check: string]: FixtureCheck } = {
   ref,
   uri,
   schema,
-  body,
-  type,
-  "record-type": recordType,
+  record,
   proposal,
   apply: applyCheck,
   store,

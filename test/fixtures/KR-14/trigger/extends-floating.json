@@ -1,8 +1,46 @@
 {
-  "check": "type",
+  "check": "record",
   "input": {
-    "body": { "extends": "demo/base", "abstract": false, "kind": "entity", "schema": { "type": "object", "properties": { "text": { "type": "string" } }, "required": ["text"] } },
-    "types": { "demo/base@1": { "abstract": true, "kind": "entity", "schema": { "type": "object", "properties": { "text": { "type": "string" } }, "required": ["text"] } } }
+    "record": {
+      "type": "core/type@1",
+      "rev": 1,
+      "body": {
+        "extends": "demo/base",
+        "abstract": false,
+        "kind": "entity",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
+      }
+    },
+    "types": {
+      "demo/base@1": {
+        "abstract": true,
+        "kind": "entity",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
+      }
+    }
   },
-  "expect": { "rule": "KR-14", "path": "/extends" }
+  "expect": {
+    "rule": "KR-14",
+    "path": "/body/extends"
+  }
 }

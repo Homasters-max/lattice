@@ -1,11 +1,63 @@
 {
-  "check": "type",
+  "check": "record",
   "input": {
-    "body": { "extends": "demo/a@1", "abstract": false, "kind": "entity", "schema": { "type": "object", "properties": { "text": { "type": "string" } }, "required": ["text"] } },
+    "record": {
+      "type": "core/type@1",
+      "rev": 1,
+      "body": {
+        "extends": "demo/a@1",
+        "abstract": false,
+        "kind": "entity",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
+      }
+    },
     "types": {
-      "demo/a@1": { "extends": "demo/b@1", "abstract": true, "kind": "entity", "schema": { "type": "object", "properties": { "text": { "type": "string" } }, "required": ["text"] } },
-      "demo/b@1": { "extends": "demo/a@1", "abstract": true, "kind": "entity", "schema": { "type": "object", "properties": { "text": { "type": "string" } }, "required": ["text"] } }
+      "demo/a@1": {
+        "extends": "demo/b@1",
+        "abstract": true,
+        "kind": "entity",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
+      },
+      "demo/b@1": {
+        "extends": "demo/a@1",
+        "abstract": true,
+        "kind": "entity",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
+      }
     }
   },
-  "expect": { "rule": "KR-15", "path": "/extends" }
+  "expect": {
+    "rule": "KR-15",
+    "path": "/body/extends"
+  }
 }

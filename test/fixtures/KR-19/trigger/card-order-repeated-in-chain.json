@@ -1,23 +1,53 @@
 {
-  "check": "type",
+  "check": "record",
   "input": {
-    "body": {
-      "extends": "demo/base@1",
-      "abstract": false,
-      "kind": "entity",
-      "schema": {
-        "type": "object",
-        "properties": { "title": { "type": "string", "card_order": 1 }, "text": { "type": "string", "card_order": 1 } },
-        "required": ["title", "text"]
+    "record": {
+      "type": "core/type@1",
+      "rev": 1,
+      "body": {
+        "extends": "demo/base@1",
+        "abstract": false,
+        "kind": "entity",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "card_order": 1
+            },
+            "text": {
+              "type": "string",
+              "card_order": 1
+            }
+          },
+          "required": [
+            "title",
+            "text"
+          ]
+        }
       }
     },
     "types": {
       "demo/base@1": {
         "abstract": true,
         "kind": "entity",
-        "schema": { "type": "object", "properties": { "title": { "type": "string", "card_order": 1 } }, "required": ["title"] }
+        "schema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "card_order": 1
+            }
+          },
+          "required": [
+            "title"
+          ]
+        }
       }
     }
   },
-  "expect": { "rule": "KR-19", "path": "/schema/properties/text/card_order" }
+  "expect": {
+    "rule": "KR-19",
+    "path": "/body/schema/properties/text/card_order"
+  }
 }
