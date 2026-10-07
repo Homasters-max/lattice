@@ -6,8 +6,8 @@
 //   wave --dir D --worktree W [--conflicts a,b]               следующий круг: briefs агентов
 //   check <файл.out.json>                                     выход агента против его brief
 //   merge --dir D                                             итоги круга → состояние, отчёт
-//   brief fixer --dir D --worktree W --job answer|verify-red|rebase|owner [--log P] [--owner текст]
-//   answer --dir D                                            ответ исправляющего → состояние, комментарий
+//   brief fixer --dir D --worktree W --job answer|tidy|verify-red|rebase|owner [--log P] [--owner текст]
+//   answer --dir D [--job tidy]                               ответ исправляющего → состояние, комментарий
 //   escalate --dir D --why текст [--from файл.out.json]       вопрос владельцу: комментарий и questions
 //   owner --dir D (--answers файл.json | --text текст)        решение владельца → состояние, комментарий
 //   final --dir D                                             итоговый комментарий
@@ -19,7 +19,7 @@ import { join } from "node:path";
 import { check, FIXER_JOBS } from "./dev-loop/protocol.mjs";
 import { answer, decision, escalation, final, parseHeader, questions, review } from "./dev-loop/render.mjs";
 import { changedLines, scope } from "./dev-loop/scope.mjs";
-import { answerFindings, answerText, ask, entryOf, initial, mergeWave, openFindings, planWave, recordAnswer, toAnswer } from "./dev-loop/state.mjs";
+import { answerFindings, answerText, ask, entryOf, initial, looseFindings, mergeWave, openFindings, planWave, recordAnswer } from "./dev-loop/state.mjs";
 
 const COMMENT_MAX = 65000;
 const [command, ...rest] = process.argv.slice(2);
@@ -53,8 +53,9 @@ const repoOf = (worktree) => ({
   head: () => git(worktree, "rev-parse", "HEAD"),
   remote: (branch) => (branch ? git(worktree, "ls-remote", "origin", `refs/heads/${branch}`).split("\t")[0] : ""),
   commits: (from, to) => git(worktree, "rev-list", `${from}..${to}`).split("\n").filter(Boolean),
+  changed: (from, to) => git(worktree, "diff", "--name-only", from, to).split("\n").filter(Boolean),
 });
-const slim = ({ id, axis, severity, rule, where, quote, text, late, history }) => ({ id, axis, severity, rule, where, quote, text, late, history });
+const slim = ({ id, axis, kind, severity, rule, where, quote, text, late, history }) => ({ id, axis, kind, severity, rule, where, quote, text, late, history });
 
 function comment(kind, body) {
   const p = join(dir(), "comments");
@@ -157,22 +158,24 @@ function brief() {
   const job = need("job");
   if (!FIXER_JOBS.includes(job)) fail(`--job: ${FIXER_JOBS.join(" | ")}`);
   const file = join(waveDir(state.wave), `fixer-${job}.in.json`);
-  const answering = job === "answer";
+  const loose = job === "tidy" ? looseFindings(state) : [];
   write(file, {
     role: "fixer", job, pr: state.pr, task: state.task, branch: state.branch, worktree: need("worktree"), base: state.head ?? undefined,
-    findings: answering ? openFindings(state).map(slim) : [], advice: answering ? state.findings.filter((f) => f.status === "advice").map(slim) : [],
-    decisions: answering ? state.decisions : [], log: flags.log, owner: flags.owner ?? state.owner?.text, out: file.replace(".in.json", ".out.json"),
+    findings: job === "answer" ? openFindings(state).map(slim) : loose.filter((f) => f.severity === "block").map(slim),
+    advice: loose.filter((f) => f.severity === "advice").map(slim),
+    decisions: job === "answer" ? state.decisions : [], log: flags.log, owner: flags.owner ?? state.owner?.text, out: file.replace(".in.json", ".out.json"),
   });
   if (state.owner) save({ ...state, owner: null });
-  print({ ok: true, brief: file, answer: answering ? toAnswer(state) : [] });
+  print({ ok: true, brief: file });
 }
 
 function answerCmd() {
   const state = load();
-  const r = checked(join(waveDir(state.wave), "fixer-answer.out.json"));
+  const job = flags.job ?? "answer";
+  const r = checked(join(waveDir(state.wave), `fixer-${job}.out.json`));
   if (r.errors.length) return print({ ok: false, errors: r.errors });
   if (r.value.status === "needs_owner") return print({ ok: true, status: "needs_owner" });
-  const next = recordAnswer(state, r.value);
+  const next = recordAnswer(state, r.value, job);
   save(next);
   print({ ok: true, status: "done", head: r.value.head, disputed: next.answers.items.filter((a) => a.action === "disputed").map((a) => a.id), comment: comment("answer", answer(next)) });
 }

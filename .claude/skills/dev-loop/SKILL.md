@@ -24,6 +24,7 @@ argument-hint: "[S0-NN | PR <n>]"
 | `review` | все `agents` одним сообщением, затем `dl merge` |
 | `merge` | `dl merge` |
 | `fix` | `dl brief fixer --worktree <work> --job answer` → новый агент `fixer` → `dl answer` → пост → «Ворота». `status: needs_owner` — эскалация с `--why "вопрос исправляющего" --from <out>` |
+| `tidy` | `dl brief fixer --worktree <work> --job tidy` → новый агент `fixer` → `dl answer --job tidy` → пост → «Ворота» |
 | `gate` | «Ворота» |
 | `instruct` | `dl brief fixer --worktree <work> --job owner` → новый агент `fixer` → `dl check <out>` → «Ворота» |
 | `resume` | ответ владельца агенту `agent`: живому — `SendMessage` `DEV-LOOP-OWNER <ответ>`; если его нет — новый по `dl brief executor --task <ID> --worktree <work>` или `dl brief fixer --worktree <work> --job <job>` (ответ brief берёт из состояния) |
@@ -62,8 +63,8 @@ Worktree: `git fetch origin`. Новая задача — `git worktree add --de
 ## Сдать
 
 - `git merge-base --is-ancestor origin/main HEAD` ложно — `dl brief fixer --worktree <work> --job rebase` → агент `fixer` → `dl check <out>` → verify. `conflicts` задевают `src/` или `test/` — `dl wave --worktree <work> --conflicts <файлы через запятую>`, дальше по `next`. Иначе — к следующему пункту.
-- `dl final` → пост. `gh pr ready <n>`, `gh pr edit <n> --remove-label blocked`.
-- Владельцу одна строка: задача, число кругов, ссылка на PR, есть ли что решить до merge. Merge делает владелец.
+- `dl final` → пост. `gh pr ready <n>`; метка `blocked` на PR есть (`gh pr view <n> --json labels`) — `gh pr edit <n> --remove-label blocked`.
+- Владельцу: задача, число кругов, ссылка на PR; что отложено в план и куда, что отклонено, что решить до merge — по разделам итога, без пересказа. Merge делает владелец.
 
 ## Эскалация
 

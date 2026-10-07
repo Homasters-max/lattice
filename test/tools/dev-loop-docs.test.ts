@@ -43,7 +43,7 @@ describe("dev-loop documents, commands and contract", () => {
   it("names in the protocol every job, status and outcome the code knows", () => {
     const jobs = [...listOf(protocolCode, "REVIEW_JOBS"), ...listOf(protocolCode, "FIXER_JOBS")];
     for (const job of listOf(protocolCode, "REVIEW_JOBS")) expect(tool + stateCode).toContain(`"${job}"`);
-    for (const word of [...jobs, ...listOf(protocolCode, "STATUSES"), "ready", "needs_owner", "done", "fixed", "disputed"])
+    for (const word of [...jobs, ...listOf(protocolCode, "STATUSES"), ...listOf(protocolCode, "KINDS"), "ready", "needs_owner", "done", "fixed", "disputed", "deferred", "declined"])
       expect(protocol).toMatch(new RegExp(`[\`"]${word}[\`"]`));
   });
 
