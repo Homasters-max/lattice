@@ -1,0 +1,17 @@
+{
+  "check": "body",
+  "input": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" }
+      },
+      "required": ["title"]
+    },
+    "body": {}
+  },
+  "expect": {
+    "rule": "KR-21",
+    "path": "/title"
+  }
+}

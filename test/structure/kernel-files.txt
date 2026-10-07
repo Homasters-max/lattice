@@ -1,5 +1,6 @@
 # ST-05: every file reachable from src/kernel/index.ts; the structure test
 # fails when the reach and this list differ. One path per line, sorted.
+src/kernel/annotations.ts
 src/kernel/canon.ts
 src/kernel/formats.ts
 src/kernel/hash.ts
@@ -11,5 +12,7 @@ src/kernel/record.ts
 src/kernel/ref.ts
 src/kernel/rejection.ts
 src/kernel/rules.ts
+src/kernel/schema.ts
 src/kernel/uri.ts
+src/kernel/validate.ts
 src/kernel/version.ts

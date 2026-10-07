@@ -1,0 +1,17 @@
+{
+  "check": "schema",
+  "input": {
+    "kind": "entity",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "of": { "type": "string", "format": "ref", "key": true }
+      },
+      "required": ["of"]
+    }
+  },
+  "expect": {
+    "rule": "KR-19",
+    "path": "/properties/of/key"
+  }
+}

@@ -74,7 +74,7 @@ describe("rejections (LG-17)", () => {
   });
 
   it("ST-17: registers every rule the kernel enforces once", () => {
-    expect(RULES.map((r) => r.id)).toEqual(["KR-04", "KR-06", "KR-07", "KR-08", "KR-10", "KR-11", "KR-13", "KR-23", "KR-24"]);
+    expect(RULES.map((r) => r.id)).toEqual(["KR-04", "KR-06", "KR-07", "KR-08", "KR-10", "KR-11", "KR-13", "KR-18", "KR-19", "KR-21", "KR-23", "KR-24"]);
   });
 });
 

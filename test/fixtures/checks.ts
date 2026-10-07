@@ -10,9 +10,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileOf } from "../../src/adapters/store-jsonl/index.js";
 import {
+  checkBody,
   checkFormat,
   checkHeader,
   checkRev,
+  checkSchema,
   checkUri,
   isJsonObject,
   KR_04,
@@ -22,6 +24,9 @@ import {
   KR_10,
   KR_11,
   KR_13,
+  KR_18,
+  KR_19,
+  KR_21,
   KR_23,
   KR_24,
   parseJson,
@@ -32,6 +37,7 @@ import {
   type JsonValue,
   type Kind,
   type Rejection,
+  type Schema,
 } from "../../src/kernel/index.js";
 import { apply, createView, encodeCommit, land, LG_06, LG_09, LG_23, LG_54, openLines, readProposal, type LandActs } from "../../src/ledger/index.js";
 import { landingPortsForTests, type GitFixtureOptions } from "../support/assembly.js";
@@ -84,6 +90,27 @@ const ref: FixtureCheck = {
 const uri: FixtureCheck = {
   enforces: [KR_24.id],
   run: (input) => refused(checkUri(field(input, "value") as JsonValue, { intent: null, path: "" })) ?? { ok: true },
+};
+
+/** `input`: `{ schema, kind }` — the schema of a type of this kind, checked from the root (KR-18, KR-19). */
+const schema: FixtureCheck = {
+  enforces: [KR_18.id, KR_19.id],
+  run: (input) => refused(checkSchema(field(input, "schema") as JsonValue, field(input, "kind") as Kind, { intent: null, path: "" })) ?? { ok: true },
+};
+
+/** The schema `types` gives a pinned reference, as the caller of validate resolves `$ref` (KR-21); `null` when it gives none. */
+function resolveFrom(types: unknown): (ref: string) => Schema | null {
+  const known = (types ?? {}) as { readonly [ref: string]: Schema };
+  return (ref) => (Object.hasOwn(known, ref) ? (known[ref] ?? null) : null);
+}
+
+/** `input`: `{ body, schema, types? }` — a body against a schema, checked from the root; `$ref` resolved from `types`. */
+const body: FixtureCheck = {
+  enforces: [KR_21.id],
+  run: (input) => {
+    const resolve = resolveFrom(field(input, "types"));
+    return refused(checkBody(field(input, "body") as JsonValue, field(input, "schema") as Schema, resolve, { intent: null, path: "" })) ?? { ok: true };
+  },
 };
 
 /** `input`: `{ proposal }`, read as a proposal value, refused from its root. */
@@ -182,6 +209,8 @@ export const CHECKS: { readonly [check: string]: FixtureCheck } = {
   header,
   ref,
   uri,
+  schema,
+  body,
   proposal,
   apply: applyCheck,
   store,

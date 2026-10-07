@@ -28,9 +28,26 @@ rules: [KR-18, KR-19, KR-20, KR-21]
 ## Интерфейс
 
 ```ts
-checkSchema(schema, ctx: { kind: "entity" | "event" }): Violation[]   // KR-18, KR-19
-validate(value, schema, resolve: (ref) => Schema | null): Violation[] // KR-21; [] значит ok
+// src/kernel/schema.ts, src/kernel/annotations.ts
+type Schema = JsonObject                                                   // схема, которую checkSchema принял
+checkSchema(schema: JsonValue, kind: Kind, place: Place): Rejection[]      // KR-18, KR-19; отказы отсортированы
+
+// src/kernel/validate.ts
+type Violation = { path, keyword, expected, got }                          // KR-21; path — JSON Pointer (G-13)
+type Resolve = (ref: string) => Schema | null                              // $ref как записан: type@n
+validate(value, schema: Schema, resolve): { ok: true } | { ok: false, violations }   // KR-21, CONVENTIONS §2
+checkBody(body, schema: Schema, resolve, place: Place): Rejection[]        // KR-21: отказ на каждое нарушение
+
+// src/kernel/ref.ts
+isPinned(s: string): boolean               // pinned ссылка без фрагмента: type записи, $ref, ref.to
 ```
+
+Как сделано:
+- **Интерфейс по соглашениям, а не по наброску.** `checkSchema` — жёсткая проверка с фикстурами ST-17, поэтому отказы `Rejection` с KR-18 и KR-19 и путём от `place.path` (CONVENTIONS §2), а не `Violation[]`; `kind` — аргумент, как у `checkId` и `checkRev`. `validate` возвращает `{ ok } | { ok: false, violations }`, как велит CONVENTIONS §2.
+- **`checkBody`** добавлен к `validate`: фикстуре KR-21 нужна жёсткая проверка, а отказ строит только проверка ядра. Каждое нарушение — отказ KR-21 с путём `place.path` + путь нарушения и `expected` `{keyword: …}`; фаза 2 apply зовёт её (заметка в S0-13). Все нарушения — KR-21, и формат внутри схемы тоже, а не KR-11: отказы правил формата — для проверок вне схемы (заметка S0-04).
+- **Форма схемы и места аннотаций** — по рекомендациям G-22 и G-23 (PLAN.md, раздел 12). Схема без `type`, `$ref`, `oneOf`, `enum` и `const` отклоняется: она пускала бы любой объект, а объекты всегда закрыты.
+- **`validate` над схемой, которую принял `checkSchema`**: другая схема — ошибка программы `bug:`, а не нарушение значения. Аннотации `validate` не проверяет: `pin` и метка — фаза 4 (S0-15). `$ref`, которого `resolve` не знает, и `$ref`, вернувшийся к себе до спуска в значение, — нарушения `$ref`, а не исключение и не зацикливание. Обе проверки идут своим стеком, так что глубина вложенности стек не переполняет.
+- **`isPinned`** вынесен в `ref.ts` из `checkType` заголовка (KR-07): та же грамматика нужна `$ref` и `ref.to`. В `json.ts` — `isJsonArray` (`Array.isArray` сужает до `any[]`) и `own`: член объекта читается только свой, поле может называться `constructor`.
 
 ## Тесты и фикстуры
 
@@ -38,11 +55,13 @@ validate(value, schema, resolve: (ref) => Schema | null): Violation[] // KR-21; 
 - Порядок нарушений стабилен при перестановке ключей входа.
 - Фикстуры trigger/pass: KR-18 (ключевое слово вне подмножества, открытый объект), KR-19 (аннотация не на своём месте), KR-21 (тело не проходит схему типа).
 
+Как сделано: `test/kernel/schema.test.ts` — каждое ключевое слово на месте, вне места и с плохим значением, запрещённые, закрытость, `$ref` и `oneOf` (`const` разных типов различны: `1` и `"1"`), кардинальность KR-20, что называет отказ каждого рода — `intent` и место вызывающего, `expected`, `got`, порядок; `test/kernel/schema-annotations.test.ts` — место и форма каждой аннотации, у `ref` — каждый член из `{to, pin, label}` обязателен, отказ — с `intent` вызывающего; `test/kernel/validate.test.ts` — каждое ключевое слово проходит и не проходит, нарушение каждого — целиком `{path, keyword, expected, got}`, объекты, map, массивы, `oneOf`, `$ref`; `test/kernel/validate-order.test.ts` — порядок, свойство fast-check «перестановка ключей значения и схемы не меняет результат», `resolve` — единственный вход, `checkBody`. Строки `checks.ts`: `schema` (`{schema, kind}` — `checkSchema` от корня), `body` (`{body, schema, types?}` — `checkBody` от корня, `$ref` из `types`). Фикстуры — `test/fixtures/{KR-18,KR-19,KR-21}/`. KR-20 своей жёсткой проверки не имеет: её держит закрытость KR-18, показывают тесты.
+
 ## Готово, когда
 
-- [ ] схема вне подмножества отклоняется с KR-18 и путём к ключевому слову
-- [ ] `validate` детерминирован и не читает ничего, кроме `resolve`
-- [ ] фикстуры KR-18, KR-19, KR-21 — trigger и pass
+- [x] схема вне подмножества отклоняется с KR-18 и путём к ключевому слову
+- [x] `validate` детерминирован и не читает ничего, кроме `resolve`
+- [x] фикстуры KR-18, KR-19, KR-21 — trigger и pass
 
 ## Риски и заметки
 

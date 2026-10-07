@@ -11,6 +11,12 @@ export type JsonObject = { readonly [key: string]: JsonValue };
 
 export const isJsonObject = (v: JsonValue | undefined): v is JsonObject => typeof v === "object" && v !== null && !Array.isArray(v);
 
+/** The member of an object under a key — its own, never one of `Object.prototype`: a field may be named `constructor`. */
+export const own = (o: JsonObject, key: string): JsonValue | undefined => (Object.hasOwn(o, key) ? o[key] : undefined);
+
+/** An array of JSON values — `Array.isArray` narrows to `any[]`. */
+export const isJsonArray = (v: JsonValue | undefined): v is readonly JsonValue[] => Array.isArray(v);
+
 /** `got` of a check of a form (CONVENTIONS.md §3): the value that came, or the description "absent" for a field that has none. */
 export const gotOf = (v: JsonValue | undefined): JsonValue => (v === undefined ? "absent" : v);
 

@@ -1,0 +1,16 @@
+{
+  "check": "schema",
+  "input": {
+    "kind": "entity",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "target": { "type": "string", "format": "ref", "ref": { "to": "demo/shape@1", "pin": "loose", "label": "about" } }
+      }
+    }
+  },
+  "expect": {
+    "rule": "KR-19",
+    "path": "/properties/target/ref/pin"
+  }
+}

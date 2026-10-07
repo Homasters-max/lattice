@@ -1,0 +1,16 @@
+{
+  "check": "schema",
+  "input": {
+    "kind": "entity",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "owner": { "type": "string", "format": "email" }
+      }
+    }
+  },
+  "expect": {
+    "rule": "KR-18",
+    "path": "/properties/owner/format"
+  }
+}

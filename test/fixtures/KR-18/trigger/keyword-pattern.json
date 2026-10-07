@@ -1,0 +1,17 @@
+{
+  "check": "schema",
+  "input": {
+    "kind": "entity",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "pattern": "^[A-Z]" }
+      },
+      "required": ["title"]
+    }
+  },
+  "expect": {
+    "rule": "KR-18",
+    "path": "/properties/title/pattern"
+  }
+}

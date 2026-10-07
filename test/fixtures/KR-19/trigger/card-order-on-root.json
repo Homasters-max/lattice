@@ -1,0 +1,17 @@
+{
+  "check": "schema",
+  "input": {
+    "kind": "entity",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" }
+      },
+      "card_order": 1
+    }
+  },
+  "expect": {
+    "rule": "KR-19",
+    "path": "/card_order"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "check": "schema",
+  "input": {
+    "kind": "entity",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "target": { "type": "string", "format": "ref", "edge": "about" }
+      }
+    }
+  },
+  "expect": {
+    "rule": "KR-19",
+    "path": "/properties/target/edge"
+  }
+}

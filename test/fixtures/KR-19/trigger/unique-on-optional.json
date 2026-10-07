@@ -1,0 +1,17 @@
+{
+  "check": "schema",
+  "input": {
+    "kind": "entity",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "unique": true }
+      },
+      "required": []
+    }
+  },
+  "expect": {
+    "rule": "KR-19",
+    "path": "/properties/code/unique"
+  }
+}
