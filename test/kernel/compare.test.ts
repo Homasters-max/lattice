@@ -51,7 +51,7 @@ const rows: readonly Row[] = [
   ["wider: a type paired with null", { type: ["string", "null"] }, S, "revision", { relation: "wider", aspects: ["validity"] }],
   ["narrower: fewer items", { type: "array", items: S, maxItems: 2 }, { type: "array", items: S }, "revision", { relation: "narrower", aspects: ["validity"] }],
   ["wider: an array without items admits any item", { type: "array" }, { type: "array", items: S }, "revision", { relation: "wider", aspects: ["validity"] }],
-  ["narrower: narrower items",{ type: "array", items: { type: "string", maxLength: 1 } }, { type: "array", items: S }, "revision", { relation: "narrower", aspects: ["validity"] }],
+  ["narrower: narrower items", { type: "array", items: { type: "string", maxLength: 1 } }, { type: "array", items: S }, "revision", { relation: "narrower", aspects: ["validity"] }],
   ["narrower: narrower map values", { type: "object", values: { type: "integer" } }, { type: "object", values: { type: "number" } }, "revision", { relation: "narrower", aspects: ["validity"] }],
   ["narrower: an optional field made required", object({ a: S }), object({ a: S }, ["a"]), "revision", { relation: "narrower", aspects: ["validity"] }],
   // objects in revision mode are closed
@@ -79,7 +79,7 @@ const rows: readonly Row[] = [
   ["graph: removed unique is wider", object({ a: S }), object({ a: { type: "string", unique: true } }), "revision", { relation: "wider", aspects: ["unique"] }],
   ["aspects: an added field brings its annotations", object({ a: S, b: { type: "string", card_order: 1 } }, ["b"]), object({ a: S }), "revision", { relation: "wider", aspects: ["validity", "card_order"] }],
   ["aspects: an added required unique field brings unique", object({ a: S, b: { type: "string", unique: true } }), object({ a: S }), "revision", { relation: "incomparable", aspects: ["validity", "unique"] }],
-  ["aspects: validity and presentation together",{ type: "string", maxLength: 1, description: "x" }, S, "revision", { relation: "narrower", aspects: ["validity", "description"] }],
+  ["aspects: validity and presentation together", { type: "string", maxLength: 1, description: "x" }, S, "revision", { relation: "narrower", aspects: ["validity", "description"] }],
   // $ref through resolve
   ["$ref: the same reference is the same", { $ref: "demo/span@1" }, { $ref: "demo/span@1" }, "revision", { relation: "same", aspects: [] }],
   ["$ref: another revision with an equal schema is the same", { $ref: "demo/span@3" }, { $ref: "demo/span@1" }, "revision", { relation: "same", aspects: [] }],
