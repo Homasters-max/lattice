@@ -67,11 +67,11 @@ Push автора — `git push origin HEAD:refs/heads/<branch>` (worktree в de
   - id находкам даёт инструмент.
 
 **fixer** — `job`: `answer` — ответ на круг, `tidy` — хвосты перед сдачей, `verify-red` — красный verify по `log`, `rebase` — пересборка на `origin/main`, `owner` — поручение владельца из `owner`.
-- Вход: `branch`, `base` — ревьюированный head, `findings` — открытые `block` (в `answer` все, в `tidy` — `late`), `advice` — советы (`tidy`), `decisions` — решения владельца `{id, action: fix|task|gap, note}`, `log` (verify-red).
+- Вход: `branch`, `base` — ревьюированный head, `since` — начало ветки (`tidy`), `findings` — открытые `block` (в `answer` все, в `tidy` — `late`), `advice` — советы (`tidy`), `decisions` — решения владельца `{id, action: fix|task|gap, note}`, `log` (verify-red).
 - Выход: `{status: "done" | "needs_owner", head, answers: [{id, action, commits?, where?, note?}], conflicts?: [файл], question?, gaps?}`.
   - На каждую находку из `findings` и `advice` и каждое решение `task` или `gap` — ровно один ответ.
   - `action`: в `answer` — `fixed` | `disputed`; в `tidy` ещё `deferred` | `declined`.
-  - `fixed` — коммиты из `base..head`.
+  - `fixed` — коммиты из `base..head`; в `tidy` — из `since..head`, всей ветки: хвост мог закрыть и более ранний коммит.
   - `disputed` — только о блокирующей находке; `note` называет правило, которое говорит иное. «Трудно» или «вне объёма» — не довод, а `deferred` или вопрос владельцу.
   - `deferred` — `where`: файл задачи или `PLAN.md` фазы, изменённый в этом ответе. `declined` — только совет, причина в `note`.
   - `head` — HEAD worktree, запушенный в `branch`.

@@ -101,12 +101,12 @@ function reviewer(brief, out, errors) {
 const ACTIONS = { answer: ["fixed", "disputed"], tidy: ["fixed", "deferred", "declined", "disputed"] };
 
 function answer(errors, a, ctx) {
-  const { brief, range, changed, advice } = ctx;
+  const { brief, from, range, changed, advice } = ctx;
   need(errors, ACTIONS[brief.job].includes(a.action), `answers.${a.id}: ${ACTIONS[brief.job].join(" | ")}`);
   need(errors, a.note === undefined || text(a.note, LIMITS.note), `answers.${a.id}.note: до ${LIMITS.note} знаков`);
   if (a.action === "fixed")
     need(errors, Array.isArray(a.commits) && a.commits.length > 0 && a.commits.every((c) => range.some((r) => sameSha(r, c))),
-      `answers.${a.id}: commits — коммиты этого ответа (${brief.base.slice(0, 7)}..head)`);
+      `answers.${a.id}: commits — коммиты из ${from.slice(0, 7)}..head`);
   if (a.action === "disputed") need(errors, !advice.has(a.id) && RULE.test(a.note ?? ""), `answers.${a.id}: спор — только о блокирующей находке и с правилом`);
   if (a.action === "deferred")
     need(errors, PLAN_RECORD.test(a.where ?? "") && changed.includes(a.where), `answers.${a.id}: where — файл задачи или PLAN.md фазы, изменённый в этом ответе`);
@@ -120,11 +120,13 @@ function answers(brief, out, errors, repo) {
   const ids = items.map((a) => a.id);
   for (const id of expected) need(errors, ids.includes(id), `answers: нет ответа на ${id}`);
   need(errors, new Set(ids).size === ids.length, "answers: на находку — ровно один ответ");
-  const range = isSha(out.head) ? repo.commits(brief.base, out.head) : [];
+  // tidy: хвост мог закрыть любой коммит ветки — например, поручение владельца до последнего круга.
+  const from = brief.job === "tidy" ? brief.since : brief.base;
+  const range = isSha(out.head) ? repo.commits(from, out.head) : [];
   const changed = isSha(out.head) ? repo.changed(brief.base, out.head) : [];
   for (const a of items) {
     need(errors, expected.includes(a.id), `answers: ${a.id} не поручен`);
-    answer(errors, a, { brief, range, changed, advice });
+    answer(errors, a, { brief, from, range, changed, advice });
   }
 }
 

@@ -161,6 +161,7 @@ function brief() {
   const loose = job === "tidy" ? looseFindings(state) : [];
   write(file, {
     role: "fixer", job, pr: state.pr, task: state.task, branch: state.branch, worktree: need("worktree"), base: state.head ?? undefined,
+    since: job === "tidy" ? git(need("worktree"), "merge-base", "origin/main", "HEAD") : undefined,
     findings: job === "answer" ? openFindings(state).map(slim) : loose.filter((f) => f.severity === "block").map(slim),
     advice: loose.filter((f) => f.severity === "advice").map(slim),
     decisions: job === "answer" ? state.decisions : [], log: flags.log, owner: flags.owner ?? state.owner?.text, out: file.replace(".in.json", ".out.json"),

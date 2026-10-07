@@ -156,7 +156,7 @@ describe("dev-loop, outputs the protocol refuses", { timeout: 30_000 }, () => {
     const fb = fixerBrief(l);
     const base = (read(fb).base as string).slice(0, 7);
     out(fb, { status: "done", head: head(l), answers: [{ id: "W1-T1", action: "fixed", commits: [head(l)] }, { id: "W1-T1", action: "disputed", note: "CONVENTIONS §2" }, { id: "W1-T2", action: "disputed", note: "no" }] });
-    expect(dl(l, "answer").errors).toEqual(["answers: на находку — ровно один ответ", `answers.W1-T1: commits — коммиты этого ответа (${base}..head)`, "answers.W1-T2: спор — только о блокирующей находке и с правилом"]);
+    expect(dl(l, "answer").errors).toEqual(["answers: на находку — ровно один ответ", `answers.W1-T1: commits — коммиты из ${base}..head`, "answers.W1-T2: спор — только о блокирующей находке и с правилом"]);
     writeFileSync(join(l.work, "x.txt"), "x");
     sh(l.work, "git", ["add", "-A"]);
     sh(l.work, "git", ["commit", "-q", "-m", "local"]);
@@ -178,6 +178,15 @@ describe("dev-loop, outputs the protocol refuses", { timeout: 30_000 }, () => {
 });
 
 describe("dev-loop, nothing is lost before the end", { timeout: 30_000 }, () => {
+  it("accepts in tidy an advice fixed by a commit before the reviewed head", () => {
+    const l = loop();
+    expect(round(l, [{ ...BLOCK, kind: "advice", rule: "" }])).toMatchObject({ next: "tidy" });
+    const tb = dl(l, "brief", "fixer", "--worktree", l.work, "--job", "tidy").brief as string;
+    const task = sh(l.work, "git", ["log", "-1", "--format=%H", "HEAD"]);
+    out(tb, { status: "done", head: head(l), answers: [{ id: "W1-T1", action: "fixed", commits: [task] }] });
+    expect(dl(l, "answer", "--job", "tidy")).toMatchObject({ ok: true, status: "done" });
+  });
+
   it("sends advice to a tidy round that records what is deferred in the plan", () => {
     const l = loop();
     const advice = { ...BLOCK, kind: "advice", rule: "", text: "a fixture would show the path" };
