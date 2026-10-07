@@ -63,7 +63,7 @@ describe("a hard check of the kernel returns a Result (CONVENTIONS.md §2, LG-17
     expect(rejectionsOf(out).map((r) => [r.rule, r.intent, r.path])).toEqual([["KR-04", "demo/a", "/records/0/seq"]]);
   });
 
-  it("CONVENTIONS.md §5: the rejections of checkHeader come sorted — its closed form and the grammar of its fields together", () => {
+  it("KR-04, KR-06, KR-07, KR-08: the rejections of checkHeader come sorted (CONVENTIONS.md §5) — its closed form and the grammar of its fields together", () => {
     const out = checkHeader(deepFreeze({ ...ENTITY, id: "Demo/A", type: "demo/note", by: "x", extra: 1 }), ROOT);
     expect(rejectionsOf(out).map((r) => [r.rule, r.path])).toEqual([
       ["KR-08", "/by"],

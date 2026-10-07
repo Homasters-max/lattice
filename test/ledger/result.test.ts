@@ -41,7 +41,7 @@ describe("a hard check of the ledger returns a Result (CONVENTIONS.md §2, LG-17
     expect(rejectionsOf(out).every((r) => r.intent === null && r.path.startsWith("/store/knowledge.jsonl/"))).toBe(true);
   });
 
-  it("CONVENTIONS.md §5: the rejections of verifyChain come sorted — not in the order of its lines and checks", () => {
+  it("LG-04, LG-05, LG-06: the rejections of verifyChain come sorted (CONVENTIONS.md §5) — not in the order of its lines and checks", () => {
     const commits = deepFreeze(landedChain([proposal("demo/a"), proposal("demo/b")]));
     const out = verifyChain(deepFreeze([commits[1]!, commits[0]!]), NO_KEYS, STORE);
     expect(rejectionsOf(out).map((r) => [r.rule, r.path])).toEqual([
