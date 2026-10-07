@@ -1,0 +1,17 @@
+{
+  "check": "proposal",
+  "input": {
+    "proposal": {
+      "session": {
+        "id": "01JB2X00000000000000000SES"
+      },
+      "intents": [],
+      "sig": null,
+      "seq": 1
+    }
+  },
+  "expect": {
+    "rule": "LG-09",
+    "path": "/seq"
+  }
+}

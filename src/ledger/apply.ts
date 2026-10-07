@@ -8,7 +8,7 @@
 import { canon, checkId, hashRecord, KERNEL_VERSION, refused, type Record, type Rejection, type Result } from "../kernel/index.js";
 import { known, type Commit, type Evidence } from "./commit.js";
 import type { Act } from "./ports/acts.js";
-import { canonicalIntents, proposalHash, type Intent, type Proposal } from "./proposal.js";
+import { canonicalIntents, NO_FACTS, proposalHash, type Intent, type Proposal } from "./proposal.js";
 import type { View } from "./view.js";
 
 /** The land session and the acts landing formed (LG-22); the session's `at` is the time of landing. */
@@ -23,9 +23,10 @@ function recordOf(before: View, proposal: Proposal, i: Intent): Record {
 }
 
 /**
- * LG-15: assigns `seq`, `rev` and `hash`; records follow the canonical order of LG-06. Apply knows
- * neither the tail commit nor the change request, so `prev`, `request` and `sig` stay `null`:
- * landing fills `prev` and `request` (G-14), the signature arrives with S0-10 and S0-20.
+ * LG-15: assigns `seq`, `rev` and `hash`; records follow the canonical order of LG-06 (G-03), facts by the key
+ * their types declare once apply reads them from `before` (S0-13). Apply knows neither the tail commit nor the
+ * change request, so `prev`, `request` and `sig` stay `null`: landing fills `prev` and `request` (G-14) and signs
+ * with the land session's key (S0-20).
  */
 function candidate(before: View, proposal: Proposal, acts: LandActs): Commit {
   return {
@@ -33,13 +34,13 @@ function candidate(before: View, proposal: Proposal, acts: LandActs): Commit {
     prev: null,
     kernel: KERNEL_VERSION,
     base: before.seq,
-    proposal: proposalHash(proposal),
+    proposal: proposalHash(proposal, NO_FACTS),
     proposal_sig: proposal.sig,
     by: acts.session.id,
     at: acts.session.at,
     request: null,
     sig: null,
-    records: canonicalIntents(proposal.intents).map((i) => recordOf(before, proposal, i)),
+    records: canonicalIntents(proposal.intents, NO_FACTS).map((i) => recordOf(before, proposal, i)),
   };
 }
 

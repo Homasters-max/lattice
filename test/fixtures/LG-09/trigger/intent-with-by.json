@@ -1,0 +1,29 @@
+{
+  "check": "proposal",
+  "input": {
+    "proposal": {
+      "session": {
+        "id": "01JB2X00000000000000000SES"
+      },
+      "intents": [
+        {
+          "op": "entity",
+          "id": "demo/a",
+          "type": "demo/note@1",
+          "expected": null,
+          "at": "2026-10-06T11:00:00.000000Z",
+          "body": {
+            "text": "a"
+          },
+          "by": "01JB2X00000000000000000SES"
+        }
+      ],
+      "sig": null
+    }
+  },
+  "expect": {
+    "rule": "LG-09",
+    "path": "/by",
+    "intent": "demo/a"
+  }
+}

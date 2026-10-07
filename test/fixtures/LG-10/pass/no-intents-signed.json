@@ -1,0 +1,14 @@
+{
+  "check": "signature",
+  "input": {
+    "proposal": {
+      "session": {
+        "id": "01JB2X00000000000000000SES"
+      },
+      "intents": [],
+      "sig": null
+    },
+    "signedBy": "alice",
+    "session": "alice"
+  }
+}

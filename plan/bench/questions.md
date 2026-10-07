@@ -37,3 +37,7 @@
 | 29 | Which JSON Schema keywords may a schema of a type hold? | lattice/kr-18, lattice/kr-19 | normal | S0-06 | 2026-10-07 |
 | 30 | What may stand beside a $ref in a schema? | — | blank | S0-06, G-22 (KR-18 называет `$ref`, но не его соседей) | 2026-10-07 |
 | 31 | May a field nested inside another object carry the annotation unique? | — | blank | S0-06, G-23 (KR-19 — «a required field», глубина не названа) | 2026-10-07 |
+| 32 | Which key signs a knowledge commit, and over what? | lattice/lg-06 | normal | S0-10 | 2026-10-07 |
+| 33 | Does the order of intents in a proposal change its hash? | lattice/lg-10, lattice/lg-06, lattice/lg-11 | normal | S0-10 | 2026-10-07 |
+| 34 | Which bytes does the Ed25519 signature of a commit or a proposal sign: the text of the hash or its raw digest? | — | blank | S0-10, G-24 (LG-06 и LG-10 — «signature of the hash», байты не названы) | 2026-10-07 |
+| 35 | How is a signature written in a record? | — | blank | S0-10, G-10 (TR-10 задаёт формат ключа, но не подписи) | 2026-10-07 |

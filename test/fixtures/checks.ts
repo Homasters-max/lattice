@@ -39,12 +39,33 @@ import {
   type Rejection,
   type Schema,
 } from "../../src/kernel/index.js";
-import { apply, createView, encodeCommit, land, LG_06, LG_09, LG_23, LG_54, openLines, readProposal, type LandActs } from "../../src/ledger/index.js";
+import {
+  apply,
+  createView,
+  encodeCommit,
+  land,
+  LG_04,
+  LG_05,
+  LG_06,
+  LG_09,
+  LG_10,
+  LG_23,
+  LG_54,
+  NO_FACTS,
+  openLines,
+  readProposal,
+  signCommit,
+  signProposal,
+  verifyChain,
+  verifyProposal,
+  type Commit,
+} from "../../src/ledger/index.js";
 import { landingPortsForTests, type GitFixtureOptions } from "../support/assembly.js";
+// The land session of every fixture: apply takes the commit's `by` and `at` from it (LG-22).
+import { keyOfLand, LAND, landedChain } from "../support/chain.js";
+import { testKey } from "../support/keys.js";
 import type { CheckOutcome, FixtureCheck } from "./run.js";
 
-/** The land session of every fixture: apply takes the commit's `by` and `at` from it (LG-22). */
-const LAND: LandActs = { session: { id: "01JB2X00000000000000000LND", at: "2026-10-06T12:00:00.000000Z" }, events: [] };
 
 const field = (input: unknown, name: string): unknown => (input as { readonly [k: string]: unknown })[name];
 
@@ -154,6 +175,49 @@ const store: FixtureCheck = {
   },
 };
 
+/** `input`: `{ proposal, signedBy?, session }` — a proposal, signed first by the test key `signedBy` if given, verified by the test key `session`. */
+const signature: FixtureCheck = {
+  enforces: [LG_10.id],
+  run: (input) => {
+    const read = readProposal(field(input, "proposal") as JsonValue);
+    if (!read.ok) return read;
+    const by = field(input, "signedBy");
+    const p = typeof by === "string" ? signProposal(read.value, testKey(by).key, NO_FACTS) : read.value;
+    return refused(verifyProposal(p, testKey(String(field(input, "session"))).publicKey, NO_FACTS)) ?? { ok: true };
+  },
+};
+
+/** A change of a landed commit in a trigger: fields set by JSON Pointer, then signed again by the test key `signedBy` if given. */
+type Edit = { readonly line: number; readonly set?: { readonly [pointer: string]: JsonValue }; readonly signedBy?: string };
+
+/** `value` with the value at a JSON Pointer replaced; the pointer names a member or an item that is there. */
+function setAt(value: JsonValue, [head, ...rest]: readonly string[], to: JsonValue): JsonValue {
+  if (head === undefined) return to;
+  const name = head.replaceAll("~1", "/").replaceAll("~0", "~");
+  if (Array.isArray(value)) return value.map((v: JsonValue, i) => (String(i) === name ? setAt(v, rest, to) : v));
+  if (!isJsonObject(value) || !(name in value)) throw new Error(`bug: a fixture edits ${name}, which the commit has not`);
+  return { ...value, [name]: setAt(value[name]!, rest, to) };
+}
+
+function edited(c: Commit, edit: Edit): Commit {
+  const set = Object.entries(edit.set ?? {}).reduce<JsonValue>((v, [pointer, to]) => setAt(v, pointer.split("/").slice(1), to), c);
+  return edit.signedBy === undefined ? (set as Commit) : signCommit(set as Commit, testKey(edit.signedBy).key);
+}
+
+/**
+ * `input`: `{ proposals, edits? }` — the chain landing forms for the proposals (`landedChain`), verified as the lines
+ * of `store/knowledge.jsonl` with the key of the land session. `edits` change landed commits as a broken store holds
+ * them: the raw input of a trigger only (Q-23).
+ */
+const chain: FixtureCheck = {
+  enforces: [LG_04.id, LG_05.id, LG_06.id],
+  run: (input) => {
+    const edits = (field(input, "edits") ?? []) as readonly Edit[];
+    const commits = landedChain(field(input, "proposals") as readonly JsonValue[]).map((c, i) => edits.filter((e) => e.line === i + 1).reduce(edited, c));
+    return refused(verifyChain(commits, keyOfLand, "/store/knowledge.jsonl")) ?? { ok: true };
+  },
+};
+
 type FixtureFile = string | Uint8Array | null;
 
 /**
@@ -214,5 +278,7 @@ export const CHECKS: { readonly [check: string]: FixtureCheck } = {
   proposal,
   apply: applyCheck,
   store,
+  signature,
+  chain,
   land: landCheck,
 };

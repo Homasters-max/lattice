@@ -1,0 +1,38 @@
+{
+  "check": "chain",
+  "input": {
+    "proposals": [
+      {
+        "session": {
+          "id": "01JB2X00000000000000000SES"
+        },
+        "intents": [
+          {
+            "op": "entity",
+            "id": "demo/a",
+            "type": "demo/note@1",
+            "expected": null,
+            "at": "2026-10-06T11:00:00.000000Z",
+            "body": {
+              "text": "demo/a"
+            }
+          }
+        ],
+        "sig": null
+      }
+    ],
+    "edits": [
+      {
+        "line": 1,
+        "set": {
+          "/prev": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        "signedBy": "land"
+      }
+    ]
+  },
+  "expect": {
+    "rule": "LG-05",
+    "path": "/store/knowledge.jsonl/1/prev"
+  }
+}
