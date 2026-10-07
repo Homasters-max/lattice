@@ -1,0 +1,29 @@
+{
+  "check": "record",
+  "input": {
+    "record": {
+      "type": "core/type@1",
+      "rev": 1,
+      "body": {
+        "abstract": false,
+        "kind": "entity",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "pattern": "^[A-Z]"
+            }
+          },
+          "required": [
+            "title"
+          ]
+        }
+      }
+    }
+  },
+  "expect": {
+    "rule": "KR-18",
+    "path": "/body/schema/properties/title/pattern"
+  }
+}

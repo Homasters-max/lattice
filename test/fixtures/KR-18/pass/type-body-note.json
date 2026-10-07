@@ -1,0 +1,33 @@
+{
+  "check": "record",
+  "input": {
+    "record": {
+      "type": "core/type@1",
+      "rev": 1,
+      "body": {
+        "abstract": false,
+        "kind": "entity",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 8
+            }
+          },
+          "required": [
+            "title"
+          ]
+        }
+      }
+    }
+  }
+}

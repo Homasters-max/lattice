@@ -1,0 +1,49 @@
+{
+  "check": "record",
+  "input": {
+    "record": {
+      "type": "core/type@1",
+      "rev": 1,
+      "body": {
+        "extends": "demo/base@1",
+        "abstract": false,
+        "kind": "entity",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "card_order": 1
+            },
+            "text": {
+              "type": "string",
+              "card_order": 2
+            }
+          },
+          "required": [
+            "title",
+            "text"
+          ]
+        }
+      }
+    },
+    "types": {
+      "demo/base@1": {
+        "abstract": true,
+        "kind": "entity",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "card_order": 1
+            }
+          },
+          "required": [
+            "title"
+          ]
+        }
+      }
+    }
+  }
+}
