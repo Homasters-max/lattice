@@ -84,7 +84,7 @@ function readIntent(v: JsonValue, i: number, root: Place): Result<Intent> {
 export function readProposal(value: JsonValue, place: Place = ROOT): Result<Proposal> {
   if (!isJsonObject(value)) return refuse(reject(LG_09, { ...place, expected: "a proposal", got: value }));
   const fields = closedForm(value, PROPOSAL, LG_09, place);
-  const listed = Array.isArray(value.intents) ? (value.intents as readonly JsonValue[]) : [];
+  const listed = PROPOSAL.intents.fits(value.intents) ? value.intents : [];
   const intents = listed.map((v, i) => readIntent(v, i, place));
   const refusal = refused<Proposal>([...rejectionsOf(fields), ...intents.flatMap(rejectionsOf)]);
   if (refusal !== null) return refusal;

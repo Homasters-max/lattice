@@ -152,7 +152,7 @@ const COMMIT: MembersOf<Fields> = {
 function readCommit(value: JsonValue, place: Place): Result<Commit> {
   if (!isJsonObject(value)) return refuse(reject(LG_06, { ...place, expected: "a commit", got: gotOf(value) }));
   const fields = closedForm(value, COMMIT, LG_06, place);
-  const listed = Array.isArray(value.records) ? (value.records as readonly JsonValue[]) : [];
+  const listed = COMMIT.records.fits(value.records) ? value.records : [];
   const records = listed.map((r, i) => checkHeader(r, under(under(place, "records"), i)));
   const refusal = refused<Commit>([...rejectionsOf(fields), ...records.flatMap(rejectionsOf)]);
   if (refusal !== null) return refusal;
