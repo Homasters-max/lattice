@@ -1,5 +1,5 @@
 // dev-loop scope splits the diff of the branch into hunks and names for each the axes whose triggers it touches
-// (plan/dev-loop.md, «Круги»): the verdict of an axis is evidence keyed by the hunk, so an edit that touches a hunk
+// (plan/dev-loop.md, «Круги»): the review of an axis is evidence keyed by the hunk, so an edit that touches a hunk
 // gives it a new id and an edit elsewhere keeps it (S0-45). These cases build a throwaway repository and show each
 // trigger, the id of a hunk and what the scope says to the owner.
 // The repository of a base is built once and copied for each case; the cases run concurrently (S0-40).

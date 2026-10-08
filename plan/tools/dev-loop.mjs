@@ -217,7 +217,8 @@ async function merge() {
   const errors = Object.fromEntries(results.filter((r) => r.errors.length).map((r) => [r.brief.agent, r.errors]));
   if (Object.keys(errors).length) return print({ ok: false, errors });
   const outputs = results.map((r) => r.value);
-  // Вердикт оси — за hunk'и её brief'а (S0-45); late — по строкам дельты от прошлого ревьюированного head.
+  // Вердикт оси — за hunk'и её brief'а (S0-45); late — находка вне строк дельты от прошлого ревьюированного head
+  // и вне hunk'ов, которые её ось получила в этом круге.
   const reviewed = results.filter((r) => Array.isArray(r.brief.hunks)).map((r) => ({ axis: r.brief.axis, hunks: r.brief.hunks }));
   const changed = changedLines({ base: s.since && !s.rebased ? s.since : s.base, head: s.head, dir: s.worktree });
   const result = mergeWave(state, { wave: n, scope: s, outputs, changed, reviewed });

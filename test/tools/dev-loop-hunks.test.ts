@@ -1,7 +1,8 @@
-// Review by hunks (S0-45): the verdict of an axis is evidence keyed by (axis, hunk). A round reviews only the hunks
-// without a verdict, with the axes whose triggers they touch; the verifier gives the answered findings their status.
-// The axes that start with the gate keep the verdicts of the hunks the fix of a red gate did not touch; the answer
-// to a round with blocking findings decides its advice too. Each case runs dl on a throwaway repository with an origin,
+// Review by hunks (S0-45): the review of an axis is evidence keyed by (axis, hunk). A round reviews only the hunks
+// its axis has not reviewed, with the axes whose triggers they touch; the verifier gives the answered findings their
+// status. The axes that start with the gate keep their review of the hunks the fix of a red gate did not touch; a finding
+// in a hunk the round gave its axis blocks, one outside the delta and those hunks is late. The answer to a round with
+// blocking findings decides its advice too, and may defer a late finding and the owner's decisions task and gap. Each case runs dl on a throwaway repository with an origin,
 // built once and copied for each case; the cases run concurrently (S0-40).
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -113,7 +114,8 @@ const TWO: Files = { "src/ledger/land.ts": land(2), "src/ledger/lift.ts": LIFT }
 type Brief = Json & { hunks?: string[]; context: { hunks?: { file: string; at: string; reasons: string[] }[] } };
 const briefOf = (r: Json, agent: string) => read(agents(r).find((a) => a.agent === agent)!.brief) as Brief;
 const shownHunks = (b: Brief) => b.context.hunks!.map((h) => `${h.file}:${h.at}`);
-const verdicts = (l: Loop) => Object.values(read(join(l.dir, "state.json")).verdicts as { [id: string]: string }).sort();
+// The axes that reviewed each hunk of the head, by their letters.
+const reviewedBy = (l: Loop) => Object.values(read(join(l.dir, "state.json")).reviewedBy as { [id: string]: string }).sort();
 
 // The fixer answers W1-T1 by a commit of the files; then the next round.
 async function fixAndWave(l: Loop, files: Files): Promise<{ fix: string; w: Json }> {
@@ -133,11 +135,26 @@ async function closeAll(l: Loop, w: Json, h: string): Promise<Json> {
   return dl(l, "merge");
 }
 
+// Round 1 starts Standards and Architecture with the gate; the fix of the red gate edits the hunk of land.ts, and the
+// rest of the round reviews on its head. → that head: the round after it has the same head and the hunk of land.ts to
+// review with Standards.
+async function redGate(l: Loop): Promise<string> {
+  const early = await dl(l, "wave", "--worktree", l.work, "--early");
+  const h1 = await head(l);
+  for (const a of agents(early)) out(a.brief, { axis: read(a.brief).axis, head: h1, summary: "checked", statuses: [], findings: [] });
+  const h2 = await commit(l.work, { "src/ledger/land.ts": land(3) }, "S0-99: verify — red");
+  expect(await closeAll(l, await dl(l, "wave", "--worktree", l.work), h2)).toMatchObject({ ok: true, wave: 1, next: "wave" });
+  return h2;
+}
+
+// The record in the plan a deferred answer names.
+const TASK_RECORD = "plan/phases/S0/tasks/S0-98-x.md";
+
 describe.concurrent("dev-loop, review by hunks", { timeout: 60_000 }, () => {
-  it("reviews in the next round only the edited hunk and only with the axes of its triggers; the verdicts of the other hunks hold", async () => {
+  it("reviews in the next round only the edited hunk and only with the axes of its triggers; the review of the other hunks holds", async () => {
     const l = await loop(TWO);
     expect(await round(l, [BLOCK])).toMatchObject({ next: "fix" });
-    expect(verdicts(l)).toEqual(["AST", "ST"]);
+    expect(reviewedBy(l)).toEqual(["AST", "ST"]);
     const { fix, w } = await fixAndWave(l, { "src/ledger/land.ts": land(3) });
     expect(agents(w).map((a) => a.agent)).toEqual(["reviewer-spec", "reviewer-standards", "verifier"]);
     for (const agent of ["reviewer-spec", "reviewer-standards"]) {
@@ -145,7 +162,7 @@ describe.concurrent("dev-loop, review by hunks", { timeout: 60_000 }, () => {
       expect(briefOf(w, agent).hunks).toHaveLength(1);
     }
     expect(await closeAll(l, w, fix)).toMatchObject({ ok: true, next: "done" });
-    expect(verdicts(l)).toEqual(["AST", "ST"]);
+    expect(reviewedBy(l)).toEqual(["AST", "ST"]);
   });
 
   it("does not call Architecture for a delta without its triggers, and calls it for a new export, with that hunk alone", async () => {
@@ -158,8 +175,10 @@ describe.concurrent("dev-loop, review by hunks", { timeout: 60_000 }, () => {
     expect(arch.context.hunks).toEqual([expect.objectContaining({ file: "src/ledger/land.ts", at: "4", reasons: ["новый или изменённый экспорт (опись closure-check)"] })]);
     expect(arch.reasons).toEqual(["новый или изменённый экспорт (опись closure-check)"]);
   });
+});
 
-  it("keeps after a red gate the verdicts of the axes started with it on the hunks its fix did not touch", async () => {
+describe.concurrent("dev-loop, a round that starts with the gate", { timeout: 60_000 }, () => {
+  it("keeps after a red gate the review of the axes started with it on the hunks its fix did not touch", async () => {
     const l = await loop(TWO);
     const early = await dl(l, "wave", "--worktree", l.work, "--early");
     expect(early).toMatchObject({ ok: true, wave: 1, next: "gate" });
@@ -173,19 +192,46 @@ describe.concurrent("dev-loop, review by hunks", { timeout: 60_000 }, () => {
     expect(rest).toMatchObject({ ok: true, wave: 1, started: ["reviewer-architecture", "reviewer-standards"], next: "review" });
     expect(agents(rest).map((a) => a.agent)).toEqual(["reviewer-spec"]);
     expect(await closeAll(l, rest, h2)).toMatchObject({ ok: true, wave: 1, next: "wave" });
-    // lift.ts keeps the verdicts of Architecture and Standards from before the red gate; land.ts has Spec's alone.
-    expect(verdicts(l)).toEqual(["AST", "S"]);
+    // lift.ts keeps the review of Architecture and Standards from before the red gate; land.ts has Spec's alone.
+    expect(reviewedBy(l)).toEqual(["AST", "S"]);
     const w2 = await dl(l, "wave", "--worktree", l.work);
     expect(agents(w2).map((a) => a.agent)).toEqual(["reviewer-standards"]);
     expect(shownHunks(briefOf(w2, "reviewer-standards"))).toEqual(["src/ledger/land.ts:2"]);
     expect(await closeAll(l, w2, h2)).toMatchObject({ ok: true, wave: 2, next: "done" });
   });
 
-  it("starts Spec with the gate when the report of prove --ready is on the head", async () => {
+  it("starts Spec with the gate only when the report of prove --ready is on the head and without edits", async () => {
+    const early = async (report: (head: string) => Json) => {
+      const l = await loop(TWO);
+      temp.write(join(l.work, ".lattice", "mutants.json"), JSON.stringify({ base: "x", mutants: [], ...report(await head(l)) }));
+      return agents(await dl(l, "wave", "--worktree", l.work, "--early")).map((a) => a.agent);
+    };
+    const [ready, dirty, other, headless] = await Promise.all([
+      early((h) => ({ head: h, dirty: false })),
+      early((h) => ({ head: h, dirty: true })),
+      early(() => ({ head: "0".repeat(40), dirty: false })),
+      early(() => ({ dirty: false })),
+    ]);
+    expect(ready).toEqual(["reviewer-spec", "reviewer-standards", "reviewer-architecture"]);
+    for (const without of [dirty, other, headless]) expect(without).toEqual(["reviewer-standards", "reviewer-architecture"]);
+  });
+});
+
+describe.concurrent("dev-loop, a finding outside the hunks of its axis", { timeout: 60_000 }, () => {
+  it("blocks by a finding in a hunk the round gave its axis on the head of the last round; a finding outside it is late, and the answer defers it", async () => {
     const l = await loop(TWO);
-    temp.write(join(l.work, ".lattice", "mutants.json"), JSON.stringify({ head: await head(l), dirty: false, base: "x", mutants: [] }));
-    const early = await dl(l, "wave", "--worktree", l.work, "--early");
-    expect(agents(early).map((a) => a.agent)).toEqual(["reviewer-spec", "reviewer-standards", "reviewer-architecture"]);
+    const h2 = await redGate(l);
+    const w2 = await dl(l, "wave", "--worktree", l.work);
+    expect(agents(w2).map((a) => a.agent)).toEqual(["reviewer-standards"]);
+    const outside = { ...BLOCK, rule: "CONVENTIONS §2.1", where: "src/ledger/lift.ts:2", quote: "return 1;" };
+    out(agents(w2)[0]!.brief, { axis: "standards", head: h2, summary: "checked", statuses: [], findings: [{ ...BLOCK, quote: "return 3;" }, outside] });
+    expect(await dl(l, "merge")).toMatchObject({ ok: true, wave: 2, next: "fix", open: ["W2-T1", "W2-T2"] });
+    const findings = read(join(l.dir, "state.json")).findings as { id: string; late: boolean }[];
+    expect(findings.map((f) => [f.id, f.late])).toEqual([["W2-T1", false], ["W2-T2", true]]);
+    const fb = await fixerBrief(l);
+    const fix = await commit(l.work, { "src/ledger/land.ts": land(4), [TASK_RECORD]: "# S0-98\n\n- [ ] lift by the constant\n" }, "S0-99: review — constant; lift deferred to S0-98");
+    out(fb, { status: "done", head: fix, answers: [{ id: "W2-T1", action: "fixed", commits: [fix] }, { id: "W2-T2", action: "deferred", where: TASK_RECORD, note: "S0-98" }] });
+    expect(await dl(l, "answer")).toMatchObject({ ok: true, status: "done" });
   });
 });
 
@@ -212,5 +258,20 @@ describe.concurrent("dev-loop, advice of a round with blocking findings", { time
   it("sends the advice of a round without blocking findings to a tidy round", async () => {
     const l = await loop();
     expect(await round(l, [{ ...BLOCK, kind: "advice", rule: "" }])).toMatchObject({ next: "tidy" });
+  });
+
+  it("lets the answer defer the owner's decisions task and gap by a record in the plan", async () => {
+    const l = await loop();
+    const other = { ...BLOCK, rule: "CONVENTIONS §2.1", where: "src/ledger/land.ts:1", quote: "export function land(): number {" };
+    expect(await round(l, [BLOCK, other])).toMatchObject({ next: "fix", open: ["W1-T1", "W1-T2"] });
+    await dl(l, "escalate", "--why", "проверить");
+    temp.write(join(l.dir, "a.json"), JSON.stringify({ "W1-T1": { action: "task", note: "a task for the constant" }, "W1-T2": { action: "gap", note: "a gap of the phase" } }));
+    expect(await dl(l, "owner", "--answers", join(l.dir, "a.json"))).toMatchObject({ ok: true, next: "fix" });
+    const fb = await fixerBrief(l);
+    expect(read(fb)).toMatchObject({ findings: [], decisions: [{ id: "W1-T1", action: "task" }, { id: "W1-T2", action: "gap" }] });
+    const plan = "plan/phases/S0/PLAN.md";
+    const rec = await commit(l.work, { [TASK_RECORD]: "# S0-98\n\n- [ ] the constant of land\n", [plan]: "# S0\n\n## 12\n\n- G-01: the name of land\n" }, "S0-99: review — the owner's decisions in the plan");
+    out(fb, { status: "done", head: rec, answers: [{ id: "W1-T1", action: "deferred", where: TASK_RECORD, note: "S0-98" }, { id: "W1-T2", action: "deferred", where: plan, note: "G-01" }] });
+    expect(await dl(l, "answer")).toMatchObject({ ok: true, status: "done" });
   });
 });

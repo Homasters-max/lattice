@@ -18,8 +18,8 @@ type Json = { [key: string]: unknown };
 type Loop = { work: string; dir: string };
 type Files = { readonly [path: string]: string };
 type Step = { kind: string; role: string | null; job: string | null; wave: number; head: string | null; start: string; end: string | null; green?: boolean; reason?: string };
-// The moment of a command: minute m of one morning.
-type At = { at: string; red?: boolean };
+// The moment of a command: minute m of one morning; red — verify fails; hold — verify waits for this file.
+type At = { at: string; red?: boolean; hold?: string };
 
 const t = (m: number): At => ({ at: new Date(Date.UTC(2026, 9, 8, 10, m)).toISOString() });
 const red = (m: number): At => ({ ...t(m), red: true });
@@ -42,13 +42,28 @@ async function commit(work: string, files: Files, message: string): Promise<stri
 }
 
 const land = (n: number) => `export function land(): number {\n  return ${n};\n}\n`;
-// verify of the repository: red while RED is set, its output goes to the log of the gate; CONVENTIONS.md holds
+// verify of the repository: red while RED is set, its output goes to the log of the gate; while HOLD is set it says
+// it started and waits for the file HOLD, so a case runs another command of dl during the gate. CONVENTIONS.md holds
 // the item findings name (CONVENTIONS §N.M).
 const MAIN: Files = {
   "src/ledger/land.ts": land(1),
   "CONVENTIONS.md": "# C\n\n## 1. A\n\n### §1.1 One\nОбласть: `src/**`\n",
   "package.json": JSON.stringify({ name: "t", private: true, scripts: { verify: "node verify.mjs" } }) + "\n",
-  "verify.mjs": 'if (process.env.RED) {\n  console.log("verify: boom");\n  process.exit(1);\n}\nconsole.log("verify: fine");\n',
+  "verify.mjs": [
+    'import { existsSync, writeFileSync } from "node:fs";',
+    "const hold = process.env.HOLD;",
+    "if (hold) {",
+    '  writeFileSync(`${hold}.started`, "");',
+    "  const sleep = new Int32Array(new SharedArrayBuffer(4));",
+    "  for (const end = Date.now() + 30000; !existsSync(hold) && Date.now() < end; ) Atomics.wait(sleep, 0, 0, 20);",
+    "}",
+    "if (process.env.RED) {",
+    '  console.log("verify: boom");',
+    "  process.exit(1);",
+    "}",
+    'console.log("verify: fine");',
+    "",
+  ].join("\n"),
   // The task the executor hands in: dl check reads the items it names done (S0-51).
   "plan/phases/S0-x/tasks/S0-99-x.md": "---\nid: S0-99\ntitle: X\nphase: S0\n---\n\n## Готово, когда\n\n- [ ] land works\n",
 };
@@ -83,6 +98,8 @@ async function dl(l: Loop, when: At, ...args: string[]): Promise<Json> {
   const env: NodeJS.ProcessEnv = { ...process.env, DEV_LOOP_GH: gh, DEV_LOOP_NOW: when.at };
   if (when.red === true) env.RED = "1";
   else delete env.RED;
+  if (when.hold !== undefined) env.HOLD = when.hold;
+  else delete env.HOLD;
   return JSON.parse(await sh(l.work, tool, [...args, "--dir", l.dir], env)) as Json;
 }
 
@@ -267,6 +284,21 @@ describe.concurrent("dev-loop gate", { timeout: 60_000 }, () => {
     expect(await dl(l, red(3), "gate", "--worktree", l.work)).toMatchObject({ green: false, next: "escalate", why: "verify красный трижды" });
     expect(await dl(l, t(4), "gate", "--worktree", l.work)).toMatchObject({ green: true, next: "wave" });
     expect(await dl(l, red(5), "gate", "--worktree", l.work)).toMatchObject({ next: "red" });
+  });
+
+  it("keeps what dl wave --early wrote to the state while verify ran: the gate reads the state again before it writes", async () => {
+    const l = await loop();
+    await dl(l, t(0), "init", "--pr", "9", "--task", "S0-99", "--branch", BRANCH);
+    const hold = join(l.dir, "hold");
+    const gate = dl(l, { ...t(1), hold }, "gate", "--worktree", l.work);
+    for (let i = 0; i < 1500 && !temp.exists(`${hold}.started`); i++) await new Promise((done) => setTimeout(done, 20));
+    expect(await dl(l, t(2), "wave", "--worktree", l.work, "--early")).toMatchObject({ ok: true, wave: 1, next: "gate" });
+    temp.write(hold, "");
+    expect(await gate).toMatchObject({ ok: true, green: true, next: "wave" });
+    expect(steps(l).map((x) => [x.kind, x.wave, x.start, x.end])).toEqual([
+      ["review", 1, t(2).at, null],
+      ["gate", 0, t(1).at, t(1).at],
+    ]);
   });
 
   it("verifies the head pushed to the branch, and refuses a worktree with changes", async () => {
