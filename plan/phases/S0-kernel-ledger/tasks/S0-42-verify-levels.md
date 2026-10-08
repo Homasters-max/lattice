@@ -42,7 +42,7 @@ rules: [ST-12, ST-18]
 
 ## Готово, когда
 
-- [ ] `npm run prove` выбирает test-sets по hash и печатает причины одной JSON-строкой
-- [ ] ratchet ST-18 зелёный, тесты переведены на хелперы
-- [ ] контракт агентов ссылается на `npm run prove`
-- [ ] `npm run verify` зелёный
+- [x] `npm run prove` выбирает test-sets по hash и печатает причины одной JSON-строкой
+- [x] ratchet ST-18 зелёный, тесты переведены на хелперы
+- [x] контракт агентов ссылается на `npm run prove`
+- [x] `npm run verify` зелёный
