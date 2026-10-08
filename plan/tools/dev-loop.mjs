@@ -296,7 +296,7 @@ function restore() {
   print({ ok: true, ...restoreFrom(read(need("comments")).comments ?? []) });
 }
 
-// gh — вывод как текст; gh — разобранный JSON. DEV_LOOP_GH — fake gh тестов.
+// ghText — вывод как текст; gh — разобранный JSON. DEV_LOOP_GH — fake gh тестов.
 const ghText = (...args) => {
   const fake = process.env.DEV_LOOP_GH;
   const [cmd, argv] = fake ? [process.execPath, [fake, ...args]] : ["gh", args];
@@ -433,10 +433,10 @@ function ready() {
     return print({ ok: true, next: "escalate", missing: change.missing, why: `${task}: не выполнены пункты «Готово, когда»: ${change.missing.map((m) => `«${m}»`).join(", ")} — перенос в новую задачу только с согласия владельца (plan-task, «Отступления»)` });
   if (change.error) fail(change.error);
   for (const [path, text] of Object.entries(change.files)) write(join(worktree, path), text);
-  const check = spawnSync(process.execPath, ["plan/tools/plan-check.mjs"], { cwd: worktree, encoding: "utf8" });
-  if (check.status !== 0) {
+  const planCheck = spawnSync(process.execPath, ["plan/tools/plan-check.mjs"], { cwd: worktree, encoding: "utf8" });
+  if (planCheck.status !== 0) {
     git(worktree, "checkout", "--", ...Object.keys(change.files));
-    return print({ ok: false, error: "plan-check красный — сдача не записана", log: `${check.stdout}${check.stderr}`.trim().split("\n").slice(-20) });
+    return print({ ok: false, error: "plan-check красный — сдача не записана", log: `${planCheck.stdout}${planCheck.stderr}`.trim().split("\n").slice(-20) });
   }
   if (git(worktree, "status", "--porcelain") !== "") {
     git(worktree, "add", "--", ...Object.keys(change.files));
