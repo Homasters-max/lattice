@@ -28,8 +28,8 @@ function sh(cwd: string, cmd: string, args: string[], env = process.env): Promis
 
 const ITEMS = ["the tool marks `a | b`", "`npm run verify` зелёный"];
 const TASK = ["---", "id: S0-99", "title: Something", "phase: S0", "---", "", "# S0-99", "", "## Готово, когда", "", ...ITEMS.map((i) => `- [ ] ${i}`), ""].join("\n");
-const PHASES = (status: string) => ["# Фазы", "", "| Фаза | Название | Статус | Начата | Выполнена | План |", "|---|---|---|---|---|---|",
-  `| S0 | Kernel | ${status} | — | — | [план](phases/S0-x/PLAN.md) |`, "| SW | Switch | ⬜ не начата | — | — | — |", ""].join("\n");
+const PHASES = (status: string, started = "—") => ["# Фазы", "", "| Фаза | Название | Статус | Начата | Выполнена | План |", "|---|---|---|---|---|---|",
+  `| S0 | Kernel | ${status} | ${started} | — | [план](phases/S0-x/PLAN.md) |`, "| SW | Switch | ⬜ не начата | — | — | — |", ""].join("\n");
 const BOARD = (other: string) => ["# S0", "", "| Задача | Название | Этап | Статус | PR | Заметка |", "|---|---|---|---|---|---|",
   `| [S0-98](tasks/S0-98-y.md) | Other | A | ${other} | | |`, "| [S0-99](tasks/S0-99-x.md) | Something | A | ⬜ | | note |", ""].join("\n");
 const REPO: Files = {
@@ -65,13 +65,13 @@ async function build(): Promise<string> {
 
 let built: Promise<string> | undefined;
 
-async function repo(phase: string, other: string): Promise<Case> {
+async function repo(phase: string, other: string, started = "—"): Promise<Case> {
   built ??= build();
   const root = await mkdtemp(join(temp, "case-"));
   await cp(await built, root, { recursive: true });
   const work = join(root, "work");
   await sh(work, "git", ["remote", "set-url", "origin", join(root, "origin.git")]);
-  await put(work, { "plan/STATUS.md": PHASES(phase), "plan/phases/S0-x/STATUS.md": BOARD(other) });
+  await put(work, { "plan/STATUS.md": PHASES(phase, started), "plan/phases/S0-x/STATUS.md": BOARD(other) });
   await sh(work, "git", ["add", "-A"]);
   await sh(work, "git", ["commit", "-q", "-m", "S0-99: the work"]);
   await sh(work, "git", ["push", "-q", "origin", `HEAD:refs/heads/${BRANCH}`]);
@@ -125,13 +125,19 @@ describe.concurrent("dev-loop ready, a task handed in", { timeout: 30_000 }, () 
     expect(ghCalls(c)).toContainEqual(["pr", "ready", "9"]);
   });
 
-  it("sends the phase to acceptance after its last task and keeps a phase in work as it is otherwise", async () => {
+  it("sends the phase to acceptance after its last task and keeps a phase in work otherwise; its start date stays, a missing one is today", async () => {
     const last = await repo("🔄 в работе", "✅");
     expect(await ready(last, ITEMS)).toMatchObject({ ok: true, next: "gate" });
     expect(file(last, "plan/STATUS.md")).toContain("| S0 | Kernel | 🔍 приёмка | 2026-10-08 |");
-    const middle = await repo("🔄 в работе", "⬜");
+    const undated = await repo("🔄 в работе", "⬜");
+    expect(await ready(undated, ITEMS)).toMatchObject({ ok: true });
+    expect(file(undated, "plan/STATUS.md")).toBe(PHASES("🔄 в работе", "2026-10-08"));
+    const middle = await repo("🔄 в работе", "⬜", "2026-09-01");
     expect(await ready(middle, ITEMS)).toMatchObject({ ok: true });
-    expect(file(middle, "plan/STATUS.md")).toBe(PHASES("🔄 в работе").replace("| 🔄 в работе | — |", "| 🔄 в работе | 2026-10-08 |"));
+    expect(file(middle, "plan/STATUS.md")).toBe(PHASES("🔄 в работе", "2026-09-01"));
+    const lastDated = await repo("🔄 в работе", "✅", "2026-09-01");
+    expect(await ready(lastDated, ITEMS)).toMatchObject({ ok: true, next: "gate" });
+    expect(file(lastDated, "plan/STATUS.md")).toBe(PHASES("🔍 приёмка", "2026-09-01"));
   });
 });
 
