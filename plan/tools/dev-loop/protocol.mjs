@@ -38,15 +38,18 @@ const shown = (v) => {
 };
 
 // Поля выхода по схеме роли (plan/dev-loop.md, «Роли: вход и выход»); других полей в out.json нет.
-const FIELDS = {
-  executor: ["status", "pr", "branch", "head", "done", "question", "gaps"],
-  reviewer: ["axis", "head", "summary", "statuses", "findings"],
-  fixer: ["status", "head", "answers", "conflicts", "question", "gaps"],
+// context_missing — у всех ролей: что агенту пришлось прочитать сверх brief и зачем (S0-48); итог цикла его печатает.
+export const FIELDS = {
+  executor: ["status", "pr", "branch", "head", "done", "question", "gaps", "context_missing"],
+  reviewer: ["axis", "head", "summary", "statuses", "findings", "context_missing"],
+  fixer: ["status", "head", "answers", "conflicts", "question", "gaps", "context_missing"],
 };
 
 function fields(errors, out, role) {
   const extra = Object.keys(out).filter((k) => !FIELDS[role].includes(k));
   need(errors, extra.length === 0, `лишние поля: ${extra.join(", ")} — схема ${role} в plan/dev-loop.md, «Роли: вход и выход»: ${FIELDS[role].join(", ")}`);
+  need(errors, out.context_missing === undefined || (Array.isArray(out.context_missing) && out.context_missing.every((c) => text(c, LIMITS.note))),
+    `context_missing: ${shown(out.context_missing)} — список строк до ${LIMITS.note} знаков: что прочитано сверх brief и зачем`);
 }
 
 // Ссылки на пункты CONVENTIONS.md в text: каждая называет пункт §N.M, который есть в файле worktree.

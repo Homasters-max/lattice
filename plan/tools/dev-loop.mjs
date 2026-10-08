@@ -3,7 +3,9 @@
 //   scope <base> [<head>] [--delta] [--main <ref>]          режим и оси круга
 //   start (--task T | --pr N) [--root R]                      старт или продолжение: копия на main, worktree, npm ci, PR задачи —
 //                                                             у новой задачи ветка, коммит «T: start» и draft PR (S0-51), следующий шаг
-//   brief executor --dir D --task T --worktree W [--owner текст]
+//   brief executor --dir D --task T --worktree W [--owner текст]   brief в бюджете: данные задачи (context.mjs, S0-48)
+//   step selfcheck|pr|deviation|where [--worktree W] [--task T]       материал шага агента: самопроверка по diff ветки
+//                                                             или раздел plan-task как есть
 //   init --dir D --task T (--from executor.out.json | --pr N --branch B)
 //   ready --dir D --worktree W --from executor.out.json       сдача (шаг 6 plan-task): пункты done → [x], доска, фаза, plan-check, push, PR ready
 //   gate --dir D --worktree W                                 ворота: verify на запушенном head в D/verify.log, следующий шаг
@@ -16,13 +18,14 @@
 //   owner --dir D (--answers файл.json | --text текст)        решение владельца → состояние, комментарий
 //   final --dir D --worktree W                                итоговый комментарий
 //   restore --dir D --comments файл.json                      состояние из `gh pr view --json comments` (отладка; start делает сам)
-// Файлы цикла в D: state.json, waves/<n>/<агент>.in.json и .out.json, waves/<n>/scope.json, comments/<NN>-<вид>.md,
+// Файлы цикла в D: state.json, waves/<n>/<агент>.in.json и .out.json, waves/<n>/scope.json, waves/<n>/diff.patch, comments/<NN>-<вид>.md,
 //   verify.log — лог последних ворот, steps.json — шаги до init (init переносит их в состояние).
 // Время шагов (clock.mjs) — сейчас или DEV_LOOP_NOW (ISO), если задано: так тесты не ждут.
 import { execFileSync, spawnSync } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { begin, finish, reasonOf, redsInRow } from "./dev-loop/clock.mjs";
+import { contextMissing, diffOf, executorBrief as executorContext, fixerBrief as fixerContext, reviewerBrief as reviewerContext, selfcheck, STEPS, stepText } from "./dev-loop/context.mjs";
 import { check, FIXER_JOBS } from "./dev-loop/protocol.mjs";
 import { answer, decision, escalation, final, parseHeader, questions, review } from "./dev-loop/render.mjs";
 import { changedLines, conventionsChanged, scope } from "./dev-loop/scope.mjs";
@@ -101,15 +104,26 @@ function checked(outFile) {
   }
 }
 
-function reviewerBrief(state, s, plan, a, worktree, out) {
+// Brief ревьюера: поля протокола и материал оси в бюджете (context.mjs); diff — {patch, files} круга, кроме conflicts.
+function reviewerBrief(state, s, plan, a, { worktree, out, diff, patch, body }) {
   const ids = new Set(a.findings.map((f) => f.id));
-  return {
+  const base = {
     role: "reviewer", agent: a.agent, axis: a.axis, job: a.job, pr: state.pr, task: state.task, worktree, wave: plan.wave,
     base: s.base, head: s.head, reasons: s.reasons?.[a.axis] ?? [],
     expectations: a.axis === "spec" ? s.expectations : undefined, triggers: a.axis === "architecture" ? s.triggers : undefined,
     files: a.files, range: a.range, findings: a.findings.map(slim), disputed: plan.disputed.filter((id) => ids.has(id)),
-    answers: (state.answers?.items ?? []).filter((x) => ids.has(x.id)), out,
+    answers: (state.answers?.items ?? []).filter((x) => ids.has(x.id)), diff: diff ? patch : undefined, out,
   };
+  return reviewerContext(base, { diff, body: a.axis === "spec" ? body() : null });
+}
+
+// Тело PR для brief Spec: ревьюеру gh не нужен. gh не ответил — тела нет, и brief называет это в cut.
+function prBody(pr) {
+  try {
+    return gh("pr", "view", String(pr), "--json", "body").body ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function scopeFor(state, worktree) {
@@ -141,9 +155,14 @@ function wave() {
   }
   write(join(wd, "scope.json"), { ...s, worktree });
   if (n === 1 && s.mode === "none") return print({ ok: true, wave: n, mode: "none", agents: [], next: "final" });
+  const diff = flags.conflicts ? null : diffOf(worktree, s.base, s.head);
+  const patch = join(wd, "diff.patch");
+  if (diff) write(patch, diff.patch);
+  let body;
+  const ctx = { worktree, diff, patch, body: () => (body === undefined ? (body = prBody(state.pr)) : body) };
   const agents = plan.agents.map((a) => {
     const brief = join(wd, `${a.agent}.in.json`);
-    write(brief, reviewerBrief(state, s, plan, a, worktree, join(wd, `${a.agent}.out.json`)));
+    write(brief, reviewerBrief(state, s, plan, a, { ...ctx, out: join(wd, `${a.agent}.out.json`) }));
     return { agent: a.agent, brief };
   });
   const briefs = Object.fromEntries(agents.map((a) => [a.agent, statSync(a.brief).size]));
@@ -176,7 +195,7 @@ function executorBrief() {
   mkdirSync(dir(), { recursive: true });
   const state = existsSync(statePath()) ? read(statePath()) : null;
   // pr и branch — PR, который открыл start (S0-51); без состояния их нет, и шаг 1 делает executor.
-  write(file, { role: "executor", task: need("task"), pr: state?.pr, branch: state?.branch, worktree: need("worktree"), owner: flags.owner ?? state?.owner?.text, out: join(dir(), "executor.out.json") });
+  write(file, executorContext({ role: "executor", task: need("task"), pr: state?.pr, branch: state?.branch, worktree: need("worktree"), owner: flags.owner ?? state?.owner?.text, out: join(dir(), "executor.out.json") }));
   stamp((steps) => begin(steps, { kind: "agent", role: "executor", job: null, wave: state?.wave ?? 0, briefs: { executor: statSync(file).size } }, now()));
   print({ ok: true, brief: file });
 }
@@ -189,13 +208,13 @@ function brief() {
   if (!FIXER_JOBS.includes(job)) fail(`--job: ${FIXER_JOBS.join(" | ")}`);
   const file = join(waveDir(state.wave), `fixer-${job}.in.json`);
   const loose = job === "tidy" ? looseFindings(state) : [];
-  write(file, {
+  write(file, fixerContext({
     role: "fixer", job, pr: state.pr, task: state.task, branch: state.branch, worktree: need("worktree"), base: state.head ?? undefined,
     since: job === "tidy" ? git(need("worktree"), "merge-base", "origin/main", "HEAD") : undefined,
     findings: job === "answer" ? openFindings(state).map(slim) : loose.filter((f) => f.severity === "block").map(slim),
     advice: loose.filter((f) => f.severity === "advice").map(slim),
     decisions: job === "answer" ? state.decisions : [], log: flags.log, owner: flags.owner ?? state.owner?.text, out: file.replace(".in.json", ".out.json"),
-  });
+  }));
   const step = { kind: "agent", role: "fixer", job, wave: state.wave, briefs: { [`fixer-${job}`]: statSync(file).size } };
   save({ ...state, owner: null, steps: begin(stepsOf(state), step, now()) });
   print({ ok: true, brief: file });
@@ -447,8 +466,19 @@ function ready() {
   print({ ok: true, head: git(worktree, "rev-parse", "HEAD"), next: "gate" });
 }
 
+// Материал шага агента (S0-48): selfcheck — по diff ветки; pr, deviation, where — разделы plan-task как есть.
+function step() {
+  const name = positional[0];
+  const worktree = flags.worktree ?? ".";
+  if (name === "selfcheck") return print({ ok: true, step: name, ...selfcheck(worktree, flags.task) });
+  if (!(name in STEPS)) fail(`step: selfcheck | ${Object.keys(STEPS).join(" | ")}`);
+  const text = stepText(worktree, name) ?? fail(`нет раздела «${STEPS[name]}» в plan-task`);
+  print({ ok: true, step: name, text });
+}
+
 const commands = {
   start,
+  step,
   ready,
   scope: () => print(scope({ base: positional[0] ?? fail("нужен base"), head: positional[1], delta: flags.delta === true, main: flags.main })),
   brief,
@@ -470,7 +500,8 @@ const commands = {
     const state = load();
     const first = join(dir(), "waves", "1", "scope.json");
     const conventions = conventionsChanged({ dir: need("worktree") });
-    print({ ok: true, comment: comment("final", final(state, { scope: existsSync(first) ? read(first) : undefined, conventions, at: now() })) });
+    const context = contextMissing(dir());
+    print({ ok: true, comment: comment("final", final(state, { scope: existsSync(first) ? read(first) : undefined, conventions, context, at: now() })) });
   },
   restore,
 };

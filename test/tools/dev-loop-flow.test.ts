@@ -11,14 +11,16 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const tool = join(import.meta.dirname, "../../plan/tools/dev-loop.mjs");
 let temp = "";
+// The fake gh of the tool: dl wave asks GitHub for the body of the PR for the brief of Spec (S0-48).
+let gh = "";
 const BRANCH = "s0-99-x";
 type Json = { [key: string]: unknown };
 type Loop = { work: string; dir: string };
 type Files = { readonly [path: string]: string };
 
-function sh(cwd: string, cmd: string, args: string[]): Promise<string> {
+function sh(cwd: string, cmd: string, args: string[], env = process.env): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile(cmd, args, { cwd, encoding: "utf8" }, (error, stdout, stderr) => {
+    execFile(cmd, args, { cwd, encoding: "utf8", env }, (error, stdout, stderr) => {
       if (error && cmd === "git") reject(new Error(`git ${args.join(" ")}: ${stderr}`));
       else resolve(stdout.trim());
     });
@@ -84,7 +86,7 @@ async function loop(change: Files = TASK, main: Files = NO_MAIN): Promise<Loop> 
 }
 
 async function dl(l: Loop, ...args: string[]): Promise<Json> {
-  return JSON.parse(await sh(l.work, process.execPath, [tool, ...args, ...(args[0] === "check" ? [] : ["--dir", l.dir])])) as Json;
+  return JSON.parse(await sh(l.work, process.execPath, [tool, ...args, ...(args[0] === "check" ? [] : ["--dir", l.dir])], { ...process.env, DEV_LOOP_GH: gh })) as Json;
 }
 
 const read = (file: string): Json => JSON.parse(readFileSync(file, "utf8")) as Json;
@@ -110,6 +112,8 @@ function comments(l: Loop): string {
 
 beforeAll(() => {
   temp = mkdtempSync(join(tmpdir(), "dev-loop-flow-"));
+  gh = join(temp, "gh.mjs");
+  writeFileSync(gh, 'console.log(JSON.stringify({ body: "PR body" }));\n');
 });
 
 afterAll(() => {

@@ -22,6 +22,41 @@ describe("dev-loop documents, agents", () => {
     expect(agentFiles.map((f) => f.replace(/\.md$/, "")).sort()).toEqual([...spawned].sort());
   });
 
+  // The tools of each role (S0-48): what the body asks of the agent and nothing more — gh is for no reviewer.
+  const TOOLS: { readonly [agent: string]: string } = {
+    executor: "Read, Edit, Write, Bash, Grep, Glob",
+    fixer: "Read, Edit, Write, Bash, Grep, Glob",
+    "reviewer-spec": "Read, Grep, Glob, Bash, Write",
+    "reviewer-standards": "Read, Grep, Glob, Write",
+    "reviewer-architecture": "Read, Grep, Glob, Write",
+    verifier: "Read, Grep, Glob, Bash, Write",
+  };
+  const roleOf = (agent: string) => (["executor", "fixer"].includes(agent) ? agent : "reviewer");
+  // The field names of a schema `{a, b?: [x], c: "y" | "z"}`: the first word of each top-level entry.
+  const fieldsOf = (schema: string) => {
+    let flat = schema.slice(1, -1).replace(/"[^"]*"/g, "");
+    for (let prev = ""; prev !== flat; ) [prev, flat] = [flat, flat.replace(/\[[^[\]]*\]|\{[^{}]*\}/g, "")];
+    return flat.split(",").map((s) => /^\s*(\w+)/.exec(s)?.[1]).filter((s) => s !== undefined);
+  };
+  const schemaIn = (text: string) => /`(\{[^`]*\})`/.exec(text)?.[1];
+
+  it("gives every agent the tools of its role", () => {
+    for (const file of agentFiles) expect(text(`${agentDir}/${file}`)).toMatch(new RegExp(`\\ntools: ${TOOLS[file.replace(/\.md$/, "")]}\\n`));
+  });
+
+  it("writes in the body of every agent the schema of its output that the protocol and the code check", () => {
+    const fields = Object.fromEntries([...protocolCode.matchAll(/^ {2}(\w+): \[([^\]]*)\],$/gm)].map((m) => [m[1]!, [...m[2]!.matchAll(/"(\w+)"/g)].map((f) => f[1]!)]));
+    for (const role of ["executor", "reviewer", "fixer"]) {
+      const line = protocol.split("\n").find((l) => l.startsWith(`**${role}**`))!;
+      const schema = schemaIn(protocol.slice(protocol.indexOf(line)).split("\n").find((l) => l.startsWith("- Выход:"))!)!;
+      expect(fieldsOf(schema)).toEqual(fields[role]);
+    }
+    for (const file of agentFiles) {
+      const body = text(`${agentDir}/${file}`);
+      expect(fieldsOf(schemaIn(body.slice(body.indexOf("## Выход")))!)).toEqual(fields[roleOf(file.replace(/\.md$/, ""))]);
+    }
+  });
+
   it("gives every agent its name, a model, an effort and the protocol", () => {
     for (const file of agentFiles) {
       const body = text(`${agentDir}/${file}`);

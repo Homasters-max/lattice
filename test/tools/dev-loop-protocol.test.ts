@@ -58,7 +58,7 @@ describe("dev-loop protocol, a reference to CONVENTIONS.md", () => {
 describe("dev-loop protocol, an output outside the schema of its role", () => {
   it("names the fields the schema of the reviewer lacks and what came instead of the fields it needs", () => {
     expect(checked({ head: "", hunks: [], new: [], statuses: [] })).toEqual([
-      "лишние поля: hunks, new — схема reviewer в plan/dev-loop.md, «Роли: вход и выход»: axis, head, summary, statuses, findings",
+      "лишние поля: hunks, new — схема reviewer в plan/dev-loop.md, «Роли: вход и выход»: axis, head, summary, statuses, findings, context_missing",
       "axis: нет — нужно standards",
       `head: пусто — нужно ${HEAD}`,
       "summary: нет — нужно что проверено, до 800 знаков",
