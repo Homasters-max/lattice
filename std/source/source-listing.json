@@ -1,0 +1,51 @@
+{
+  "extends": "std/fact@1",
+  "abstract": false,
+  "kind": "event",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "of": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "format": "uri",
+            "edge": "derived-from",
+            "description": "the source the import read, an external link (TR-39, G-41)"
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "key": true,
+        "description": "what the fact is about, {role: ref}; the key of the fact (TY-14, TR-28)"
+      },
+      "value": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri",
+              "description": "an item of the source, by its external link"
+            },
+            "description": "the items the import saw (TR-39)"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "description": "the listing the import saw (TR-39)"
+      },
+      "revoked": {
+        "type": "boolean",
+        "description": "true cancels the fact in force for the same key (TR-28)"
+      }
+    },
+    "required": [
+      "of"
+    ]
+  }
+}

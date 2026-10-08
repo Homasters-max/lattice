@@ -1,108 +1,26 @@
-// The types of S0 as data (S0-08; TY-01…TY-16, RT-10, TR-29, GL-01): the
-// sources of std/source/ — one type body per file, named by the slug of its
-// id — and the session type of `core` that ledger code makes. Each passes the
-// check of the kernel as a record of `core/type@1`, each chain of `extends`
-// narrows its parent, and every type that has records has a valid and an
-// invalid example in test/ledger/examples/ (S0-28 reuses them). The kernel
-// resolves types only through the resolver a caller gives (KR-21): here, the
-// sources themselves, as the ledger of `std` will hold them (S0-24).
+// The types of std as data (S0-08; TY-01…TY-16, RT-10, TR-29, GL-01): each
+// source of std/source/ passes the check of the kernel as a record of
+// `core/type@1`, each chain of `extends` narrows its parent, and every type
+// that has records has a valid and an invalid example in test/ledger/examples/
+// (S0-28 reuses them). The drafts of S0-09 are in std-drafts.test.ts.
 import { describe, expect, it } from "vitest";
-import { checkAgainstType, compare, hashRecord, isJsonObject, parseJson, rejectionsOf, ROOT, type JsonObject, type JsonValue, type ResolveType } from "../../src/kernel/index.js";
+import { compare, hashRecord, isJsonObject, type JsonValue } from "../../src/kernel/index.js";
 import { SESSION_TYPE } from "../../src/ledger/index.js";
-import { deepFreeze } from "../support/deep-freeze.js";
 import { owned } from "../support/files.js";
+import { BASES, body, check, field, fieldsOf, json, LABELS, list, META, nonAbstract, object, parentsOf, recordOf, required, schemaOf, SESSION, std, STD_TYPES } from "./std-sources.js";
 
-const META = "core/type@1";
-const SESSION = "core/session@1";
-
-/** The types of S0 by TY-Z02…TY-Z05 and the scope of S0-08; the rest of `std` is S0-09. */
-const S0_TYPES = [
-  ...["act", "alias", "behaviour", "clause", "code", "composition", "contract", "decision", "decision-point", "domain", "example", "fact"],
-  ...["hint", "implementation", "invariant", "judge-adapter", "knowledge", "namespace-policy", "port", "prose", "quality-profile", "requirement", "retired"],
-  ...["scenario", "section", "setup", "stage", "term", "test-set", "valid-period"],
-];
-
-const BASES = ["behaviour", "composition", "contract", "decision-point", "hint", "implementation", "knowledge"];
-
-/** TY-16: the base edge labels of `std`. */
-const LABELS = ["about", "caused-by", "decides", "derived-from", "implements", "measures", "part-of", "supersedes", "uses", "verifies"];
-
-/** A file as JSON, frozen deep: the sources reach `compare` and the resolver of the kernel as they are (§1.5). */
-function json(path: string): JsonValue {
-  const parsed = parseJson(owned.text(path));
-  if (!parsed.ok) throw new Error(`bug: ${path} is no JSON the kernel parses`);
-  return deepFreeze(parsed.value);
-}
-
-const object = (value: JsonValue | undefined): JsonObject => {
-  if (value === undefined || !isJsonObject(value)) throw new Error("bug: an object was expected");
-  return value;
-};
-
-const list = (value: JsonValue | undefined): readonly JsonValue[] => {
-  if (!Array.isArray(value)) throw new Error("bug: an array was expected");
-  return value as readonly JsonValue[];
-};
-
-type Std = { readonly bodies: ReadonlyMap<string, JsonObject>; readonly resolve: ResolveType };
-
-let loaded: Std | undefined;
-
-/** The sources of std/source/ by slug, and the resolver of type bodies by pinned reference over them and `core`. */
-function std(): Std {
-  if (loaded !== undefined) return loaded;
-  const files = owned.list("std/source").filter((f) => f.endsWith(".json"));
-  const bodies = new Map(files.map((f) => [f.slice(0, -".json".length), object(json(`std/source/${f}`))] as const));
-  const resolve: ResolveType = (ref) => {
-    if (ref === SESSION) return SESSION_TYPE.body;
-    const slug = /^std\/([a-z0-9][a-z0-9.-]*)@1$/.exec(ref)?.[1];
-    return slug === undefined ? null : (bodies.get(slug) ?? null);
-  };
-  loaded = { bodies, resolve };
-  return loaded;
-}
-
-const body = (slug: string): JsonObject => {
-  const found = std().bodies.get(slug);
-  if (found === undefined) throw new Error(`bug: no std/source/${slug}.json`);
-  return found;
-};
-
-const schemaOf = (slug: string) => object(body(slug).schema);
-const fieldsOf = (slug: string) => object(schemaOf(slug).properties);
-const field = (slug: string, name: string) => object(fieldsOf(slug)[name]);
-const required = (slug: string) => schemaOf(slug).required;
-
-/** The parents of a type by slug, nearest first. */
-function parentsOf(slug: string): string[] {
-  const parent = body(slug).extends;
-  if (parent === undefined) return [];
-  const next = typeof parent === "string" ? /^std\/(.+)@1$/.exec(parent)?.[1] : undefined;
-  if (next === undefined) throw new Error(`bug: ${slug} extends no type of std`);
-  return [next, ...parentsOf(next)];
-}
-
-const check = (record: { readonly type: string; readonly rev?: number; readonly body: JsonValue }) => rejectionsOf(checkAgainstType(deepFreeze(record), std().resolve, ROOT));
-
-/** A record of the type at `ref` with this body: `rev` only for an entity (KR-04, KR-05). */
-function recordOf(ref: string, value: JsonValue, kind: JsonValue) {
-  return kind === "entity" ? { type: ref, rev: 1, body: value } : { type: ref, body: value };
-}
-
-const nonAbstract = () => S0_TYPES.filter((slug) => body(slug).abstract === false);
-
-describe("the sources of the types of S0 (S0-08)", () => {
-  it("TY-01, TY-02: std/source holds one type body per file, named by its slug — exactly the types of S0", () => {
-    expect([...std().bodies.keys()].sort()).toEqual(S0_TYPES);
+describe("the sources of the types of std (S0-08, S0-09)", () => {
+  it("TY-01, TY-02: std/source holds one type body per file, named by its slug — every type of std", () => {
+    expect([...std().bodies.keys()].sort()).toEqual(STD_TYPES);
   });
 
   it("TY-01, KR-14, KR-15, KR-18, KR-19: every source passes the check of the kernel as a record of core/type@1", () => {
-    const refused = S0_TYPES.map((slug) => [slug, check({ type: META, rev: 1, body: body(slug) })] as const).filter(([, r]) => r.length > 0);
+    const refused = STD_TYPES.map((slug) => [slug, check({ type: META, rev: 1, body: body(slug) })] as const).filter(([, r]) => r.length > 0);
     expect(refused).toEqual([]);
   });
 
   it("KR-15: every chain of extends narrows its parent or keeps it", () => {
-    const relations = S0_TYPES.flatMap((slug) => {
+    const relations = STD_TYPES.flatMap((slug) => {
       const [parent] = parentsOf(slug);
       return parent === undefined ? [] : [[slug, compare(schemaOf(slug), schemaOf(parent), "extends", std().resolve).relation] as const];
     });
@@ -115,11 +33,11 @@ describe("the sources of the types of S0 (S0-08)", () => {
       Object.entries(fieldsOf(slug))
         .flatMap(([name, s]) => (isJsonObject(s) && typeof s.card_order === "number" ? [[s.card_order, name] as const] : []))
         .sort(([a], [b]) => a - b);
-    for (const slug of S0_TYPES) {
+    for (const slug of STD_TYPES) {
       const orders = [slug, ...parentsOf(slug)].flatMap((s) => card(s).map(([o]) => o));
       expect([slug, new Set(orders).size]).toEqual([slug, card(slug).length]);
     }
-    const cards = ["requirement", "scenario", "decision", "invariant", "term", "clause", "prose", "example"].map((s) => [s, card(s).map(([, n]) => n)]);
+    const cards = ["requirement", "scenario", "decision", "invariant", "term", "clause", "prose", "example", "bench-item", "review-note"].map((s) => [s, card(s).map(([, n]) => n)]);
     expect(cards).toEqual([
       ["requirement", ["title", "statement"]],
       ["scenario", ["title", "when", "then"]],
@@ -129,14 +47,17 @@ describe("the sources of the types of S0 (S0-08)", () => {
       ["clause", ["cells"]],
       ["prose", ["text"]],
       ["example", ["text"]],
+      ["bench-item", []],
+      ["review-note", ["note"]],
     ]);
   });
 });
 
 describe("the base types and what extends them", () => {
-  it("TY-03, G-02: each base type is an abstract root entity type with an optional supersedes of pinned references, label supersedes", () => {
+  it("TY-03, G-02, G-39: each base type is a root entity type with an optional supersedes of pinned references, label supersedes; all but decision-point are abstract", () => {
+    const own: { readonly [base: string]: readonly string[] } = { implementation: ["contract", "code"], "decision-point": ["candidates", "question", "judge", "policy", "bench", "targets"] };
     for (const base of BASES) {
-      expect([base, body(base).extends, body(base).abstract, body(base).kind, required(base)]).toEqual([base, undefined, true, "entity", base === "implementation" ? ["contract", "code"] : []]);
+      expect([base, body(base).extends, body(base).abstract, body(base).kind, required(base)]).toEqual([base, undefined, base !== "decision-point", "entity", own[base] ?? []]);
       expect([base, field(base, "supersedes")]).toEqual([
         base,
         {
@@ -150,13 +71,13 @@ describe("the base types and what extends them", () => {
 
   it("TY-03: every entity type with records extends one of the base types and keeps its supersedes", () => {
     const entities = nonAbstract().filter((slug) => body(slug).kind === "entity");
-    expect(entities.map((slug) => [slug, parentsOf(slug).at(-1)]).filter(([, root]) => root === undefined || !BASES.includes(root))).toEqual([]);
+    expect(entities.filter((slug) => !BASES.includes(parentsOf(slug).at(-1) ?? slug))).toEqual([]);
     expect(entities.filter((slug) => fieldsOf(slug).supersedes === undefined)).toEqual([]);
   });
 
   it("TY-05, GL-01: domain and section extend composition; the content blocks are the knowledge and composition types", () => {
     const content = nonAbstract().filter((slug) => parentsOf(slug).some((p) => p === "knowledge" || p === "composition"));
-    expect(content).toEqual(["clause", "decision", "domain", "example", "invariant", "prose", "requirement", "scenario", "section", "term"]);
+    expect(content).toEqual(["bench-item", "bench-set", "clause", "decision", "domain", "example", "invariant", "prose", "requirement", "scenario", "section", "term"]);
     expect([parentsOf("domain"), parentsOf("section")]).toEqual([["composition"], ["composition"]]);
     expect(required("domain")).toEqual(["items"]);
     expect(required("section")).toEqual(["heading", "level", "items"]);
@@ -251,7 +172,7 @@ describe("behaviour", () => {
       if (typeof label === "string") used.add(label);
       Object.values(value).forEach(walk);
     };
-    S0_TYPES.forEach((slug) => walk(schemaOf(slug)));
+    STD_TYPES.forEach((slug) => walk(schemaOf(slug)));
     expect([...used].filter((l) => !LABELS.includes(l))).toEqual([]);
   });
 });
@@ -314,7 +235,7 @@ describe("examples of the types with records", () => {
   ];
 
   it("KR-16: a type without records has no example; every type with records has one", () => {
-    expect(owned.list("test/ledger/examples/std").sort()).toEqual(nonAbstract().map((slug) => `${slug}.json`));
+    expect(owned.list("test/ledger/examples/std").sort()).toEqual(nonAbstract().map((slug) => `${slug}.json`).sort());
   });
 
   it("KR-21: every valid example passes the check of its type, and the same example with a field more does not", () => {

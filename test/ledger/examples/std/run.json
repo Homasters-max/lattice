@@ -1,0 +1,334 @@
+{
+  "valid": [
+    {
+      "pipeline": "lattice/solve@3",
+      "setup": "lattice/setup-ci@2",
+      "input": {},
+      "fingerprint": "sha256:0f1e2d3c",
+      "tuple": {
+        "implementations": [
+          {
+            "implementation": "lattice/rank-jev@1",
+            "code": "sha256:0f1e2d3c",
+            "executor": "inproc"
+          }
+        ],
+        "judges": [
+          {
+            "judge": "acme/judge.jev@3",
+            "model": "jev-2026-09"
+          }
+        ],
+        "ports": [
+          {
+            "port": "std/judge@1",
+            "mode": "recorded"
+          }
+        ],
+        "lattice": "0.1.0",
+        "pins": {
+          "std": "0.1.0"
+        }
+      },
+      "environment": {
+        "runtime": "node 22.11.0",
+        "icu": "75.1"
+      },
+      "commit": {
+        "seq": 41,
+        "hash": "sha256:0f1e2d3c"
+      },
+      "budget": {
+        "ms": 60000,
+        "calls": 20
+      },
+      "spending": {
+        "ms": 812,
+        "tokens": 1500,
+        "usd": "0.0125",
+        "calls": 3
+      },
+      "stages": [
+        {
+          "stage": "std/decide@1",
+          "status": "selected",
+          "result": {
+            "status": "selected",
+            "selected": [
+              "acme/tool-a@1"
+            ],
+            "evaluations": [
+              {
+                "candidate": "acme/tool-a@1",
+                "value": "best",
+                "score": 0.71,
+                "score_semantics": "preference"
+              }
+            ],
+            "inputs": {
+              "point": "acme/pick-tool@1",
+              "candidates": [
+                "acme/tool-a@1"
+              ],
+              "input_fingerprint": "sha256:0f1e2d3c"
+            }
+          }
+        }
+      ],
+      "outcome": "selected",
+      "output": {},
+      "parent": "01JB4M2Z8Q6N7R3T5V9W0X1Y3A"
+    },
+    {
+      "pipeline": "lattice/solve@3",
+      "setup": "lattice/setup-ci@2",
+      "input": {},
+      "fingerprint": "sha256:0f1e2d3c",
+      "tuple": {
+        "implementations": [
+          {
+            "implementation": "lattice/rank-jev@1",
+            "code": "sha256:0f1e2d3c",
+            "executor": "inproc"
+          }
+        ],
+        "judges": [
+          {
+            "judge": "acme/judge.jev@3",
+            "model": "jev-2026-09"
+          }
+        ],
+        "ports": [
+          {
+            "port": "std/judge@1",
+            "mode": "recorded"
+          }
+        ],
+        "lattice": "0.1.0",
+        "pins": {
+          "std": "0.1.0"
+        }
+      },
+      "environment": {
+        "runtime": "node 22.11.0",
+        "icu": "75.1"
+      },
+      "commit": {
+        "seq": 41,
+        "hash": "sha256:0f1e2d3c"
+      },
+      "budget": {
+        "ms": 60000,
+        "calls": 20
+      },
+      "spending": {
+        "ms": 812,
+        "tokens": 1500,
+        "usd": "0.0125",
+        "calls": 3
+      },
+      "stages": [
+        {
+          "stage": "lattice/retrieve@2",
+          "status": "unavailable",
+          "fallback": "lattice/retrieve-local@1"
+        },
+        {
+          "stage": "std/decide@1",
+          "status": "selected",
+          "result": {
+            "status": "selected",
+            "selected": [
+              "acme/tool-a@1"
+            ],
+            "evaluations": [
+              {
+                "candidate": "acme/tool-a@1",
+                "value": "best",
+                "score": 0.71,
+                "score_semantics": "preference"
+              }
+            ],
+            "inputs": {
+              "point": "acme/pick-tool@1",
+              "candidates": [
+                "acme/tool-a@1"
+              ],
+              "input_fingerprint": "sha256:0f1e2d3c"
+            }
+          }
+        },
+        {
+          "stage": "lattice/verify@1",
+          "status": "unsure"
+        }
+      ],
+      "outcome": "escalated",
+      "previous": "01JB4M2Z8Q6N7R3T5V9W0X1Y3A",
+      "fallback": true
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/outcome",
+      "keyword": "required",
+      "body": {
+        "pipeline": "lattice/solve@3",
+        "setup": "lattice/setup-ci@2",
+        "input": {},
+        "fingerprint": "sha256:0f1e2d3c",
+        "tuple": {
+          "implementations": [
+            {
+              "implementation": "lattice/rank-jev@1",
+              "code": "sha256:0f1e2d3c",
+              "executor": "inproc"
+            }
+          ],
+          "judges": [
+            {
+              "judge": "acme/judge.jev@3",
+              "model": "jev-2026-09"
+            }
+          ],
+          "ports": [
+            {
+              "port": "std/judge@1",
+              "mode": "recorded"
+            }
+          ],
+          "lattice": "0.1.0",
+          "pins": {
+            "std": "0.1.0"
+          }
+        },
+        "environment": {
+          "runtime": "node 22.11.0",
+          "icu": "75.1"
+        },
+        "commit": {
+          "seq": 41,
+          "hash": "sha256:0f1e2d3c"
+        },
+        "budget": {
+          "ms": 60000,
+          "calls": 20
+        },
+        "spending": {
+          "ms": 812,
+          "tokens": 1500,
+          "usd": "0.0125",
+          "calls": 3
+        },
+        "stages": [
+          {
+            "stage": "std/decide@1",
+            "status": "selected",
+            "result": {
+              "status": "selected",
+              "selected": [
+                "acme/tool-a@1"
+              ],
+              "evaluations": [
+                {
+                  "candidate": "acme/tool-a@1",
+                  "value": "best",
+                  "score": 0.71,
+                  "score_semantics": "preference"
+                }
+              ],
+              "inputs": {
+                "point": "acme/pick-tool@1",
+                "candidates": [
+                  "acme/tool-a@1"
+                ],
+                "input_fingerprint": "sha256:0f1e2d3c"
+              }
+            }
+          }
+        ],
+        "output": {},
+        "parent": "01JB4M2Z8Q6N7R3T5V9W0X1Y3A"
+      }
+    },
+    {
+      "path": "/environment",
+      "keyword": "required",
+      "body": {
+        "pipeline": "lattice/solve@3",
+        "setup": "lattice/setup-ci@2",
+        "input": {},
+        "fingerprint": "sha256:0f1e2d3c",
+        "tuple": {
+          "implementations": [
+            {
+              "implementation": "lattice/rank-jev@1",
+              "code": "sha256:0f1e2d3c",
+              "executor": "inproc"
+            }
+          ],
+          "judges": [
+            {
+              "judge": "acme/judge.jev@3",
+              "model": "jev-2026-09"
+            }
+          ],
+          "ports": [
+            {
+              "port": "std/judge@1",
+              "mode": "recorded"
+            }
+          ],
+          "lattice": "0.1.0",
+          "pins": {
+            "std": "0.1.0"
+          }
+        },
+        "commit": {
+          "seq": 41,
+          "hash": "sha256:0f1e2d3c"
+        },
+        "budget": {
+          "ms": 60000,
+          "calls": 20
+        },
+        "spending": {
+          "ms": 812,
+          "tokens": 1500,
+          "usd": "0.0125",
+          "calls": 3
+        },
+        "stages": [
+          {
+            "stage": "std/decide@1",
+            "status": "selected",
+            "result": {
+              "status": "selected",
+              "selected": [
+                "acme/tool-a@1"
+              ],
+              "evaluations": [
+                {
+                  "candidate": "acme/tool-a@1",
+                  "value": "best",
+                  "score": 0.71,
+                  "score_semantics": "preference"
+                }
+              ],
+              "inputs": {
+                "point": "acme/pick-tool@1",
+                "candidates": [
+                  "acme/tool-a@1"
+                ],
+                "input_fingerprint": "sha256:0f1e2d3c"
+              }
+            }
+          }
+        ],
+        "outcome": "selected",
+        "output": {},
+        "parent": "01JB4M2Z8Q6N7R3T5V9W0X1Y3A"
+      }
+    }
+  ]
+}

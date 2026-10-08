@@ -1,0 +1,110 @@
+{
+  "extends": "std/behaviour@1",
+  "abstract": false,
+  "kind": "entity",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "supersedes": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/behaviour@1",
+            "pin": "pinned",
+            "label": "supersedes"
+          }
+        },
+        "description": "the pinned last revisions of the blocks this one replaces (TY-03, RF-12)"
+      },
+      "stages": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "stage": {
+              "type": "string",
+              "format": "ref",
+              "ref": {
+                "to": "std/stage@1",
+                "pin": "pinned",
+                "label": "uses"
+              },
+              "description": "the stage contract revision the step runs (RT-01)"
+            },
+            "params": {
+              "type": "object",
+              "description": "the static params of the stage, checked against the params type of its contract when the pipeline is validated (RT-02); any value, which the subset cannot say: closed until the kernel takes the keyword of S0-53 (G-38)"
+            },
+            "reads": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": "the context fields the stage reads (RT-03)"
+            },
+            "writes": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": "the context fields the stage writes (RT-03)"
+            },
+            "on": {
+              "type": "object",
+              "values": {
+                "enum": [
+                  "continue",
+                  "fallback",
+                  "escalate",
+                  "refuse"
+                ]
+              },
+              "description": "an action per status the stage contract declares; fallback runs the stage of field fallback (RT-04, G-40)"
+            },
+            "fallback": {
+              "type": "string",
+              "format": "ref",
+              "ref": {
+                "to": "std/stage@1",
+                "pin": "pinned",
+                "label": "uses"
+              },
+              "description": "the one alternative stage that action fallback runs in place; it writes the same fields and has no on of its own (RT-04, RT-05, G-40)"
+            }
+          },
+          "required": [
+            "stage",
+            "reads",
+            "writes"
+          ]
+        },
+        "minItems": 1,
+        "description": "the stages in order: no backward jumps, no loops (RT-01, RT-05)"
+      },
+      "bench": {
+        "type": "string",
+        "format": "ref",
+        "description": "the bench set it is measured on, set@n (RT-01, BN-02); no label of TY-16 says measured on (G-42)"
+      },
+      "targets": {
+        "type": "object",
+        "values": {
+          "type": "number"
+        },
+        "description": "a target per metric of measure (RT-01, BN-07, BN-12)"
+      },
+      "tolerance": {
+        "type": "number",
+        "minimum": 0,
+        "description": "the regression tolerance, no smaller than measured noise (BN-12)"
+      }
+    },
+    "required": [
+      "stages"
+    ]
+  }
+}

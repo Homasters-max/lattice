@@ -1,0 +1,28 @@
+{
+  "valid": [
+    {
+      "of": {
+        "source": "https://tracker.example.com/projects/acme"
+      },
+      "value": {
+        "items": [
+          "https://tracker.example.com/issues/1"
+        ]
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/of/source",
+      "keyword": "format",
+      "body": {
+        "of": {
+          "source": "the tracker"
+        },
+        "value": {
+          "items": []
+        }
+      }
+    }
+  ]
+}

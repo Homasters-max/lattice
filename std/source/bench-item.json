@@ -1,0 +1,81 @@
+{
+  "extends": "std/knowledge@1",
+  "abstract": false,
+  "kind": "entity",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "supersedes": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/knowledge@1",
+            "pin": "pinned",
+            "label": "supersedes"
+          }
+        },
+        "description": "the pinned last revisions of the blocks this one replaces (TY-03, RF-12)"
+      },
+      "refs": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/knowledge@1",
+            "pin": "floating",
+            "label": "about"
+          }
+        },
+        "description": "the IDs its text mentions, as floating references (LG-42, G-01)"
+      },
+      "kind": {
+        "enum": [
+          "normal",
+          "trap",
+          "blank"
+        ],
+        "description": "the kind of the item (BN-01)"
+      },
+      "input": {
+        "type": "object",
+        "description": "the input: a need, a point state or any pipeline input (BN-01); any value, which the subset cannot say: closed until the kernel takes the keyword of S0-53 (G-38)"
+      },
+      "expected": {
+        "type": "object",
+        "properties": {
+          "refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "ref",
+              "description": "an expected block"
+            },
+            "description": "pinned references, compared by id (BN-01)"
+          },
+          "value": {
+            "type": "object",
+            "description": "an expected value (BN-01); any value, which the subset cannot say: closed until the kernel takes the keyword of S0-53 (G-38)"
+          }
+        },
+        "required": [],
+        "description": "the expected answer: pinned references or a value (BN-01); that it holds one of them is G-43"
+      },
+      "variants": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "description": "a paraphrase or a translation of the input; any value, which the subset cannot say: closed until the kernel takes the keyword of S0-53 (G-38)"
+        },
+        "description": "paraphrases and translations of its input with the same expected answer (BN-03)"
+      }
+    },
+    "required": [
+      "kind",
+      "input",
+      "expected"
+    ]
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "abstract": false,
+  "kind": "event",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "operation": {
+        "type": "string",
+        "format": "ref",
+        "ref": {
+          "to": "std/port@1",
+          "pin": "pinned",
+          "label": "uses"
+        },
+        "description": "the operation, port@n#operations/<op> (TY-09, RT-26)"
+      },
+      "key": {
+        "type": "string",
+        "minLength": 1,
+        "description": "the idempotency key, hash(operation, input fingerprint of the run, hash of the payload) (RT-26)"
+      },
+      "payload": {
+        "type": "string",
+        "minLength": 1,
+        "description": "the hash of the payload (RT-26)"
+      },
+      "stage": {
+        "type": "string",
+        "format": "ref",
+        "ref": {
+          "to": "std/stage@1",
+          "pin": "pinned",
+          "label": "caused-by"
+        },
+        "description": "the stage that caused it (RT-26)"
+      },
+      "deadline": {
+        "type": "string",
+        "format": "date-time",
+        "description": "past it a pending intent raises a signal (OB-11)"
+      }
+    },
+    "required": [
+      "operation",
+      "key",
+      "payload",
+      "stage"
+    ]
+  }
+}

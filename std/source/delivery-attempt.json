@@ -1,0 +1,31 @@
+{
+  "abstract": false,
+  "kind": "event",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "intent": {
+        "type": "string",
+        "format": "ref",
+        "ref": {
+          "to": "std/delivery-intent@1",
+          "pin": "any",
+          "label": "about"
+        },
+        "description": "the intent it delivers (RT-26); an event, so pin says nothing (G-42); the design names no field but intent and status (G-43)"
+      },
+      "status": {
+        "enum": [
+          "started",
+          "done",
+          "failed"
+        ],
+        "description": "started before the call, done or failed after it (RT-26)"
+      }
+    },
+    "required": [
+      "intent",
+      "status"
+    ]
+  }
+}

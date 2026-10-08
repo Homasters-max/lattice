@@ -1,0 +1,34 @@
+{
+  "valid": [
+    {
+      "kind": "trap",
+      "input": {},
+      "expected": {
+        "refs": [
+          "demo/order-intake@2"
+        ]
+      }
+    },
+    {
+      "kind": "blank",
+      "input": {},
+      "expected": {
+        "refs": []
+      },
+      "variants": [
+        {}
+      ]
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/kind",
+      "keyword": "enum",
+      "body": {
+        "kind": "edge",
+        "input": {},
+        "expected": {}
+      }
+    }
+  ]
+}

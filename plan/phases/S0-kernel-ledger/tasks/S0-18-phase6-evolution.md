@@ -45,3 +45,4 @@ rules: [RF-12, RF-13, RF-14, RF-15, RF-16, RF-17, RF-18, RF-19, RF-22, TY-08, TY
 - Если сверх L — делить на «типы и `migrate`» и «контракты и пины».
 - От S0-07: `compare(a, b, mode, resolve)` возвращает `{relation, aspects}`, `aspects` — список имён `validity`, `ref`, `edge`, `unique`, `key`, `card_order`, `description` в этом порядке (G-27); `same-shape` RF-15 — каждый аспект из `card_order`, `description`.
 - От S0-08: схема `fact` не выражает закрытость status facts (TY-14); отказ — эта фаза по `after` (G-32). Что у неотозванного `alias` есть `value` (TR-29), проверяет фаза 4 (S0-15).
+- От S0-09: status facts — `retired`, `alias`, `live`, `calibration`, `verdict`, `dismissed` (TR-29); закрытость всех шести — эта фаза (G-32).

@@ -1,0 +1,19 @@
+{
+  "valid": [
+    {
+      "run": "01JB4M2Z8Q6N7R3T5V9W0X1Y2Z",
+      "stage": "std/decide@1",
+      "status": "ambiguous"
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/status",
+      "keyword": "required",
+      "body": {
+        "run": "01JB4M2Z8Q6N7R3T5V9W0X1Y2Z",
+        "stage": "std/decide@1"
+      }
+    }
+  ]
+}

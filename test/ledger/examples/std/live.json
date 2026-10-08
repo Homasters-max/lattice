@@ -1,0 +1,35 @@
+{
+  "valid": [
+    {
+      "of": {
+        "pipeline": "lattice/solve"
+      },
+      "value": {
+        "pipeline": "lattice/solve@3",
+        "setup": "lattice/setup-ci@2",
+        "tuple": "sha256:0f1e2d3c"
+      }
+    },
+    {
+      "of": {
+        "pipeline": "lattice/solve"
+      },
+      "revoked": true
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/value/tuple",
+      "keyword": "required",
+      "body": {
+        "of": {
+          "pipeline": "lattice/solve"
+        },
+        "value": {
+          "pipeline": "lattice/solve@3",
+          "setup": "lattice/setup-ci@2"
+        }
+      }
+    }
+  ]
+}

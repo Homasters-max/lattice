@@ -1,0 +1,346 @@
+{
+  "abstract": false,
+  "kind": "event",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "pipeline": {
+        "type": "string",
+        "format": "ref",
+        "ref": {
+          "to": "std/pipeline@1",
+          "pin": "pinned",
+          "label": "uses"
+        },
+        "description": "the pipeline revision run (RT-14)"
+      },
+      "setup": {
+        "type": "string",
+        "format": "ref",
+        "ref": {
+          "to": "std/setup@1",
+          "pin": "pinned",
+          "label": "uses"
+        },
+        "description": "the setup revision named (RT-14)"
+      },
+      "input": {
+        "type": "object",
+        "description": "the input of the run (RT-14); any value, which the subset cannot say: closed until the kernel takes the keyword of S0-53 (G-38)"
+      },
+      "fingerprint": {
+        "type": "string",
+        "minLength": 1,
+        "description": "sha256(canon(input)) (RT-14)"
+      },
+      "tuple": {
+        "type": "object",
+        "properties": {
+          "implementations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "implementation": {
+                  "type": "string",
+                  "format": "ref",
+                  "ref": {
+                    "to": "std/implementation@1",
+                    "pin": "pinned",
+                    "label": "uses"
+                  },
+                  "description": "an implementation or adapter the setup binds"
+                },
+                "code": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "its code hash (RT-12)"
+                },
+                "executor": {
+                  "enum": [
+                    "inproc",
+                    "subprocess"
+                  ],
+                  "description": "the executor (RT-31)"
+                },
+                "version": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "its own version, for an llm or judge adapter that cannot report which model answered (RT-14, RT-30)"
+                }
+              },
+              "required": [
+                "implementation",
+                "code",
+                "executor"
+              ]
+            },
+            "description": "the code hashes and executors of every implementation and adapter (RT-14)"
+          },
+          "judges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "judge": {
+                  "type": "string",
+                  "format": "ref",
+                  "ref": {
+                    "to": "std/judge-adapter@1",
+                    "pin": "pinned",
+                    "label": "uses"
+                  },
+                  "description": "a judge@n"
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "its exact model id (DP-10)"
+                }
+              },
+              "required": [
+                "judge",
+                "model"
+              ]
+            },
+            "description": "each judge@n with its model (RT-14)"
+          },
+          "ports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "port": {
+                  "type": "string",
+                  "format": "ref",
+                  "ref": {
+                    "to": "std/port@1",
+                    "pin": "pinned",
+                    "label": "uses"
+                  },
+                  "description": "a port"
+                },
+                "mode": {
+                  "enum": [
+                    "service",
+                    "recorded",
+                    "fixture"
+                  ],
+                  "description": "the mode of the port (RT-22, RT-23)"
+                }
+              },
+              "required": [
+                "port",
+                "mode"
+              ]
+            },
+            "description": "the mode of each port (RT-14)"
+          },
+          "lattice": {
+            "type": "string",
+            "minLength": 1,
+            "description": "the LATTICE version (RT-14)"
+          },
+          "pins": {
+            "type": "object",
+            "values": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "the library pins, by library (RT-14, LG-44)"
+          }
+        },
+        "required": [
+          "implementations",
+          "judges",
+          "ports",
+          "lattice",
+          "pins"
+        ],
+        "description": "the execution tuple (RT-14, LG-38)"
+      },
+      "environment": {
+        "type": "object",
+        "properties": {
+          "runtime": {
+            "type": "string",
+            "minLength": 1,
+            "description": "the runtime version"
+          },
+          "icu": {
+            "type": "string",
+            "minLength": 1,
+            "description": "the ICU version"
+          }
+        },
+        "required": [
+          "runtime",
+          "icu"
+        ],
+        "description": "the environment, beside the tuple, not in it (RT-14)"
+      },
+      "commit": {
+        "type": "object",
+        "properties": {
+          "seq": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "its seq (LG-06)"
+          },
+          "hash": {
+            "type": "string",
+            "minLength": 1,
+            "description": "its hash (LG-06)"
+          }
+        },
+        "required": [
+          "seq",
+          "hash"
+        ],
+        "description": "the knowledge commit it read (RT-14, RT-17)"
+      },
+      "budget": {
+        "type": "object",
+        "properties": {
+          "ms": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "milliseconds"
+          },
+          "tokens": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "tokens"
+          },
+          "usd": {
+            "type": "string",
+            "format": "decimal",
+            "description": "USD"
+          },
+          "calls": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "calls"
+          }
+        },
+        "required": [],
+        "description": "its budget, given by the caller and capped by the namespace policy (RT-19)"
+      },
+      "spending": {
+        "type": "object",
+        "properties": {
+          "ms": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "milliseconds"
+          },
+          "tokens": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "tokens"
+          },
+          "usd": {
+            "type": "string",
+            "format": "decimal",
+            "description": "USD"
+          },
+          "calls": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "calls"
+          }
+        },
+        "required": [],
+        "description": "what it spent, counted from the tape (RT-19)"
+      },
+      "stages": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "stage": {
+              "type": "string",
+              "format": "ref",
+              "ref": {
+                "to": "std/stage@1",
+                "pin": "pinned",
+                "label": "uses"
+              },
+              "description": "the stage contract revision"
+            },
+            "status": {
+              "type": "string",
+              "minLength": 1,
+              "description": "the status of the stage (RT-04)"
+            },
+            "fallback": {
+              "type": "string",
+              "format": "ref",
+              "ref": {
+                "to": "std/stage@1",
+                "pin": "pinned",
+                "label": "uses"
+              },
+              "description": "the fallback stage that ran in its place (RT-04, RT-15)"
+            },
+            "result": {
+              "$ref": "std/decision-result@1",
+              "description": "the DecisionResult, for decide (DP-08)"
+            }
+          },
+          "required": [
+            "stage",
+            "status"
+          ]
+        },
+        "description": "the outcome of every stage that ran (RT-14)"
+      },
+      "outcome": {
+        "type": "string",
+        "minLength": 1,
+        "description": "the status of the last stage, or escalated, refused, error, budget-exceeded, cancelled (RT-15)"
+      },
+      "fallback": {
+        "type": "boolean",
+        "description": "true when a fallback ran (RT-15); how the outcome and the output say so the design does not give, so the record says it beside them (G-43)"
+      },
+      "output": {
+        "type": "object",
+        "description": "its output; none when it stopped early (RT-15); any value, which the subset cannot say: closed until the kernel takes the keyword of S0-53 (G-38)"
+      },
+      "previous": {
+        "type": "string",
+        "format": "ref",
+        "ref": {
+          "to": "std/run@1",
+          "pin": "any",
+          "label": "caused-by"
+        },
+        "description": "the run this one continues with an answer (RT-18); an event, so pin says nothing (G-42)"
+      },
+      "parent": {
+        "type": "string",
+        "format": "ref",
+        "ref": {
+          "to": "std/step@1",
+          "pin": "any",
+          "label": "caused-by"
+        },
+        "description": "the step that started it (OB-06); none for a run no step started, as a step first in its session has no parent (OB-02, G-43); an event, so pin says nothing (G-42)"
+      }
+    },
+    "required": [
+      "pipeline",
+      "setup",
+      "input",
+      "fingerprint",
+      "tuple",
+      "environment",
+      "commit",
+      "budget",
+      "spending",
+      "stages",
+      "outcome"
+    ]
+  }
+}

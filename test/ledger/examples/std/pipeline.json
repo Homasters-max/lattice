@@ -1,0 +1,80 @@
+{
+  "valid": [
+    {
+      "stages": [
+        {
+          "stage": "std/lens.candidates@1",
+          "params": {},
+          "reads": [
+            "need"
+          ],
+          "writes": [
+            "pool"
+          ]
+        },
+        {
+          "stage": "std/decide@1",
+          "reads": [
+            "need",
+            "pool"
+          ],
+          "writes": [
+            "selection"
+          ],
+          "on": {
+            "unavailable": "fallback",
+            "ambiguous": "escalate"
+          },
+          "fallback": "demo/rank-bm25@1"
+        }
+      ],
+      "bench": "demo/solve-set@1",
+      "targets": {
+        "hit@10": 0.95
+      },
+      "tolerance": 0.02
+    },
+    {
+      "stages": [
+        {
+          "stage": "std/lens.expand@1",
+          "reads": [],
+          "writes": [
+            "answer"
+          ]
+        }
+      ]
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/stages/0/on/unavailable",
+      "keyword": "enum",
+      "body": {
+        "stages": [
+          {
+            "stage": "std/decide@1",
+            "reads": [
+              "need",
+              "pool"
+            ],
+            "writes": [
+              "selection"
+            ],
+            "on": {
+              "unavailable": "retry"
+            },
+            "fallback": "demo/rank-bm25@1"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/stages",
+      "keyword": "minItems",
+      "body": {
+        "stages": []
+      }
+    }
+  ]
+}
