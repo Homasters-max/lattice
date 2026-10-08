@@ -7,7 +7,7 @@ import { execFile } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { cp, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const tool = join(import.meta.dirname, "../../plan/tools/dev-loop.mjs");
@@ -27,12 +27,15 @@ async function sh(cwd: string, args: string[]): Promise<string> {
   return r.stdout.trim();
 }
 
-// main on origin moves one commit ahead of the checkout, as after a merge of a PR.
-async function advance(root: string): Promise<void> {
+// main on origin moves one commit ahead of the checkout, as after a merge of a PR; the commit adds these files.
+async function advance(root: string, files: { [path: string]: string } = { "b.txt": "b\n" }): Promise<void> {
   const other = join(root, "other");
   await sh(root, ["clone", "-q", "--template=", "-b", "main", join(root, "origin.git"), other]);
   for (const args of [["config", "user.email", "t@t"], ["config", "user.name", "t"]]) await sh(other, args);
-  await writeFile(join(other, "b.txt"), "b\n");
+  for (const [path, text] of Object.entries(files)) {
+    await mkdir(dirname(join(other, path)), { recursive: true });
+    await writeFile(join(other, path), text);
+  }
   await sh(other, ["add", "-A"]);
   await sh(other, ["commit", "-q", "-m", "merged"]);
   await sh(other, ["push", "-q", "origin", "main"]);
@@ -119,7 +122,8 @@ describe.concurrent("dev-loop start", { timeout: 30_000 }, () => {
     expect(await sh(work, ["log", "-1", "--format=%s"])).toBe("S0-98: start");
     expect(await sh(work, ["rev-parse", "HEAD^"])).toBe(await sh(work, ["rev-parse", "origin/main"]));
     const brief = await exec(r.work, process.execPath, [tool, "brief", "executor", "--task", "S0-98", "--worktree", work, "--dir", s.dir as string]);
-    expect(JSON.parse(readFileSync((JSON.parse(brief.stdout) as Json).brief as string, "utf8"))).toMatchObject({ pr: 77, branch: "s0-98-new-thing" });
+    const briefPath = (JSON.parse(brief.stdout) as Json).brief as string;
+    expect(JSON.parse(readFileSync(briefPath, "utf8"))).toMatchObject({ pr: 77, branch: "s0-98-new-thing" });
     expect(await start(r, github, "--task", "S0-98")).toMatchObject({ pr: 77, created: false, interrupted: false, opened: false, next: "executor" });
     writeFileSync(join(work, "half.txt"), "x");
     expect(await start(r, github, "--task", "S0-98")).toMatchObject({ created: false, interrupted: true, opened: false });
@@ -138,6 +142,15 @@ describe.concurrent("dev-loop start", { timeout: 30_000 }, () => {
   it("refuses to open a task without its file on main", async () => {
     const r = await repo();
     expect(await start(r, { list: [], comments: [] }, "--task", "S0-97")).toMatchObject({ ok: false, error: "нет файла задачи S0-97 в plan/phases/*/tasks на origin/main" });
+  });
+
+  it("opens a task whose file reached main after a refusal, in the worktree the refusal left on the old main", async () => {
+    const r = await repo();
+    expect(await start(r, { list: [], comments: [] }, "--task", "S0-97")).toMatchObject({ ok: false });
+    await advance(r.root, { "plan/phases/S0-x/tasks/S0-97-later.md": "---\nid: S0-97\ntitle: Later\nphase: S0\n---\n" });
+    const s = await start(r, { list: [], comments: [] }, "--task", "S0-97");
+    expect(s).toMatchObject({ ok: true, pr: 77, branch: "s0-97-later", created: false, interrupted: false, opened: true });
+    expect(await sh(s.work as string, ["rev-parse", "HEAD^"])).toBe(await sh(s.work as string, ["rev-parse", "origin/main"]));
   });
 
   it("resumes a ready PR without comments of the loop at the gate, with its state", async () => {

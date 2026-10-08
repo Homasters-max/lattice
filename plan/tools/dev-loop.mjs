@@ -351,14 +351,15 @@ function syncCopy(repo) {
 
 // Шаг 1 plan-task для новой задачи (S0-51): ветка s0-NN-<slug> от свежего main, пустой коммит «S0-NN: start»,
 // draft PR «S0-NN · <название>». Ветка, оставшаяся от прерванного старта, берётся как есть.
+// Файл задачи читается с origin/main: worktree, оставшийся от отказа «нет файла задачи», стоит на старом main.
 function openPr(work, task) {
+  git(work, "checkout", "-q", "--detach", "origin/main");
   const found = findTask(work, task) ?? fail(`нет файла задачи ${task} в plan/phases/*/tasks на origin/main`);
   const branch = found.branch;
   if (git(work, "ls-remote", "origin", `refs/heads/${branch}`) !== "") {
     git(work, "fetch", "-q", "origin", branch);
     git(work, "checkout", "-q", "--detach", "FETCH_HEAD");
   } else {
-    git(work, "checkout", "-q", "--detach", "origin/main");
     git(work, "commit", "-q", "--allow-empty", "-m", `${task}: start`);
     git(work, "push", "-q", "origin", `HEAD:refs/heads/${branch}`);
   }
