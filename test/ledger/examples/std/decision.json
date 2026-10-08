@@ -1,0 +1,28 @@
+{
+  "valid": [
+    {
+      "title": "One queue",
+      "context": "orders arrive twice",
+      "choice": "one queue per tenant",
+      "consequences": "no global order",
+      "decides": [
+        "demo/order-intake"
+      ]
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/choice",
+      "keyword": "minLength",
+      "body": {
+        "title": "One queue",
+        "context": "orders arrive twice",
+        "choice": "",
+        "consequences": "no global order",
+        "decides": [
+          "demo/order-intake"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "extends": "std/implementation@1",
+  "abstract": false,
+  "kind": "entity",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "supersedes": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/implementation@1",
+            "pin": "pinned",
+            "label": "supersedes"
+          }
+        },
+        "description": "the pinned last revisions of the blocks this one replaces (TY-03, RF-12)"
+      },
+      "contract": {
+        "type": "string",
+        "format": "ref",
+        "ref": {
+          "to": "std/port@1",
+          "pin": "pinned",
+          "label": "implements"
+        },
+        "description": "the judge port revision it implements (TY-12)"
+      },
+      "code": {
+        "$ref": "std/code@1",
+        "description": "the adapter code: prompt, retries, backoff and batching (DP-10)"
+      },
+      "model": {
+        "type": "string",
+        "minLength": 1,
+        "description": "the exact model id it pins (TY-12, DP-10)"
+      }
+    },
+    "required": [
+      "contract",
+      "code",
+      "model"
+    ]
+  }
+}

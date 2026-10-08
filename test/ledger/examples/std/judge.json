@@ -1,0 +1,25 @@
+{
+  "valid": [
+    {
+      "contract": "std/judge@1",
+      "code": {
+        "module": "src/capabilities/order-intake/index.ts",
+        "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "model": "claude-opus-4-1-20250805"
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/model",
+      "keyword": "required",
+      "body": {
+        "contract": "std/judge@1",
+        "code": {
+          "module": "src/capabilities/order-intake/index.ts",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "extends": "std/knowledge@1",
+  "abstract": false,
+  "kind": "entity",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "supersedes": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/knowledge@1",
+            "pin": "pinned",
+            "label": "supersedes"
+          }
+        },
+        "description": "the pinned last revisions of the blocks this one replaces (TY-03, RF-12)"
+      },
+      "refs": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/knowledge@1",
+            "pin": "floating",
+            "label": "about"
+          }
+        },
+        "description": "the IDs its text mentions, as floating references (LG-42, G-01)"
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1,
+        "card_order": 1,
+        "description": "the title"
+      },
+      "context": {
+        "type": "string",
+        "minLength": 1,
+        "description": "what the decision answers"
+      },
+      "choice": {
+        "type": "string",
+        "minLength": 1,
+        "card_order": 2,
+        "description": "what is chosen"
+      },
+      "consequences": {
+        "type": "string",
+        "minLength": 1,
+        "description": "what follows from the choice"
+      },
+      "decides": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref"
+        },
+        "description": "the blocks it decides, label decides; a target of any type, so no annotation ref (G-31)"
+      }
+    },
+    "required": [
+      "title",
+      "context",
+      "choice",
+      "consequences"
+    ]
+  }
+}

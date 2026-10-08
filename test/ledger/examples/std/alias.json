@@ -1,0 +1,22 @@
+{
+  "valid": [
+    {
+      "of": {
+        "entity": "demo/order-in"
+      },
+      "value": "demo/order-intake"
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/value",
+      "keyword": "format",
+      "body": {
+        "of": {
+          "entity": "demo/order-in"
+        },
+        "value": "Demo Order"
+      }
+    }
+  ]
+}

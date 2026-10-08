@@ -1,0 +1,29 @@
+{
+  "valid": [
+    {
+      "title": "Order intake",
+      "statement": "An order is accepted once.",
+      "refs": [
+        "demo/order"
+      ],
+      "supersedes": [
+        "demo/intake@3"
+      ]
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/statement",
+      "keyword": "required",
+      "body": {
+        "title": "Order intake",
+        "refs": [
+          "demo/order"
+        ],
+        "supersedes": [
+          "demo/intake@3"
+        ]
+      }
+    }
+  ]
+}

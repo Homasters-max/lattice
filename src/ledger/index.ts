@@ -12,5 +12,6 @@ export type { Store } from "./ports/store.js";
 export { canonicalIntents, NO_FACTS, proposalHash, readProposal, signProposal, verifyProposal, type Intent, type KeyOf, type Proposal } from "./proposal.js";
 export type { Row } from "./rows.js";
 export { LG_04, LG_05, LG_06, LG_09, LG_10, LG_23, LG_54, RULES } from "./rules.js";
+export { SESSION_TYPE } from "./session-type.js";
 export { openLines, openTail, type OpenedTail, type TailPorts } from "./tail.js";
 export { createView, type View } from "./view.js";

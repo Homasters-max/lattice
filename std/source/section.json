@@ -1,0 +1,85 @@
+{
+  "extends": "std/composition@1",
+  "abstract": false,
+  "kind": "entity",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "supersedes": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/composition@1",
+            "pin": "pinned",
+            "label": "supersedes"
+          }
+        },
+        "description": "the pinned last revisions of the blocks this one replaces (TY-03, RF-12)"
+      },
+      "heading": {
+        "type": "string",
+        "minLength": 1,
+        "description": "the heading of the section"
+      },
+      "level": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 6,
+        "description": "the level of the heading"
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "item": {
+                  "const": "block"
+                },
+                "ref": {
+                  "type": "string",
+                  "format": "ref",
+                  "description": "a block or a subsection, label part-of (G-31)"
+                }
+              },
+              "required": [
+                "item",
+                "ref"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "item": {
+                  "const": "table"
+                },
+                "header": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "description": "the header of a table of clauses; its rows are the block items after it"
+                }
+              },
+              "required": [
+                "item",
+                "header"
+              ]
+            }
+          ],
+          "discriminator": "item"
+        },
+        "description": "its blocks and subsections in order, and the header of each table it holds (LG-42)"
+      }
+    },
+    "required": [
+      "heading",
+      "level",
+      "items"
+    ]
+  }
+}

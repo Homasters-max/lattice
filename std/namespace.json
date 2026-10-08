@@ -1,0 +1,15 @@
+{
+  "owner": "lattice",
+  "labels": {
+    "about": "a block or a fact is about its target",
+    "caused-by": "an event was caused by its target",
+    "decides": "a decision decides its target",
+    "derived-from": "a record was derived from its target",
+    "implements": "an implementation implements the contract revision it pins (TY-11)",
+    "measures": "a measurement measures its target",
+    "part-of": "a block is part of its target",
+    "supersedes": "a block replaces the pinned revision of its target (RF-12)",
+    "uses": "a block uses its target: a stage its ports, a setup its bindings",
+    "verifies": "a test set or a check verifies its target (TY-13)"
+  }
+}

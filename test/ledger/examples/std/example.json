@@ -1,0 +1,17 @@
+{
+  "valid": [
+    {
+      "lang": "json",
+      "text": "{ }\n"
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/lang",
+      "keyword": "required",
+      "body": {
+        "text": "{ }\n"
+      }
+    }
+  ]
+}

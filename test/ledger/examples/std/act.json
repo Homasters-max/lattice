@@ -1,0 +1,26 @@
+{
+  "valid": [
+    {
+      "verb": "approve",
+      "target": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "identity": "github:dev",
+      "uri": "https://github.com/demo/repo/pull/1#pullrequestreview-1",
+      "at": "2026-10-06T12:00:00.000000Z",
+      "verified": true
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/verb",
+      "keyword": "enum",
+      "body": {
+        "verb": "veto",
+        "target": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "identity": "github:dev",
+        "uri": "https://github.com/demo/repo/pull/1#pullrequestreview-1",
+        "at": "2026-10-06T12:00:00.000000Z",
+        "verified": true
+      }
+    }
+  ]
+}

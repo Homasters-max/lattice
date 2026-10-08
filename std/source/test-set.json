@@ -1,0 +1,54 @@
+{
+  "extends": "std/behaviour@1",
+  "abstract": false,
+  "kind": "entity",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "supersedes": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/behaviour@1",
+            "pin": "pinned",
+            "label": "supersedes"
+          }
+        },
+        "description": "the pinned last revisions of the blocks this one replaces (TY-03, RF-12)"
+      },
+      "contract": {
+        "type": "string",
+        "format": "ref",
+        "ref": {
+          "to": "std/contract@1",
+          "pin": "pinned",
+          "label": "verifies"
+        },
+        "description": "the contract revision under test (TY-13)"
+      },
+      "code": {
+        "$ref": "std/code@1",
+        "description": "the code of the test set (TY-13)"
+      },
+      "covers": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/scenario@1",
+            "pin": "any",
+            "label": "verifies"
+          }
+        },
+        "description": "the scenarios it checks (TY-13)"
+      }
+    },
+    "required": [
+      "contract",
+      "code"
+    ]
+  }
+}

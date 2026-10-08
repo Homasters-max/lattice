@@ -1,0 +1,29 @@
+{
+  "valid": [
+    {
+      "contract": "demo/order-intake-stage@1",
+      "code": {
+        "module": "test/order/index.test.ts",
+        "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "covers": [
+        "demo/repeat-order@1"
+      ]
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/code/hash",
+      "keyword": "required",
+      "body": {
+        "contract": "demo/order-intake-stage@1",
+        "code": {
+          "module": "test/order/index.test.ts"
+        },
+        "covers": [
+          "demo/repeat-order@1"
+        ]
+      }
+    }
+  ]
+}

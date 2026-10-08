@@ -1,0 +1,24 @@
+{
+  "valid": [
+    {
+      "requirement": "demo/order-intake@2",
+      "title": "Repeat order",
+      "given": "an accepted order",
+      "when": "it comes again",
+      "then": "it is refused"
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/requirement",
+      "keyword": "format",
+      "body": {
+        "requirement": "Not A Ref",
+        "title": "Repeat order",
+        "given": "an accepted order",
+        "when": "it comes again",
+        "then": "it is refused"
+      }
+    }
+  ]
+}

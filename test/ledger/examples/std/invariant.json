@@ -1,0 +1,22 @@
+{
+  "valid": [
+    {
+      "title": "Once",
+      "statement": "an order is accepted at most once",
+      "checked_by": [
+        "demo/order-tests@1"
+      ]
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/checked_by",
+      "keyword": "type",
+      "body": {
+        "title": "Once",
+        "statement": "an order is accepted at most once",
+        "checked_by": "demo/order-tests@1"
+      }
+    }
+  ]
+}

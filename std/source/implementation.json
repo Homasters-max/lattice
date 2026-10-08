@@ -1,0 +1,40 @@
+{
+  "abstract": true,
+  "kind": "entity",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "supersedes": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/implementation@1",
+            "pin": "pinned",
+            "label": "supersedes"
+          }
+        },
+        "description": "the pinned last revisions of the blocks this one replaces (TY-03, RF-12)"
+      },
+      "contract": {
+        "type": "string",
+        "format": "ref",
+        "ref": {
+          "to": "std/contract@1",
+          "pin": "pinned",
+          "label": "implements"
+        },
+        "description": "the one stage or port revision it implements (TY-11)"
+      },
+      "code": {
+        "$ref": "std/code@1",
+        "description": "the code that implements the contract (TY-11)"
+      }
+    },
+    "required": [
+      "contract",
+      "code"
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "valid": [
+    {
+      "text": "KR-Z01. The kernel is the small pure core.",
+      "list": [
+        "Record",
+        "Canon"
+      ]
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/list",
+      "keyword": "minItems",
+      "body": {
+        "text": "KR-Z01. The kernel is the small pure core.",
+        "list": []
+      }
+    }
+  ]
+}

@@ -3,7 +3,7 @@
 // slice, the ledger has the ports of S0, and the lists are well-formed.
 import ts from "typescript";
 import { beforeAll, describe, expect, it } from "vitest";
-import { knowledge, owned } from "../support/files.js";
+import { owned } from "../support/files.js";
 import { auditForm, defaultExports, modelCasts } from "./audit-form.js";
 import { auditImports, portEntries } from "./audit-imports.js";
 import { auditKernelFiles, auditStdNames, stdTypeNames } from "./audit-kernel.js";
@@ -87,7 +87,8 @@ describe("structure of this repository", () => {
   });
 
   it("KR-01: the kernel names no std type", () => {
-    const names = new Set(stdTypeNames(knowledge.text("03-types.md")));
+    const names = new Set(stdTypeNames(owned.list("std/source")));
+    expect(names.size).toBeGreaterThan(0);
     expect(auditStdNames(repo, names)).toEqual([]);
   });
 

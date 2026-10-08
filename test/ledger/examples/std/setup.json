@@ -1,0 +1,45 @@
+{
+  "valid": [
+    {
+      "stages": [],
+      "ports": []
+    },
+    {
+      "stages": [
+        {
+          "contract": "demo/intake@1",
+          "implementation": "demo/intake-impl@2",
+          "executor": "subprocess"
+        }
+      ],
+      "ports": [
+        {
+          "port": "std/llm@1",
+          "adapter": "std/llm-anthropic@1",
+          "mode": "recorded",
+          "memo": true,
+          "executor": "inproc"
+        },
+        {
+          "port": "std/judge@1",
+          "mode": "service"
+        }
+      ]
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/ports/0/mode",
+      "keyword": "enum",
+      "body": {
+        "stages": [],
+        "ports": [
+          {
+            "port": "std/llm@1",
+            "mode": "live"
+          }
+        ]
+      }
+    }
+  ]
+}

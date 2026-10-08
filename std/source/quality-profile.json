@@ -1,0 +1,64 @@
+{
+  "extends": "std/behaviour@1",
+  "abstract": false,
+  "kind": "entity",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "supersedes": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/behaviour@1",
+            "pin": "pinned",
+            "label": "supersedes"
+          }
+        },
+        "description": "the pinned last revisions of the blocks this one replaces (TY-03, RF-12)"
+      },
+      "complexity": {
+        "type": "integer",
+        "minimum": 0,
+        "description": "the most cyclomatic complexity per function"
+      },
+      "function_lines": {
+        "type": "integer",
+        "minimum": 0,
+        "description": "the most lines of a function"
+      },
+      "nesting": {
+        "type": "integer",
+        "minimum": 0,
+        "description": "the deepest nesting"
+      },
+      "parameters": {
+        "type": "integer",
+        "minimum": 0,
+        "description": "the most parameters of a function"
+      },
+      "file_lines": {
+        "type": "integer",
+        "minimum": 0,
+        "description": "the most lines of a file"
+      },
+      "purity": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "description": "a purity rule"
+        },
+        "description": "the purity rules (ST-09)"
+      }
+    },
+    "required": [
+      "complexity",
+      "function_lines",
+      "nesting",
+      "parameters",
+      "file_lines"
+    ]
+  }
+}

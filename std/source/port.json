@@ -1,0 +1,81 @@
+{
+  "extends": "std/contract@1",
+  "abstract": false,
+  "kind": "entity",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "supersedes": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/contract@1",
+            "pin": "pinned",
+            "label": "supersedes"
+          }
+        },
+        "description": "the pinned last revisions of the blocks this one replaces (TY-03, RF-12)"
+      },
+      "operations": {
+        "type": "object",
+        "values": {
+          "type": "object",
+          "properties": {
+            "input": {
+              "type": "string",
+              "format": "ref",
+              "ref": {
+                "to": "core/type@1",
+                "pin": "pinned",
+                "label": "uses"
+              },
+              "description": "the abstract type of the input"
+            },
+            "output": {
+              "type": "string",
+              "format": "ref",
+              "ref": {
+                "to": "core/type@1",
+                "pin": "pinned",
+                "label": "uses"
+              },
+              "description": "the abstract type of the output"
+            },
+            "class": {
+              "enum": [
+                "read",
+                "write",
+                "llm",
+                "irreversible"
+              ],
+              "description": "the class of the operation (RT-08)"
+            },
+            "idempotent": {
+              "type": "boolean",
+              "description": "whether a repeat has no further effect"
+            },
+            "memo": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": "the paths into input that form the memo key, in the syntax of a fragment (TY-10)"
+            }
+          },
+          "required": [
+            "input",
+            "output",
+            "class"
+          ]
+        },
+        "description": "a map from operation name to the operation (TY-07)"
+      }
+    },
+    "required": [
+      "operations"
+    ]
+  }
+}
