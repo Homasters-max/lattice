@@ -3,6 +3,8 @@
 // to 🔍; plan-check runs, the change is the last commit of the branch, and the PR turns ready. An item the executor
 // does not name stops the handing in with a question to the owner. GitHub is a fake gh that logs its calls;
 // plan-check is the repository's own, here a stub red while PLAN_RED is set.
+// A case runs several dl commands and git on its copy; under the full run, beside the cases of review by hunks (S0-45),
+// one went past 30 s, so it waits 60 s, as those of the clock and the flow.
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { scratch, type Scratch } from "../support/files.js";
@@ -109,7 +111,7 @@ afterAll(() => {
   temp.remove();
 });
 
-describe.concurrent("dev-loop ready, a task handed in", { timeout: 30_000 }, () => {
+describe.concurrent("dev-loop ready, a task handed in", { timeout: 60_000 }, () => {
   it("marks the items, closes the task on the board, starts the phase, pushes the last commit and turns the PR ready", async () => {
     const c = await repo("📝 план", "⬜");
     expect(await ready(c, ITEMS)).toMatchObject({ ok: true, next: "gate", head: await head(c) });
@@ -142,7 +144,7 @@ describe.concurrent("dev-loop ready, a task handed in", { timeout: 30_000 }, () 
   });
 });
 
-describe.concurrent("dev-loop ready, a task not handed in", { timeout: 30_000 }, () => {
+describe.concurrent("dev-loop ready, a task not handed in", { timeout: 60_000 }, () => {
   it("asks the owner about an item the executor did not name and changes nothing", async () => {
     const c = await repo("🔄 в работе", "⬜");
     const before = await head(c);
@@ -164,7 +166,7 @@ describe.concurrent("dev-loop ready, a task not handed in", { timeout: 30_000 },
   });
 });
 
-describe.concurrent("dev-loop check, the items an executor names done", { timeout: 30_000 }, () => {
+describe.concurrent("dev-loop check, the items an executor names done", { timeout: 60_000 }, () => {
   it("accepts the items of the task file and refuses an output without them or with an item the file lacks", async () => {
     const c = await repo("🔄 в работе", "⬜");
     const check = async (done: readonly string[] | undefined) => (await dl(c, ["check", await executorOut(c, done)])).errors;

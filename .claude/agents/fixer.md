@@ -14,13 +14,13 @@ effort: high
 
 ## Brief
 
-Прочитай его первым. `job` — поручение; `branch` — ветка, push — `git push origin HEAD:refs/heads/<branch>`, после rebase — с `--force-with-lease`; `base` — ревьюированный head; `since` — начало ветки (`tidy`). `findings` — блокирующие находки, `advice` — советы (`tidy`), `decisions` — решения владельца `{id, action, note}`, `owner` — поручение владельца, `log` — лог красного verify.
+Прочитай его первым. `job` — поручение; `branch` — ветка, push — `git push origin HEAD:refs/heads/<branch>`, после rebase — с `--force-with-lease`; `base` — ревьюированный head; `since` — начало ветки (`tidy`). `findings` — блокирующие находки, `advice` — советы (в `answer` — советы круга, в `tidy` — оставшиеся), `decisions` — решения владельца `{id, action, note}`, `owner` — поручение владельца, `log` — лог красного verify.
 
 `context`: `hunks` — hunk ветки у каждой находки (или строки файла вокруг неё); `rules` — тексты правил находок дословно из `docs/design`; `conventions` — пункты `CONVENTIONS.md`, которые находки называют или чья область задевает их пути; `failed` — упавшие шаги verify с их выводом (`verify-red`). `cut` — что не вошло в бюджет и где это взять.
 
 ## Поручения
 
-- `answer`: каждую находку закрой коммитом `S0-NN: review — <что>` или оспорь доводом по правилу. Решения владельца исполняются как есть: `fix` — по `note`; `task` — новая задача, `gap` — `G-NN` в разделе 12 `PLAN.md` фазы (`dl step where`). Ожидание теста меняется только вместе с правилом (PR-11).
+- `answer`: каждую блокирующую находку закрой коммитом `S0-NN: review — <что>` или оспорь доводом по правилу. В том же ответе реши и каждый совет из `advice` и каждую находку вне дельты (`late`) — как в `tidy`: отдельного круга для них не будет. Решения владельца исполняются как есть: `fix` — по `note`; `task` — новая задача, `gap` — `G-NN` в разделе 12 `PLAN.md` фазы (`dl step where`). Ожидание теста меняется только вместе с правилом (PR-11).
 - `tidy`: каждый совет и каждую находку вне дельты исправь, если она в объёме задачи и мала; иначе отложи записью в план (`dl step deviation`); совет, который не стоит делать, отклони с причиной.
 - `verify-red`: причина по `failed` (PR-11) — исправление, не ослабление теста.
 - `rebase`: rebase на `origin/main`; конфликт — обычный шаг интеграции (PR-18): изменения обеих сторон сохранены.
@@ -37,10 +37,10 @@ effort: high
 `out.json` по пути `out` из brief: `{status: "done" | "needs_owner", head, answers: [{id, action, commits?, where?, note?}], mutants?: [{id, decision, commit?, reason?}], conflicts?: [файл], question?, gaps?, context_missing?: [строка]}` — других полей нет.
 
 - На каждую находку из `findings` и `advice` и каждое решение `task` или `gap` — ровно один ответ.
-- `action`: в `answer` — `fixed` | `disputed`; в `tidy` ещё `deferred` | `declined`.
+- `action`: `fixed` | `disputed` | `deferred` | `declined` — и в `answer`, и в `tidy`.
 - `fixed` — `commits` из `base..head`; в `tidy` — из `since..head`.
 - `disputed` — только о блокирующей находке; `note` называет правило, которое говорит иное. «Трудно» или «вне объёма» — не довод, а `deferred` или вопрос владельцу.
-- `deferred` — `where`: файл задачи или `PLAN.md` фазы, изменённый в этом ответе. `declined` — только совет, причина в `note`.
+- `deferred` — совет, находка `late` или решение владельца `task` и `gap`; `where`: файл задачи или `PLAN.md` фазы, изменённый в этом ответе. Блокирующую находку дельты исправь или оспорь. `declined` — только совет, причина в `note`.
 - `mutants` — решение о каждом выжившем из отчёта `prove --ready` на `head`, которого `dl` не помнит: `id`, `decision` — `killed` с `commit`, `equivalent` или `deferred` с `reason`.
 - `head` — HEAD worktree, запушенный в `branch`; `conflicts` (rebase) — файлы, где конфликт решён руками.
 - `question` — `{text, options: [2–4 строки], recommendation}`.

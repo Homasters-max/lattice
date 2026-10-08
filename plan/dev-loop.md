@@ -29,21 +29,24 @@ Push автора — `git push origin HEAD:refs/heads/<branch>` (worktree в de
 
 ## Круги
 
-Круг — ревью одного head. Режим и оси выбирает `dev-loop.mjs wave`, а не агент.
+Круг — ревью hunk'ов одного head. Hunk'и, оси и агентов выбирает `dev-loop.mjs wave`, а не агент. Ревью устроено как тесты (S0-45): вердикт — evidence с ключом, ревьюируется только то, что его не имеет.
 
-| `job` в brief | Когда | Что делает агент |
+- **Вердикт оси** — evidence с ключом (ось, hunk). Hunk — кусок diff ветки от merge-base с `origin/main` без контекста; его id — hash файла и строк hunk'а в head, номер строки в ключ не входит. Состояние цикла хранит вердикты; hunk, которого коснулась правка, получает новый id и вердикта не имеет, правка в другом месте файла вердикт не снимает.
+- **Круг** ревьюирует только hunk'и без действующего вердикта и только осями, чьи триггеры они задевают; находки с ответом автора получают статусы от `verifier`. Остались после круга hunk'и head без вердикта, а блокирующих находок нет, — `next: wave`, круг по ним.
+- **Триггеры осей** — по классу пути `scripts/paths.mjs`. Spec — всё, кроме генерируемого, если ветка меняет не только текст. Standards — код, тесты, конфигурация, `CONVENTIONS.md`. Architecture — новый или изменённый экспорт в `src/`, `scripts/`, `test/support/`; новый модуль или порт; правка `test/support/`; файл из `test/structure/skeleton-files.txt`. Без них опись `plan/closure-check.md` — самопроверка executor (`dl step selfcheck`).
+- **Старт круга.** Architecture и Standards стартуют вместе с воротами (`dl wave --early`); Spec — с ними, если отчёт `prove --ready` на head уже готов, иначе после зелёных ворот вместе с `verifier` (`dl wave`). Красные ворота начатых агентов не отменяют: hunk'и, которые задело исправление красного, теряют вердикты и идут в следующий круг, вердикты прочих действуют. Круг `next: wave` бюджет кругов не тратит, как и красные ворота.
+
+| `job` в brief | Кто | Что делает агент |
 |---|---|---|
-| `full` | круг 1 | весь diff `base..head` на своей оси |
-| `delta` | круг 2 и дальше | статус каждой своей находки из brief; новые находки — в hunk'ах дельты `base..head` |
-| `close` | дельта мала (`verifier`) | статусы всех находок из brief; каждый hunk дельты сопоставлен находке или сверен с правилом — сопоставление в `summary`, новые находки в `findings` |
-| `status` | у находки нет оси в круге (`verifier`) | только статусы |
+| `hunks` | ось, у которой есть hunk'и без её вердикта | только hunk'и из brief на своей оси; новые находки — в них |
+| `answers` | `verifier`, есть находки с ответом автора | статус каждой находки из brief по ответу автора и дельте; новых находок нет |
 | `conflicts` | после пересборки на `main` (`verifier`) | `git range-diff` по `range` и `files`: верно ли соединены обе стороны |
 
-Находку в строке, которую дельта не меняла, инструмент помечает `late`: она не продлевает цикл сама; её исправляют, если круг и так будет, иначе её решает `tidy`. Ветка во время кругов на `main` не пересобирается — только после последнего зелёного круга.
+Находку в строке, которую дельта не меняла и которой нет в hunk'ах, полученных её осью в этом круге, инструмент помечает `late`: она не продлевает цикл сама; её исправляют, если круг и так будет, иначе её решает `answer` или `tidy`. Ветка во время кругов на `main` не пересобирается — только после последнего зелёного круга.
 
 ## Ничего не теряется
 
-Когда блокирующих находок не осталось, а советы или находки `late` есть, перед сдачей идёт один круг `tidy`. Исправляющий решает каждую: `fixed` — исправлено коммитом; `deferred` — работа записана в план, в `where` файл записи: новая задача или пункт ещё не начатой задачи по `plan-task` («Отступления»), либо `PLAN.md` фазы; `declined` — совет отклонён, причина в `note`. Инструмент проверяет, что `where` изменён в этом ответе, — план не расходится с кодом. Итог перечисляет отложенное со ссылками и отклонённое с причинами.
+Советы и находки `late` круга с блокирующими находками решает тот же ответ `answer`: отдельного круга для них нет. Круг `tidy` — один, перед сдачей, только после круга без блокирующих находок, где есть советы или находки `late`. Исправляющий решает каждую: `fixed` — исправлено коммитом; `deferred` — работа записана в план, в `where` файл записи: новая задача или пункт ещё не начатой задачи по `plan-task` («Отступления»), либо `PLAN.md` фазы; `declined` — совет отклонён, причина в `note`. Инструмент проверяет, что `where` изменён в этом ответе, — план не расходится с кодом. Итог перечисляет отложенное со ссылками и отклонённое с причинами.
 
 ## Правило не закрывает находку
 
@@ -85,9 +88,9 @@ Push автора — `git push origin HEAD:refs/heads/<branch>` (worktree в de
   - По `done` `dl ready` отмечает пункты `[x]`, ставит ✅ и ссылку на PR на доске, переводит фазу в `plan/STATUS.md` в 🔄 или 🔍, гонит `plan-check`, коммитит последним коммитом ветки и переводит PR в ready. Пункт файла, которого нет в `done`, — не сдача, а вопрос владельцу (`plan-task`, «Отступления»).
 
 **reviewer** — `reviewer-spec`, `reviewer-standards`, `reviewer-architecture`, `verifier` (ось `verify`): `.claude/agents/<агент>.md`.
-- Вход: `axis`, `job`, `wave`, `base`, `head`, `reasons` (почему выбрана ось), `expectations` (Spec), `triggers` (Architecture), `files` и `range` (conflicts), `findings` — порученные находки, `disputed`, `answers` — ответ автора на них, `diff`. `context` по оси: Spec — `task`, `rules`, `questions`, `pr_body`, `mutation` и `mutants` — отчёт `prove --ready` с решениями авторов, `hunks`; Standards — `conventions` по путям hunk'ов, `st` — строки ST классов путей, `hunks`; Architecture — `closure` — текст `plan/closure-check.md`, `rm` — RM-Z04 и RM-08, `hunks`; verifier — `hunks` дельты, кроме `conflicts`.
+- Вход: `axis`, `job`, `wave`, `base`, `head`, `reasons` — почему выбрана ось, сводка причин её hunk'ов, `hunks` — id hunk'ов, за которые ось получит вердикт, `expectations` (Spec), `triggers` (Architecture), `files` и `range` (conflicts), `findings` — находки на статус (`answers`), `disputed`, `answers` — ответ автора на них, `diff` — путь `diff.patch` ветки. `context` по оси: Spec — `task`, `rules`, `questions`, `pr_body`, `mutation` и `mutants` — отчёт `prove --ready` с решениями авторов, `hunks`; Standards — `conventions` по путям hunk'ов, `st` — строки ST классов путей, `hunks`; Architecture — `closure` — текст `plan/closure-check.md`, `rm` — RM-Z04 и RM-08, `hunks`. `hunks` оси — `{id, file, at, reasons, diff}`: hunk без вердикта оси и причина его выбора; verifier — `hunks` дельты от прошлого ревьюированного head, кроме `conflicts`.
 - Выход: `{axis, head, summary, statuses: [{id, status, note?}], findings: [{kind, rule, where, quote, text, ratchet?}], context_missing?: [строка]}` — пять полей обязательны.
-  - `summary` — что проверено, до 800 знаков; в `close` и `conflicts` — как сопоставлены hunk'и.
+  - `summary` — что проверено, до 800 знаков; в `conflicts` — как сопоставлены hunk'и.
   - `statuses` и `findings` — списки, пустой, если нечего.
   - `where` — `файл:строка` в `head`.
   - `text` — что не так и что было бы верно, одно-два предложения по-русски.
@@ -95,13 +98,13 @@ Push автора — `git push origin HEAD:refs/heads/<branch>` (worktree в de
   - id находкам даёт инструмент.
 
 **fixer** — `.claude/agents/fixer.md`. `job`: `answer` — ответ на круг, `tidy` — хвосты перед сдачей, `verify-red` — красный verify по `log`, `rebase` — пересборка на `origin/main`, `owner` — поручение владельца из `owner`.
-- Вход: `branch`, `base` — ревьюированный head, `since` — начало ветки (`tidy`), `findings` — открытые `block` (в `answer` все, в `tidy` — `late`), `advice` — советы (`tidy`), `decisions` — решения владельца `{id, action: fix|task|gap, note}`, `log` (verify-red). `context`: `failed` — упавшие шаги verify из `log`, `hunks` — hunk ветки у каждой находки, `rules` — тексты правил находок, `conventions` — пункты, которые находки называют или чья область задевает их пути.
+- Вход: `branch`, `base` — ревьюированный head, `since` — начало ветки (`tidy`), `findings` — открытые `block` (в `answer` все, в `tidy` — `late`), `advice` — советы (в `answer` — советы круга, в `tidy` — оставшиеся), `decisions` — решения владельца `{id, action: fix|task|gap, note}`, `log` (verify-red). `context`: `failed` — упавшие шаги verify из `log`, `hunks` — hunk ветки у каждой находки, `rules` — тексты правил находок, `conventions` — пункты, которые находки называют или чья область задевает их пути.
 - Выход: `{status: "done" | "needs_owner", head, answers: [{id, action, commits?, where?, note?}], mutants?: [{id, decision, commit?, reason?}], conflicts?: [файл], question?, gaps?, context_missing?: [строка]}`.
   - На каждую находку из `findings` и `advice` и каждое решение `task` или `gap` — ровно один ответ.
-  - `action`: в `answer` — `fixed` | `disputed`; в `tidy` ещё `deferred` | `declined`.
+  - `action`: `fixed` | `disputed` | `deferred` | `declined` — и в `answer`, и в `tidy`.
   - `fixed` — коммиты из `base..head`; в `tidy` — из `since..head`, всей ветки: хвост мог закрыть и более ранний коммит.
   - `disputed` — только о блокирующей находке; `note` называет правило, которое говорит иное. «Трудно» или «вне объёма» — не довод, а `deferred` или вопрос владельцу.
-  - `deferred` — `where`: файл задачи или `PLAN.md` фазы, изменённый в этом ответе. `declined` — только совет, причина в `note`.
+  - `deferred` — совет, находка `late` или решение владельца `task` и `gap`; `where`: файл задачи или `PLAN.md` фазы, изменённый в этом ответе. Блокирующую находку дельты исправляют или оспаривают. `declined` — только совет, причина в `note`.
   - `head` — HEAD worktree, запушенный в `branch`.
   - `conflicts` (rebase) — файлы, где конфликт решён руками.
   - `mutants` — решения о выживших мутантах, которых `dl` ещё не помнит (раздел «Мутанты»).
@@ -117,7 +120,7 @@ Push автора — `git push origin HEAD:refs/heads/<branch>` (worktree в de
 
 ## Самопроверка
 
-Executor перед выходом `ready`, fixer перед push — на своём diff или дельте. Список дел по закоммиченному diff ветки даёт `dl step selfcheck --task <ID>`: сработавшие триггеры Architecture и опись `plan/closure-check.md` по ним, пункты `CONVENTIONS.md` по путям diff, строки таблицы «Правила» PR; пустой `todo` — по списку делать нечего. Сверх списка:
+Executor перед выходом `ready`, fixer перед push — на своём diff или дельте. Список дел по закоммиченному diff ветки даёт `dl step selfcheck --task <ID>`: сработавшие триггеры Architecture и строки чистого кода, похожие на класс каталога обходов, и опись `plan/closure-check.md` по ним, пункты `CONVENTIONS.md` по путям diff, строки таблицы «Правила» PR; пустой `todo` — по списку делать нечего. Сверх списка:
 
 - **Standards**: `AGENTS.md`, ST-01…ST-18 (`docs/design/13-structure.md`), имена по глоссарию (ST-03). Чаще всего ловят: адаптеры для тестов собирает только `test/support/assembly.ts` (CONVENTIONS §1.8), отказ называет rule ID (ST-17);
 - **Architecture**: у каждой строки описи из `architecture.inventory` — вердикт по `closure`;

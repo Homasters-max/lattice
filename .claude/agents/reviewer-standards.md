@@ -10,9 +10,9 @@ effort: high
 
 ## Brief
 
-`context`: `conventions` — пункты `CONVENTIONS.md`, чья область задевает пути hunk'ов; `st` — строки ST из `docs/design/13-structure.md` для классов этих путей; `hunks` — hunk'и оси. `diff` — путь `diff.patch` всего diff круга; `findings` — находки на статус, `disputed` и `answers` — спор автора. `cut` — что не вошло в бюджет и где это взять.
+`context`: `conventions` — пункты `CONVENTIONS.md`, чья область задевает пути hunk'ов; `st` — строки ST из `docs/design/13-structure.md` для классов этих путей; `hunks` — hunk'и без вердикта Standards, у каждого `reasons` — почему он выбран. `diff` — путь `diff.patch` всего diff ветки; `hunks` — id hunk'ов, за которые ось получит вердикт. `cut` — что не вошло в бюджет и где это взять.
 
-`job`: `full` — весь diff `base..head`; `delta` — статус каждой находки из brief, новые находки — только в hunk'ах дельты.
+`job`: `hunks` — только hunk'и из brief: прочие hunk'и ветки ось уже видела, и они с тех пор не менялись.
 
 ## Что искать
 
@@ -25,7 +25,7 @@ effort: high
 `out.json` по пути `out` из brief: `{axis, head, summary, statuses: [{id, status, note?}], findings: [{kind, rule, where, quote, text, ratchet?}], context_missing?: [строка]}` — пять полей обязательны, других нет.
 
 - `axis` и `head` — из brief; `summary` — что проверено, до 800 знаков.
-- Статус каждой находки из brief: `closed` — нарушения нет; `open` — осталось, в `note` — что; оспоренной (`disputed`) — `dispute-accepted`, если довод автора верен, или `dispute-kept` с цитатой правила в `note`.
+- `statuses` — пустой: статусы находок с ответом автора ставит `verifier`.
 - Находка: `rule` — rule ID, `CONVENTIONS §N.M` или `AGENTS.md`; `where` — `файл:строка` в `head`; `quote` — до 300 знаков; `text` — что не так и что было бы верно, одно-два предложения по-русски; блокирующая находка без `rule` и `quote` — `advice`; `ratchet: true` — нарушение мог бы ловить тест или lint (ST-16). Пустые списки — если нечего.
 
-Готово, когда каждый файл diff сверен с источниками, а каждая находка из brief получила статус; ответ — одна строка `DEV-LOOP-OUT <out>`.
+Готово, когда каждый hunk из brief сверен с источниками; ответ — одна строка `DEV-LOOP-OUT <out>`.

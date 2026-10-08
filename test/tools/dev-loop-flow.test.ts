@@ -2,6 +2,8 @@
 // the tool on a throwaway repository with an origin: a loop that converges and resumes from its comments,
 // a dispute the owner settles, a stop the owner answers, and outputs of agents the protocol refuses.
 // The repository and its loop are built once and copied for each case; the cases run concurrently (S0-40).
+// A case runs a dozen dl commands, a round of each edited hunk among them (S0-45): under the full run it waits 60 s,
+// as those of the clock.
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { scratch, type Scratch } from "../support/files.js";
@@ -113,8 +115,8 @@ afterAll(() => {
   temp.remove();
 });
 
-describe.concurrent("dev-loop, a loop that converges", { timeout: 30_000 }, () => {
-  it("finds, answers, checks the closure and ends; the comments restore the state", async () => {
+describe.concurrent("dev-loop, a loop that converges", { timeout: 60_000 }, () => {
+  it("finds, answers, checks the answer and the edited hunk and ends; the comments restore the state", async () => {
     const l = await loop();
     const m1 = await round(l, [BLOCK]);
     expect(m1).toMatchObject({ ok: true, wave: 1, next: "fix", open: ["W1-T1"] });
@@ -126,27 +128,28 @@ describe.concurrent("dev-loop, a loop that converges", { timeout: 30_000 }, () =
     expect(await dl(l, "restore", "--comments", comments(l))).toMatchObject({ entry: "answer", next: "gate" });
 
     const w2 = await dl(l, "wave", "--worktree", l.work);
-    expect(w2).toMatchObject({ wave: 2, mode: "verify" });
-    expect(agents(w2).map((a) => a.agent)).toEqual(["verifier"]);
-    out(agents(w2)[0]!.brief, { axis: "verify", head: fix, summary: "closed", statuses: [{ id: "W1-T1", status: "closed" }], findings: [] });
+    expect(w2).toMatchObject({ wave: 2, axes: ["spec", "standards", "verify"] });
+    expect(agents(w2).map((a) => a.agent)).toEqual(["reviewer-spec", "reviewer-standards", "verifier"]);
+    for (const a of agents(w2)) out(a.brief, { axis: read(a.brief).axis, head: fix, summary: "closed", statuses: a.agent === "verifier" ? [{ id: "W1-T1", status: "closed" }] : [], findings: [] });
     expect(await dl(l, "merge")).toMatchObject({ ok: true, wave: 2, next: "done", open: [] });
     expect(await dl(l, "merge")).toMatchObject({ ok: false, error: "нет круга 3: сначала wave" });
 
     const fin = (await dl(l, "final", "--worktree", l.work)).comment as string;
-    expect(temp.text(fin)).toContain("| 2 | проверка закрытия | Проверка закрытия | — | W1-T1 |");
+    expect(temp.text(fin)).toContain("| 2 | ревью hunk'ов | 1 | Spec, Standards, Проверка ответов | — | W1-T1 |");
     expect(await dl(l, "restore", "--comments", comments(l))).toMatchObject({ ok: true, entry: "final", wave: 2, next: "end" });
   });
 });
 
-describe.concurrent("dev-loop, the owner decides", { timeout: 30_000 }, () => {
+describe.concurrent("dev-loop, the owner decides", { timeout: 60_000 }, () => {
   it("escalates a kept dispute and closes the finding by the owner's decision", async () => {
     const l = await loop();
     await round(l, [BLOCK]);
     out(await fixerBrief(l), { status: "done", head: await head(l), answers: [{ id: "W1-T1", action: "disputed", note: "CONVENTIONS §2.1 allows it" }] });
     expect(await dl(l, "answer")).toMatchObject({ ok: true, disputed: ["W1-T1"] });
     const w2 = await dl(l, "wave", "--worktree", l.work);
-    expect(agents(w2).map((a) => a.agent)).toEqual(["reviewer-standards"]);
-    out(agents(w2)[0]!.brief, { axis: "standards", head: await head(l), summary: "kept", statuses: [{ id: "W1-T1", status: "dispute-kept", note: "§1 names it" }], findings: [] });
+    expect(agents(w2).map((a) => a.agent)).toEqual(["verifier"]);
+    expect(read(agents(w2)[0]!.brief)).toMatchObject({ job: "answers", disputed: ["W1-T1"] });
+    out(agents(w2)[0]!.brief, { axis: "verify", head: await head(l), summary: "kept", statuses: [{ id: "W1-T1", status: "dispute-kept", note: "§1 names it" }], findings: [] });
     expect(await dl(l, "merge")).toMatchObject({ next: "escalate" });
     const e = await dl(l, "escalate", "--why", "спор");
     expect((read(e.questions as string) as unknown as Json[])[0]).toMatchObject({ header: "W1-T1" });
@@ -188,7 +191,7 @@ describe.concurrent("dev-loop, the owner decides", { timeout: 30_000 }, () => {
   });
 });
 
-describe.concurrent("dev-loop, outputs the protocol refuses", { timeout: 30_000 }, () => {
+describe.concurrent("dev-loop, outputs the protocol refuses", { timeout: 60_000 }, () => {
   it("refuses a reviewer that misses a status, disputes nothing or reviews another head", async () => {
     const l = await loop();
     await round(l, [BLOCK]);
@@ -196,7 +199,7 @@ describe.concurrent("dev-loop, outputs the protocol refuses", { timeout: 30_000 
     const fix = await commit(l.work, { "src/ledger/land.ts": land(3) }, "fix");
     out(fb, { status: "done", head: fix, answers: [{ id: "W1-T1", action: "fixed", commits: [fix] }] });
     await dl(l, "answer");
-    const v = agents(await dl(l, "wave", "--worktree", l.work))[0]!.brief;
+    const v = agents(await dl(l, "wave", "--worktree", l.work)).find((a) => a.agent === "verifier")!.brief;
     out(v, { axis: "verify", head: "", summary: "x", statuses: [{ id: "W1-T1", status: "dispute-kept", note: "n" }], findings: [null] });
     const errors = ((await dl(l, "merge")).errors as { [agent: string]: string[] }).verifier!;
     expect(errors).toEqual([`head: пусто — нужно ${fix}`, "findings: [null] — нужен список объектов, пустой, если нечего", "statuses.W1-T1: dispute-kept — автор не оспаривал"]);
@@ -233,7 +236,7 @@ describe.concurrent("dev-loop, outputs the protocol refuses", { timeout: 30_000 
   });
 });
 
-describe.concurrent("dev-loop, nothing is lost before the end", { timeout: 30_000 }, () => {
+describe.concurrent("dev-loop, nothing is lost before the end", { timeout: 60_000 }, () => {
   it("accepts in tidy an advice fixed by a commit before the reviewed head", async () => {
     const l = await loop();
     expect(await round(l, [{ ...BLOCK, kind: "advice", rule: "" }])).toMatchObject({ next: "tidy" });
@@ -270,7 +273,7 @@ describe.concurrent("dev-loop, nothing is lost before the end", { timeout: 30_00
 
 // The final report lists for the owner what the branch changed in CONVENTIONS.md of main: an item by its number,
 // a file without items by its lines, and a rewrite of more lines than it lists by their count.
-describe.concurrent("dev-loop, CONVENTIONS.md of main in the final report", { timeout: 30_000 }, () => {
+describe.concurrent("dev-loop, CONVENTIONS.md of main in the final report", { timeout: 60_000 }, () => {
   it("lists for the owner the items of CONVENTIONS.md of main the branch rewrote or removed, by number", async () => {
     const item = (id: string, title: string, body: string) => [`### ${id} ${title}`, "Область: `src/**`", "", body, ""];
     const main = ["# C", "", "## 1. Data", "", ...item("§1.1", "One", "Kept."), ...item("§1.2", "Two", "Old."), ...item("§1.3", "Three", "Gone.")].join("\n");

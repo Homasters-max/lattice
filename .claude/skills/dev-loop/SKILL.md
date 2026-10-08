@@ -22,13 +22,13 @@ argument-hint: "[S0-NN | PR <n>]"
 
 | `next` | Действие |
 |---|---|
-| `review` | все `agents` одним сообщением, затем `dl merge` |
-| `merge` | `dl merge` |
+| `review` | все `agents` одним сообщением; когда ответили они и агенты, начатые с воротами, — `dl merge` |
+| `merge` | `dl merge`, когда ответили агенты, начатые с воротами |
 | `fix` | `dl brief fixer --worktree <work> --job answer` → новый агент `fixer` → `dl answer` → пост → «Ворота». `status: needs_owner` — эскалация с `--why "вопрос исправляющего" --from <out>` |
-| `tidy` | `dl brief fixer --worktree <work> --job tidy` → новый агент `fixer` → `dl answer --job tidy` → пост → «Ворота» |
+| `tidy` | `dl brief fixer --worktree <work> --job tidy` → новый агент `fixer` → `dl answer --job tidy` → пост → «Ворота». Бывает только после круга без блокирующих находок: советы круга с ними решает `answer` |
 | `gate` | «Ворота» |
-| `wave` | `dl wave --worktree <work>`, дальше по `next` |
-| `red` | `dl brief fixer --worktree <work> --job verify-red --log <log>` (`log` из вывода `dl gate`) → новый агент `fixer` → `dl check <out>` → «Ворота». Круг на это не тратится |
+| `wave` | `dl wave --worktree <work>`, дальше по `next`: после зелёных ворот — остальные агенты круга, после `dl merge` — круг по hunk'ам head без вердикта |
+| `red` | `dl brief fixer --worktree <work> --job verify-red --log <log>` (`log` из вывода `dl gate`) → новый агент `fixer` → `dl check <out>` → «Ворота». Круг на это не тратится; агенты, начатые с воротами, работают дальше |
 | `instruct` | `dl brief fixer --worktree <work> --job owner` → новый агент `fixer` → `dl check <out>` → «Ворота» |
 | `resume` | ответ владельца агенту `agent`: живому — `SendMessage` `DEV-LOOP-OWNER <ответ>`; если его нет — новый по `dl brief executor --task <ID> --worktree <work>` или `dl brief fixer --worktree <work> --job <job>` (ответ brief берёт из состояния) |
 | `done`, `final` | «Сдать» |
@@ -60,7 +60,9 @@ argument-hint: "[S0-NN | PR <n>]"
 
 ## Ворота
 
-`dl gate --worktree <work>`, дальше по `next`. Ворота — программа: `dl` ставит `<work>` на head, запушенный в ветку PR, гонит `npm run verify` в `<папка>/verify.log` и пишет время ворот в состояние. `next`: `wave` — verify зелёный; `red` — красный; `escalate` — красный третий раз подряд, `why` — «verify красный трижды». `ok: false` — в `<work>` остались изменения: агент не закоммитил работу — повтори его поручение.
+`dl gate --worktree <work>` идёт вместе с ревью: сначала `dl wave --worktree <work> --early` — оси, которые стартуют с воротами (Architecture и Standards, Spec — если отчёт `prove --ready` на head готов); его `agents` запусти в фоне одним сообщением, затем `dl gate --worktree <work>`, дальше по `next` ворот. `next` у `--early` — `gate`; `owner` — «Эскалация» с `--why` из вывода, ворота не гони. Повторный `--early` в том же круге агентов не даёт: начатые работают дальше.
+
+Ворота — программа: `dl` ставит `<work>` на head, запушенный в ветку PR, гонит `npm run verify` в `<папка>/verify.log` и пишет время ворот в состояние. `next`: `wave` — verify зелёный, `dl wave` даёт остальных агентов круга; `red` — красный: исправление красного снимает вердикты только hunk'ов, которые задело, — их ревьюирует следующий круг; `escalate` — красный третий раз подряд, `why` — «verify красный трижды». `ok: false` — в `<work>` остались изменения: агент не закоммитил работу — повтори его поручение.
 
 Ветка, от которой ушёл `main`, до «Сдать» не пересобирается: ревью считает diff от merge-base, а пересборка посреди цикла делает следующий круг полным. Исключение — текстовый конфликт с `main` (`gh pr view <n> --json mergeStateStatus` — `DIRTY`): `dl brief fixer --worktree <work> --job rebase` → агент `fixer` → `dl check <out>` → «Ворота».
 

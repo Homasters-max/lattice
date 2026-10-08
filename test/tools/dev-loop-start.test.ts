@@ -3,6 +3,8 @@
 // and says where to go next. It also brings the owner's checkout to a fresh main
 // when that loses nothing. GitHub is a fake gh that answers from a file.
 // The checkout and its origin are built once and copied for each case; the cases run concurrently (S0-40).
+// A case runs several dl commands and git on its copy; under the full run, beside the cases of review by hunks (S0-45),
+// one went past 30 s, so it waits 60 s, as those of the clock and the flow.
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { scratch, type Scratch } from "../support/files.js";
@@ -108,7 +110,7 @@ afterAll(() => {
   temp.remove();
 });
 
-describe.concurrent("dev-loop start", { timeout: 30_000 }, () => {
+describe.concurrent("dev-loop start", { timeout: 60_000 }, () => {
   it("opens a new task: a branch from main, the start commit and a draft PR; the executor next, its brief with them", async () => {
     const r = await repo();
     const s = await start(r, { list: [], comments: [] }, "--task", "S0-98");
@@ -151,7 +153,7 @@ describe.concurrent("dev-loop start", { timeout: 30_000 }, () => {
   });
 });
 
-describe.concurrent("dev-loop start, a task whose file is not on main", { timeout: 30_000 }, () => {
+describe.concurrent("dev-loop start, a task whose file is not on main", { timeout: 60_000 }, () => {
   it("refuses to open a task without its file on main", async () => {
     const r = await repo();
     expect(await start(r, { list: [], comments: [] }, "--task", "S0-97")).toMatchObject({ ok: false, error: "нет файла задачи S0-97 в plan/phases/*/tasks на origin/main" });
@@ -169,7 +171,7 @@ describe.concurrent("dev-loop start, a task whose file is not on main", { timeou
 
 const none = { list: [], comments: [] };
 
-describe.concurrent("dev-loop start, the owner's checkout brought to main", { timeout: 30_000 }, () => {
+describe.concurrent("dev-loop start, the owner's checkout brought to main", { timeout: 60_000 }, () => {
   it("fast-forwards a clean checkout on main to origin/main", async () => {
     const r = await repo({ ahead: true });
     expect(await start(r, none, "--task", "S0-98")).toMatchObject({ copy: { branch: "main", synced: true, behind: 0 } });
@@ -185,7 +187,7 @@ describe.concurrent("dev-loop start, the owner's checkout brought to main", { ti
   });
 });
 
-describe.concurrent("dev-loop start, the owner's checkout left as it is", { timeout: 30_000 }, () => {
+describe.concurrent("dev-loop start, the owner's checkout left as it is", { timeout: 60_000 }, () => {
   it("leaves a branch whose PR is not merged, and says how far main is", async () => {
     const r = await repo({ ahead: true });
     await sh(r.work, ["checkout", "-q", "-b", "s0-99-x"]);

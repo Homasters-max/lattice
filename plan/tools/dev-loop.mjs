@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // dev-loop: инструмент оркестратора /dev-loop (plan/dev-loop.md). Каждая команда печатает одну строку JSON.
-//   scope <base> [<head>] [--delta] [--main <ref>]          режим и оси круга
+//   scope <base> [<head>] [--since <ref>]                   hunk'и ветки и оси, чьи триггеры они задевают
 //   start (--task T | --pr N) [--root R]                      старт или продолжение: копия на main, worktree, npm ci, PR задачи —
 //                                                             у новой задачи ветка, коммит «T: start» и draft PR (S0-51), следующий шаг
 //   brief executor --dir D --task T --worktree W [--owner текст]   brief в бюджете: данные задачи (context.mjs, S0-48)
@@ -9,7 +9,8 @@
 //   init --dir D --task T (--from executor.out.json | --pr N --branch B)
 //   ready --dir D --worktree W --from executor.out.json       сдача (шаг 6 plan-task): пункты done → [x], доска, фаза, plan-check, push, PR ready
 //   gate --dir D --worktree W                                 ворота: verify на запушенном head в D/verify.log, следующий шаг
-//   wave --dir D --worktree W [--conflicts a,b]               следующий круг: briefs агентов
+//   wave --dir D --worktree W [--early | --conflicts a,b]     следующий круг: briefs агентов; --early — оси, которые стартуют
+//                                                             вместе с воротами; без него — остальные агенты того же круга
 //   check <файл.out.json> [--dir D]                           выход агента против его brief; с --dir — конец шага агента
 //   merge --dir D                                             итоги круга → состояние, отчёт
 //   brief fixer --dir D --worktree W --job answer|tidy|verify-red|rebase|owner [--log P] [--owner текст]
@@ -37,7 +38,7 @@ const [command, ...rest] = process.argv.slice(2);
 const flags = {};
 const positional = [];
 for (let i = 0; i < rest.length; i++) {
-  if (rest[i] === "--delta") flags.delta = true;
+  if (rest[i] === "--early") flags.early = true;
   else if (rest[i].startsWith("--")) flags[rest[i].slice(2)] = rest[++i];
   else positional.push(rest[i]);
 }
@@ -120,19 +121,22 @@ async function checked(outFile) {
   }
 }
 
-// Brief ревьюера: поля протокола и материал оси в бюджете (context.mjs); diff — {patch, files} круга, кроме conflicts.
-function reviewerBrief(state, s, plan, a, { worktree, out, diff, patch, body }) {
+// Brief ревьюера: поля протокола и материал оси в бюджете (context.mjs); patch — путь diff.patch ветки, кроме conflicts.
+// hunks — id hunk'ов оси: за них merge ставит вердикт; context.hunks — их текст и причина выбора каждого (S0-45).
+// Проверка ответов получает hunk'и дельты от прошлого ревьюированного head.
+function reviewerBrief(state, s, plan, a, { worktree, out, patch, body }) {
   const ids = new Set(a.findings.map((f) => f.id));
   const base = {
     role: "reviewer", agent: a.agent, axis: a.axis, job: a.job, pr: state.pr, task: state.task, worktree, wave: plan.wave,
-    base: s.base, head: s.head, reasons: s.reasons?.[a.axis] ?? [],
+    base: s.base, head: s.head, reasons: plan.reasons?.[a.axis] ?? [],
     expectations: a.axis === "spec" ? s.expectations : undefined, triggers: a.axis === "architecture" ? s.triggers : undefined,
-    files: a.files, range: a.range, findings: a.findings.map(slim), disputed: plan.disputed.filter((id) => ids.has(id)),
-    answers: (state.answers?.items ?? []).filter((x) => ids.has(x.id)), diff: diff ? patch : undefined, out,
+    hunks: a.hunks?.map((h) => h.id), files: a.files, range: a.range, findings: a.findings.map(slim), disputed: plan.disputed.filter((id) => ids.has(id)),
+    answers: (state.answers?.items ?? []).filter((x) => ids.has(x.id)), diff: a.job === "conflicts" ? undefined : patch, out,
   };
   // Spec получает отчёт мутаций `prove --ready` и решения авторов о выживших (S0-44).
   const mutation = a.axis === "spec" ? { report: reportOf(worktree), decisions: state.mutants ?? {} } : null;
-  return reviewerContext(base, { diff, body: a.axis === "spec" ? body() : null, mutation });
+  const hunks = a.job === "conflicts" ? null : (a.hunks ?? s.delta ?? []);
+  return reviewerContext(base, { hunks, body: a.axis === "spec" ? body() : null, mutation });
 }
 
 // Тело PR для brief Spec: ревьюеру gh не нужен. gh не ответил — тела нет, и brief называет это в cut.
@@ -144,40 +148,52 @@ function prBody(pr) {
   }
 }
 
-function scopeFor(state, worktree) {
-  if (state.wave === 0) return scope({ base: "origin/main", dir: worktree });
-  const delta = scope({ base: state.head, delta: true, dir: worktree });
-  return delta.rebased ? { ...scope({ base: "origin/main", dir: worktree }), rebased: true } : delta;
-}
+// Hunk'и ветки от merge-base с origin/main; since — прошлый ревьюированный head: от него дельта и late.
+const scopeFor = (state, worktree) => scope({ base: "origin/main", since: state.head ?? null, dir: worktree });
 
 function conflictsPlan(state, worktree, n) {
   const head = git(worktree, "rev-parse", "HEAD");
   const range = [`${git(worktree, "merge-base", "origin/main", state.head)}..${state.head}`, `origin/main..${head}`];
-  const s = { mode: "conflicts", axes: [], reasons: {}, stops: [], base: state.head, head, triggers: null, lines: 0 };
-  return { s, plan: { wave: n, mode: "conflicts", disputed: [], agents: [{ agent: "verifier", axis: "verify", job: "conflicts", findings: [], files: flags.conflicts.split(","), range }] } };
+  const s = { mode: "conflicts", hunks: [], axes: [], reasons: {}, stops: [], base: state.head, head, triggers: null, lines: 0 };
+  return { s, plan: { wave: n, reasons: {}, disputed: [], agents: [{ agent: "verifier", axis: "verify", job: "conflicts", findings: [], files: flags.conflicts.split(","), range }] } };
 }
 
+// Оси, которые стартуют вместе с воротами (S0-45): Architecture и Standards; Spec — если отчёт `prove --ready`
+// на head уже готов (S0-44). Остальные — после зелёных ворот.
+function earlyAxes(worktree, head) {
+  const report = reportOf(worktree);
+  const ready = report !== null && report.dirty === false && typeof report.head === "string" && (head.startsWith(report.head) || report.head.startsWith(head));
+  return ["architecture", "standards", ...(ready ? ["spec"] : [])];
+}
+
+// Круг: `--early` — оси, которые стартуют вместе с воротами; без него — остальные агенты того же круга, если он начат
+// с воротами, иначе все. Агент, начатый с воротами на прошлом head, остаётся: hunk'и, которые с тех пор задело
+// исправление красных ворот, вердикта не получат и идут в следующий круг.
 function wave() {
   const state = load();
   const worktree = need("worktree");
   const n = state.wave + 1;
   const wd = waveDir(n);
-  for (const f of readdirSync(wd)) rmSync(join(wd, f));
+  const prior = existsSync(join(wd, "scope.json")) ? read(join(wd, "scope.json")) : null;
+  const going = prior?.early === true && !flags.conflicts;
+  if (going && flags.early) return print({ ok: true, wave: n, agents: [], next: "gate" });
+  const started = going ? readdirSync(wd).filter((f) => f.endsWith(".in.json")).map((f) => f.replace(/\.in\.json$/, "")) : [];
+  if (!going) for (const f of readdirSync(wd)) rmSync(join(wd, f));
   let s;
   let plan;
   if (flags.conflicts) ({ s, plan } = conflictsPlan(state, worktree, n));
   else {
     s = scopeFor(state, worktree);
     if (s.stops.length) return print({ ok: true, wave: n, next: "owner", why: s.stops.join("; ") });
-    plan = planWave(state, s);
+    plan = planWave(state, s, { axes: flags.early ? earlyAxes(worktree, s.head) : null, skip: started });
+    if (going) plan.reasons = { ...prior.reasons, ...plan.reasons };
   }
-  write(join(wd, "scope.json"), { ...s, worktree });
-  if (n === 1 && s.mode === "none") return print({ ok: true, wave: n, mode: "none", agents: [], next: "final" });
-  const diff = flags.conflicts ? null : diffOf(worktree, s.base, s.head);
+  write(join(wd, "scope.json"), { ...s, reasons: plan.reasons, early: flags.early === true, worktree });
+  if (n === 1 && !flags.early && started.length === 0 && plan.agents.length === 0) return print({ ok: true, wave: n, agents: [], next: "final" });
   const patch = join(wd, "diff.patch");
-  if (diff) write(patch, diff.patch);
+  if (!flags.conflicts) write(patch, diffOf(worktree, s.base, s.head).patch);
   let body;
-  const ctx = { worktree, diff, patch, body: () => (body === undefined ? (body = prBody(state.pr)) : body) };
+  const ctx = { worktree, patch, body: () => (body === undefined ? (body = prBody(state.pr)) : body) };
   const agents = plan.agents.map((a) => {
     const brief = join(wd, `${a.agent}.in.json`);
     write(brief, reviewerBrief(state, s, plan, a, { ...ctx, out: join(wd, `${a.agent}.out.json`) }));
@@ -186,7 +202,8 @@ function wave() {
   const briefs = Object.fromEntries(agents.map((a) => [a.agent, statSync(a.brief).size]));
   const reason = reasonOf(state, { rebased: flags.conflicts !== undefined || s.rebased === true });
   save({ ...state, steps: begin(stepsOf(state), { kind: "review", role: "reviewer", job: null, wave: n, reason, briefs }, now()) });
-  print({ ok: true, wave: n, mode: s.mode, axes: s.axes, rebased: s.rebased === true, agents, next: agents.length ? "review" : "merge" });
+  const next = flags.early ? "gate" : agents.length ? "review" : "merge";
+  print({ ok: true, wave: n, axes: plan.agents.map((a) => a.axis), hunks: s.hunks.length, rebased: s.rebased === true, agents, started, next });
 }
 
 async function merge() {
@@ -200,8 +217,11 @@ async function merge() {
   const errors = Object.fromEntries(results.filter((r) => r.errors.length).map((r) => [r.brief.agent, r.errors]));
   if (Object.keys(errors).length) return print({ ok: false, errors });
   const outputs = results.map((r) => r.value);
-  const changed = changedLines({ base: s.base, head: s.head, dir: s.worktree });
-  const result = mergeWave(state, { wave: n, scope: s, outputs, changed });
+  // Вердикт оси — за hunk'и её brief'а (S0-45); late — находка вне строк дельты от прошлого ревьюированного head
+  // и вне hunk'ов, которые её ось получила в этом круге.
+  const reviewed = results.filter((r) => Array.isArray(r.brief.hunks)).map((r) => ({ axis: r.brief.axis, hunks: r.brief.hunks }));
+  const changed = changedLines({ base: s.since && !s.rebased ? s.since : s.base, head: s.head, dir: s.worktree });
+  const result = mergeWave(state, { wave: n, scope: s, outputs, changed, reviewed });
   const next = { ...result.state, steps: finish(stepsOf(state), { kind: "review", role: "reviewer" }, now(), { head: s.head }) };
   save(next);
   const file = comment("review", review(next, { scope: s, outputs, next: result.next }));
@@ -225,12 +245,14 @@ function brief() {
   const job = need("job");
   if (!FIXER_JOBS.includes(job)) fail(`--job: ${FIXER_JOBS.join(" | ")}`);
   const file = join(waveDir(state.wave), `fixer-${job}.in.json`);
+  // answer решает и советы своего круга (S0-45); tidy — советы и находки вне дельты после круга без блокирующих.
   const loose = job === "tidy" ? looseFindings(state) : [];
+  const advice = job === "answer" ? state.findings.filter((f) => f.status === "advice") : loose.filter((f) => f.severity === "advice");
   write(file, fixerContext({
     role: "fixer", job, pr: state.pr, task: state.task, branch: state.branch, worktree: need("worktree"), base: state.head ?? undefined,
     since: job === "tidy" ? git(need("worktree"), "merge-base", "origin/main", "HEAD") : undefined,
     findings: job === "answer" ? openFindings(state).map(slim) : loose.filter((f) => f.severity === "block").map(slim),
-    advice: loose.filter((f) => f.severity === "advice").map(slim),
+    advice: advice.map(slim),
     decisions: job === "answer" ? state.decisions : [], log: flags.log, owner: flags.owner ?? state.owner?.text, out: file.replace(".in.json", ".out.json"),
   }));
   const step = { kind: "agent", role: "fixer", job, wave: state.wave, briefs: { [`fixer-${job}`]: statSync(file).size } };
@@ -313,8 +335,10 @@ function gate() {
   closeSync(fd);
   const green = run.status === 0;
   const head = git(worktree, "rev-parse", "HEAD");
-  const steps = [...stepsOf(state), { kind: "gate", role: null, job: null, wave: state.wave, head, start, end: now(), green }];
-  save({ ...state, steps });
+  // Ревью стартует вместе с воротами (S0-45): за прогон `dl wave --early` мог записать состояние — оно читается заново.
+  const latest = load();
+  const steps = [...stepsOf(latest), { kind: "gate", role: null, job: null, wave: latest.wave, head, start, end: now(), green }];
+  save({ ...latest, steps });
   const route = green ? { next: "wave" } : redsInRow(steps) >= 3 ? { next: "escalate", why: "verify красный трижды" } : { next: "red" };
   print({ ok: true, head, green, log, ...route });
 }
@@ -498,7 +522,7 @@ const commands = {
   start,
   step,
   ready,
-  scope: () => print(scope({ base: positional[0] ?? fail("нужен base"), head: positional[1], delta: flags.delta === true, main: flags.main })),
+  scope: () => print(scope({ base: positional[0] ?? fail("нужен base"), head: positional[1], since: flags.since ?? null })),
   brief,
   init,
   gate,

@@ -19,7 +19,7 @@ function checked(out: object, conventions: string | null = CONVENTIONS): string[
   const dir = scratch("dl-protocol-");
   dirs.push(dir);
   if (conventions !== null) dir.write("CONVENTIONS.md", conventions);
-  const brief = { role: "reviewer", axis: "standards", job: "full", head: HEAD, worktree: dir.dir, findings: [], disputed: [] };
+  const brief = { role: "reviewer", axis: "standards", job: "hunks", head: HEAD, worktree: dir.dir, findings: [], disputed: [] };
   dir.write("r.in.json", JSON.stringify(brief));
   const file = dir.write("r.out.json", JSON.stringify(out));
   return (JSON.parse(tool.run(["check", file]).stdout) as { errors: string[] }).errors;

@@ -1,26 +1,44 @@
-// scope: что ревьюить в круге — режим и оси (plan/dev-loop.md, «Круги»). Решение детерминировано.
-// Круг 1: base — origin/main, diff от merge-base. Следующие круги: base — прошлый ревьюированный head, delta.
-// main — от него считается вся ветка для stops.
-// Результат {mode, axes, reasons, stops, triggers, expectations, rebased, lines, base, head}:
-//   mode — none (ревью не нужен) | verify (дельта мала: проверка закрытия находок) | review (оси из axes);
-//   reasons — почему выбрана каждая ось; stops — что требует решения владельца до ревью;
+// scope: что ревьюить — hunk'и ветки и оси, чьи триггеры они задевают (plan/dev-loop.md, «Круги»). Решение детерминировано.
+// Hunk — кусок diff ветки merge-base(base, head)..head без контекста. Его id — hash файла, номера среди одинаковых hunk'ов
+// файла и строк − и + (S0-45): вердикт оси — evidence с ключом (ось, id); правка hunk'а меняет id, и вердикт теряется.
+// Файл без hunk'ов — переименование, бинарный, режим — один hunk из строки статуса.
+// Результат {hunks, axes, reasons, stops, triggers, expectations, bypass, delta, rebased, lines, base, head, since}:
+//   hunks — [{id, file, at, text, axes: {ось: [причина]}}]: at — строки новой стороны, text — заголовок @@ и строки;
+//   axes и reasons — сводка по всем hunk'ам; stops — что требует решения владельца до ревью;
 //   triggers — триггеры аудита ST-15; expectations — тест-файлы, где ожидания изменены или отключены (PR-11);
-//   rebased — base не предок head: дельту посчитать нельзя, нужен круг без delta.
+//   bypass — добавленные строки чистого кода, похожие на класс каталога обходов: их сверяет самопроверка executor;
+//   delta — hunk'и since..head, прошлого ревьюированного head: их читает проверка ответов; rebased — since не предок head.
+import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { classOf } from "../../../scripts/paths.mjs";
 import { conventionsOf } from "./conventions.mjs";
 
-const VERIFY_MAX_LINES = 40;
+export const HUNK_AXES = ["spec", "standards", "architecture"];
 // Признаки классов каталога обходов в добавленной строке чистого кода; строка с отступом — не уровень модуля.
 const BYPASS = /\bJSON\.(stringify|parse)\b|\bnew Date\b|\bDate\.now\b|\bMath\.random\b|\bprocess\.|\b(readFileSync|writeFileSync)\b|^let\s|\bthrow\b|\b(skip|force|unsafe)[A-Z_]/;
-const IMPORT_EXPORT = /^(import|export)\b/;
+const EXPORT = /^export\b/;
 const DISABLED_TEST = /\.(skip|only|todo)\b|\b(xit|xdescribe)\(/;
+// Пути, чьи экспорты держит опись closure-check.
+const STRUCTURAL = /^(src|scripts)\/|^test\/support\//;
+// Что изменено — по классу пути (scripts/paths.mjs, S0-42): причина Spec и Standards.
+const CHANGED = {
+  code: "изменён код",
+  tests: "изменены тесты",
+  task: "изменены файл задачи или PLAN.md",
+  design: "изменён docs/design",
+  config: "изменена конфигурация",
+  conventions: "изменён CONVENTIONS.md",
+  text: "текст ветки, где изменены код, тесты или задача",
+};
+const STANDARDS = ["code", "tests", "config", "conventions"];
+const EXPECTATION = "изменено или отключено ожидание теста (PR-11)";
 
 let cwd = process.cwd();
 const git = (...args) => execFileSync("git", args, { cwd, encoding: "utf8", maxBuffer: 1 << 26, stdio: ["ignore", "pipe", "pipe"] });
 const lines = (text) => text.split("\n").filter(Boolean);
+const unique = (list) => [...new Set(list)];
 
-// Класс пути — от него зависят оси круга и материал агента — даёт классификатор scripts/paths.mjs (S0-42).
+// Класс пути — от него зависят оси hunk'а и материал агента — даёт классификатор scripts/paths.mjs (S0-42).
 
 // Файлы diff с переименованиями: {path, old, cls, status A|M|D|R|C|T, lines}.
 function changes(from, head) {
@@ -43,18 +61,57 @@ function changes(from, head) {
   return [...files.values()];
 }
 
-// Строки hunk'ов (+ и −) по файлам — без заголовков diff.
-function hunkLines(from, head, files) {
-  const out = new Map();
+// Hunk'и diff from..head без контекста: {f, header, at, rows, added: [{line, text}]}; rows — строки − и +.
+function hunksOf(from, head, files) {
+  const out = [];
+  const byPath = new Map(files.map((f) => [f.path, f]));
   const paths = files.flatMap((f) => (f.old ? [f.old, f.path] : [f.path]));
   if (paths.length === 0) return out;
   let file = null;
-  for (const row of git("diff", "-M", "-U0", from, head, "--", ...paths).split("\n")) {
-    if (row.startsWith("diff --git ")) file = row.slice(row.lastIndexOf(" b/") + 3);
-    else if (row.startsWith("+++ ") || row.startsWith("--- ") || row.startsWith("@@")) continue;
-    else if (file && /^[+-]/.test(row)) (out.get(file) ?? out.set(file, []).get(file)).push(row);
+  let hunk = null;
+  let line = 0;
+  const close = () => {
+    if (hunk) out.push(hunk);
+    hunk = null;
+  };
+  for (const row of git("diff", "-M", "-U0", "--no-color", "--no-ext-diff", from, head, "--", ...paths).split("\n")) {
+    if (row.startsWith("diff --git ")) {
+      close();
+      file = byPath.get(row.slice(row.lastIndexOf(" b/") + 3)) ?? null;
+      continue;
+    }
+    const m = /^@@ -\S+ \+(\d+)(?:,(\d+))? @@/.exec(row);
+    if (file && m) {
+      close();
+      line = Number(m[1]);
+      const count = m[2] === undefined ? 1 : Number(m[2]);
+      hunk = { f: file, header: row, at: count <= 1 ? `${line}` : `${line}-${line + count - 1}`, rows: [], added: [] };
+    } else if (hunk && /^[+-]/.test(row)) {
+      hunk.rows.push(row);
+      if (row.startsWith("+")) hunk.added.push({ line: line++, text: row.slice(1) });
+    }
   }
-  return out;
+  close();
+  // Файл без hunk'ов: переименование без правки, бинарный файл, режим.
+  const seen = new Set(out.map((h) => h.f.path));
+  for (const f of files.filter((x) => !seen.has(x.path))) {
+    const header = `${f.status} ${f.old ? `${f.old} → ` : ""}${f.path}`;
+    out.push({ f, header, at: "файл", rows: [header], added: [] });
+  }
+  return out.sort((a, b) => (a.f.path < b.f.path ? -1 : a.f.path > b.f.path ? 1 : 0));
+}
+
+// Id hunk'а: файл, номер среди hunk'ов файла с теми же строками, строки − и +. Номера строк в id не входят:
+// правка выше по файлу сдвигает hunk, но не снимает его вердикт.
+function withIds(hunks) {
+  const count = new Map();
+  return hunks.map((h) => {
+    const body = h.rows.join("\n");
+    const key = `${h.f.path}\0${body}`;
+    const n = count.get(key) ?? 0;
+    count.set(key, n + 1);
+    return { ...h, id: createHash("sha256").update(`${h.f.path}\0${n}\0${body}`).digest("hex").slice(0, 12) };
+  });
 }
 
 function skeleton(head) {
@@ -68,15 +125,16 @@ function skeleton(head) {
 const moduleOf = (path) => /^src\/([^/]+)\//.exec(path ?? "")?.[1];
 // Чистый код (ST-04): модули вне adapters, assembly, cli и тест-хелперы — там каталог обходов ищется по строкам.
 const isPure = (f) => f.path.startsWith("test/support/") || !["adapters", "assembly", "cli", undefined].includes(moduleOf(f.path));
+const isAdded = (f) => f.status === "A" || f.status === "R" || f.status === "C";
+const pathsOf = (f) => (f.old ? [f.path, f.old] : [f.path]);
 
 function isNewModule(from, module) {
   return git("ls-tree", "--name-only", from, `src/${module}/`).trim() === "";
 }
 
-function triggersOf(files, from, head) {
-  const owned = skeleton(head);
+function triggersOf(files, from, owned) {
   const modules = [...new Set(files.flatMap((f) => [moduleOf(f.path), moduleOf(f.old)]).filter(Boolean))].sort();
-  const added = files.filter((f) => f.status === "A" || f.status === "R" || f.status === "C");
+  const added = files.filter(isAdded);
   return {
     skeleton: files.filter((f) => owned.has(f.path) || owned.has(f.old)).map((f) => f.path),
     newModules: [...new Set(added.map((f) => moduleOf(f.path)).filter((m) => m && isNewModule(from, m)))],
@@ -85,30 +143,39 @@ function triggersOf(files, from, head) {
   };
 }
 
-function architectureReasons(files, hunks, triggers) {
-  const reasons = [];
-  const structural = (f) => /^(src|scripts)\/|^test\/support\//.test(f.path) || /^(src|scripts)\/|^test\/support\//.test(f.old ?? "");
-  const body = (path) => (hunks.get(path) ?? []).map((l) => l.slice(1).trim());
-  const touched = files.filter(structural);
-  if (touched.some((f) => f.status !== "M")) reasons.push("файл добавлен, удалён или переименован в src/, scripts/ или test/support/");
-  if (touched.some((f) => body(f.path).some((l) => IMPORT_EXPORT.test(l)))) reasons.push("изменены импорты или экспорты (опись closure-check)");
-  if (touched.filter(isPure).some((f) => (hunks.get(f.path) ?? []).some((l) => l.startsWith("+") && BYPASS.test(l.slice(1)))))
-    reasons.push("добавленная строка похожа на класс каталога обходов (closure-check)");
-  if (files.some((f) => f.path.startsWith("test/support/"))) reasons.push("тест-хелперы test/support/");
-  if (files.some((f) => f.path.startsWith("src/assembly/"))) reasons.push("сборка src/assembly/");
-  if (files.some((f) => f.path === "package.json")) reasons.push("package.json");
-  if (files.some((f) => f.cls === "design")) reasons.push("docs/design");
-  if (files.some((f) => f.cls === "generated")) reasons.push("генерируемые файлы gen/ или store/ (AG-11)");
-  if (triggers.skeleton.length) reasons.push("файл walking skeleton (ST-15)");
-  if (triggers.modules.length) reasons.push("задеты три модуля и больше (ST-15)");
-  return reasons;
+// Триггеры Architecture одного hunk'а (S0-45): новый или изменённый экспорт, новый модуль или порт, test/support/,
+// файл walking skeleton. Прочее — опись closure-check в самопроверке executor.
+function architectureOf(h, { owned, triggers }) {
+  const f = h.f;
+  const out = [];
+  if (pathsOf(f).some((p) => STRUCTURAL.test(p)) && h.rows.some((r) => EXPORT.test(r.slice(1).trim()))) out.push("новый или изменённый экспорт (опись closure-check)");
+  const module = moduleOf(f.path);
+  if (module && triggers.newModules.includes(module)) out.push(`новый модуль ${module} (ST-15)`);
+  if (triggers.newPorts.includes(f.path)) out.push("новый порт (ST-15)");
+  if (pathsOf(f).some((p) => p.startsWith("test/support/"))) out.push("тест-хелперы test/support/");
+  if (pathsOf(f).some((p) => owned.has(p))) out.push("файл walking skeleton (ST-15)");
+  return out;
 }
 
 // Ожидание изменено: удалена строка с expect, тест отключён, фикстура правила удалена или изменена.
-function expectationsOf(files, hunks) {
-  const changed = (f) => (hunks.get(f.path) ?? []).some((l) => (l.startsWith("-") && l.includes("expect(")) || (l.startsWith("+") && DISABLED_TEST.test(l)));
-  const fixture = (f) => f.path.startsWith("test/fixtures/") && f.status !== "A";
-  return files.filter((f) => f.cls === "tests" && (fixture(f) || changed(f))).map((f) => f.path);
+function isExpectation(h) {
+  if (h.f.cls !== "tests") return false;
+  if (h.f.path.startsWith("test/fixtures/") && h.f.status !== "A") return true;
+  return h.rows.some((r) => (r.startsWith("-") && r.includes("expect(")) || (r.startsWith("+") && DISABLED_TEST.test(r)));
+}
+
+// Оси hunk'а и причина каждой. Spec — всё, кроме генерируемого, если ветка меняет не только текст; Standards — код,
+// тесты, конфигурация, CONVENTIONS.md; Architecture — по своим триггерам.
+function axesOf(h, ctx) {
+  const axes = {};
+  const spec = [];
+  if (h.f.cls !== "generated" && ctx.reviewable) spec.push(CHANGED[h.f.cls]);
+  if (isExpectation(h)) spec.push(EXPECTATION);
+  if (spec.length) axes.spec = unique(spec);
+  if (STANDARDS.includes(h.f.cls)) axes.standards = [CHANGED[h.f.cls]];
+  const architecture = architectureOf(h, ctx);
+  if (architecture.length) axes.architecture = architecture;
+  return axes;
 }
 
 function stopsOf(branch) {
@@ -118,44 +185,26 @@ function stopsOf(branch) {
   return stops;
 }
 
-function specReasons(has, expectations, delta) {
-  const reasons = [];
-  if (has("code")) reasons.push("изменён код");
-  if (has("task")) reasons.push("изменены файлы задачи или PLAN.md");
-  if (has("design", "config", "generated")) reasons.push("изменены docs/design, конфигурация или генерируемые файлы");
-  if (expectations.length) reasons.push("изменены или отключены ожидания тестов (PR-11)");
-  if (!delta && has("tests")) reasons.push("изменены тесты");
-  return reasons;
-}
+const shown = (h) => ({ file: h.f.path, at: h.at, text: [h.header, ...(h.rows[0] === h.header ? [] : h.rows)].join("\n") });
 
-export function scope({ base, head = "HEAD", delta = false, main = "origin/main", dir = process.cwd() }) {
+export function scope({ base = "origin/main", head = "HEAD", since = null, dir = process.cwd() }) {
   cwd = dir;
-  if (delta && !succeeds("merge-base", "--is-ancestor", base, head)) return { rebased: true };
-  const from = delta ? base : git("merge-base", base, head).trim();
+  const from = git("merge-base", base, head).trim();
+  const at = git("rev-parse", head).trim();
   const files = changes(from, head);
-  const has = (...cls) => files.some((f) => cls.includes(f.cls) || cls.includes(classOf(f.old ?? "")));
-  const hunks = hunkLines(from, head, files.filter((f) => ["code", "tests"].includes(f.cls)));
-  const triggers = triggersOf(files, from, head);
-  const expectations = expectationsOf(files, hunks);
+  const owned = skeleton(head);
+  const triggers = triggersOf(files, from, owned);
+  const ctx = { owned, triggers, reviewable: files.some((f) => f.cls !== "text") };
+  const raw = withIds(hunksOf(from, head, files));
+  const hunks = raw.map((h) => ({ id: h.id, ...shown(h), axes: axesOf(h, ctx) }));
+  const axes = HUNK_AXES.filter((a) => hunks.some((h) => h.axes[a]));
+  const reasons = Object.fromEntries(HUNK_AXES.map((a) => [a, unique(hunks.flatMap((h) => h.axes[a] ?? []))]));
+  const expectations = unique(raw.filter(isExpectation).map((h) => h.f.path));
+  const bypass = raw.filter((h) => STRUCTURAL.test(h.f.path) && isPure(h.f)).flatMap((h) => h.added.filter((a) => BYPASS.test(a.text)).map((a) => `${h.f.path}:${a.line}`));
+  const rebased = since !== null && !succeeds("merge-base", "--is-ancestor", since, head);
+  const delta = since !== null && !rebased ? hunksOf(since, head, changes(since, head)).map(shown) : [];
   const total = files.reduce((n, f) => n + f.lines, 0);
-  const branch = delta && succeeds("rev-parse", "--verify", main) ? changes(git("merge-base", main, head).trim(), head) : files;
-  const reasons = {
-    spec: specReasons(has, expectations, delta),
-    standards: has("code", "tests", "config", "conventions") ? ["изменены код, тесты, конфигурация или CONVENTIONS.md"] : [],
-    architecture: architectureReasons(files, hunks, triggers),
-  };
-
-  const small = delta && total <= VERIFY_MAX_LINES && !has("design", "config", "conventions", "generated")
-    && files.every((f) => f.status === "M") && reasons.architecture.length === 0 && expectations.length === 0;
-  let mode = "review";
-  if (!has("code", "tests", "config", "conventions", "design", "generated", "task")) mode = delta ? "verify" : "none";
-  else if (small) mode = "verify";
-  if (mode === "review" && !reasons.spec.length && !reasons.standards.length && !reasons.architecture.length)
-    reasons.spec.push("изменения выше порога проверки закрытия");
-
-  const axes = mode === "review" ? ["spec", "standards", "architecture"].filter((a) => reasons[a].length) : [];
-  const stops = stopsOf(branch);
-  return { mode, axes, reasons, stops, triggers, expectations, rebased: false, lines: total, base: from, head: git("rev-parse", head).trim() };
+  return { hunks, axes, reasons, stops: stopsOf(files), triggers, expectations, bypass, delta, rebased, lines: total, base: from, head: at, since };
 }
 
 function succeeds(...args) {
