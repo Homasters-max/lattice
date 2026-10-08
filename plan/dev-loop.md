@@ -79,12 +79,13 @@ Push автора — `git push origin HEAD:refs/heads/<branch>` (worktree в de
 
 **executor** — `.claude/agents/executor.md`. Шаги 1 и 6 `plan-task` механические, их делает `dl` (S0-51): `dl start` открывает ветку, коммит `S0-NN: start` и draft PR; `dl ready` по выходу executor сдаёт задачу.
 - Вход: общие поля и `branch` — ветка draft PR, который открыл `dl start`; нет `pr` — шаг 1 делает executor. `context`: `task` — файл задачи, `rules` — тексты правил из `rules`, `questions` — строки Q-NN и G-NN задачи, `conventions` — пункты по модулям задачи.
-- Выход: `{status: "ready" | "needs_owner", pr, branch, head, done?: [пункт], question?, gaps?: ["G-NN"], context_missing?: [строка]}`; `head` закоммичен и запушен в `branch`.
+- Выход: `{status: "ready" | "needs_owner", pr, branch, head, done?: [пункт], mutants?: [{id, decision, commit?, reason?}], question?, gaps?: ["G-NN"], context_missing?: [строка]}`; `head` закоммичен и запушен в `branch`.
   - `done` — выполненные пункты «Готово, когда» словами файла задачи; при `ready` обязателен, пункт, которого нет в файле, `dl check` не принимает.
+  - `mutants` — решения о выживших мутантах (раздел «Мутанты»).
   - По `done` `dl ready` отмечает пункты `[x]`, ставит ✅ и ссылку на PR на доске, переводит фазу в `plan/STATUS.md` в 🔄 или 🔍, гонит `plan-check`, коммитит последним коммитом ветки и переводит PR в ready. Пункт файла, которого нет в `done`, — не сдача, а вопрос владельцу (`plan-task`, «Отступления»).
 
 **reviewer** — `reviewer-spec`, `reviewer-standards`, `reviewer-architecture`, `verifier` (ось `verify`): `.claude/agents/<агент>.md`.
-- Вход: `axis`, `job`, `wave`, `base`, `head`, `reasons` (почему выбрана ось), `expectations` (Spec), `triggers` (Architecture), `files` и `range` (conflicts), `findings` — порученные находки, `disputed`, `answers` — ответ автора на них, `diff`. `context` по оси: Spec — `task`, `rules`, `questions`, `pr_body`, `hunks`; Standards — `conventions` по путям hunk'ов, `st` — строки ST классов путей, `hunks`; Architecture — `closure` — текст `plan/closure-check.md`, `rm` — RM-Z04 и RM-08, `hunks`; verifier — `hunks` дельты, кроме `conflicts`.
+- Вход: `axis`, `job`, `wave`, `base`, `head`, `reasons` (почему выбрана ось), `expectations` (Spec), `triggers` (Architecture), `files` и `range` (conflicts), `findings` — порученные находки, `disputed`, `answers` — ответ автора на них, `diff`. `context` по оси: Spec — `task`, `rules`, `questions`, `pr_body`, `mutation` и `mutants` — отчёт `prove --ready` с решениями авторов, `hunks`; Standards — `conventions` по путям hunk'ов, `st` — строки ST классов путей, `hunks`; Architecture — `closure` — текст `plan/closure-check.md`, `rm` — RM-Z04 и RM-08, `hunks`; verifier — `hunks` дельты, кроме `conflicts`.
 - Выход: `{axis, head, summary, statuses: [{id, status, note?}], findings: [{kind, rule, where, quote, text, ratchet?}], context_missing?: [строка]}` — пять полей обязательны.
   - `summary` — что проверено, до 800 знаков; в `close` и `conflicts` — как сопоставлены hunk'и.
   - `statuses` и `findings` — списки, пустой, если нечего.
@@ -95,7 +96,7 @@ Push автора — `git push origin HEAD:refs/heads/<branch>` (worktree в de
 
 **fixer** — `.claude/agents/fixer.md`. `job`: `answer` — ответ на круг, `tidy` — хвосты перед сдачей, `verify-red` — красный verify по `log`, `rebase` — пересборка на `origin/main`, `owner` — поручение владельца из `owner`.
 - Вход: `branch`, `base` — ревьюированный head, `since` — начало ветки (`tidy`), `findings` — открытые `block` (в `answer` все, в `tidy` — `late`), `advice` — советы (`tidy`), `decisions` — решения владельца `{id, action: fix|task|gap, note}`, `log` (verify-red). `context`: `failed` — упавшие шаги verify из `log`, `hunks` — hunk ветки у каждой находки, `rules` — тексты правил находок, `conventions` — пункты, которые находки называют или чья область задевает их пути.
-- Выход: `{status: "done" | "needs_owner", head, answers: [{id, action, commits?, where?, note?}], conflicts?: [файл], question?, gaps?, context_missing?: [строка]}`.
+- Выход: `{status: "done" | "needs_owner", head, answers: [{id, action, commits?, where?, note?}], mutants?: [{id, decision, commit?, reason?}], conflicts?: [файл], question?, gaps?, context_missing?: [строка]}`.
   - На каждую находку из `findings` и `advice` и каждое решение `task` или `gap` — ровно один ответ.
   - `action`: в `answer` — `fixed` | `disputed`; в `tidy` ещё `deferred` | `declined`.
   - `fixed` — коммиты из `base..head`; в `tidy` — из `since..head`, всей ветки: хвост мог закрыть и более ранний коммит.
@@ -103,6 +104,16 @@ Push автора — `git push origin HEAD:refs/heads/<branch>` (worktree в de
   - `deferred` — `where`: файл задачи или `PLAN.md` фазы, изменённый в этом ответе. `declined` — только совет, причина в `note`.
   - `head` — HEAD worktree, запушенный в `branch`.
   - `conflicts` (rebase) — файлы, где конфликт решён руками.
+  - `mutants` — решения о выживших мутантах, которых `dl` ещё не помнит (раздел «Мутанты»).
+
+## Мутанты
+
+`npm run prove --ready` (`scripts/prove.mjs`, `scripts/mutate.mjs`) мутирует изменённые hunk'и `src/` против начала ветки шестью операторами `scripts/mutants.mjs` и гоняет каждого мутанта на test-sets, которые достают его файл. Отчёт — `.lattice/mutants.json` в worktree: `head`, `dirty`, мутанты с `id`, оператором, строкой, исходом `killed` | `survived` | `budget-exceeded` и тестом, который убил. Выжившие не делают `prove` красным — их решает автор: executor до `ready`, fixer до push.
+
+- Решение — элемент `mutants` выхода: `{id, decision, commit?, reason?}`. `decision`: `killed` — тест, который убивает мутанта, в коммите ветки `commit`, и отчёт на `head` показывает его `killed`; `equivalent` — мутант не меняет поведения; `deferred` — отложен; у `equivalent` и `deferred` — `reason`, до 300 знаков.
+- `dl check` отказывает выходу `ready` executor и `done` fixer, если в изменённых hunk'ах `src/` есть мутанты, а отчёта на `head` без незакоммиченных правок нет, если отчёт не называет мутанта или выживший не решён.
+- Решённого `dl` помнит в состоянии по `id` мутанта и снова не выносит; `id` — hash файла, оператора, строки и правки.
+- Spec получает в brief сводку отчёта и мутантов с решениями; вне отчёта ревьюер мутирует только `npm run mutate -- --at <файл:строка>`.
 
 ## Самопроверка
 
@@ -113,4 +124,4 @@ Executor перед выходом `ready`, fixer перед push — на св�
 - **Spec**: таблица «Правила» в описании PR называет тесты, которые правило и показывают; ожидания не ослаблены (PR-11); отступления записаны в файле задачи и в PR;
 - исправление не повторяет класс нарушения в другом месте: соседей исправленного (тот же паттерн в других файлах ветки) исправь тем же коммитом.
 
-Готово, когда каждый пункт сверен с diff и `npm run prove` зелёный: `outcome: "passed"` в JSON последней строки, код выхода 0; вывод не режется `| tail`. `prove` гоняет затронутые test-sets и весь fitness (`scripts/prove.mjs`); полный `npm run verify` — для CI и ворот.
+Готово, когда каждый пункт сверен с diff, `npm run prove --ready` по закоммиченному зелёный: `outcome: "passed"` в JSON последней строки, код выхода 0, — и выжившие мутанты решены; вывод не режется `| tail`. `prove` гоняет затронутые test-sets и весь fitness (`scripts/prove.mjs`), `--ready` — ещё мутантов изменённых hunk'ов `src/`; полный `npm run verify` — для CI и ворот.

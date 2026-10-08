@@ -26,7 +26,7 @@ effort: high
 - `rebase`: rebase на `origin/main`; конфликт — обычный шаг интеграции (PR-18): изменения обеих сторон сохранены.
 - `owner`: исполни поручение владельца.
 
-Строки `CONVENTIONS.md` из `main` не правь, чтобы закрыть находку или совет: предложение изменить правило — в «Открытое» PR. Перед push — `dl step selfcheck --task <task>` по закоммиченному: каждый пункт `todo` сверь с diff, соседей исправленного (тот же паттерн в других файлах ветки) исправь тем же коммитом; `npm run prove` зелёный: итог — `outcome` в JSON последней строки и код выхода, вывод не режь `| tail`.
+Строки `CONVENTIONS.md` из `main` не правь, чтобы закрыть находку или совет: предложение изменить правило — в «Открытое» PR. Перед push — `dl step selfcheck --task <task>` по закоммиченному: каждый пункт `todo` сверь с diff, соседей исправленного (тот же паттерн в других файлах ветки) исправь тем же коммитом; `npm run prove --ready` по закоммиченному зелёный: итог — `outcome` в JSON последней строки и код выхода, вывод не режь `| tail`. Каждого выжившего мутанта из `.lattice/mutants.json`, которого `dl` ещё не помнит, реши: `killed` — тест закоммичен, и новый `prove --ready` это показывает; `equivalent` или `deferred` — с `reason`.
 
 ## Стоп
 
@@ -34,14 +34,15 @@ effort: high
 
 ## Выход
 
-`out.json` по пути `out` из brief: `{status: "done" | "needs_owner", head, answers: [{id, action, commits?, where?, note?}], conflicts?: [файл], question?, gaps?, context_missing?: [строка]}` — других полей нет.
+`out.json` по пути `out` из brief: `{status: "done" | "needs_owner", head, answers: [{id, action, commits?, where?, note?}], mutants?: [{id, decision, commit?, reason?}], conflicts?: [файл], question?, gaps?, context_missing?: [строка]}` — других полей нет.
 
 - На каждую находку из `findings` и `advice` и каждое решение `task` или `gap` — ровно один ответ.
 - `action`: в `answer` — `fixed` | `disputed`; в `tidy` ещё `deferred` | `declined`.
 - `fixed` — `commits` из `base..head`; в `tidy` — из `since..head`.
 - `disputed` — только о блокирующей находке; `note` называет правило, которое говорит иное. «Трудно» или «вне объёма» — не довод, а `deferred` или вопрос владельцу.
 - `deferred` — `where`: файл задачи или `PLAN.md` фазы, изменённый в этом ответе. `declined` — только совет, причина в `note`.
+- `mutants` — решение о каждом выжившем из отчёта `prove --ready` на `head`, которого `dl` не помнит: `id`, `decision` — `killed` с `commit`, `equivalent` или `deferred` с `reason`.
 - `head` — HEAD worktree, запушенный в `branch`; `conflicts` (rebase) — файлы, где конфликт решён руками.
 - `question` — `{text, options: [2–4 строки], recommendation}`.
 
-Готово, когда поручение выполнено, самопроверка пройдена, `npm run prove` зелёный, ветка запушена, worktree чистый; ответ — одна строка `DEV-LOOP-OUT <out>`.
+Готово, когда поручение выполнено, самопроверка пройдена, `npm run prove --ready` зелёный и выжившие решены, ветка запушена, worktree чистый; ответ — одна строка `DEV-LOOP-OUT <out>`.
