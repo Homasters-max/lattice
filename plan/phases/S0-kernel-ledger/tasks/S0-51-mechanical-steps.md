@@ -31,6 +31,7 @@ rules: []
 - `dl init --from`, когда состояние уже написал `start`, добавляет в него `gaps` executor — раньше при существующем состоянии они терялись;
 - `dl ready --worktree <work> --from <out>`; `done` — пункты словами файла задачи. `dl check` не принимает выход `ready` без `done` и пункт, которого в файле нет; `dl ready` при невыполненном пункте печатает `next: escalate` и ничего не меняет, при красном `plan-check` — `ok: false` и возвращает файлы. Фаза: ⬜ или 📝 → 🔄 с датой «Начата», после последней задачи доски → 🔍; разбор — `plan/tools/dev-loop/task.mjs`;
 - контракт executor меняется и в `plan/dev-loop.md` (вход `branch`, выход `done`, самопроверка «перед выходом `ready`»);
+- PR теперь открывает `dl`, и executor не создаёт PR с описанием, а правит описание открытого: `.claude/agents/executor.md` называет способ — `gh api -X PATCH repos/{owner}/{repo}/pulls/<pr> -F body=@<файл>`, потому что `gh pr edit` падает без scope `read:org`. Пишет описание, как и прежде, executor (S0-48);
 - тесты: старт — `test/tools/dev-loop-start.test.ts`, новая задача тестового репозитория — S0-98 (у S0-99 там уже есть ветка и PR других случаев); сдача и `done` в `dl check` — `test/tools/dev-loop-ready.test.ts`.
 
 ## Тесты и фикстуры
