@@ -119,7 +119,7 @@
           "pin": "any",
           "label": "derived-from"
         },
-        "description": "the run a memo answer came from (RT-24)"
+        "description": "the run a memo answer came from (RT-24); an event, so pin says nothing (G-42)"
       }
     },
     "required": [

@@ -316,7 +316,7 @@
           "pin": "any",
           "label": "caused-by"
         },
-        "description": "the run this one continues with an answer (RT-18)"
+        "description": "the run this one continues with an answer (RT-18); an event, so pin says nothing (G-42)"
       },
       "parent": {
         "type": "string",
@@ -326,7 +326,7 @@
           "pin": "any",
           "label": "caused-by"
         },
-        "description": "the step that started it (OB-06)"
+        "description": "the step that started it (OB-06); an event, so pin says nothing (G-42)"
       }
     },
     "required": [

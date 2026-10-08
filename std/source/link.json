@@ -12,7 +12,7 @@
           "pin": "any",
           "label": "about"
         },
-        "description": "the explore session that names its reason (TR-13)"
+        "description": "the explore session that names its reason (TR-13); an event, so pin says nothing (G-42)"
       },
       "for": {
         "oneOf": [

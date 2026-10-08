@@ -12,7 +12,7 @@
           "pin": "any",
           "label": "part-of"
         },
-        "description": "the session of the step; the steps of one session form one chain (OB-02, LG-07)"
+        "description": "the session of the step; the steps of one session form one chain (OB-02, LG-07); an event, so pin says nothing (G-42)"
       },
       "parent": {
         "type": "string",
@@ -22,7 +22,7 @@
           "pin": "any",
           "label": "part-of"
         },
-        "description": "the parent step (OB-02)"
+        "description": "the parent step (OB-02); an event, so pin says nothing (G-42)"
       },
       "kind": {
         "enum": [
