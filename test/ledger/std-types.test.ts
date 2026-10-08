@@ -27,10 +27,11 @@ const BASES = ["behaviour", "composition", "contract", "decision-point", "hint",
 /** TY-16: the base edge labels of `std`. */
 const LABELS = ["about", "caused-by", "decides", "derived-from", "implements", "measures", "part-of", "supersedes", "uses", "verifies"];
 
+/** A file as JSON, frozen deep: the sources reach `compare` and the resolver of the kernel as they are (§1.5). */
 function json(path: string): JsonValue {
   const parsed = parseJson(owned.text(path));
   if (!parsed.ok) throw new Error(`bug: ${path} is no JSON the kernel parses`);
-  return parsed.value;
+  return deepFreeze(parsed.value);
 }
 
 const object = (value: JsonValue | undefined): JsonObject => {
