@@ -53,7 +53,7 @@ const OWNS = {
 };
 
 /** The roots a test set owns: a folder ends with `/`, a file is itself, `""` is the whole repository. */
-export function ownedRoots(set) {
+function ownedRoots(set) {
   if (FITNESS.includes(set)) return [""];
   return [`test/${set}/`, ...(OWNS[set] ?? [])];
 }

@@ -11,7 +11,7 @@ let bin: Program;
 
 beforeAll(() => {
   out = scratch("lattice-bin-");
-  const built = program("node_modules/typescript/bin/tsc").run(["-p", "tsconfig.build.json", "--outDir", out.dir, "--sourceMap", "false"], { cwd: repoRoot });
+  const built = program("tsc").run(["-p", "tsconfig.build.json", "--outDir", out.dir, "--sourceMap", "false"], { cwd: repoRoot });
   if (built.status !== 0) throw new Error(`bug: the build of src/ failed\n${built.stdout}${built.stderr}`);
   // The build of the package runs as ES modules: package.json says "type": "module".
   out.write("package.json", '{ "type": "module" }\n');

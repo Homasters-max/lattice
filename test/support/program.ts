@@ -7,8 +7,17 @@ import { existsSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { inRepository, inScratch, repoRoot } from "./files.js";
 
-/** The tools the environment of the tests names: started by name, as the code under test starts them. */
-export const ENVIRONMENT: readonly string[] = ["git"];
+/**
+ * The tools the environment of the tests names, and how each starts: `git` by name, as the code under test starts it;
+ * `tsc` by the node entry the lockfile installs — a dependency, no program of the project, so its path is refused.
+ */
+const TOOLS = new Map<string, readonly [string, readonly string[]]>([
+  ["git", ["git", []]],
+  ["tsc", [process.execPath, [join(repoRoot, "node_modules/typescript/bin/tsc")]]],
+]);
+
+/** The names of the tools of the environment of the tests. */
+export const ENVIRONMENT: readonly string[] = [...TOOLS.keys()];
 
 /** How a run of a program ended: its exit code (1 when a signal ended it) and its output. */
 export type Ran = { readonly status: number; readonly stdout: string; readonly stderr: string };
@@ -26,9 +35,12 @@ const MAX_BUFFER = 1 << 26;
 
 /** The command and leading arguments of `entry`, or a refusal of ST-18 for what is no program of the project. */
 function commandOf(entry: string): readonly [string, readonly string[]] {
-  if (ENVIRONMENT.includes(entry)) return [entry, []];
+  const tool = TOOLS.get(entry);
+  if (tool !== undefined) return tool;
   if (isAbsolute(entry)) return [process.execPath, [inScratch(entry)]];
-  const file = join(repoRoot, inRepository(entry));
+  const path = inRepository(entry);
+  if (path.split("/").includes("node_modules")) throw new Error(`ST-18: ${entry} is a dependency, no program of this project; a tool of the environment is started by its name (${ENVIRONMENT.join(", ")})`);
+  const file = join(repoRoot, path);
   if (!existsSync(file)) throw new Error(`ST-18: ${entry} is no program of this project nor a tool its environment names (${ENVIRONMENT.join(", ")})`);
   return [process.execPath, [file]];
 }
