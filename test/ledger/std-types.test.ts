@@ -157,6 +157,7 @@ describe("the base types and what extends them", () => {
     const content = nonAbstract().filter((slug) => parentsOf(slug).some((p) => p === "knowledge" || p === "composition"));
     expect(content).toEqual(["clause", "decision", "domain", "example", "invariant", "prose", "requirement", "scenario", "section", "term"]);
     expect([parentsOf("domain"), parentsOf("section")]).toEqual([["composition"], ["composition"]]);
+    expect(required("domain")).toEqual(["items"]);
     expect(required("section")).toEqual(["heading", "level", "items"]);
     const branches = list(object(field("section", "items").items).oneOf).map((b) => Object.keys(object(object(b).properties)));
     expect(branches).toEqual([

@@ -1,7 +1,6 @@
 {
   "valid": [
     {
-      "name": "orders",
       "items": [
         "demo/order-intake",
         "demo/order-tests"
@@ -13,7 +12,6 @@
       "path": "/items/0",
       "keyword": "format",
       "body": {
-        "name": "orders",
         "items": [
           "?"
         ]

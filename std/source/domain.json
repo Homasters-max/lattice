@@ -18,11 +18,6 @@
         },
         "description": "the pinned last revisions of the blocks this one replaces (TY-03, RF-12)"
       },
-      "name": {
-        "type": "string",
-        "minLength": 1,
-        "description": "the name of the domain, a structural label"
-      },
       "items": {
         "type": "array",
         "items": {
@@ -33,7 +28,6 @@
       }
     },
     "required": [
-      "name",
       "items"
     ]
   }
