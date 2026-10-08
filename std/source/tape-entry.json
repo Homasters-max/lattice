@@ -22,7 +22,7 @@
       "occurrence": {
         "type": "integer",
         "minimum": 1,
-        "description": "which occurrence of the same request it answers (RT-23)"
+        "description": "which occurrence of the same request it answers (RT-23); operation, request and occurrence key an answer within the stream of one run, not across the type, so none carries key (KR-19, TR-28)"
       },
       "answer": {
         "type": "object",
