@@ -2,6 +2,8 @@
 // the tool on a throwaway repository with an origin: a loop that converges and resumes from its comments,
 // a dispute the owner settles, a stop the owner answers, and outputs of agents the protocol refuses.
 // The repository and its loop are built once and copied for each case; the cases run concurrently (S0-40).
+// A case runs a dozen dl commands, a round of each edited hunk among them (S0-45): under the full run it waits 60 s,
+// as those of the clock.
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { scratch, type Scratch } from "../support/files.js";
