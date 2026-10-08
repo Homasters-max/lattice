@@ -299,11 +299,14 @@ describe("prove, the records of its runs (S0-43)", { timeout: 60_000 }, () => {
     expect([slow.key, record(slow.key).outcome, record(slow.key).failed]).toEqual([red.key, "budget-exceeded", ["test/ledger/x.test.ts > x timeout"]]);
   });
 
-  it("ST-12: a red step fails the record of each fitness set: the steps are fitness tests over the same repository", async () => {
+  it("ST-12: a red step fails the record of each fitness set, and of no other: the steps are fitness tests over the same repository", async () => {
+    stand.write("src/ledger/b.ts", 'import { a } from "../kernel/a.js";\nexport const b = a + 2;\n');
     stand.write("red", "step:lint\n");
     const run = await proveRun();
     expect(run.status).not.toBe(0);
-    expect(record(run.report.sets[0]!.key)).toMatchObject({ test_set: "structure", outcome: "failed", failed: ["step: lint"] });
+    const recordOf = (set: string) => record(run.report.sets.find((s) => s.set === set)!.key);
+    expect(recordOf("structure")).toMatchObject({ test_set: "structure", outcome: "failed", failed: ["step: lint"] });
+    expect(recordOf("ledger")).toMatchObject({ test_set: "ledger", outcome: "ok", failed: [] });
   });
 });
 
