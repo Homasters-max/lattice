@@ -135,7 +135,7 @@ describe.concurrent("dev-loop, a loop that converges", { timeout: 60_000 }, () =
     expect(await dl(l, "merge")).toMatchObject({ ok: false, error: "нет круга 3: сначала wave" });
 
     const fin = (await dl(l, "final", "--worktree", l.work)).comment as string;
-    expect(temp.text(fin)).toContain("| 2 | ревью hunk'ов | 2 | Spec, Standards, Проверка ответов | — | W1-T1 |");
+    expect(temp.text(fin)).toContain("| 2 | ревью hunk'ов | 1 | Spec, Standards, Проверка ответов | — | W1-T1 |");
     expect(await dl(l, "restore", "--comments", comments(l))).toMatchObject({ ok: true, entry: "final", wave: 2, next: "end" });
   });
 });

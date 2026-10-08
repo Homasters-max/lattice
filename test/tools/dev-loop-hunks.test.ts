@@ -1,6 +1,7 @@
 // Review by hunks (S0-45): the review of an axis is evidence keyed by (axis, hunk). A round reviews only the hunks
 // its axis has not reviewed, with the axes whose triggers they touch; the verifier gives the answered findings their
-// status. The axes that start with the gate keep their review of the hunks the fix of a red gate did not touch; a finding
+// status. The axes that start with the gate keep their review of the hunks the fix of a red gate did not touch, and the
+// round of the hunks it touched costs no budget; a round counts its hunks once whatever the axes; a finding
 // in a hunk the round gave its axis blocks, one outside the delta and those hunks is late. The answer to a round with
 // blocking findings decides its advice too, and may defer a late finding and the owner's decisions task and gap. Each case runs dl on a throwaway repository with an origin,
 // built once and copied for each case; the cases run concurrently (S0-40).
@@ -155,6 +156,8 @@ describe.concurrent("dev-loop, review by hunks", { timeout: 60_000 }, () => {
     const l = await loop(TWO);
     expect(await round(l, [BLOCK])).toMatchObject({ next: "fix" });
     expect(reviewedBy(l)).toEqual(["AST", "ST"]);
+    // The round counts its hunks, not the hunks of each axis.
+    expect((read(join(l.dir, "state.json")).waves as { hunks: number }[])[0]!.hunks).toBe(2);
     const { fix, w } = await fixAndWave(l, { "src/ledger/land.ts": land(3) });
     expect(agents(w).map((a) => a.agent)).toEqual(["reviewer-spec", "reviewer-standards", "verifier"]);
     for (const agent of ["reviewer-spec", "reviewer-standards"]) {
@@ -194,6 +197,8 @@ describe.concurrent("dev-loop, a round that starts with the gate", { timeout: 60
     expect(await closeAll(l, rest, h2)).toMatchObject({ ok: true, wave: 1, next: "wave" });
     // lift.ts keeps the review of Architecture and Standards from before the red gate; land.ts has Spec's alone.
     expect(reviewedBy(l)).toEqual(["AST", "S"]);
+    // The round of land.ts the red gate left does not count against the budget, as the red gate does not.
+    expect(read(join(l.dir, "state.json")).budget).toBe(4);
     const w2 = await dl(l, "wave", "--worktree", l.work);
     expect(agents(w2).map((a) => a.agent)).toEqual(["reviewer-standards"]);
     expect(shownHunks(briefOf(w2, "reviewer-standards"))).toEqual(["src/ledger/land.ts:2"]);

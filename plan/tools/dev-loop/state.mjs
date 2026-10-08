@@ -133,7 +133,8 @@ export function mergeWave(state, { wave, scope, outputs, changed, reviewed = [] 
       found.push(id);
     }
   }
-  const hunks = reviewed.reduce((n, r) => n + r.hunks.length, 0);
+  // Число разных hunk'ов круга: hunk, который смотрели две оси, считается один раз.
+  const hunks = new Set(reviewed.flatMap((r) => r.hunks)).size;
   next.waves.push({ n: wave, mode, axes: outputs.map((o) => o.axis), base: scope.base, head: scope.head, hunks, found, closed });
   Object.assign(next, { wave, head: scope.head, base: scope.base, answers: null, decisions: [] });
   next.triggers ??= scope.triggers;
@@ -142,7 +143,10 @@ export function mergeWave(state, { wave, scope, outputs, changed, reviewed = [] 
     next.reviewedBy = reviewedAfter(state, scope.hunks ?? [], reviewed);
     next.unreviewed = countUnreviewed(scope.hunks ?? [], next.reviewedBy);
   }
-  return { state: next, warnings, ...decide(next) };
+  const decided = decide(next);
+  // Круг по hunk'ам без вердикта на том же head — след исправления красных ворот, а на них круг не тратится.
+  if (decided.next === "wave") next.budget += 1;
+  return { state: next, warnings, ...decided };
 }
 
 // Решение по кругу: stop | fix (решения владельца) | escalate | wave (hunk'и без вердикта) | tidy | done | fix —
