@@ -1,5 +1,7 @@
 // Fitness test of ST-17: every rule ID a hard check enforces has a fixture
-// that triggers it and one that passes it. Layout and format: CONVENTIONS.md.
+// that triggers it and one that passes it — a folder test/fixtures/<RULE-ID>/
+// with trigger/ and pass/, each with a parsable <case>.json; every folder is a
+// rule ID the design defines and a registry declares. Format: run.ts.
 // The rule IDs of the design are read by the codec, as LATTICE reads it.
 import { idOf, parse, type Section } from "../../src/codec/index.js";
 import { ROOT } from "../../src/kernel/index.js";

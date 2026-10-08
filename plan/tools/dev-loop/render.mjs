@@ -1,5 +1,6 @@
 // render: комментарии цикла в PR по шаблонам (plan/dev-loop.md, «Обмен»). Чистые функции.
 // Первая строка каждого комментария — заголовок <!-- dev-loop {kind, state} --> с состоянием после события.
+import { measure } from "./clock.mjs";
 import { openFindings } from "./state.mjs";
 
 const AXIS = { spec: "Spec", standards: "Standards", architecture: "Architecture", verify: "Проверка закрытия" };
@@ -114,7 +115,30 @@ function audit(t) {
   return [...t.skeleton.map((p) => `skeleton \`${p}\``), ...t.newModules.map((m) => `новый модуль ${m}`), ...t.newPorts.map((p) => `новый порт \`${p}\``), ...(t.modules.length ? [`модулей: ${t.modules.join(", ")}`] : [])];
 }
 
-export function final(state, { scope, conventions = [] } = {}) {
+const minutes = (ms) => (ms / 60000).toFixed(1);
+const CATEGORY = {
+  executor: "executor", gate: "ворота", "review:first": "круги: первый", "review:block": "круги: блокирующие", "review:tidy": "круги: tidy",
+  "review:owner": "круги: владелец", "review:rebase": "круги: rebase", fixer: "fixer", owner: "владелец",
+};
+const stepName = (s) => {
+  if (s.kind === "agent") return s.job ? `${s.role} ${s.job}` : s.role;
+  return { gate: "ворота", review: `круг ${s.wave}`, owner: "владелец" }[s.kind];
+};
+
+// Замер цикла (S0-46): критический путь, итоги по категориям — круги по причинам, — время вне шагов, размеры brief'ов.
+function measured(steps, at) {
+  if (!steps.length) return [];
+  const m = measure(steps, at);
+  const out = ["", "### Замер", "", `Критический путь, мин: ${m.path.map(({ step, ms }) => `${stepName(step)} ${minutes(ms)}`).join(" → ") || "—"}.`];
+  out.push(`Весь цикл ${minutes(m.span)} мин: в шагах ${minutes(m.inSteps)}, вне шагов ${minutes(m.span - m.inSteps)}.${m.running ? ` Не закрыто шагов: ${m.running}.` : ""}`);
+  out.push("", "| Шаг | Число | Мин |", "|---|---|---|");
+  for (const r of m.rows) out.push(`| ${CATEGORY[r.key]} | ${r.count}${r.reds === undefined ? "" : `, красных ${r.reds}`} | ${minutes(r.ms)} |`);
+  if (m.briefs.length) out.push("", "| Brief | Число | Байт, наибольший | Байт, всего |", "|---|---|---|---|", ...m.briefs.map((b) => `| ${b.name} | ${b.count} | ${b.max} | ${b.total} |`));
+  return out;
+}
+
+// at — время итога: конец цикла для замера.
+export function final(state, { scope, conventions = [], at } = {}) {
   const out = [header("final", state), title(state, "Итог цикла"), ""];
   out.push(`Head \`${short(state.head ?? scope?.head)}\` · \`npm run verify\` зелёный · кругов: ${state.waves.length} из ${state.budget}`);
   if (!state.waves.length && scope) out.push("", `Ревью не требовался: изменения вне кода (${scope.lines} строк).`);
@@ -136,5 +160,6 @@ export function final(state, { scope, conventions = [] } = {}) {
   out.push("", "### Решить владельцу до merge", "", ...(todo.length ? todo : ["нечего"]));
   const ratchet = state.findings.filter((f) => f.ratchet).map((f) => f.id);
   out.push("", `Триггеры аудита ST-15: ${audit(state.triggers ?? scope?.triggers).join("; ") || "нет"}.`, `Кандидаты в ratchet (ST-16): ${ratchet.join(", ") || "нет"}.`);
+  out.push(...measured(state.steps ?? [], at));
   return lines(out);
 }

@@ -1,6 +1,11 @@
 // Purity outside `adapters`, `assembly` and `cli` (ST-04; KR-02 for the
 // kernel): no clock, randomness, environment, network, files, scheduler,
-// locale, code evaluation, GC or console. The list is CONVENTIONS.md §8.
+// locale, code evaluation, GC or console, and no state at module level —
+// `let` or `var` outside a function. The lists below are the norm: a name
+// declared in the file itself is no global and is not refused. Allowed:
+// `node:crypto` for the names of PURE_CRYPTO, `TextEncoder`, `TextDecoder`,
+// `new Date(x)` with an argument, `Date.UTC`, `getUTC*`, `toISOString`,
+// `toUpperCase`, `toLowerCase`.
 import ts from "typescript";
 import { importsOf, type Import } from "./imports.js";
 import { IMPURE, placeOf, PURE_CRYPTO } from "./modules.js";
@@ -95,6 +100,16 @@ function importUse(i: Import): string | null {
   return refused.length === 0 ? null : `node:crypto ${refused.join(", ")}`;
 }
 
+/** `let` and `var` at module level: state a pure function would keep between calls. */
+function moduleState(sf: ts.SourceFile): { readonly line: number; readonly decl: string }[] {
+  return sf.statements.filter(ts.isVariableStatement).flatMap((s) => {
+    const list = s.declarationList;
+    const keyword = list.flags & ts.NodeFlags.Let ? "let" : list.flags & (ts.NodeFlags.Const | ts.NodeFlags.Using) ? null : "var";
+    if (keyword === null) return [];
+    return list.declarations.map((d) => ({ line: sf.getLineAndCharacterOfPosition(d.getStart(sf)).line + 1, decl: `${keyword} ${d.name.getText(sf)}` }));
+  });
+}
+
 function fileProblems(path: string, sf: ts.SourceFile, checker: ts.TypeChecker): string[] {
   const rule = placeOf(path)?.module === "kernel" ? "KR-02" : "ST-04";
   const say = (line: number, use: string) => `${rule}: ${path}:${line} uses ${use}; pure code reaches the world only through ports`;
@@ -102,6 +117,7 @@ function fileProblems(path: string, sf: ts.SourceFile, checker: ts.TypeChecker):
     const use = importUse(i);
     return use === null ? [] : [say(i.line, use)];
   });
+  for (const { line, decl } of moduleState(sf)) out.push(`${rule}: ${path}:${line} keeps state at module level (${decl}); pure code keeps no state between calls`);
   const visit = (node: ts.Node) => {
     const use = nodeUse(node, checker);
     if (use !== null) out.push(say(sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1, use));

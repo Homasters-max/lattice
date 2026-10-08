@@ -1,5 +1,5 @@
 // The kernel version (KR-03), the grammar of ids (KR-06), the header on the
-// surface (KR-04), the form of a rejection (LG-17, CONVENTIONS.md §3) and the
+// surface (KR-04), the form of a rejection (LG-17, CONVENTIONS.md §3.1) and the
 // hash of bytes (LG-30). Canon, hash and formats are in canon.test.ts,
 // parse.test.ts, formats.test.ts and vectors.test.ts; the full header is in
 // record.test.ts, references and links in ref.test.ts. Every input crosses the

@@ -179,7 +179,7 @@ function siteRejections(site: Site, kind: Kind, intent: string | null): Rejectio
 
 /**
  * KR-18, KR-19: the schema of a type of this kind, admitted, or its rejections keyword by keyword at the place the
- * caller names — where the schema sits in its input; the rejections come sorted (CONVENTIONS.md §5).
+ * caller names — where the schema sits in its input; the rejections come sorted (CONVENTIONS.md §5.2).
  */
 export function checkSchema(schema: JsonValue, kind: Kind, place: Place): Result<Schema> {
   if (!isJsonObject(schema)) return refuse(reject(KR_18, { ...place, expected: "a schema object", got: schema }));

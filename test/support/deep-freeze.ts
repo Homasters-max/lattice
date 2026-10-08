@@ -1,5 +1,5 @@
 // Freezes a value and everything it holds, so that a function that mutates
-// its input fails in the test (CONVENTIONS.md §1).
+// its input fails in the test (CONVENTIONS.md §1.5).
 
 export function deepFreeze<T>(value: T): T {
   if (typeof value === "object" && value !== null && !Object.isFrozen(value)) {

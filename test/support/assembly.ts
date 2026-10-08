@@ -3,7 +3,7 @@
 // (ST-07, TR-14) — reach the working code only from here: the whole assembly
 // for the commands, the ports of landing for the tests of the ledger, or the git
 // of the tests. No file of `src/` imports them (test/structure, ST-07); the
-// contract tests of a port import the adapters they test (CONVENTIONS.md §9).
+// contract tests of a port import the adapters they test (CONVENTIONS.md §8.4).
 import { createActsFixture, type ActsFixtureOptions } from "../../src/adapters/acts-fixture/index.js";
 import { createClockFixed, type ClockFixedOptions } from "../../src/adapters/clock-fixed/index.js";
 import { createGitFixture, type GitFixtureOptions } from "../../src/adapters/git-fixture/index.js";

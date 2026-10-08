@@ -4,8 +4,9 @@
 //   start (--task T | --pr N) [--root R]                      старт или продолжение: копия на main, PR, worktree, npm ci, следующий шаг
 //   brief executor --dir D --task T --worktree W [--owner текст]
 //   init --dir D --task T (--from executor.out.json | --pr N --branch B)
+//   gate --dir D --worktree W                                 ворота: verify на запушенном head в D/verify.log, следующий шаг
 //   wave --dir D --worktree W [--conflicts a,b]               следующий круг: briefs агентов
-//   check <файл.out.json>                                     выход агента против его brief
+//   check <файл.out.json> [--dir D]                           выход агента против его brief; с --dir — конец шага агента
 //   merge --dir D                                             итоги круга → состояние, отчёт
 //   brief fixer --dir D --worktree W --job answer|tidy|verify-red|rebase|owner [--log P] [--owner текст]
 //   answer --dir D [--job tidy]                               ответ исправляющего → состояние, комментарий
@@ -13,10 +14,13 @@
 //   owner --dir D (--answers файл.json | --text текст)        решение владельца → состояние, комментарий
 //   final --dir D --worktree W                                итоговый комментарий
 //   restore --dir D --comments файл.json                      состояние из `gh pr view --json comments` (отладка; start делает сам)
-// Файлы цикла в D: state.json, waves/<n>/<агент>.in.json и .out.json, waves/<n>/scope.json, comments/<NN>-<вид>.md.
-import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+// Файлы цикла в D: state.json, waves/<n>/<агент>.in.json и .out.json, waves/<n>/scope.json, comments/<NN>-<вид>.md,
+//   verify.log — лог последних ворот, steps.json — шаги до init (init переносит их в состояние).
+// Время шагов (clock.mjs) — сейчас или DEV_LOOP_NOW (ISO), если задано: так тесты не ждут.
+import { execFileSync, spawnSync } from "node:child_process";
+import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { begin, finish, reasonOf, redsInRow } from "./dev-loop/clock.mjs";
 import { check, FIXER_JOBS } from "./dev-loop/protocol.mjs";
 import { answer, decision, escalation, final, parseHeader, questions, review } from "./dev-loop/render.mjs";
 import { changedLines, conventionsChanged, scope } from "./dev-loop/scope.mjs";
@@ -49,12 +53,24 @@ const waveDir = (n) => {
   mkdirSync(p, { recursive: true });
   return p;
 };
+const now = () => process.env.DEV_LOOP_NOW ?? new Date().toISOString();
+const stepsPath = () => join(dir(), "steps.json");
+const stepsOf = (state) => state.steps ?? [];
+// Шаги цикла меняет change: в состоянии, а до init — в steps.json. Без --dir (отладка) шаги не пишутся.
+function stamp(change) {
+  if (flags.dir === undefined) return;
+  const state = existsSync(statePath()) ? read(statePath()) : null;
+  if (state) return save({ ...state, steps: change(stepsOf(state)) });
+  mkdirSync(dir(), { recursive: true });
+  write(stepsPath(), change(existsSync(stepsPath()) ? read(stepsPath()) : []));
+}
 const git = (worktree, ...args) => execFileSync("git", args, { cwd: worktree, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 const repoOf = (worktree) => ({
   head: () => git(worktree, "rev-parse", "HEAD"),
   remote: (branch) => (branch ? git(worktree, "ls-remote", "origin", `refs/heads/${branch}`).split("\t")[0] : ""),
   commits: (from, to) => git(worktree, "rev-list", `${from}..${to}`).split("\n").filter(Boolean),
   changed: (from, to) => git(worktree, "diff", "--name-only", from, to).split("\n").filter(Boolean),
+  conventions: () => (existsSync(join(worktree, "CONVENTIONS.md")) ? readFileSync(join(worktree, "CONVENTIONS.md"), "utf8") : ""),
 });
 const slim = ({ id, axis, kind, severity, rule, where, quote, text, late, history }) => ({ id, axis, kind, severity, rule, where, quote, text, late, history });
 
@@ -123,6 +139,9 @@ function wave() {
     write(brief, reviewerBrief(state, s, plan, a, worktree, join(wd, `${a.agent}.out.json`)));
     return { agent: a.agent, brief };
   });
+  const briefs = Object.fromEntries(agents.map((a) => [a.agent, statSync(a.brief).size]));
+  const reason = reasonOf(state, { rebased: flags.conflicts !== undefined || s.rebased === true });
+  save({ ...state, steps: begin(stepsOf(state), { kind: "review", role: "reviewer", job: null, wave: n, reason, briefs }, now()) });
   print({ ok: true, wave: n, mode: s.mode, axes: s.axes, rebased: s.rebased === true, agents, next: agents.length ? "review" : "merge" });
 }
 
@@ -139,16 +158,18 @@ function merge() {
   const outputs = results.map((r) => r.value);
   const changed = changedLines({ base: s.base, head: s.head, dir: s.worktree });
   const result = mergeWave(state, { wave: n, scope: s, outputs, changed });
-  save(result.state);
-  const file = comment("review", review(result.state, { scope: s, outputs, next: result.next }));
-  print({ ok: true, wave: n, next: result.next, why: result.why, open: openFindings(result.state).map((f) => f.id), warnings: [...results.flatMap((r) => r.warnings), ...result.warnings], comment: file });
+  const next = { ...result.state, steps: finish(stepsOf(state), { kind: "review", role: "reviewer" }, now(), { head: s.head }) };
+  save(next);
+  const file = comment("review", review(next, { scope: s, outputs, next: result.next }));
+  print({ ok: true, wave: n, next: result.next, why: result.why, open: openFindings(next).map((f) => f.id), warnings: [...results.flatMap((r) => r.warnings), ...result.warnings], comment: file });
 }
 
 function executorBrief() {
   const file = join(dir(), "executor.in.json");
   mkdirSync(dir(), { recursive: true });
-  const owner = flags.owner ?? (existsSync(statePath()) ? read(statePath()).owner?.text : undefined);
-  write(file, { role: "executor", task: need("task"), worktree: need("worktree"), owner, out: join(dir(), "executor.out.json") });
+  const state = existsSync(statePath()) ? read(statePath()) : null;
+  write(file, { role: "executor", task: need("task"), worktree: need("worktree"), owner: flags.owner ?? state?.owner?.text, out: join(dir(), "executor.out.json") });
+  stamp((steps) => begin(steps, { kind: "agent", role: "executor", job: null, wave: state?.wave ?? 0, briefs: { executor: statSync(file).size } }, now()));
   print({ ok: true, brief: file });
 }
 
@@ -167,7 +188,8 @@ function brief() {
     advice: loose.filter((f) => f.severity === "advice").map(slim),
     decisions: job === "answer" ? state.decisions : [], log: flags.log, owner: flags.owner ?? state.owner?.text, out: file.replace(".in.json", ".out.json"),
   });
-  if (state.owner) save({ ...state, owner: null });
+  const step = { kind: "agent", role: "fixer", job, wave: state.wave, briefs: { [`fixer-${job}`]: statSync(file).size } };
+  save({ ...state, owner: null, steps: begin(stepsOf(state), step, now()) });
   print({ ok: true, brief: file });
 }
 
@@ -176,8 +198,12 @@ function answerCmd() {
   const job = flags.job ?? "answer";
   const r = checked(join(waveDir(state.wave), `fixer-${job}.out.json`));
   if (r.errors.length) return print({ ok: false, errors: r.errors });
-  if (r.value.status === "needs_owner") return print({ ok: true, status: "needs_owner" });
-  const next = recordAnswer(state, r.value, job);
+  const steps = finish(stepsOf(state), { kind: "agent", role: "fixer", job }, now(), { head: r.value.head ?? null });
+  if (r.value.status === "needs_owner") {
+    save({ ...state, steps });
+    return print({ ok: true, status: "needs_owner" });
+  }
+  const next = { ...recordAnswer(state, r.value, job), steps };
   save(next);
   print({ ok: true, status: "done", head: r.value.head, disputed: next.answers.items.filter((a) => a.action === "disputed").map((a) => a.id), comment: comment("answer", answer(next)) });
 }
@@ -191,7 +217,8 @@ function escalate() {
   const state = load();
   const from = flags.from ? read(flags.from) : null;
   const asker = from ? read(flags.from.replace(/\.out\.json$/, ".in.json")) : {};
-  const next = ask(state, { why: need("why"), question: from?.question, agent: asker.role, job: asker.job });
+  const asked = ask(state, { why: need("why"), question: from?.question, agent: asker.role, job: asker.job });
+  const next = { ...asked, steps: begin(stepsOf(state), { kind: "owner", role: null, job: null, wave: state.wave, head: state.head }, now()) };
   save(next);
   const file = comment("escalation", escalation(next));
   print({ ok: true, comment: file, questions: writeQuestions(next, file.replace(/\.md$/, ".questions.json")) });
@@ -202,19 +229,48 @@ function owner() {
   const answers = flags.text === undefined ? read(need("answers")) : null;
   const result = answers ? answerFindings(state, answers) : answerText(state, flags.text);
   if (result.errors.length) return print({ ok: false, errors: result.errors });
-  save(result.state);
-  const file = comment("decision", decision(result.state, answers ? { answers } : { text: flags.text }));
+  const next = { ...result.state, steps: finish(stepsOf(state), { kind: "owner" }, now()) };
+  save(next);
+  const file = comment("decision", decision(next, answers ? { answers } : { text: flags.text }));
   print({ ok: true, next: result.next, why: result.why, agent: result.agent, job: result.job, comment: file });
 }
 
+// Состояние цикла; шаги, записанные до него в steps.json, переходят в состояние.
 function init() {
   mkdirSync(dir(), { recursive: true });
-  if (existsSync(statePath())) return print({ ok: true, state: statePath(), existed: true });
-  const from = flags.from ? read(flags.from) : {};
-  const pr = from.pr ?? Number(need("pr"));
-  const branch = from.branch ?? need("branch");
-  save(initial({ pr, task: flags.task ?? null, branch, gaps: from.gaps ?? [] }));
-  print({ ok: true, state: statePath(), existed: false });
+  const early = existsSync(stepsPath()) ? read(stepsPath()) : [];
+  const existed = existsSync(statePath());
+  if (existed) {
+    const state = load();
+    save({ ...state, steps: [...stepsOf(state), ...early] });
+  } else {
+    const from = flags.from ? read(flags.from) : {};
+    const pr = from.pr ?? Number(need("pr"));
+    const branch = from.branch ?? need("branch");
+    save({ ...initial({ pr, task: flags.task ?? null, branch, gaps: from.gaps ?? [] }), steps: early });
+  }
+  rmSync(stepsPath(), { force: true });
+  print({ ok: true, state: statePath(), existed });
+}
+
+// Ворота: verify на head, запушенном в ветку цикла, лог — в D/verify.log. Красные трижды подряд — к владельцу.
+function gate() {
+  const state = load();
+  const worktree = need("worktree");
+  const start = now();
+  if (git(worktree, "status", "--porcelain") !== "") fail("в worktree есть изменения: ворота проверяют запушенный head");
+  git(worktree, "fetch", "-q", "origin");
+  git(worktree, "checkout", "-q", "--detach", `origin/${state.branch}`);
+  const log = join(dir(), "verify.log");
+  const fd = openSync(log, "w");
+  const run = spawnSync("npm run verify", { cwd: worktree, shell: true, stdio: ["ignore", fd, fd] });
+  closeSync(fd);
+  const green = run.status === 0;
+  const head = git(worktree, "rev-parse", "HEAD");
+  const steps = [...stepsOf(state), { kind: "gate", role: null, job: null, wave: state.wave, head, start, end: now(), green }];
+  save({ ...state, steps });
+  const route = green ? { next: "wave" } : redsInRow(steps) >= 3 ? { next: "escalate", why: "verify красный трижды" } : { next: "red" };
+  print({ ok: true, head, green, log, ...route });
 }
 
 // Состояние из комментариев PR → {entry, next, …}; entry none — заголовков цикла нет.
@@ -317,10 +373,13 @@ const commands = {
   scope: () => print(scope({ base: positional[0] ?? fail("нужен base"), head: positional[1], delta: flags.delta === true, main: flags.main })),
   brief,
   init,
+  gate,
   wave,
   check: () => {
     const r = checked(positional[0] ?? fail("нужен файл .out.json"));
     const { status, pr, head, conflicts, question } = r.value ?? {};
+    if (r.errors.length === 0 && ["executor", "fixer"].includes(r.brief.role))
+      stamp((steps) => finish(steps, { kind: "agent", role: r.brief.role, job: r.brief.job ?? null }, now(), { head: head ?? null }));
     print({ ok: r.errors.length === 0, errors: r.errors, warnings: r.warnings, status, pr, head, conflicts, question: status === "needs_owner" ? question : undefined });
   },
   merge,
@@ -331,7 +390,7 @@ const commands = {
     const state = load();
     const first = join(dir(), "waves", "1", "scope.json");
     const conventions = conventionsChanged({ dir: need("worktree") });
-    print({ ok: true, comment: comment("final", final(state, { scope: existsSync(first) ? read(first) : undefined, conventions })) });
+    print({ ok: true, comment: comment("final", final(state, { scope: existsSync(first) ? read(first) : undefined, conventions, at: now() })) });
   },
   restore,
 };

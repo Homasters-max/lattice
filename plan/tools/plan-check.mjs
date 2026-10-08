@@ -4,14 +4,16 @@
 // Состав фазы — правила по таблице SL-Z04 (срез документа, полные и частичные исключения).
 // Ошибки (выход 1): frontmatter задачи; зависимость не существует или цикл; доска и файлы задач расходятся;
 // неизвестный статус; ✅ при незавершённой зависимости; ✅ при неотмеченном или пустом «Готово, когда»; фаза ✅ при незавершённых задачах;
-// правило из `rules` не существует в дизайне; правило фазы не отнесено ни к одной задаче.
+// правило из `rules` не существует в дизайне; правило фазы не отнесено ни к одной задаче;
+// пункт CONVENTIONS.md без номера §N.M или области путей; ссылка кода или процесса на пункт, которого нет (S0-50).
 // Предупреждения: правило другой фазы в `rules`; название на доске не совпадает с файлом; задачи сданы,
 // а фаза ещё не в работе; отметки «Готово, когда» у задачи без ✅; RULES.md устарел.
 // Доска хранит только итог задачи (⬜, ✅, ✖); что в работе — открытые PR, их инструмент не читает.
 // --rules — переписать phases/<фаза>/RULES.md.
-import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync, existsSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { conventionsOf, unknownReferences } from "./dev-loop/conventions.mjs";
 
 const rootAt = process.argv.indexOf("--root");
 const ROOT = rootAt > 0 ? process.argv[rootAt + 1] : join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -297,6 +299,34 @@ function rulesMarkdown(phase, rules, owners) {
   return lines.join("\n") + "\n";
 }
 
+// ---------- CONVENTIONS.md (S0-50)
+
+// Где ссылаются на пункты CONVENTIONS.md: код, тесты, скрипты и процесс. Задачи и PLAN.md фаз — история, их ссылки
+// не правятся; test/tools — данные тестов инструментов.
+const REFERRERS = ["AGENTS.md", "CONVENTIONS.md", "plan/dev-loop.md", "plan/closure-check.md", ".claude", "src", "test", "scripts"];
+const READ_FOR_REFERENCES = /\.(md|ts|mjs|js)$/;
+
+function filesUnder(path) {
+  const full = join(ROOT, path);
+  if (!existsSync(full)) return [];
+  if (!statSync(full).isDirectory()) return [path];
+  return readdirSync(full, { recursive: true, encoding: "utf8" })
+    .map((f) => `${path}/${f.replaceAll("\\", "/")}`)
+    .filter((f) => READ_FOR_REFERENCES.test(f) && !f.startsWith("test/tools/") && statSync(join(ROOT, f)).isFile());
+}
+
+function checkConventions() {
+  const file = join(ROOT, "CONVENTIONS.md");
+  if (!existsSync(file)) return;
+  const { items, problems } = conventionsOf(read(file));
+  problems.forEach(err);
+  const ids = new Set(items.map((i) => i.id));
+  for (const path of REFERRERS.flatMap(filesUnder))
+    read(join(ROOT, path)).split("\n").forEach((line, i) => {
+      for (const ref of unknownReferences(line, ids)) err(`${path}:${i + 1}: CONVENTIONS ${ref} — нет такого пункта; ссылка называет пункт §N.M`);
+    });
+}
+
 // ---------- main
 
 const design = loadDesign();
@@ -307,6 +337,7 @@ const all = new Map(perPhase.flatMap(({ tasks }) => [...tasks]));
 const acyclic = checkGraph(all);
 for (const x of perPhase) x.status = loadBoard(x.phase, x.tasks);
 const statusOf = (id) => perPhase.find((x) => x.status.has(id))?.status.get(id);
+checkConventions();
 
 const total = [...design.byDoc.values()].flat().length;
 console.log(`plan-check: в дизайне ${total} правил; фаз с планом — ${planned.length} из ${phases.length}`);

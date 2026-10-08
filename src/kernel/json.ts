@@ -17,10 +17,10 @@ export const own = (o: JsonObject, key: string): JsonValue | undefined => (Objec
 /** An array of JSON values — `Array.isArray` narrows to `any[]`. */
 export const isJsonArray = (v: JsonValue | undefined): v is readonly JsonValue[] => Array.isArray(v);
 
-/** `got` of a check of a form (CONVENTIONS.md §3): the value that came, or the description "absent" for a field that has none. */
+/** `got` of a check of a form (CONVENTIONS.md §3.3): the value that came, or the description "absent" for a field that has none. */
 export const gotOf = (v: JsonValue | undefined): JsonValue => (v === undefined ? "absent" : v);
 
-/** Compares strings by UTF-16 code units, as canon sorts keys (CONVENTIONS.md §5). */
+/** Compares strings by UTF-16 code units, as canon sorts keys (CONVENTIONS.md §5.4). */
 export const compareText = (a: string, b: string): number => (a === b ? 0 : a < b ? -1 : 1);
 
 /** The JSON Pointer (RFC 6901) of a member or an item under `path`. */

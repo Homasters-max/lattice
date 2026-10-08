@@ -13,11 +13,13 @@ src/ledger/ports/clock.ts
 src/ledger/ports/git.ts
 src/ledger/ports/ids.ts
 src/ledger/ports/store.ts
+test/structure/audit-form.ts
 test/structure/audit-imports.ts
 test/structure/audit-kernel.ts
 test/structure/audit-purity.ts
 test/structure/boundaries.test.ts
 test/structure/cases.ts
+test/structure/form.test.ts
 test/structure/imports.test.ts
 test/structure/imports.ts
 test/structure/kernel.test.ts

@@ -1,4 +1,4 @@
-// One form of the outcome of a hard check (CONVENTIONS.md §2, §3, §5; LG-17):
+// One form of the outcome of a hard check (CONVENTIONS.md §2.1, §3.2, §5.2; LG-17):
 // every hard check the kernel exports returns a Result — the value it checked,
 // of its own type, or its rejections, sorted — and takes the place where its
 // input sits, the intent too (G-13). `validate` keeps its own type (KR-21).
@@ -44,10 +44,10 @@ const NOTE = deepFreeze({ type: "object", properties: { text: { type: "string" }
 
 const TYPES: ResolveType = (ref) => (ref === "demo/note@1" ? { abstract: false, kind: "entity", schema: NOTE } : null);
 
-/** A refused outcome's rejections are in the order of CONVENTIONS.md §5. */
+/** A refused outcome's rejections are in the order of CONVENTIONS.md §5.2. */
 const sorted = (r: Result<unknown>): boolean => !r.ok && JSON.stringify(r.rejections) === JSON.stringify(sortRejections(r.rejections));
 
-describe("a hard check of the kernel returns a Result (CONVENTIONS.md §2, LG-17)", () => {
+describe("a hard check of the kernel returns a Result (CONVENTIONS.md §2.2, LG-17)", () => {
   it("LG-17: checkFormat, checkId and checkUri give the string they checked, or the rejection at the place given", () => {
     expect(checkFormat("date", "2026-10-06", PLACE)).toEqual({ ok: true, value: "2026-10-06" });
     expect(checkFormat("date", 5, PLACE)).toEqual({ ok: false, rejections: [reject(KR_11, { ...PLACE, expected: "date", got: 5 })] });
@@ -63,7 +63,7 @@ describe("a hard check of the kernel returns a Result (CONVENTIONS.md §2, LG-17
     expect(rejectionsOf(out).map((r) => [r.rule, r.intent, r.path])).toEqual([["KR-04", "demo/a", "/records/0/seq"]]);
   });
 
-  it("KR-04, KR-06, KR-07, KR-08: the rejections of checkHeader come sorted (CONVENTIONS.md §5) — its closed form and the grammar of its fields together", () => {
+  it("KR-04, KR-06, KR-07, KR-08: the rejections of checkHeader come sorted (CONVENTIONS.md §5.2) — its closed form and the grammar of its fields together", () => {
     const out = checkHeader(deepFreeze({ ...ENTITY, id: "Demo/A", type: "demo/note", by: "x", extra: 1 }), ROOT);
     expect(rejectionsOf(out).map((r) => [r.rule, r.path])).toEqual([
       ["KR-08", "/by"],
@@ -95,7 +95,7 @@ describe("a hard check of the kernel returns a Result (CONVENTIONS.md §2, LG-17
   });
 });
 
-describe("the rejections of checkHeader carry the intent of its place (CONVENTIONS.md §3, G-13)", () => {
+describe("the rejections of checkHeader carry the intent of its place (CONVENTIONS.md §3.1, G-13)", () => {
   it("LG-17: the rejections of the grammar of checkHeader's fields carry the intent of the place too", () => {
     const out = checkHeader(deepFreeze({ ...ENTITY, id: "Demo/A", type: "demo/note", by: "x", at: "2026-10-06" }), PLACE);
     expect(rejectionsOf(out).map((r) => [r.rule, r.intent, r.path])).toEqual([
@@ -107,7 +107,7 @@ describe("the rejections of checkHeader carry the intent of its place (CONVENTIO
   });
 });
 
-describe("the strict parse takes a place (CONVENTIONS.md §3, G-13)", () => {
+describe("the strict parse takes a place (CONVENTIONS.md §3.2, G-13)", () => {
   const AT = deepFreeze({ intent: "demo/a", path: "/body" });
 
   it("KR-10: parseJson refuses at the place given — the text as a whole and inside it, with its intent", () => {
