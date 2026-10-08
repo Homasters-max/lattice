@@ -1,6 +1,6 @@
 // `npm run prove --ready` mutates the changed hunks of src/ (S0-44): each operator makes mutants of the code it knows,
-// a mutant runs against the test sets that reach its file, and its outcome — killed by a named test, survived — goes to
-// the report; a cache keeps the outcome while the mutant and its test sets stay the same. `mutate --at` runs one mutant
+// a mutant runs against the test sets that reach its file, and its outcome — killed by a named test, survived, stopped
+// over its budget — goes to the report; a cache keeps the outcome while the mutant and its test sets stay the same. `mutate --at` runs one mutant
 // at a line. These cases run prove on a throwaway repository: its steps stand in for those of verify, and its test
 // runner, in place of vitest, runs the cases a test file exports and writes the JSON report vitest writes.
 import { join } from "node:path";
@@ -146,7 +146,7 @@ async function ready(extra: NodeJS.ProcessEnv = {}, args: readonly string[] = ["
 }
 
 describe("prove --ready, the operators", { timeout: 120_000 }, () => {
-  it("ST-17: every operator makes a mutant that a test which sees it kills and that survives without one", async () => {
+  it("every operator makes a mutant that a test which sees it kills and that survives without one", async () => {
     const run = await ready();
     expect(run.status).toBe(0);
     for (const operator of OPERATORS) {
@@ -167,7 +167,7 @@ describe("prove --ready, the operators", { timeout: 120_000 }, () => {
 });
 
 describe("prove --ready, the cache", { timeout: 120_000 }, () => {
-  it("ST-17: a second run without edits runs no mutant; an edit of a test set runs its mutants again", async () => {
+  it("a second run without edits runs no mutant; an edit of a test set runs its mutants again", async () => {
     const first = await ready();
     // npm run prove --ready gives the flag to the script as npm_config_ready.
     const second = await ready({ npm_config_ready: "true" }, []);
@@ -182,12 +182,41 @@ describe("prove --ready, the cache", { timeout: 120_000 }, () => {
 });
 
 describe("mutate --at", { timeout: 120_000 }, () => {
-  it("ST-17: runs one mutant at a line and names the test that kills it; refuses a line outside src/", async () => {
+  it("runs one mutant at a line and names the test that kills it; refuses a line outside src/", async () => {
     const ran = await mutate.start(["--at", `src/kernel/ops.ts:${BOUNDARY_LINE}`, "--base", "main"], { cwd: stand.dir, env: env() });
     expect(ran.status).toBe(0);
     expect(JSON.parse(ran.stdout.trim())).toMatchObject({ outcome: "passed", mutant: { operator: "boundary", outcome: "killed", killer: "test/kernel/ops.test.ts > boundary: ten is out" } });
     const outside = await mutate.start(["--at", "runner.mjs:1"], { cwd: stand.dir, env: env() });
     expect([outside.status, (JSON.parse(outside.stdout.trim()) as { outcome: string }).outcome]).toEqual([1, "failed"]);
     expect(stand.exists(join(".lattice", "mutate", "cache.json"))).toBe(true);
+  });
+});
+
+// Code whose refusal keeps a loop finite: without it, the test of the refusal never ends.
+const LOOP = `export function countdown(n: number): number {
+  if (n < 0) throw new Error("ST-17: negative");
+  let steps = 0;
+  for (let i = n; i !== 0; i--) steps++;
+  return steps;
+}
+`;
+const LOOP_TEST = `import { countdown } from "../../src/kernel/loop.ts";
+export const cases = {
+  "countdown: refuses a negative": () => {
+    try { countdown(-1); } catch { return; }
+    throw new Error("no refusal");
+  },
+};
+`;
+
+describe("mutate, the budget", { timeout: 120_000 }, () => {
+  // Last in this file: the new test changes the kernel test set, which the cases above read.
+  it("stops a mutant that runs over the budget: budget-exceeded, no test named", async () => {
+    stand.write("src/kernel/loop.ts", LOOP);
+    stand.write("test/kernel/loop.test.ts", LOOP_TEST);
+    // The least budget is 1 s instead of 10 s: the mutant never ends, so the case waits for its budget, not for 10 s.
+    const ran = await mutate.start(["--at", "src/kernel/loop.ts:2", "--operator", "refusal", "--base", "main"], { cwd: stand.dir, env: env({ MUTATE_BUDGET_MIN_MS: "1000" }) });
+    expect(ran.status).toBe(0);
+    expect(JSON.parse(ran.stdout.trim())).toMatchObject({ outcome: "passed", mutant: { operator: "refusal", outcome: "budget-exceeded", killer: null } });
   });
 });

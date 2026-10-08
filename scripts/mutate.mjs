@@ -5,7 +5,9 @@
 // the hashes of those sets. The runs go in a pool of copies of the working tree outside the repository, node_modules
 // linked; each test set group first runs without a mutant: a red baseline proves nothing, and its time sets the budget
 // of a mutant. The outcome of a mutant: killed — the run failed, the first failed test named; survived — it passed,
-// or no test set reaches the file; budget-exceeded — the run went over the budget and was stopped.
+// or no test set reaches the file; budget-exceeded — the run went over the budget and was stopped. The budget is the
+// time of the baseline × 3, not less than 10 s — or than MUTATE_BUDGET_MIN_MS when it is set: so a test shows
+// budget-exceeded with a mutant that never ends without waiting the 10 s.
 // The cache .lattice/mutate/cache.json keeps the outcome by (hash of the mutant, hash of its test sets): a mutant does
 // not run again while its inputs are the same. The report of --ready is .lattice/mutants.json:
 //   {"head", "dirty", "base", "mutants": [{"id", "file", "line", "operator", "code", "before", "after", "tests",
@@ -27,7 +29,7 @@ import { flagOf, isMain } from "./verify.mjs";
 
 const POOL_MAX = 4;
 const BUDGET_FACTOR = 3;
-const BUDGET_MIN_MS = 10_000;
+const BUDGET_MIN_MS = Number(process.env.MUTATE_BUDGET_MIN_MS) > 0 ? Number(process.env.MUTATE_BUDGET_MIN_MS) : 10_000;
 const OUTPUT_KEPT = 4000;
 const SURVIVORS_LISTED = 20;
 
