@@ -4,6 +4,8 @@
 // of one step: the self-check over the diff of the branch and the sections of plan-task as written. What an agent had to
 // read beyond its brief comes back in context_missing, and the final report prints it.
 // Each case runs the tool on a throwaway repository with an origin; GitHub is a fake gh.
+// A case runs several dl commands; under the full run, beside the cases of review by hunks (S0-45), one took 20 s of
+// its 30, so it waits 60 s, as those of the clock and the flow.
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { owned, scratch, type Scratch } from "../support/files.js";
@@ -102,7 +104,7 @@ afterAll(() => {
   temp.remove();
 });
 
-describe.concurrent("dev-loop brief of the executor", { timeout: 30_000 }, () => {
+describe.concurrent("dev-loop brief of the executor", { timeout: 60_000 }, () => {
   it("carries the task, its rules word for word, its Q-NN and G-NN rows and only the items of CONVENTIONS.md that touch its modules", async () => {
     const l = await loop({ "src/ledger/land.ts": land(2) });
     const b = read((await dl(l, "brief", "executor", "--task", "S0-99", "--worktree", l.work)).brief as string);
@@ -123,7 +125,7 @@ describe.concurrent("dev-loop brief of the executor", { timeout: 30_000 }, () =>
   });
 });
 
-describe.concurrent("dev-loop briefs of the reviewers", { timeout: 30_000 }, () => {
+describe.concurrent("dev-loop briefs of the reviewers", { timeout: 60_000 }, () => {
   it("gives Standards only the ST rows of the classes of its hunks and the items of CONVENTIONS.md over their paths", async () => {
     const l = await loop({ "src/ledger/land.ts": land(2) });
     const b = read((await wave(l))["reviewer-standards"]!);
@@ -167,7 +169,7 @@ describe.concurrent("dev-loop briefs of the reviewers", { timeout: 30_000 }, () 
   });
 });
 
-describe.concurrent("dev-loop hunks of each axis", { timeout: 30_000 }, () => {
+describe.concurrent("dev-loop hunks of each axis", { timeout: 60_000 }, () => {
   it("gives Spec the hunks of every changed file but the generated ones, each with its id and the reason it was chosen", async () => {
     const l = await loop({ "src/ledger/land.ts": land(2), "plan/notes.md": "notes\n", "gen/rules.json": "{}\n" });
     const spec = read((await wave(l))["reviewer-spec"]!);
@@ -200,7 +202,7 @@ describe.concurrent("dev-loop hunks of each axis", { timeout: 30_000 }, () => {
   });
 });
 
-describe.concurrent("dev-loop briefs of the fixer", { timeout: 30_000 }, () => {
+describe.concurrent("dev-loop briefs of the fixer", { timeout: 60_000 }, () => {
   it("answer: each finding with its hunk, the texts of its rules and the items of CONVENTIONS.md it names or its path falls under", async () => {
     const l = await loop({ "src/ledger/land.ts": land(2) });
     const head = await sh(l.work, git, ["rev-parse", "HEAD"]);
@@ -242,7 +244,7 @@ describe.concurrent("dev-loop briefs of the fixer", { timeout: 30_000 }, () => {
   });
 });
 
-describe.concurrent("dev-loop step", { timeout: 30_000 }, () => {
+describe.concurrent("dev-loop step", { timeout: 60_000 }, () => {
   const selfcheck = async (l: Loop) => (await dl(l, "step", "selfcheck", "--worktree", l.work, "--task", "S0-99")) as Json & { todo: string[]; architecture: { inventory: Json[] } | null; rules: string[] };
 
   it("selfcheck: a diff without a trigger of Architecture gives no inventory; the items of its paths and the rows of the rules", async () => {
@@ -284,7 +286,7 @@ describe.concurrent("dev-loop step", { timeout: 30_000 }, () => {
   });
 });
 
-describe.concurrent("dev-loop context_missing", { timeout: 30_000 }, () => {
+describe.concurrent("dev-loop context_missing", { timeout: 60_000 }, () => {
   it("accepts a list of lines from every role, refuses anything else, and prints the lines in the final report", async () => {
     const l = await loop({ "src/ledger/land.ts": land(2) });
     const briefs = await wave(l);
