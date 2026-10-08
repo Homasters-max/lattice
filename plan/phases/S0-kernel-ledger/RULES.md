@@ -192,7 +192,7 @@
 | TR-26 | полностью | [S0-14](tasks/S0-14-standing.md) |
 | TR-27 | полностью | [S0-14](tasks/S0-14-standing.md) |
 | TR-28 | полностью | [S0-14](tasks/S0-14-standing.md) |
-| TR-29 | полностью | [S0-08](tasks/S0-08-std-types-s0.md), [S0-14](tasks/S0-14-standing.md), [S0-15](tasks/S0-15-phase4-references.md), [S0-18](tasks/S0-18-phase6-evolution.md) |
+| TR-29 | полностью | [S0-08](tasks/S0-08-std-types-s0.md), [S0-14](tasks/S0-14-standing.md), [S0-15](tasks/S0-15-phase4-references.md) |
 | TR-31 | полностью | [S0-14](tasks/S0-14-standing.md) |
 | TR-40 | полностью | [S0-02](tasks/S0-02-code-conventions.md) |
 
