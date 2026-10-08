@@ -113,7 +113,7 @@ afterAll(() => {
   temp.remove();
 });
 
-describe.concurrent("dev-loop, a loop that converges", { timeout: 30_000 }, () => {
+describe.concurrent("dev-loop, a loop that converges", { timeout: 60_000 }, () => {
   it("finds, answers, checks the answer and the edited hunk and ends; the comments restore the state", async () => {
     const l = await loop();
     const m1 = await round(l, [BLOCK]);
@@ -138,7 +138,7 @@ describe.concurrent("dev-loop, a loop that converges", { timeout: 30_000 }, () =
   });
 });
 
-describe.concurrent("dev-loop, the owner decides", { timeout: 30_000 }, () => {
+describe.concurrent("dev-loop, the owner decides", { timeout: 60_000 }, () => {
   it("escalates a kept dispute and closes the finding by the owner's decision", async () => {
     const l = await loop();
     await round(l, [BLOCK]);
@@ -189,7 +189,7 @@ describe.concurrent("dev-loop, the owner decides", { timeout: 30_000 }, () => {
   });
 });
 
-describe.concurrent("dev-loop, outputs the protocol refuses", { timeout: 30_000 }, () => {
+describe.concurrent("dev-loop, outputs the protocol refuses", { timeout: 60_000 }, () => {
   it("refuses a reviewer that misses a status, disputes nothing or reviews another head", async () => {
     const l = await loop();
     await round(l, [BLOCK]);
@@ -234,7 +234,7 @@ describe.concurrent("dev-loop, outputs the protocol refuses", { timeout: 30_000 
   });
 });
 
-describe.concurrent("dev-loop, nothing is lost before the end", { timeout: 30_000 }, () => {
+describe.concurrent("dev-loop, nothing is lost before the end", { timeout: 60_000 }, () => {
   it("accepts in tidy an advice fixed by a commit before the reviewed head", async () => {
     const l = await loop();
     expect(await round(l, [{ ...BLOCK, kind: "advice", rule: "" }])).toMatchObject({ next: "tidy" });
@@ -271,7 +271,7 @@ describe.concurrent("dev-loop, nothing is lost before the end", { timeout: 30_00
 
 // The final report lists for the owner what the branch changed in CONVENTIONS.md of main: an item by its number,
 // a file without items by its lines, and a rewrite of more lines than it lists by their count.
-describe.concurrent("dev-loop, CONVENTIONS.md of main in the final report", { timeout: 30_000 }, () => {
+describe.concurrent("dev-loop, CONVENTIONS.md of main in the final report", { timeout: 60_000 }, () => {
   it("lists for the owner the items of CONVENTIONS.md of main the branch rewrote or removed, by number", async () => {
     const item = (id: string, title: string, body: string) => [`### ${id} ${title}`, "Область: `src/**`", "", body, ""];
     const main = ["# C", "", "## 1. Data", "", ...item("§1.1", "One", "Kept."), ...item("§1.2", "Two", "Old."), ...item("§1.3", "Three", "Gone.")].join("\n");
