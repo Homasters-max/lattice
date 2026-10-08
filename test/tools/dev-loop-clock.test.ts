@@ -43,9 +43,11 @@ async function commit(work: string, files: Files, message: string): Promise<stri
 }
 
 const land = (n: number) => `export function land(): number {\n  return ${n};\n}\n`;
-// verify of the repository: red while RED is set, its output goes to the log of the gate.
+// verify of the repository: red while RED is set, its output goes to the log of the gate; CONVENTIONS.md holds
+// the item findings name (CONVENTIONS §N.M).
 const MAIN: Files = {
   "src/ledger/land.ts": land(1),
+  "CONVENTIONS.md": "# C\n\n## 1. A\n\n### §1.1 One\nОбласть: `src/**`\n",
   "package.json": JSON.stringify({ name: "t", private: true, scripts: { verify: "node verify.mjs" } }) + "\n",
   "verify.mjs": 'if (process.env.RED) {\n  console.log("verify: boom");\n  process.exit(1);\n}\nconsole.log("verify: fine");\n',
 };
@@ -91,7 +93,7 @@ const outOf = (brief: string) => brief.replace(".in.json", ".out.json");
 const out = (brief: string, value: Json) => writeFileSync(outOf(brief), JSON.stringify(value));
 const head = (l: Loop) => sh(l.work, "git", ["rev-parse", "HEAD"]);
 const steps = (l: Loop) => read(join(l.dir, "state.json")).steps as Step[];
-const BLOCK = { kind: "rule", rule: "CONVENTIONS §1", where: "src/ledger/land.ts:2", quote: "return 2;", text: "magic number; use the constant" };
+const BLOCK = { kind: "rule", rule: "CONVENTIONS §1.1", where: "src/ledger/land.ts:2", quote: "return 2;", text: "magic number; use the constant" };
 
 // A review round from dl wave to dl merge: reviewer-standards finds `findings`, the rest find nothing.
 async function round(l: Loop, from: At, to: At, findings: Json[] = []): Promise<Json> {
