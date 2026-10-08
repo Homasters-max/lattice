@@ -191,8 +191,9 @@ function reviewer(brief, out, errors, repo) {
 }
 
 // Действия ответа: answer — блокирующие находки круга и его советы (S0-45); tidy — советы и находки вне дельты перед
-// сдачей. Отложить можно совет, находку вне дельты и решение владельца task или gap; отклонить — только совет.
-const ANSWER_JOBS = ["answer", "tidy"];
+// сдачей; owner — находки и советы, которые назвало поручение владельца, а id, которого brief не поручил, — ошибка.
+// Отложить можно совет, находку вне дельты и решение владельца task или gap; отклонить — только совет.
+const ANSWER_JOBS = ["answer", "tidy", "owner"];
 const ACTIONS = ["fixed", "disputed", "deferred", "declined"];
 
 function answer(errors, a, ctx) {
@@ -217,8 +218,9 @@ function answers(brief, out, errors, repo) {
   const items = list(errors, out.answers, "answers");
   const advice = new Set((brief.advice ?? []).map((f) => f.id));
   const decided = (brief.decisions ?? []).filter((d) => d.action !== "fix").map((d) => d.id);
-  const expected = [...brief.findings.map((f) => f.id), ...advice, ...decided];
-  const deferrable = new Set([...advice, ...brief.findings.filter((f) => f.late === true).map((f) => f.id), ...decided]);
+  const findings = brief.findings ?? [];
+  const expected = [...findings.map((f) => f.id), ...advice, ...decided];
+  const deferrable = new Set([...advice, ...findings.filter((f) => f.late === true).map((f) => f.id), ...decided]);
   const ids = items.map((a) => a.id);
   for (const id of expected) need(errors, ids.includes(id), `answers: нет ответа на ${id}`);
   need(errors, new Set(ids).size === ids.length, "answers: на находку — ровно один ответ");

@@ -84,6 +84,30 @@ function tableOf(lines, first) {
 
 const column = (table, name) => table.header.indexOf(name);
 
+const SEPARATOR = /^\|[\s|:-]+\|$/;
+// Решение владельца в ячейке «Рекомендация»: «**принята владельцем …**», «**решение владельца …**».
+const DECIDED = /(принята|решение) владельц/i;
+// Рекомендация, которая просит правку дизайна: «Уточнить TY-14 при ближайшей правке дизайна».
+const DESIGN = /Уточнить [^.]*/;
+
+/**
+ * Пробелы ids в разделе 12 PLAN.md фазы — строки таблицы с колонкой «Рекомендация»: `[{id, recommendation, decided,
+ * design}]`; recommendation null — строки нет, пусто — рекомендации нет; design — фраза о правке дизайна или null.
+ */
+export function gapsOf(plan, ids) {
+  const lines = lf(plan).split("\n");
+  return ids.map((id) => {
+    const at = lines.findIndex((l) => l.startsWith("|") && cells(l)[0] === id);
+    // Заголовок таблицы строки — над её разделителем `|---|`.
+    let sep = at;
+    while (sep > 0 && lines[sep].startsWith("|") && !SEPARATOR.test(lines[sep].trim())) sep--;
+    const col = at < 0 || sep < 1 || !SEPARATOR.test(lines[sep].trim()) ? -1 : cells(lines[sep - 1]).indexOf("Рекомендация");
+    const recommendation = col < 0 ? null : (cells(lines[at])[col] ?? "");
+    const decided = recommendation !== null && DECIDED.test(recommendation);
+    return { id, recommendation, decided, design: recommendation === null || decided ? null : (DESIGN.exec(recommendation)?.[0].trim() ?? null) };
+  });
+}
+
 /** Доска фазы, где задача id — ✅ со ссылкой link: `{text, last}` (last — на доске не осталось несданных) или `{error}`. */
 export function closeOnBoard(text, id, link) {
   const lines = lf(text).split("\n");

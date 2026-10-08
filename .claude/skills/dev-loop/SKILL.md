@@ -33,7 +33,7 @@ argument-hint: "[S0-NN | PR <n>]"
 | `resume` | ответ владельца агенту `agent`: живому — `SendMessage` `DEV-LOOP-OWNER <ответ>`; если его нет — новый по `dl brief executor --task <ID> --worktree <work>` или `dl brief fixer --worktree <work> --job <job>` (ответ brief берёт из состояния) |
 | `done`, `final` | «Сдать» |
 | `escalate`, `owner` | «Эскалация» с `--why` из вывода |
-| `ask` | «Эскалация», п. 3, с `questions` из вывода |
+| `ask` | «Эскалация», п. 2, с `questions` из вывода |
 | `executor` | «Исполнитель» |
 | `stop` | цикл стоит; PR остаётся draft с `blocked`. Владелец просит продолжить — `dl owner --text "<ответ>"` → пост, дальше по `next`: «продолжить» ведёт к `wave`, если ворота на head зелёные и с тех пор head не менялся, иначе к «Воротам»; иной текст — поручение исправляющему |
 | `end` | PR открыт и `git merge-base --is-ancestor origin/main HEAD` ложно — «Сдать» заново; иначе сообщи владельцу, что цикл завершён |
@@ -69,16 +69,15 @@ argument-hint: "[S0-NN | PR <n>]"
 ## Сдать
 
 - `git merge-base --is-ancestor origin/main HEAD` ложно — `dl brief fixer --worktree <work> --job rebase` → агент `fixer` → `dl check <out>` → `dl gate --worktree <work>`: `red` и `escalate` — по «Переходам», зелёный — дальше здесь. `conflicts` задевают `src/` или `test/` — `dl wave --worktree <work> --conflicts <файлы через запятую>`, дальше по `next`. Иначе — к следующему пункту.
-- `dl final --worktree <work>` → пост. `gh pr ready <n>` — PR в ready перевёл `dl ready`, но эскалация возвращает его в draft; метка `blocked` на PR есть (`gh pr view <n> --json labels`) — `gh pr edit <n> --remove-label blocked`.
+- `dl final --worktree <work>` → пост. `dl final` сам снимает метку `blocked` и переводит PR в ready: эскалация возвращала его в draft. `ok: false` с `gh: …` — PR не тронут и итог не записан: скажи владельцу `error` и повтори `dl final`.
 - Владельцу: задача, число кругов, ссылка на PR; что отложено в план и куда, что отклонено, что решить до merge — по разделам итога, без пересказа. Merge делает владелец. Защита ветки `main` пускает merge, только когда PR стоит на tail `main` и CI зелёный; ушёл `main` после «Сдать» — «Update branch» с rebase в PR, а при конфликте — `/dev-loop PR <n>`.
 
 ## Эскалация
 
-1. `dl escalate --why "<причина>" [--from <out агента с question>]` → пост.
-2. `gh pr ready <n> --undo`, `gh pr edit <n> --add-label blocked`.
-3. `AskUserQuestion` с вопросами из файла `questions`. Ответ может прийти и комментарием владельца в PR.
-4. Ответ на находки (вопросы с `header` = id находки) — файл `<папка>/answers.json` вида `{"W1-T1": {"action": "...", "note": "..."}}`.
+1. `dl escalate --why "<причина>" [--from <out агента с question>]` → пост. `dl escalate` сам переводит PR в draft и ставит метку `blocked`; `ok: false` с `gh: …` — эскалация не записана: скажи владельцу `error` и повтори.
+2. `AskUserQuestion` с вопросами из файла `questions`. Ответ может прийти и комментарием владельца в PR.
+3. Ответ на находки (вопросы с `header` = id находки) — файл `<папка>/answers.json` вида `{"W1-T1": {"action": "...", "note": "..."}}`.
    - Варианты: `чинить` → `fix`, `снять` → `drop`, `в задачу` → `task`, `стоп` → `stop`.
    - Свой текст с `G-NN` → `gap`, иной свой текст → `fix` с этим текстом в `note`.
    - Затем `dl owner --answers <папка>/answers.json` → пост, дальше по `next`.
-5. Ответ на прочие вопросы — `dl owner --text "<ответ>"` → пост, дальше по `next`.
+4. Ответ на прочие вопросы — `dl owner --text "<ответ>"` → пост, дальше по `next`.

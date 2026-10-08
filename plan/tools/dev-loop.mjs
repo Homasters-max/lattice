@@ -17,13 +17,14 @@
 //   merge --dir D                                             итоги круга → состояние, отчёт
 //   brief fixer --dir D --worktree W --job answer|tidy|verify-red|rebase|owner [--log P] [--owner текст]
 //   answer --dir D [--job tidy]                               ответ исправляющего → состояние, комментарий
-//   escalate --dir D --why текст [--from файл.out.json]       вопрос владельцу: комментарий и questions
+//   escalate --dir D --why текст [--from файл.out.json]       вопрос владельцу: комментарий и questions; PR — в draft с меткой blocked
 //   owner --dir D (--answers файл.json | --text текст)        решение владельца → состояние, комментарий
-//   final --dir D --worktree W                                итоговый комментарий
+//   final --dir D --worktree W                                итоговый комментарий; PR — в ready без метки blocked
 //   restore --dir D --comments файл.json                      состояние из `gh pr view --json comments` (отладка; start делает сам)
 // Файлы цикла в D: state.json, waves/<n>/<агент>.in.json и .out.json, waves/<n>/scope.json, waves/<n>/diff.patch, comments/<NN>-<вид>.md,
 //   verify.log — лог последних ворот, steps.json — шаги до init (init переносит их в состояние).
 // Записи run'ов — .lattice/verify-runs/ рабочей копии владельца (scripts/runs.mjs): пишет их только prove.
+// gh — в worktree цикла: --worktree или D/work.
 // Время шагов (clock.mjs) — сейчас или DEV_LOOP_NOW (ISO), если задано: так тесты не ждут.
 import { execFileSync, spawnSync } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -33,8 +34,8 @@ import { contextMissing, diffOf, executorBrief as executorContext, fixerBrief as
 import { check, FIXER_JOBS } from "./dev-loop/protocol.mjs";
 import { answer, decision, escalation, final, parseHeader, questions, review } from "./dev-loop/render.mjs";
 import { changedLines, conventionsChanged, scope } from "./dev-loop/scope.mjs";
-import { answerFindings, answerText, ask, entryOf, initial, looseFindings, mergeWave, openFindings, planWave, recordAnswer, rememberMutants } from "./dev-loop/state.mjs";
-import { advancePhase, closeOnBoard, findTask, itemsOf, markItems } from "./dev-loop/task.mjs";
+import { answerFindings, answerText, ask, entryOf, initial, looseFindings, mergeWave, namedFindings, openFindings, planWave, recordAnswer, rememberMutants } from "./dev-loop/state.mjs";
+import { advancePhase, closeOnBoard, findTask, gapsOf, itemsOf, markItems } from "./dev-loop/task.mjs";
 import { pruneRuns, readRun, runsDir } from "../../scripts/runs.mjs";
 
 const COMMENT_MAX = 65000;
@@ -258,16 +259,20 @@ function brief() {
   const job = need("job");
   if (!FIXER_JOBS.includes(job)) fail(`--job: ${FIXER_JOBS.join(" | ")}`);
   const file = join(waveDir(state.wave), `fixer-${job}.in.json`);
-  // answer решает и советы своего круга (S0-45); tidy — советы и находки вне дельты после круга без блокирующих.
+  // answer решает и советы своего круга (S0-45); tidy — советы и находки вне дельты после круга без блокирующих;
+  // owner — находки и советы, которые поручение владельца называет по id.
+  const owner = flags.owner ?? state.owner?.text;
   const loose = job === "tidy" ? looseFindings(state) : [];
-  const advice = job === "answer" ? state.findings.filter((f) => f.status === "advice") : loose.filter((f) => f.severity === "advice");
+  const named = job === "owner" ? namedFindings(state, owner) : null;
+  const advice = job === "answer" ? state.findings.filter((f) => f.status === "advice") : (named?.advice ?? loose.filter((f) => f.severity === "advice"));
+  const findings = job === "answer" ? openFindings(state) : (named?.findings ?? loose.filter((f) => f.severity === "block"));
   const runs = job === "verify-red" ? redRuns(state, need("worktree")) : [];
   write(file, fixerContext({
     role: "fixer", job, pr: state.pr, task: state.task, branch: state.branch, worktree: need("worktree"), base: state.head ?? undefined,
     since: job === "tidy" ? git(need("worktree"), "merge-base", "origin/main", "HEAD") : undefined,
-    findings: job === "answer" ? openFindings(state).map(slim) : loose.filter((f) => f.severity === "block").map(slim),
+    findings: findings.map(slim),
     advice: advice.map(slim),
-    decisions: job === "answer" ? state.decisions : [], log: flags.log, owner: flags.owner ?? state.owner?.text, out: file.replace(".in.json", ".out.json"),
+    decisions: job === "answer" ? state.decisions : [], log: flags.log, owner, out: file.replace(".in.json", ".out.json"),
   }, { runs }));
   const step = { kind: "agent", role: "fixer", job, wave: state.wave, briefs: { [`fixer-${job}`]: statSync(file).size } };
   save({ ...state, owner: null, steps: begin(stepsOf(state), step, now()) });
@@ -299,6 +304,8 @@ function escalate() {
   const from = flags.from ? read(flags.from) : null;
   const asker = from ? read(flags.from.replace(/\.out\.json$/, ".in.json")) : {};
   const asked = ask(state, { why: need("why"), question: from?.question, agent: asker.role, job: asker.job });
+  // Сначала PR: gh не ответил — эскалация не записана, и её повтор не даст второго комментария.
+  prStatus(state.pr, { blocked: true });
   const next = { ...asked, steps: begin(stepsOf(state), { kind: "owner", role: null, job: null, wave: state.wave, head: state.head }, now()) };
   save(next);
   const file = comment("escalation", escalation(next));
@@ -390,13 +397,35 @@ function restore() {
 }
 
 // ghText — вывод как текст; gh — разобранный JSON. DEV_LOOP_GH — fake gh тестов.
+// gh находит репозиторий по git своей cwd: это worktree цикла — --worktree или <dir>/work, — а не папка, откуда запущен dl.
+const ghCwd = () => flags.worktree ?? (flags.dir !== undefined && existsSync(join(flags.dir, "work")) ? join(flags.dir, "work") : undefined);
 const ghText = (...args) => {
   const fake = process.env.DEV_LOOP_GH;
   const [cmd, argv] = fake ? [process.execPath, [fake, ...args]] : ["gh", args];
-  return execFileSync(cmd, argv, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  return execFileSync(cmd, argv, { cwd: ghCwd(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 };
 const gh = (...args) => JSON.parse(ghText(...args));
 const PR_FIELDS = "number,title,headRefName,isDraft";
+
+// Эскалация возвращает PR в draft с меткой blocked, итог снимает метку и переводит PR в ready (plan/dev-loop.md, «Обмен»).
+// Метка — через REST: `gh pr edit --add-label` читает проекты по GraphQL и без scope read:org падает.
+const BLOCKED = "blocked";
+function prStatus(pr, { blocked }) {
+  try {
+    const now = gh("pr", "view", String(pr), "--json", "isDraft,labels");
+    const labelled = (now.labels ?? []).some((l) => l.name === BLOCKED);
+    const labels = `repos/{owner}/{repo}/issues/${pr}/labels`;
+    if (blocked) {
+      if (now.isDraft !== true) ghText("pr", "ready", String(pr), "--undo");
+      if (!labelled) ghText("api", "-X", "POST", labels, "-f", `labels[]=${BLOCKED}`);
+    } else {
+      if (labelled) ghText("api", "-X", "DELETE", `${labels}/${BLOCKED}`);
+      if (now.isDraft === true) ghText("pr", "ready", String(pr));
+    }
+  } catch (e) {
+    fail(`gh: ${String(e.stderr || e.message).trim().split("\n")[0]} — PR #${pr} не ${blocked ? "переведён в draft с меткой blocked" : "переведён в ready без метки blocked"}`);
+  }
+}
 
 function findPr() {
   if (flags.pr) return gh("pr", "view", flags.pr, "--json", PR_FIELDS);
@@ -567,7 +596,9 @@ const commands = {
     if (r.errors.length === 0 && ["executor", "fixer"].includes(r.brief.role)) {
       stamp((steps) => finish(steps, { kind: "agent", role: r.brief.role, job: r.brief.job ?? null }, now(), { head: head ?? null }));
       // Решения о мутантах dl помнит по id и снова их не выносит (S0-44); до состояния их переносит init.
-      if (flags.dir !== undefined && existsSync(statePath())) save(rememberMutants(load(), r.value, r.brief.role));
+      // Ответ на поручение владельца — как ответ на круг: совет получает статус, исправленную находку проверит круг.
+      const owned = r.brief.role === "fixer" && r.brief.job === "owner" && status === "done";
+      if (flags.dir !== undefined && existsSync(statePath())) save(owned ? recordAnswer(load(), r.value, "owner") : rememberMutants(load(), r.value, r.brief.role));
     }
     print({ ok: r.errors.length === 0, errors: r.errors, warnings: r.warnings, status, pr, head, conflicts, question: status === "needs_owner" ? question : undefined });
   },
@@ -577,10 +608,16 @@ const commands = {
   owner,
   final: () => {
     const state = load();
+    const worktree = need("worktree");
     const first = join(dir(), "waves", "1", "scope.json");
-    const conventions = conventionsChanged({ dir: need("worktree") });
+    const conventions = conventionsChanged({ dir: worktree });
     const context = contextMissing(dir());
-    print({ ok: true, comment: comment("final", final(state, { scope: existsSync(first) ? read(first) : undefined, conventions, context, at: now() })) });
+    // Пробелы цикла — по разделу 12 PLAN.md фазы задачи: решённый по рекомендации владельцу до merge не выносится.
+    const found = state.task ? findTask(worktree, state.task) : null;
+    const plan = found ? found.board.replace(/STATUS\.md$/, "PLAN.md") : null;
+    const gaps = gapsOf(plan && existsSync(join(worktree, plan)) ? readFileSync(join(worktree, plan), "utf8") : "", state.gaps ?? []);
+    prStatus(state.pr, { blocked: false });
+    print({ ok: true, comment: comment("final", final(state, { scope: existsSync(first) ? read(first) : undefined, conventions, context, gaps, plan, at: now() })) });
   },
   restore,
 };

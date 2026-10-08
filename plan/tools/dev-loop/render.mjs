@@ -68,7 +68,7 @@ export function answer(state) {
   const out = [header("answer", state), title(state, `Ответ на ревью · круг ${a.wave}`), "", `Head \`${short(a.head)}\` · \`npm run verify\` зелёный`, ""];
   out.push("| Находка | Ответ | Коммиты или запись |", "|---|---|---|");
   for (const x of a.items) out.push(`| ${x.id} | ${ACTION[x.action]}: ${cell(x.note)} | ${x.where ? `\`${x.where}\`` : (x.commits ?? []).map(short).join(", ")} |`);
-  if (state.gaps.length) out.push("", `Пробелы для решения владельца до merge: ${state.gaps.join(", ")}.`);
+  if (state.gaps.length) out.push("", `Пробелы дизайна в PLAN.md: ${state.gaps.join(", ")}; какие из них решить до merge — в итоге цикла.`);
   return lines(out);
 }
 
@@ -180,7 +180,19 @@ function contextOf(context, steps) {
   return out;
 }
 
-export function final(state, { scope, conventions = [], context = [], at } = {}) {
+// Пробелы дизайна цикла по разделу 12 PLAN.md фазы (task.mjs, gapsOf): пробел с рекомендацией решён в задаче, и итог
+// его только называет; владельцу до merge — пробел без строки в PLAN.md или без рекомендации.
+function gapLines(gaps, plan) {
+  const where = plan ? `\`${plan}\`` : "PLAN.md фазы";
+  const todo = gaps.filter((g) => !g.recommendation).map((g) => `- пробел ${g.id}: ${g.recommendation === null ? "нет строки" : "нет рекомендации"} в разделе 12 ${where}`);
+  const known = gaps.filter((g) => g.recommendation).map((g) => `- ${g.id} — ${g.decided ? "решение владельца" : "по рекомендации"}${g.design ? `; правка дизайна: «${g.design}»` : ""}`);
+  const section = known.length ? ["", "### Пробелы дизайна", "", `Решены в задаче — раздел 12 ${where}; не согласен владелец — правка дизайна.`, "", ...known] : [];
+  return { todo, section };
+}
+
+// gaps — пробелы state.gaps по PLAN.md фазы, plan — его путь; без них каждый пробел — «нет строки».
+export function final(state, { scope, conventions = [], context = [], gaps, plan = null, at } = {}) {
+  const gap = gapLines(gaps ?? state.gaps.map((id) => ({ id, recommendation: null })), plan);
   const out = [header("final", state), title(state, "Итог цикла"), ""];
   out.push(`Head \`${short(state.head ?? scope?.head)}\` · \`npm run verify\` зелёный · кругов: ${state.waves.length} из ${state.budget}`);
   if (!state.waves.length && scope) out.push("", `Ревью не требовался: изменения вне кода (${scope.lines} строк).`);
@@ -196,10 +208,11 @@ export function final(state, { scope, conventions = [], context = [], at } = {})
   const todo = [
     ...openFindings(state).filter((f) => f.late).map((f) => `- находка вне дельты ${f.id} · ${f.rule} · \`${f.where}\`: ${f.text}`),
     ...of("advice").map((f) => `- совет ${f.id} · \`${f.where}\`: ${f.text}`),
-    ...state.gaps.map((g) => `- пробел ${g} в PLAN.md: решение до merge`),
+    ...gap.todo,
     ...conventionsTodo(conventions),
   ];
   out.push("", "### Решить владельцу до merge", "", ...(todo.length ? todo : ["нечего"]));
+  out.push(...gap.section);
   const ratchet = state.findings.filter((f) => f.ratchet).map((f) => f.id);
   out.push("", `Триггеры аудита ST-15: ${audit(state.triggers ?? scope?.triggers).join("; ") || "нет"}.`, `Кандидаты в ratchet (ST-16): ${ratchet.join(", ") || "нет"}.`);
   out.push(...contextOf(context, state.steps ?? []));

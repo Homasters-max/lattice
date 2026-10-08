@@ -34,6 +34,13 @@ const disputedIds = (state) => (state.answers?.items ?? []).filter((a) => a.acti
 // Хвосты перед сдачей: советы и блокирующие находки вне дельты. Круг tidy решает каждый.
 export const looseFindings = (state) => state.findings.filter((f) => f.status === "advice" || (isOpen(f) && f.late));
 
+// Находки, которые поручение владельца называет по id (W5-S1): открытые блокирующие и советы — на них fixer job owner
+// отвечает, как в answer; прочие id поручения в brief не идут.
+export function namedFindings(state, text) {
+  const ids = new Set(String(text ?? "").match(/\bW\d+-[A-Z]\d+\b/g) ?? []);
+  return { findings: openFindings(state).filter((f) => ids.has(f.id)), advice: state.findings.filter((f) => f.status === "advice" && ids.has(f.id)) };
+}
+
 // Вердикт оси — evidence с ключом (ось, hunk) (S0-45): ось смотрела этот hunk, и он с тех пор не менялся.
 const isReviewed = (reviewedBy, id, axis) => (reviewedBy[id] ?? "").includes(LETTER[axis]);
 // Hunk'и без действующего вердикта оси — среди тех, чьи триггеры её задевают.
@@ -169,9 +176,13 @@ export function decide(state) {
 
 // Ответ исправляющего (answer или tidy) → состояние. Советы и отложенное получают итоговый статус сразу;
 // исправленные блокирующие находки закрывает следующий круг. answer решает и советы своего круга (S0-45).
+// owner — ответ на находки, которые назвало поручение владельца: ответы, которые круг ещё не проверил, остаются.
 export function recordAnswer(state, out, job) {
   const next = structuredClone(rememberMutants(state, out, "fixer"));
-  next.answers = { wave: state.wave, job, head: out.head, items: out.answers ?? [] };
+  const items = out.answers ?? [];
+  const prior = job === "owner" && state.answers ? state.answers : null;
+  const kept = (prior?.items ?? []).filter((a) => !items.some((b) => b.id === a.id));
+  next.answers = { wave: state.wave, job: prior?.job ?? job, head: out.head, items: [...kept, ...items] };
   for (const a of next.answers.items) {
     const f = next.findings.find((g) => g.id === a.id);
     if (!f) continue;

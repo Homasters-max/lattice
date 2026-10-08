@@ -189,6 +189,58 @@ describe.concurrent("dev-loop, the owner decides", { timeout: 60_000 }, () => {
     expect(await dl(l, "owner", "--text", "верни константу")).toMatchObject({ ok: true, next: "instruct" });
     expect(await dl(l, "owner", "--text", "x")).toMatchObject({ ok: false, errors: ["владельца ни о чём не спрашивали"] });
   });
+
+  // An advice the owner asks to apply after the round is answered by the fixer of the job owner: the brief carries it,
+  // an answer to an id the brief did not give is refused, and dl check records the answer, so the final report drops it.
+  it("gives the fixer of an instruction the findings it names, refuses an answer to another and records the answer", async () => {
+    const l = await loop();
+    expect(await round(l, [{ ...BLOCK, kind: "advice", rule: "", text: "a fixture would show the path" }])).toMatchObject({ next: "tidy" });
+    await dl(l, "escalate", "--why", "проверить");
+    expect(await dl(l, "owner", "--text", "примени совет W1-T1; W9-S9 нет")).toMatchObject({ ok: true, next: "instruct" });
+    const ob = (await dl(l, "brief", "fixer", "--worktree", l.work, "--job", "owner")).brief as string;
+    expect(read(ob)).toMatchObject({ job: "owner", findings: [], advice: [{ id: "W1-T1" }] });
+    const fix = await commit(l.work, { "src/ledger/land.ts": land(3) }, "S0-99: owner — the fixture");
+    const check = () => dl(l, "check", ob.replace(".in.json", ".out.json"), "--dir", l.dir);
+    out(ob, { status: "done", head: fix, answers: [{ id: "W1-T2", action: "fixed", commits: [fix] }] });
+    expect((await check()).errors).toEqual(["answers: нет ответа на W1-T1", "answers: W1-T2 не поручен"]);
+    out(ob, { status: "done", head: fix, answers: [{ id: "W1-T1", action: "fixed", commits: [fix] }] });
+    expect(await check()).toMatchObject({ ok: true, errors: [] });
+    expect((read(join(l.dir, "state.json")).findings as Json[])[0]).toMatchObject({ id: "W1-T1", status: "applied" });
+    expect(temp.text((await dl(l, "final", "--worktree", l.work)).comment as string)).not.toContain("совет W1-T1");
+  });
+});
+
+// The final report reads each gap of the loop in section 12 of PLAN.md of the phase: a gap with a recommendation is
+// decided in the task and is only named, by the owner's decision or by the recommendation, with the edit of the design
+// it asks for; the owner decides before merge only a gap without a row or without a recommendation.
+describe.concurrent("dev-loop, the gaps of PLAN.md in the final report", { timeout: 60_000 }, () => {
+  const PLAN = [
+    "# S0", "", "## 12. Мелкие пробелы дизайна", "", "| ID | Пробел | Рекомендация | Задача |", "|---|---|---|---|",
+    "| G-01 | a | **решение владельца 2026-10-08** (PR #9): `a` | S0-99 |",
+    "| G-02 | b | `on` — `{status: a | b}` | S0-99 |",
+    "| G-03 | c | `c` допустимо. Уточнить KR-18 при ближайшей правке дизайна | S0-99 |",
+    "| G-04 | d |  | S0-99 |", "",
+  ].join("\n");
+  const PHASE: Files = { "plan/phases/S0-x/tasks/S0-99-x.md": "# S0-99\n", "plan/phases/S0-x/PLAN.md": PLAN };
+
+  it("lists for the owner only a gap without a row or a recommendation and names the others by how they are decided", async () => {
+    const l = await loop({ ...TASK, ...PHASE });
+    expect(await round(l, [{ ...BLOCK, kind: "advice", rule: "" }])).toMatchObject({ next: "tidy" });
+    const tb = (await dl(l, "brief", "fixer", "--worktree", l.work, "--job", "tidy")).brief as string;
+    out(tb, { status: "done", head: await head(l), answers: [{ id: "W1-T1", action: "declined", note: "not worth it" }], gaps: ["G-01", "G-02", "G-03", "G-04", "G-05"] });
+    expect(await dl(l, "answer", "--job", "tidy")).toMatchObject({ ok: true });
+    const fin = temp.text((await dl(l, "final", "--worktree", l.work)).comment as string);
+    expect(fin.match(/^- пробел .*$/gm)).toEqual([
+      "- пробел G-04: нет рекомендации в разделе 12 `plan/phases/S0-x/PLAN.md`",
+      "- пробел G-05: нет строки в разделе 12 `plan/phases/S0-x/PLAN.md`",
+    ]);
+    expect(fin.match(/^- G-\d{2} — .*$/gm)).toEqual([
+      "- G-01 — решение владельца",
+      "- G-02 — по рекомендации",
+      "- G-03 — по рекомендации; правка дизайна: «Уточнить KR-18 при ближайшей правке дизайна»",
+    ]);
+    expect(fin.indexOf("### Пробелы дизайна")).toBeGreaterThan(fin.indexOf("- пробел G-05"));
+  });
 });
 
 describe.concurrent("dev-loop, outputs the protocol refuses", { timeout: 60_000 }, () => {
