@@ -11,7 +11,8 @@ import { conventionsOf, unknownReferences } from "./conventions.mjs";
 export const AXES = ["spec", "standards", "architecture", "verify"];
 export const LETTER = { spec: "S", standards: "T", architecture: "A", verify: "V" };
 export const STATUSES = ["closed", "open", "dispute-accepted", "dispute-kept"];
-export const REVIEW_JOBS = ["full", "delta", "close", "status", "conflicts"];
+// hunks — ось ревьюирует hunk'и без своего вердикта; answers — статусы находок с ответом автора (S0-45).
+export const REVIEW_JOBS = ["hunks", "answers", "conflicts"];
 export const FIXER_JOBS = ["answer", "tidy", "verify-red", "rebase", "owner"];
 // Критерий находки; тяжесть выводится из него: advice — совет, остальные блокируют.
 export const KINDS = ["rule", "scope", "untested", "expectation", "mechanism", "advice"];
@@ -181,7 +182,7 @@ function reviewer(brief, out, errors, repo) {
   for (const id of assigned) need(errors, ids.includes(id), `statuses: нет статуса для ${id}`);
   need(errors, new Set(ids).size === ids.length, "statuses: id повторяется");
   const findings = list(errors, out.findings, "findings");
-  need(errors, brief.job !== "status" || findings.length === 0, "findings: поручение status — только статусы");
+  need(errors, brief.job !== "answers" || findings.length === 0, "findings: поручение answers — только статусы; hunk'и ревьюируют оси");
   return {
     ...out,
     statuses: statuses.map((s) => status(errors, s, assigned, disputed)),
@@ -189,12 +190,14 @@ function reviewer(brief, out, errors, repo) {
   };
 }
 
-// Действия по заданию: answer — блокирующие находки; tidy — советы и находки вне дельты перед сдачей.
-const ACTIONS = { answer: ["fixed", "disputed"], tidy: ["fixed", "deferred", "declined", "disputed"] };
+// Действия ответа: answer — блокирующие находки круга и его советы (S0-45); tidy — советы и находки вне дельты перед
+// сдачей. Отложить можно совет, находку вне дельты и решение владельца task или gap; отклонить — только совет.
+const ANSWER_JOBS = ["answer", "tidy"];
+const ACTIONS = ["fixed", "disputed", "deferred", "declined"];
 
 function answer(errors, a, ctx) {
-  const { brief, from, range, changed, advice, repo } = ctx;
-  need(errors, ACTIONS[brief.job].includes(a.action), `answers.${a.id}: ${ACTIONS[brief.job].join(" | ")}`);
+  const { brief, from, range, changed, advice, deferrable, repo } = ctx;
+  need(errors, ACTIONS.includes(a.action), `answers.${a.id}: ${ACTIONS.join(" | ")}`);
   need(errors, a.note === undefined || text(a.note, LIMITS.note), `answers.${a.id}.note: до ${LIMITS.note} знаков`);
   if (a.action === "fixed")
     need(errors, Array.isArray(a.commits) && a.commits.length > 0 && a.commits.every((c) => range.some((r) => sameSha(r, c))),
@@ -203,15 +206,19 @@ function answer(errors, a, ctx) {
     need(errors, !advice.has(a.id) && RULE.test(a.note ?? ""), `answers.${a.id}: спор — только о блокирующей находке и с правилом`);
     references(errors, a.note, repo, `answers.${a.id}.note`);
   }
-  if (a.action === "deferred")
+  if (a.action === "deferred") {
+    need(errors, deferrable.has(a.id), `answers.${a.id}: отложить можно совет, находку вне дельты или решение владельца task и gap — блокирующую находку исправляют или оспаривают`);
     need(errors, PLAN_RECORD.test(a.where ?? "") && changed.includes(a.where), `answers.${a.id}: where — файл задачи или PLAN.md фазы, изменённый в этом ответе`);
+  }
   if (a.action === "declined") need(errors, advice.has(a.id) && text(a.note, LIMITS.note), `answers.${a.id}: отклонить можно только совет, с причиной в note`);
 }
 
 function answers(brief, out, errors, repo) {
   const items = list(errors, out.answers, "answers");
   const advice = new Set((brief.advice ?? []).map((f) => f.id));
-  const expected = [...brief.findings.map((f) => f.id), ...advice, ...(brief.decisions ?? []).filter((d) => d.action !== "fix").map((d) => d.id)];
+  const decided = (brief.decisions ?? []).filter((d) => d.action !== "fix").map((d) => d.id);
+  const expected = [...brief.findings.map((f) => f.id), ...advice, ...decided];
+  const deferrable = new Set([...advice, ...brief.findings.filter((f) => f.late === true).map((f) => f.id), ...decided]);
   const ids = items.map((a) => a.id);
   for (const id of expected) need(errors, ids.includes(id), `answers: нет ответа на ${id}`);
   need(errors, new Set(ids).size === ids.length, "answers: на находку — ровно один ответ");
@@ -221,7 +228,7 @@ function answers(brief, out, errors, repo) {
   const changed = isSha(out.head) ? repo.changed(brief.base, out.head) : [];
   for (const a of items) {
     need(errors, expected.includes(a.id), `answers: ${a.id} не поручен`);
-    answer(errors, a, { brief, from, range, changed, advice, repo });
+    answer(errors, a, { brief, from, range, changed, advice, deferrable, repo });
   }
 }
 
@@ -231,7 +238,7 @@ function fixer(brief, out, errors, repo) {
   need(errors, ["done", "needs_owner"].includes(out.status), `status: ${shown(out.status)} — нужно done | needs_owner`);
   author(out, errors, repo, brief.branch);
   need(errors, out.conflicts === undefined || (Array.isArray(out.conflicts) && out.conflicts.every((c) => text(c, 300))), "conflicts: список файлов");
-  if (brief.job in ACTIONS && out.status === "done") answers(brief, out, errors, repo);
+  if (ANSWER_JOBS.includes(brief.job) && out.status === "done") answers(brief, out, errors, repo);
   if (out.status === "done" && isSha(out.head)) mutants(errors, out, repo);
   return out;
 }

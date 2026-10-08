@@ -2,17 +2,19 @@
 // Состояние: {pr, task, branch, budget, wave, head, base, waves[], findings[], answers, decisions[], gaps[], triggers,
 //   pending — вопрос владельцу {why, question?, agent?, job?, findings?}, owner — ответ владельца агенту {text, agent, job?},
 //   tidied — круг tidy пройден, stopped, mutants — решения авторов о мутантах {id: {decision, commit?, reason?, by}} (S0-44),
-//   steps — шаги цикла и их время (clock.mjs)}.
+//   verdicts — вердикты осей по hunk'ам ветки {id hunk'а: буквы осей LETTER} (S0-45), unreviewed — число hunk'ов head
+//   без вердикта нужной оси, steps — шаги цикла и их время (clock.mjs)}.
 // Статусы находки: open, dispute-kept, closed, dispute-accepted, advice, applied, deferred (+ deferredTo), declined, owner-closed.
 // Находка: {id, axis, severity, rule, where, quote, text, ratchet, late, wave, status, history[{wave, status, note}]}.
 import { LETTER } from "./protocol.mjs";
+import { HUNK_AXES } from "./scope.mjs";
 
 export const BUDGET = 3;
 export const OWNER_ACTIONS = ["fix", "drop", "task", "gap", "stop"];
 const DUPLICATE_LINES = 3;
 
 export function initial({ pr, task, branch, gaps = [] }) {
-  return { pr, task, branch, budget: BUDGET, wave: 0, head: null, base: null, waves: [], findings: [], answers: null, decisions: [], gaps, triggers: null, pending: null, owner: null, tidied: false, stopped: false, mutants: {}, steps: [] };
+  return { pr, task, branch, budget: BUDGET, wave: 0, head: null, base: null, waves: [], findings: [], answers: null, decisions: [], gaps, triggers: null, pending: null, owner: null, tidied: false, stopped: false, mutants: {}, verdicts: {}, unreviewed: 0, steps: [] };
 }
 
 /** Решения автора о мутантах из его выхода (S0-44) — в состоянии по id мутанта: решённого dl больше не выносит. */
@@ -30,18 +32,35 @@ const disputedIds = (state) => (state.answers?.items ?? []).filter((a) => a.acti
 // Хвосты перед сдачей: советы и блокирующие находки вне дельты. Круг tidy решает каждый.
 export const looseFindings = (state) => state.findings.filter((f) => f.status === "advice" || (isOpen(f) && f.late));
 
-// Кто ставит статус каждой открытой находке и какие агенты нужны кругу.
-export function planWave(state, scope) {
+// Вердикт оси — evidence с ключом (ось, hunk) (S0-45): ось смотрела этот hunk, и он с тех пор не менялся.
+const hasVerdict = (verdicts, id, axis) => (verdicts[id] ?? "").includes(LETTER[axis]);
+// Hunk'и без действующего вердикта оси — среди тех, чьи триггеры её задевают.
+const unreviewedOf = (hunks, verdicts, axis) => hunks.filter((h) => h.axes[axis] && !hasVerdict(verdicts, h.id, axis));
+const countUnreviewed = (hunks, verdicts) => hunks.filter((h) => HUNK_AXES.some((a) => h.axes[a] && !hasVerdict(verdicts, h.id, a))).length;
+// Открытые находки, на которые автор ответил: их статусы ставит проверка ответов.
+function answeredFindings(state) {
+  const ids = new Set((state.answers?.items ?? []).map((a) => a.id));
+  return openFindings(state).filter((f) => ids.has(f.id));
+}
+
+// Агенты круга: ось — с hunk'ами без её вердикта, которые задевают её триггеры (job hunks); verifier — со статусами
+// находок с ответом (job answers). axes — только эти оси (старт вместе с воротами); skip — агенты, уже начатые
+// в этом круге: их hunk'и, которые с тех пор изменились, остаются без вердикта и идут в следующий круг.
+export function planWave(state, scope, { axes = null, skip = [] } = {}) {
   const wave = state.wave + 1;
-  const open = openFindings(state);
-  const disputed = disputedIds(state);
-  const axes = new Set(scope.axes);
-  for (const f of open) if (disputed.includes(f.id) && f.axis !== "verify") axes.add(f.axis);
-  const job = wave === 1 ? "full" : "delta";
-  const agents = [...axes].map((axis) => ({ agent: `reviewer-${axis}`, axis, job, findings: open.filter((f) => f.axis === axis) }));
-  const rest = open.filter((f) => !axes.has(f.axis));
-  if (rest.length || (scope.mode === "verify" && scope.lines > 0)) agents.push({ agent: "verifier", axis: "verify", job: scope.mode === "verify" ? "close" : "status", findings: rest });
-  return { wave, mode: scope.mode, agents, disputed };
+  const verdicts = state.verdicts ?? {};
+  const wanted = (axis, agent) => (axes === null || axes.includes(axis)) && !skip.includes(agent);
+  const agents = [];
+  const reasons = {};
+  for (const axis of HUNK_AXES) {
+    const hunks = unreviewedOf(scope.hunks, verdicts, axis);
+    if (hunks.length === 0 || !wanted(axis, `reviewer-${axis}`)) continue;
+    reasons[axis] = [...new Set(hunks.flatMap((h) => h.axes[axis]))];
+    agents.push({ agent: `reviewer-${axis}`, axis, job: "hunks", findings: [], hunks: hunks.map(({ id, file, at, text, axes: why }) => ({ id, file, at, reasons: why[axis], text })) });
+  }
+  const answered = answeredFindings(state);
+  if (answered.length && wanted("verify", "verifier")) agents.push({ agent: "verifier", axis: "verify", job: "answers", findings: answered });
+  return { wave, agents, reasons, disputed: disputedIds(state) };
 }
 
 function isDuplicate(state, f) {
@@ -66,9 +85,21 @@ function applyStatuses(next, wave, outputs) {
   return closed;
 }
 
-// Выходы агентов круга (уже проверенные) → новое состояние. changed — строки дельты (scope.changedLines).
-export function mergeWave(state, { wave, scope, outputs, changed }) {
+// Вердикты после круга: прежние — у hunk'ов, которые есть на head; новые — оси за каждый hunk её brief'а, если он
+// на head тот же. reviewed — [{axis, hunks: [id]}]. Hunk, которого коснулась правка, получил новый id, и вердикта у него нет.
+function verdictsAfter(state, hunks, reviewed) {
+  const current = new Set(hunks.map((h) => h.id));
+  const verdicts = Object.fromEntries(Object.entries(state.verdicts ?? {}).filter(([id]) => current.has(id)));
+  for (const { axis, hunks: ids } of reviewed)
+    for (const id of ids) if (current.has(id) && !hasVerdict(verdicts, id, axis)) verdicts[id] = [...(verdicts[id] ?? ""), LETTER[axis]].sort().join("");
+  return verdicts;
+}
+
+// Выходы агентов круга (уже проверенные) → новое состояние. changed — строки дельты (scope.changedLines);
+// reviewed — hunk'и, которые оси получили в brief'ах круга.
+export function mergeWave(state, { wave, scope, outputs, changed, reviewed = [] }) {
   const next = structuredClone(state);
+  const mode = scope.mode ?? "review";
   const warnings = [];
   const closed = applyStatuses(next, wave, outputs);
   const found = [];
@@ -80,25 +111,32 @@ export function mergeWave(state, { wave, scope, outputs, changed }) {
         continue;
       }
       const id = `W${wave}-${LETTER[out.axis]}${++n}`;
-      const late = wave > 1 && scope.mode !== "conflicts" && !inChanged(changed, f.where);
+      const late = wave > 1 && mode !== "conflicts" && !inChanged(changed, f.where);
       next.findings.push({ ...f, id, late, wave, status: f.severity === "block" ? "open" : "advice", history: [] });
       found.push(id);
     }
   }
-  next.waves.push({ n: wave, mode: scope.mode, axes: outputs.map((o) => o.axis), base: scope.base, head: scope.head, found, closed });
+  const hunks = reviewed.reduce((n, r) => n + r.hunks.length, 0);
+  next.waves.push({ n: wave, mode, axes: outputs.map((o) => o.axis), base: scope.base, head: scope.head, hunks, found, closed });
   Object.assign(next, { wave, head: scope.head, base: scope.base, answers: null, decisions: [] });
   next.triggers ??= scope.triggers;
-  if (scope.mode === "conflicts") next.budget += 1;
+  if (mode === "conflicts") next.budget += 1;
+  else {
+    next.verdicts = verdictsAfter(state, scope.hunks ?? [], reviewed);
+    next.unreviewed = countUnreviewed(scope.hunks ?? [], next.verdicts);
+  }
   return { state: next, warnings, ...decide(next) };
 }
 
-// Решение по кругу: stop | fix (решения владельца) | escalate | done | fix — по порядку правил.
+// Решение по кругу: stop | fix (решения владельца) | escalate | wave (hunk'и без вердикта) | tidy | done | fix —
+// по порядку правил. tidy — только после круга без блокирующих находок: советы круга с блокирующими решает answer.
 export function decide(state) {
   const open = openFindings(state);
   if (state.stopped) return { next: "stop", why: "владелец остановил цикл" };
   if (state.decisions.length) return { next: "fix", why: "решения владельца к исполнению" };
   if (open.some((f) => f.status === "dispute-kept")) return { next: "escalate", why: "автор и ревьюер расходятся в правиле" };
   if (!open.some((f) => !f.late)) {
+    if (state.unreviewed > 0) return { next: "wave", why: `hunk'ов без вердикта на head: ${state.unreviewed}` };
     const loose = looseFindings(state).length;
     if (loose && !state.tidied) return { next: "tidy", why: `хвостов перед сдачей: ${loose} — исправить, отложить в план или отклонить` };
     return { next: "done", why: "блокирующих находок нет" };
@@ -108,7 +146,7 @@ export function decide(state) {
 }
 
 // Ответ исправляющего (answer или tidy) → состояние. Советы и отложенное получают итоговый статус сразу;
-// исправленные блокирующие находки закрывает следующий круг.
+// исправленные блокирующие находки закрывает следующий круг. answer решает и советы своего круга (S0-45).
 export function recordAnswer(state, out, job) {
   const next = structuredClone(rememberMutants(state, out, "fixer"));
   next.answers = { wave: state.wave, job, head: out.head, items: out.answers ?? [] };

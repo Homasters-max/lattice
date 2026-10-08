@@ -130,7 +130,8 @@ async function wholeLoop(l: Loop): Promise<void> {
   expect(await dl(l, t(38), "answer")).toMatchObject({ ok: true, status: "done" });
   await dl(l, t(39), "gate", "--worktree", l.work);
   const w2 = await dl(l, t(40), "wave", "--worktree", l.work);
-  out(agents(w2)[0]!.brief, { axis: "verify", head: fix, summary: "closed", statuses: [{ id: "W1-T1", status: "closed" }], findings: [] });
+  // The fix edited the hunk: Spec and Standards review it again, the verifier closes the answered finding (S0-45).
+  for (const a of agents(w2)) out(a.brief, { axis: read(a.brief).axis, head: fix, summary: "closed", statuses: a.agent === "verifier" ? [{ id: "W1-T1", status: "closed" }] : [], findings: [] });
   expect(await dl(l, t(42), "merge")).toMatchObject({ ok: true, next: "done" });
   await dl(l, t(43), "escalate", "--why", "проверить");
   expect(await dl(l, t(50), "owner", "--text", "стоп")).toMatchObject({ next: "stop" });

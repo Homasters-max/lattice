@@ -112,16 +112,10 @@ export function diffOf(root, base, head = "HEAD") {
   return { patch, files };
 }
 
-// Hunk'и, которые читает ось: Spec — всё, кроме генерируемого; Standards — код, тесты, конфигурация, CONVENTIONS.md;
-// Architecture — то, что держит опись closure-check; проверка закрытия — вся дельта.
-const AXIS_FILES = {
-  spec: (f) => classOf(f) !== "generated",
-  standards: (f) => ["code", "tests", "config", "conventions"].includes(classOf(f)),
-  architecture: (f) => /^(src|scripts)\/|^test\/support\//.test(f) || f === "package.json",
-  verify: () => true,
-};
-
-const hunkItems = (files) => files.map((f) => ({ label: f.file, value: { file: f.file, diff: f.text } }));
+// Hunk'и brief'а ревьюера (S0-45): оси — hunk'и без её вердикта с причиной выбора каждого, проверке ответов — hunk'и
+// дельты. Какие hunk'и задевает ось, решает scope.mjs по её триггерам.
+const hunkItems = (hunks) =>
+  hunks.map((h) => ({ label: `${h.file}:${h.at}`, value: h.reasons ? { id: h.id, file: h.file, at: h.at, reasons: h.reasons, diff: h.text } : { file: h.file, at: h.at, diff: h.text } }));
 
 /** Добавленные строки блока файла с номерами новой стороны: `[{line, text}]`. */
 function addedLines(block) {
@@ -269,12 +263,12 @@ function mutationParts({ report, decisions }) {
   return [{ name: "mutation", value: summary, where }, { name: "mutants", items: sorted.map((m) => ({ label: m.id, value: m })), where }];
 }
 
-/** Brief ревьюера оси: материал оси, hunk'и оси и путь `diff.patch` всего diff круга. diff — {patch, files} или null;
- * body — тело PR (Spec) или null; mutation — {report, decisions} для Spec: отчёт `prove --ready` или null и решения. */
-export function reviewerBrief(base, { diff, body, mutation = null }) {
+/** Brief ревьюера оси: материал оси, её hunk'и и путь `diff.patch` всего diff ветки. hunks — `[{id?, file, at, reasons?,
+ * text}]` или null (conflicts); body — тело PR (Spec) или null; mutation — {report, decisions} для Spec: отчёт
+ * `prove --ready` или null и решения. */
+export function reviewerBrief(base, { hunks: given, body, mutation = null }) {
   const root = base.worktree;
-  const files = (diff?.files ?? []).filter((f) => AXIS_FILES[base.axis](f.file));
-  const hunks = { name: "hunks", items: hunkItems(files), where: `\`${base.diff}\`` };
+  const hunks = { name: "hunks", items: hunkItems(given ?? []), where: `\`${base.diff}\`` };
   const parts = [];
   if (base.axis === "spec") {
     const task = taskOf(root, base.task);
@@ -282,7 +276,7 @@ export function reviewerBrief(base, { diff, body, mutation = null }) {
     if (mutation) parts.push(...mutationParts(mutation));
   }
   if (base.axis === "standards") {
-    const paths = files.map((f) => f.file);
+    const paths = [...new Set((given ?? []).map((h) => h.file))];
     const st = [...new Set(paths.flatMap((p) => ST_BY_CLASS[classOf(p)] ?? []))].sort();
     parts.push(
       { name: "conventions", items: conventionsForPaths(root, paths).map((c) => ({ label: c.id, value: c })), where: "CONVENTIONS.md" },
@@ -294,7 +288,7 @@ export function reviewerBrief(base, { diff, body, mutation = null }) {
       { name: "closure", value: readText(root, CLOSURE) || null, where: `\`${CLOSURE}\`` },
       { name: "rm", items: rulesOf(root, ["RM-Z04", "RM-08"]).map((r) => ({ label: r.id, value: r })), where: "docs/design/README.md" },
     );
-  return fit(base, [...parts, ...(diff ? [hunks] : [])]);
+  return fit(base, [...parts, ...(given ? [hunks] : [])]);
 }
 
 // --- материал шага ---
@@ -327,11 +321,13 @@ function shownBy(root, id) {
 }
 
 /** Самопроверка по diff ветки (merge-base с origin/main..HEAD): триггеры Architecture и опись closure-check по ним,
- * пункты CONVENTIONS.md по путям diff, строки таблицы «Правила» PR по правилам задачи. todo пуст — делать нечего. */
+ * пункты CONVENTIONS.md по путям diff, строки таблицы «Правила» PR по правилам задачи. todo пуст — делать нечего.
+ * Строка чистого кода, похожая на класс каталога обходов, Architecture не зовёт (S0-45) — её сверяет executor. */
 export function selfcheck(root, taskId) {
   const s = scope({ base: "origin/main", dir: root });
   const { files } = diffOf(root, s.base, s.head);
-  const triggers = s.reasons.architecture;
+  const bypass = s.bypass.length ? [`добавленная строка похожа на класс каталога обходов (closure-check): ${s.bypass.slice(0, 10).join(", ")}`] : [];
+  const triggers = [...s.reasons.architecture, ...bypass];
   const inventory = triggers.length ? inventoryOf(files) : [];
   const closure = triggers.length ? ["Шаги", "Каталог обходов"].map((h) => section(readText(root, CLOSURE), h)).filter(Boolean).join("\n\n") : null;
   const conventions = conventionsForPaths(root, files.map((f) => f.file));

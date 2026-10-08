@@ -114,7 +114,7 @@ afterAll(() => {
 });
 
 describe.concurrent("dev-loop, a loop that converges", { timeout: 30_000 }, () => {
-  it("finds, answers, checks the closure and ends; the comments restore the state", async () => {
+  it("finds, answers, checks the answer and the edited hunk and ends; the comments restore the state", async () => {
     const l = await loop();
     const m1 = await round(l, [BLOCK]);
     expect(m1).toMatchObject({ ok: true, wave: 1, next: "fix", open: ["W1-T1"] });
@@ -126,14 +126,14 @@ describe.concurrent("dev-loop, a loop that converges", { timeout: 30_000 }, () =
     expect(await dl(l, "restore", "--comments", comments(l))).toMatchObject({ entry: "answer", next: "gate" });
 
     const w2 = await dl(l, "wave", "--worktree", l.work);
-    expect(w2).toMatchObject({ wave: 2, mode: "verify" });
-    expect(agents(w2).map((a) => a.agent)).toEqual(["verifier"]);
-    out(agents(w2)[0]!.brief, { axis: "verify", head: fix, summary: "closed", statuses: [{ id: "W1-T1", status: "closed" }], findings: [] });
+    expect(w2).toMatchObject({ wave: 2, axes: ["spec", "standards", "verify"] });
+    expect(agents(w2).map((a) => a.agent)).toEqual(["reviewer-spec", "reviewer-standards", "verifier"]);
+    for (const a of agents(w2)) out(a.brief, { axis: read(a.brief).axis, head: fix, summary: "closed", statuses: a.agent === "verifier" ? [{ id: "W1-T1", status: "closed" }] : [], findings: [] });
     expect(await dl(l, "merge")).toMatchObject({ ok: true, wave: 2, next: "done", open: [] });
     expect(await dl(l, "merge")).toMatchObject({ ok: false, error: "нет круга 3: сначала wave" });
 
     const fin = (await dl(l, "final", "--worktree", l.work)).comment as string;
-    expect(temp.text(fin)).toContain("| 2 | проверка закрытия | Проверка закрытия | — | W1-T1 |");
+    expect(temp.text(fin)).toContain("| 2 | ревью hunk'ов | 2 | Spec, Standards, Проверка ответов | — | W1-T1 |");
     expect(await dl(l, "restore", "--comments", comments(l))).toMatchObject({ ok: true, entry: "final", wave: 2, next: "end" });
   });
 });
@@ -145,8 +145,9 @@ describe.concurrent("dev-loop, the owner decides", { timeout: 30_000 }, () => {
     out(await fixerBrief(l), { status: "done", head: await head(l), answers: [{ id: "W1-T1", action: "disputed", note: "CONVENTIONS §2.1 allows it" }] });
     expect(await dl(l, "answer")).toMatchObject({ ok: true, disputed: ["W1-T1"] });
     const w2 = await dl(l, "wave", "--worktree", l.work);
-    expect(agents(w2).map((a) => a.agent)).toEqual(["reviewer-standards"]);
-    out(agents(w2)[0]!.brief, { axis: "standards", head: await head(l), summary: "kept", statuses: [{ id: "W1-T1", status: "dispute-kept", note: "§1 names it" }], findings: [] });
+    expect(agents(w2).map((a) => a.agent)).toEqual(["verifier"]);
+    expect(read(agents(w2)[0]!.brief)).toMatchObject({ job: "answers", disputed: ["W1-T1"] });
+    out(agents(w2)[0]!.brief, { axis: "verify", head: await head(l), summary: "kept", statuses: [{ id: "W1-T1", status: "dispute-kept", note: "§1 names it" }], findings: [] });
     expect(await dl(l, "merge")).toMatchObject({ next: "escalate" });
     const e = await dl(l, "escalate", "--why", "спор");
     expect((read(e.questions as string) as unknown as Json[])[0]).toMatchObject({ header: "W1-T1" });
@@ -196,7 +197,7 @@ describe.concurrent("dev-loop, outputs the protocol refuses", { timeout: 30_000 
     const fix = await commit(l.work, { "src/ledger/land.ts": land(3) }, "fix");
     out(fb, { status: "done", head: fix, answers: [{ id: "W1-T1", action: "fixed", commits: [fix] }] });
     await dl(l, "answer");
-    const v = agents(await dl(l, "wave", "--worktree", l.work))[0]!.brief;
+    const v = agents(await dl(l, "wave", "--worktree", l.work)).find((a) => a.agent === "verifier")!.brief;
     out(v, { axis: "verify", head: "", summary: "x", statuses: [{ id: "W1-T1", status: "dispute-kept", note: "n" }], findings: [null] });
     const errors = ((await dl(l, "merge")).errors as { [agent: string]: string[] }).verifier!;
     expect(errors).toEqual([`head: пусто — нужно ${fix}`, "findings: [null] — нужен список объектов, пустой, если нечего", "statuses.W1-T1: dispute-kept — автор не оспаривал"]);
@@ -265,6 +266,117 @@ describe.concurrent("dev-loop, nothing is lost before the end", { timeout: 30_00
     for (const a of agents(w2)) out(a.brief, { axis: read(a.brief).axis, head: rec, summary: "checked", statuses: [], findings: [] });
     expect(await dl(l, "merge")).toMatchObject({ ok: true, next: "done" });
     expect(temp.text((await dl(l, "final", "--worktree", l.work)).comment as string)).toContain("→ `plan/phases/S0/tasks/S0-98-x.md`");
+  });
+});
+
+// Review by hunks (S0-45): the verdict of an axis is evidence keyed by (axis, hunk). A round reviews only the hunks
+// without a verdict, with the axes whose triggers they touch; the verifier gives the answered findings their status.
+// The axes that start with the gate keep the verdicts of the hunks the fix of a red gate did not touch.
+const LIFT = "export function lift(): number {\n  return 1;\n}\n";
+// Two hunks: the body of land (Spec, Standards) and a new file with an export (and Architecture).
+const TWO: Files = { "src/ledger/land.ts": land(2), "src/ledger/lift.ts": LIFT };
+type Brief = Json & { hunks?: string[]; context: { hunks?: { file: string; at: string; reasons: string[] }[] } };
+const briefOf = (r: Json, agent: string) => read(agents(r).find((a) => a.agent === agent)!.brief) as Brief;
+const shownHunks = (b: Brief) => b.context.hunks!.map((h) => `${h.file}:${h.at}`);
+const verdicts = (l: Loop) => Object.values(read(join(l.dir, "state.json")).verdicts as { [id: string]: string }).sort();
+
+// The fixer answers W1-T1 by a commit of the files; then the next round.
+async function fixAndWave(l: Loop, files: Files): Promise<{ fix: string; w: Json }> {
+  const fb = await fixerBrief(l);
+  const fix = await commit(l.work, files, "S0-99: review — constant");
+  out(fb, { status: "done", head: fix, answers: [{ id: "W1-T1", action: "fixed", commits: [fix] }] });
+  expect(await dl(l, "answer")).toMatchObject({ ok: true, status: "done" });
+  return { fix, w: await dl(l, "wave", "--worktree", l.work) };
+}
+
+// Every agent of the round answers on the head; the verifier closes the findings it got.
+async function closeAll(l: Loop, w: Json, h: string): Promise<Json> {
+  for (const a of agents(w)) {
+    const b = read(a.brief) as Json & { findings: { id: string }[] };
+    out(a.brief, { axis: b.axis, head: h, summary: "checked", statuses: b.findings.map((f) => ({ id: f.id, status: "closed" })), findings: [] });
+  }
+  return dl(l, "merge");
+}
+
+describe.concurrent("dev-loop, review by hunks", { timeout: 30_000 }, () => {
+  it("reviews in the next round only the edited hunk and only with the axes of its triggers; the verdicts of the other hunks hold", async () => {
+    const l = await loop(TWO);
+    expect(await round(l, [BLOCK])).toMatchObject({ next: "fix" });
+    expect(verdicts(l)).toEqual(["AST", "ST"]);
+    const { fix, w } = await fixAndWave(l, { "src/ledger/land.ts": land(3) });
+    expect(agents(w).map((a) => a.agent)).toEqual(["reviewer-spec", "reviewer-standards", "verifier"]);
+    for (const agent of ["reviewer-spec", "reviewer-standards"]) {
+      expect(shownHunks(briefOf(w, agent))).toEqual(["src/ledger/land.ts:2"]);
+      expect(briefOf(w, agent).hunks).toHaveLength(1);
+    }
+    expect(await closeAll(l, w, fix)).toMatchObject({ ok: true, next: "done" });
+    expect(verdicts(l)).toEqual(["AST", "ST"]);
+  });
+
+  it("does not call Architecture for a delta without its triggers, and calls it for a new export, with that hunk alone", async () => {
+    const l = await loop(TWO);
+    await round(l, [BLOCK]);
+    const { w } = await fixAndWave(l, { "src/ledger/land.ts": `${land(3)}export const LAND = 3;\n` });
+    expect(agents(w).map((a) => a.agent)).toEqual(["reviewer-spec", "reviewer-standards", "reviewer-architecture", "verifier"]);
+    expect(shownHunks(briefOf(w, "reviewer-standards"))).toEqual(["src/ledger/land.ts:2", "src/ledger/land.ts:4"]);
+    const arch = briefOf(w, "reviewer-architecture");
+    expect(arch.context.hunks).toEqual([expect.objectContaining({ file: "src/ledger/land.ts", at: "4", reasons: ["новый или изменённый экспорт (опись closure-check)"] })]);
+    expect(arch.reasons).toEqual(["новый или изменённый экспорт (опись closure-check)"]);
+  });
+
+  it("keeps after a red gate the verdicts of the axes started with it on the hunks its fix did not touch", async () => {
+    const l = await loop(TWO);
+    const early = await dl(l, "wave", "--worktree", l.work, "--early");
+    expect(early).toMatchObject({ ok: true, wave: 1, next: "gate" });
+    expect(agents(early).map((a) => a.agent)).toEqual(["reviewer-standards", "reviewer-architecture"]);
+    const h1 = await head(l);
+    for (const a of agents(early)) out(a.brief, { axis: read(a.brief).axis, head: h1, summary: "checked", statuses: [], findings: [] });
+    expect(await dl(l, "wave", "--worktree", l.work, "--early")).toMatchObject({ ok: true, wave: 1, agents: [], next: "gate" });
+    // The gate is red, and the fixer of the red edits the hunk of land.ts.
+    const h2 = await commit(l.work, { "src/ledger/land.ts": land(3) }, "S0-99: verify — red");
+    const rest = await dl(l, "wave", "--worktree", l.work);
+    expect(rest).toMatchObject({ ok: true, wave: 1, started: ["reviewer-architecture", "reviewer-standards"], next: "review" });
+    expect(agents(rest).map((a) => a.agent)).toEqual(["reviewer-spec"]);
+    expect(await closeAll(l, rest, h2)).toMatchObject({ ok: true, wave: 1, next: "wave" });
+    // lift.ts keeps the verdicts of Architecture and Standards from before the red gate; land.ts has Spec's alone.
+    expect(verdicts(l)).toEqual(["AST", "S"]);
+    const w2 = await dl(l, "wave", "--worktree", l.work);
+    expect(agents(w2).map((a) => a.agent)).toEqual(["reviewer-standards"]);
+    expect(shownHunks(briefOf(w2, "reviewer-standards"))).toEqual(["src/ledger/land.ts:2"]);
+    expect(await closeAll(l, w2, h2)).toMatchObject({ ok: true, wave: 2, next: "done" });
+  });
+
+  it("starts Spec with the gate when the report of prove --ready is on the head", async () => {
+    const l = await loop(TWO);
+    temp.write(join(l.work, ".lattice", "mutants.json"), JSON.stringify({ head: await head(l), dirty: false, base: "x", mutants: [] }));
+    const early = await dl(l, "wave", "--worktree", l.work, "--early");
+    expect(agents(early).map((a) => a.agent)).toEqual(["reviewer-spec", "reviewer-standards", "reviewer-architecture"]);
+  });
+});
+
+describe.concurrent("dev-loop, advice of a round with blocking findings", { timeout: 30_000 }, () => {
+  it("gives the answer the finding and the advice, refuses an answer that leaves the advice, and has no tidy round after it", async () => {
+    const l = await loop();
+    const advice = { ...BLOCK, kind: "advice", rule: "", where: "src/ledger/land.ts:1", text: "name the function after the rule" };
+    expect(await round(l, [BLOCK, advice])).toMatchObject({ next: "fix", open: ["W1-T1"] });
+    const fb = await fixerBrief(l);
+    expect(read(fb)).toMatchObject({ job: "answer", findings: [{ id: "W1-T1" }], advice: [{ id: "W1-T2" }] });
+    const fix = await commit(l.work, { "src/ledger/land.ts": land(3) }, "S0-99: review — constant");
+    out(fb, { status: "done", head: fix, answers: [{ id: "W1-T1", action: "deferred", where: "plan/phases/S0/PLAN.md" }] });
+    expect((await dl(l, "answer")).errors).toEqual([
+      "answers: нет ответа на W1-T2",
+      "answers.W1-T1: отложить можно совет, находку вне дельты или решение владельца task и gap — блокирующую находку исправляют или оспаривают",
+      "answers.W1-T1: where — файл задачи или PLAN.md фазы, изменённый в этом ответе",
+    ]);
+    out(fb, { status: "done", head: fix, answers: [{ id: "W1-T1", action: "fixed", commits: [fix] }, { id: "W1-T2", action: "declined", note: "the name is the one of the glossary" }] });
+    expect(await dl(l, "answer")).toMatchObject({ ok: true, status: "done" });
+    expect(await closeAll(l, await dl(l, "wave", "--worktree", l.work), fix)).toMatchObject({ ok: true, wave: 2, next: "done" });
+    expect(temp.text((await dl(l, "final", "--worktree", l.work)).comment as string)).toContain("- W1-T2 · `src/ledger/land.ts:1`: name the function after the rule — the name is the one of the glossary");
+  });
+
+  it("sends the advice of a round without blocking findings to a tidy round", async () => {
+    const l = await loop();
+    expect(await round(l, [{ ...BLOCK, kind: "advice", rule: "" }])).toMatchObject({ next: "tidy" });
   });
 });
 

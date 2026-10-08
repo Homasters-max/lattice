@@ -3,10 +3,10 @@
 import { measure } from "./clock.mjs";
 import { openFindings } from "./state.mjs";
 
-const AXIS = { spec: "Spec", standards: "Standards", architecture: "Architecture", verify: "Проверка закрытия" };
+const AXIS = { spec: "Spec", standards: "Standards", architecture: "Architecture", verify: "Проверка ответов" };
 const STATUS = { closed: "закрыта", open: "открыта", "dispute-accepted": "спор принят", "dispute-kept": "спор отклонён" };
-const MODE = { none: "без ревью", verify: "проверка закрытия", review: "ревью осей", conflicts: "проверка конфликтов пересборки" };
-const NEXT = { fix: "исправления", tidy: "хвосты перед сдачей", done: "сдача", escalate: "решение владельца" };
+const MODE = { review: "ревью hunk'ов", conflicts: "проверка конфликтов пересборки" };
+const NEXT = { fix: "исправления", tidy: "хвосты перед сдачей", done: "сдача", escalate: "решение владельца", wave: "круг по hunk'ам без вердикта" };
 export const OWNER_OPTIONS = [
   { label: "чинить", action: "fix", description: "исправить по находке; как — можно дописать через Other" },
   { label: "снять", action: "drop", description: "находка закрыта решением владельца" },
@@ -47,7 +47,8 @@ function findingBlock(f) {
 export function review(state, { scope, outputs, next }) {
   const wave = state.waves.at(-1);
   const out = [header("review", state), title(state, `Ревью · круг ${wave.n}`), ""];
-  out.push(`Head \`${short(wave.head)}\` · база \`${short(wave.base)}\` · режим: ${MODE[scope.mode]} · оси: ${outputs.map((o) => AXIS[o.axis]).join(", ") || "нет"}`);
+  const what = wave.mode === "conflicts" ? MODE.conflicts : `${MODE.review}: ${wave.hunks ?? 0}`;
+  out.push(`Head \`${short(wave.head)}\` · база \`${short(wave.base)}\` · ${what} · оси: ${outputs.map((o) => AXIS[o.axis]).join(", ") || "нет"}`);
   for (const [axis, why] of Object.entries(scope.reasons ?? {})) if (why.length) out.push(`- ${AXIS[axis]}: ${why.join("; ")}`);
   for (const o of outputs) {
     out.push("", `### ${AXIS[o.axis]}`, "", o.summary);
@@ -175,8 +176,8 @@ export function final(state, { scope, conventions = [], context = [], at } = {})
   out.push(`Head \`${short(state.head ?? scope?.head)}\` · \`npm run verify\` зелёный · кругов: ${state.waves.length} из ${state.budget}`);
   if (!state.waves.length && scope) out.push("", `Ревью не требовался: изменения вне кода (${scope.lines} строк).`);
   if (state.waves.length) {
-    out.push("", "| Круг | Режим | Оси | Найдено | Закрыто |", "|---|---|---|---|---|");
-    for (const w of state.waves) out.push(`| ${w.n} | ${MODE[w.mode]} | ${w.axes.map((a) => AXIS[a]).join(", ")} | ${w.found.join(", ") || "—"} | ${w.closed.join(", ") || "—"} |`);
+    out.push("", "| Круг | Режим | Hunk'ов | Оси | Найдено | Закрыто |", "|---|---|---|---|---|---|");
+    for (const w of state.waves) out.push(`| ${w.n} | ${MODE[w.mode] ?? w.mode} | ${w.hunks ?? "—"} | ${w.axes.map((a) => AXIS[a]).join(", ")} | ${w.found.join(", ") || "—"} | ${w.closed.join(", ") || "—"} |`);
   }
   const of = (status) => state.findings.filter((f) => f.status === status);
   const deferred = of("deferred").map((f) => `- ${f.id} · \`${f.where}\`: ${f.text} → \`${f.deferredTo}\``);

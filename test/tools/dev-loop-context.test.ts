@@ -160,7 +160,7 @@ describe.concurrent("dev-loop briefs of the reviewers", { timeout: 30_000 }, () 
     const l = await loop({ "src/ledger/big.ts": big, "src/ledger/land.ts": land(2) });
     const file = (await wave(l))["reviewer-standards"]!;
     const b = read(file);
-    expect(b.cut).toEqual([expect.stringMatching(/^hunks: src\/ledger\/big\.ts \(\d+ токенов\) — `.*diff\.patch`$/)]);
+    expect(b.cut).toEqual([expect.stringMatching(/^hunks: src\/ledger\/big\.ts:1-4000 \(\d+ токенов\) — `.*diff\.patch`$/)]);
     expect((b.context.hunks as { file: string }[]).map((h) => h.file)).toEqual(["src/ledger/land.ts"]);
     expect(b.tokens).toBeLessThanOrEqual(BUDGET);
     expect(Buffer.byteLength(temp.text(file)) / 4).toBeLessThanOrEqual(BUDGET);
@@ -168,15 +168,17 @@ describe.concurrent("dev-loop briefs of the reviewers", { timeout: 30_000 }, () 
 });
 
 describe.concurrent("dev-loop hunks of each axis", { timeout: 30_000 }, () => {
-  it("gives Spec in the full wave the hunks of every changed file but the generated ones", async () => {
+  it("gives Spec the hunks of every changed file but the generated ones, each with its id and the reason it was chosen", async () => {
     const l = await loop({ "src/ledger/land.ts": land(2), "plan/notes.md": "notes\n", "gen/rules.json": "{}\n" });
     const spec = read((await wave(l))["reviewer-spec"]!);
-    expect(spec.job).toBe("full");
-    expect((spec.context.hunks as { file: string }[]).map((h) => h.file)).toEqual(["plan/notes.md", "src/ledger/land.ts"]);
-    expect((spec.context.hunks as { diff: string }[])[1]!.diff).toContain("+  return 2;");
+    expect(spec.job).toBe("hunks");
+    const hunks = spec.context.hunks as { id: string; file: string; reasons: string[]; diff: string }[];
+    expect(hunks.map((h) => [h.file, h.reasons])).toEqual([["plan/notes.md", ["текст ветки, где изменены код, тесты или задача"]], ["src/ledger/land.ts", ["изменён код"]]]);
+    expect(hunks[1]!.diff).toContain("+  return 2;");
+    expect(spec.hunks).toEqual(hunks.map((h) => h.id));
   });
 
-  it("gives the verifier closing a wave the hunks of every file of the delta and only of the delta", async () => {
+  it("gives the verifier of the answers the hunks of every file of the delta and only of the delta", async () => {
     const l = await loop({ "src/ledger/land.ts": land(2) });
     const head = await sh(l.work, git, ["rev-parse", "HEAD"]);
     const finding = { kind: "rule", rule: "LG-23", where: "src/ledger/land.ts:2", quote: "return 2;", text: "use the port" };
@@ -191,7 +193,7 @@ describe.concurrent("dev-loop hunks of each axis", { timeout: 30_000 }, () => {
     temp.write(fb.replace(".in.json", ".out.json"), JSON.stringify({ status: "done", head: fix, answers: [{ id: "W1-T1", action: "fixed", commits: [fix] }] }));
     expect(await dl(l, "answer")).toMatchObject({ ok: true, status: "done" });
     const v = read((await wave(l))["verifier"]!);
-    expect(v.job).toBe("close");
+    expect(v.job).toBe("answers");
     const hunks = v.context.hunks as { file: string; diff: string }[];
     expect(hunks.map((h) => h.file)).toEqual(["plan/phases/S0-x/tasks/S0-99-x.md", "src/ledger/land.ts"]);
     expect(hunks[1]!.diff).toContain("-  return 2;\n+  return 3;");
@@ -258,7 +260,12 @@ describe.concurrent("dev-loop step", { timeout: 30_000 }, () => {
     const s = await selfcheck(await loop({ "src/ledger/land.ts": `${land(2)}export const LAND = 2;\n` }));
     expect(s.architecture).toMatchObject({ inventory: [{ where: "src/ledger/land.ts:4", text: "export const LAND = 2;" }] });
     expect((s.architecture as unknown as { closure: string }).closure).toBe("## Шаги\n\n1. Inventory.\n\n## Каталог обходов\n\n| Класс |\n|---|\n| order |");
-    expect(s.todo[0]).toMatch(/^Architecture: изменены импорты или экспорты/);
+    expect(s.todo[0]).toMatch(/^Architecture: новый или изменённый экспорт/);
+  });
+
+  it("selfcheck: a line of pure code like a bypass gives the steps of closure-check, though it does not call Architecture", async () => {
+    const s = await selfcheck(await loop({ "src/ledger/land.ts": land(2).replace("return 2;", "return Date.now();") }));
+    expect(s.todo[0]).toBe("Architecture: добавленная строка похожа на класс каталога обходов (closure-check): src/ledger/land.ts:2 — вердикт каждой строке описи (0) и каждому классу каталога (closure)");
   });
 
   it("selfcheck: a diff only in paths no item of CONVENTIONS.md covers gives an empty list for a task without rules", async () => {
