@@ -99,6 +99,7 @@ const rows: readonly Row[] = [
   ["any: a $ref is narrower than any value", { $ref: "demo/span@1" }, ANY, "revision", { relation: "narrower", aspects: ["validity"] }],
   ["any: a $ref to any value is the same as any value", { $ref: "demo/anything@1" }, ANY, "revision", { relation: "same", aspects: [] }],
   ["any: a $ref the kernel cannot read is incomparable even to any value", { $ref: "demo/none@1" }, ANY, "revision", { relation: "incomparable", aspects: ["validity"] }],
+  ["any: a $ref to a type the kernel does not admit is incomparable even to any value (G-27, Q-33)", { $ref: "demo/odd@1" }, ANY, "revision", { relation: "incomparable", aspects: ["validity"] }],
   ["any: an enum is narrower than any value", { enum: ["a", 1] }, ANY, "revision", { relation: "narrower", aspects: ["validity"] }],
   ["any: any value is wider than a type paired with null", ANY, { type: ["string", "null"] }, "revision", { relation: "wider", aspects: ["validity"] }],
   ["any: a field narrowed from any value is narrower", object({ a: S }), object({ a: ANY }), "revision", { relation: "narrower", aspects: ["validity"] }],

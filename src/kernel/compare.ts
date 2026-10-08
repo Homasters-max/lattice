@@ -10,7 +10,8 @@
 // smaller, and a cycle of `$ref` that never descends admits no value. The
 // walk stops at a depth and a number of steps: past them nothing is shown
 // (G-27). `type: any` holds every value, so every schema is narrower than it
-// or, when it says `type: any` too, the same (G-38).
+// or, when it says `type: any` too, the same (G-38); `$ref` is followed first,
+// so a target `resolve` does not give stays incomparable even to it (G-27).
 import { annotationsShown, aspectsIn } from "./compare-annotations.js";
 import { ASPECTS, join, SAME, shown, UNSHOWN, type Aspect, type Shown } from "./compare-shown.js";
 import { isListed, valuesWithin } from "./compare-values.js";
