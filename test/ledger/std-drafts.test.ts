@@ -3,10 +3,10 @@
 // examples of the design read from docs/design as they are. What the subset of
 // KR-18 does not say is in plan/phases/S0-kernel-ledger/std-schema-gaps.md.
 import { describe, expect, it } from "vitest";
-import { validate, type JsonObject, type JsonValue } from "../../src/kernel/index.js";
+import { isJsonObject, validate, type JsonObject, type JsonValue } from "../../src/kernel/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 import { knowledge } from "../support/files.js";
-import { body, branchesOf, check, FACTS, field, fieldsOf, frozen, keysOf, list, object, parentsOf, required, RUNTIME_EVENTS, schemaOf, STATUS_FACTS, std, STD_TYPES, without } from "./std-sources.js";
+import { body, branchesOf, check, DRAFTS, FACTS, field, fieldsOf, frozen, keysOf, list, META, object, parentsOf, required, RUNTIME_EVENTS, schemaOf, STATUS_FACTS, std, STD_TYPES, without } from "./std-sources.js";
 
 describe("the drafts of S0-09: behaviour, decision points and the bench", () => {
   it("RT-01, RT-04, RT-05, G-40: a pipeline extends behaviour — stages that pin a stage contract with static params, reads, writes, on and fallback; bench and targets are optional (DP-31)", () => {
@@ -50,6 +50,23 @@ describe("the drafts of S0-09: behaviour, decision points and the bench", () => 
     expect([parentsOf("review-note"), required("review-note")]).toEqual([["hint"], ["about", "subject", "note"]]);
     const note = check({ type: "std/review-note@1", rev: 1, body: { about: "demo/order-intake@2", note: "the scenario misses a refund" } });
     expect(note.map((r) => [r.rule, r.path, r.expected])).toEqual([["KR-21", "/body/subject", { required: "present" }]]);
+  });
+});
+
+/** The types a type body names: its parent, the targets of its `$ref` and of its annotations `ref` (KR-14, KR-18, KR-19). */
+function namedTypes(value: JsonValue): string[] {
+  if (Array.isArray(value)) return list(value).flatMap(namedTypes);
+  if (!isJsonObject(value)) return [];
+  const to = value.ref !== undefined && isJsonObject(value.ref) ? value.ref.to : undefined;
+  const here = [value.extends, value.$ref, to].filter((t) => typeof t === "string");
+  return [...here, ...Object.values(value).flatMap(namedTypes)];
+}
+
+describe("the drafts of S0-09: std holds the types LATTICE reads", () => {
+  it("TY-02: every draft is a source of std/source, and every type a source names is a source of std or a type of core", () => {
+    expect(DRAFTS.filter((slug) => !std().bodies.has(slug))).toEqual([]);
+    const named = new Set(STD_TYPES.flatMap((slug) => namedTypes(body(slug))));
+    expect([...named].filter((ref) => ref !== META && std().resolve(ref) === null)).toEqual([]);
   });
 });
 
