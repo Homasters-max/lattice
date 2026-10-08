@@ -21,7 +21,7 @@ SL-03 (2): к переключению подмножество схем KR-18 �
 | `review-note` | `hint` | `about`, `subject`, `note`; без `subject` — отказ схемы (TY-04): естественно |
 | `live`, `calibration`, `verdict`, `dismissed` | `fact` | status facts с ключами TR-29: ссылки — в `of`, прочие части ключа — поля с `key` рядом с `of` (G-41) |
 | `report`, `source-listing` | `fact` | ключи BN-11 и TR-39 (G-41) |
-| `step`, `link`, `run`, `tape-entry`, `question`, `delivery-intent`, `delivery-attempt`, `code-commit` | — | события `runtime`; `code-commit` с ключом `sha` (OB-08) — естественно; `input`, `output`, `answer` — G-38; поля, которых дизайн не перечисляет, — G-43; «ровно одно из `answer` и `error`» ленты — G-43; имя `tape-entry` — G-42 |
+| `step`, `link`, `run`, `tape-entry`, `question`, `delivery-intent`, `delivery-attempt`, `code-commit` | — | события `runtime`; `code-commit` с ключом `sha` (OB-08) — естественно; `input`, `output`, `answer` — G-38; поля, которых дизайн не перечисляет, — G-43; `usd` ленты только при `billing: api` (RT-23) — `oneOf` по `billing`: выразилось, ценой повтора полей записи в каждой ветке; «ровно одно из `answer` и `error`» ленты — второй дискриминатор, которого у `oneOf` нет, — G-43; имя `tape-entry` — G-42 |
 
 ## Пробелы
 

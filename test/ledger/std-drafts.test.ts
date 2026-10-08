@@ -108,13 +108,31 @@ describe("the drafts of S0-09: events", () => {
       ["api", "subscription", "local"],
       ["started", "done", "failed"],
     ]);
-    const model = object(field("tape-entry", "model").properties);
-    expect([field("tape-entry", "mode").enum, object(model.check).enum, required("tape-entry")]).toEqual([
-      ["service", "recorded", "fixture"],
-      ["verified", "reported", "none"],
-      ["operation", "request", "occurrence", "ms", "billing", "mode"],
-    ]);
     expect(required("delivery-intent")).toEqual(["operation", "key", "payload", "stage"]);
+  });
+
+  it("RT-23: a tape entry is a union by billing, and only an entry billed by api carries usd; no field of it carries key", () => {
+    const tape = schemaOf("tape-entry");
+    const branches = list(tape.oneOf).map(object);
+    expect([branchesOf(tape), branches.map((b) => Object.hasOwn(object(b.properties), "usd"))]).toEqual([
+      ["api", "subscription", "local"],
+      [true, false, false],
+    ]);
+    for (const branch of branches) {
+      const fields = object(branch.properties);
+      expect([object(fields.mode).enum, object(object(object(fields.model).properties).check).enum, branch.required]).toEqual([
+        ["service", "recorded", "fixture"],
+        ["verified", "reported", "none"],
+        ["operation", "request", "occurrence", "ms", "billing", "mode"],
+      ]);
+      expect(Object.values(fields).filter((s) => object(s).key !== undefined)).toEqual([]);
+    }
+  });
+
+  it("RT-23: an entry billed by subscription or local with usd is refused by its schema; one billed by api with usd is not", () => {
+    const entry = (billing: string) => ({ operation: "std/port@1#operations/complete", request: "h", occurrence: 1, ms: 5, billing, usd: "0.01", mode: "recorded", answer: {} });
+    const refused = (billing: string) => check({ type: "std/tape-entry@1", body: entry(billing) }).map((r) => [r.rule, r.path]);
+    expect([refused("api"), refused("subscription"), refused("local")]).toEqual([[], [["KR-21", "/body/usd"]], [["KR-21", "/body/usd"]]]);
   });
 
   it("RT-14, RT-15, DP-08: a run holds its pipeline, setup, input, fingerprint, execution tuple, the environment beside it, commit, budget, spending, the outcome of every stage and its own; decide keeps its DecisionResult by $ref", () => {
