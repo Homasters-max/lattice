@@ -24,7 +24,7 @@ LATTICE — governance substrate: дизайн с правилами по ID в 
 
 ## Зелёный
 
-`npm run prove` — с S0-42: шаги `verify` без тестов, весь fitness и test-sets, чей hash входа изменился против `origin/main` (`--base <ref>` — другая база). Итог — `outcome` в JSON последней строки и код выхода; вывод не режется `| tail`, полный лог — `.lattice/prove.log`. `npm run verify` — полный прогон, для CI и владельца.
+`npm run prove` — с S0-42: шаги `verify` без тестов, весь fitness и test-sets, чей hash входа изменился против `origin/main` (`--base <ref>` — другая база). Итог — `outcome` в JSON последней строки и код выхода; вывод не режется `| tail`, полный лог — `.lattice/prove.log`. `npm run prove --ready` — с S0-44 ещё мутанты изменённых hunk'ов `src/`, отчёт — `.lattice/mutants.json`; выживших решает автор (`plan/dev-loop.md`, «Мутанты»). `npm run verify` — полный прогон, для CI и владельца.
 
 ## Задача плана
 

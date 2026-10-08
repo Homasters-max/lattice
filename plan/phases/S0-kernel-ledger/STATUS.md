@@ -15,7 +15,7 @@
 | [S0-48](tasks/S0-48-minimal-brief.md) | Минимальный контекст — brief несёт всё нужное роли | A | ✅ | [#47](https://github.com/Homasters-max/lattice/pull/47) | инструмент, разбор циклов |
 | [S0-51](tasks/S0-51-mechanical-steps.md) | Механические шаги в dl — старт и сдача задачи | A | ✅ | [#44](https://github.com/Homasters-max/lattice/pull/44) | инструмент, разбор циклов |
 | [S0-42](tasks/S0-42-verify-levels.md) | prove — доказательство затронутого, ratchet ST-18 | A | ✅ | [#48](https://github.com/Homasters-max/lattice/pull/48) | инструмент |
-| [S0-44](tasks/S0-44-mutate.md) | Мутации в prove --ready — выживших решает executor | A | ⬜ | | инструмент |
+| [S0-44](tasks/S0-44-mutate.md) | Мутации в prove --ready — выживших решает executor | A | ✅ | [#50](https://github.com/Homasters-max/lattice/pull/50) | инструмент |
 | [S0-45](tasks/S0-45-review-evidence.md) | Ревью по hunk'ам — вердикт оси как evidence | A | ⬜ | | инструмент, разбор циклов |
 | [S0-43](tasks/S0-43-dl-gate.md) | Записи run'ов — ворота по ключам и shadow | A | ⬜ | | инструмент |
 | [S0-49](tasks/S0-49-fixture-pairs.md) | Фикстуры каждой пары «строка проверки × rule ID» | A | ✅ | [#45](https://github.com/Homasters-max/lattice/pull/45) | разбор циклов, в лимите SL-06 |

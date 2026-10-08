@@ -122,19 +122,23 @@ describe.concurrent("dev-loop ready, a task handed in", { timeout: 30_000 }, () 
     expect(ghCalls(c)).toContainEqual(["pr", "ready", "9"]);
   });
 
-  it("sends the phase to acceptance after its last task and keeps a phase in work otherwise; its start date stays, a missing one is today", async () => {
+  // Two cases of the phase, each with its two repositories: one case of four ran at the edge of the safeguard of time.
+  it("sends the phase to acceptance after its last task; its start date stays, a missing one is today", async () => {
     const last = await repo("🔄 в работе", "✅");
     expect(await ready(last, ITEMS)).toMatchObject({ ok: true, next: "gate" });
     expect(file(last, "plan/STATUS.md")).toContain("| S0 | Kernel | 🔍 приёмка | 2026-10-08 |");
+    const lastDated = await repo("🔄 в работе", "✅", "2026-09-01");
+    expect(await ready(lastDated, ITEMS)).toMatchObject({ ok: true, next: "gate" });
+    expect(file(lastDated, "plan/STATUS.md")).toBe(PHASES("🔍 приёмка", "2026-09-01"));
+  });
+
+  it("keeps a phase in work otherwise; its start date stays, a missing one is today", async () => {
     const undated = await repo("🔄 в работе", "⬜");
     expect(await ready(undated, ITEMS)).toMatchObject({ ok: true });
     expect(file(undated, "plan/STATUS.md")).toBe(PHASES("🔄 в работе", "2026-10-08"));
     const middle = await repo("🔄 в работе", "⬜", "2026-09-01");
     expect(await ready(middle, ITEMS)).toMatchObject({ ok: true });
     expect(file(middle, "plan/STATUS.md")).toBe(PHASES("🔄 в работе", "2026-09-01"));
-    const lastDated = await repo("🔄 в работе", "✅", "2026-09-01");
-    expect(await ready(lastDated, ITEMS)).toMatchObject({ ok: true, next: "gate" });
-    expect(file(lastDated, "plan/STATUS.md")).toBe(PHASES("🔍 приёмка", "2026-09-01"));
   });
 });
 

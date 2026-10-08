@@ -13,15 +13,20 @@
 //    "sets": [{"set": "kernel", "reasons": ["import: src/kernel/canon.ts"], "hash": "sha256:…", "seed": 123, "exit": 0, "ms": 900}, …],
 //    "skipped": ["ledger", …], "steps": [{"step": "lint:ids", "ms": 640, "exit": 0}, …], "log": "<path of the log>"}
 // The exit code is 1 when a test set or a step fails.
-//   npm run prove [-- --base <ref>]
+// --ready (S0-44) adds the mutants of the changed hunks of src/ (scripts/mutate.mjs): the line gets
+//   "mutants": {"report": "<path>", "total", "killed", "survived", "budget-exceeded", "ran", "survivors": […]};
+//   a survivor does not fail the outcome — the executor or the fixer decides it (plan/dev-loop.md).
+//   npm run prove [--ready] [-- --base <ref>]
 import { Buffer } from "node:buffer";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join, posix, resolve } from "node:path";
 import ts from "typescript";
-import { FITNESS, owns, testSetOf } from "./paths.mjs";
-import { finish, isMain, runSteps, STEPS } from "./verify.mjs";
+import { filtersOf, FITNESS, owns, seedOf, testSetOf } from "./paths.mjs";
+import { finish, flagOf, isMain, runSteps, STEPS } from "./verify.mjs";
+
+export { seedOf };
 
 /** The config of every run of the tests: an input of every test set. */
 const CONFIG = ["package.json", "package-lock.json", "tsconfig.json", "vitest.config.ts", "test/support/setup.ts", "test/support/global-setup.ts"];
@@ -106,11 +111,24 @@ function inputOf(tree, set) {
   return input;
 }
 
+/**
+ * What the tests of `set` run as code (S0-44): the files their test files and the config import and start, transitively —
+ * the files a mutant of which these tests can see. Unlike the input, a fitness set reaches only what its own tests import.
+ */
+function reachOf(tree, set) {
+  const reach = new Set([...tree.files.filter((p) => testSetOf(p) === set), ...CONFIG]);
+  const queue = [...reach];
+  while (queue.length > 0)
+    for (const [link] of linksOf(tree, queue.pop())) {
+      if (reach.has(link)) continue;
+      reach.add(link);
+      queue.push(link);
+    }
+  return [...reach].sort();
+}
+
 /** The hash of an input over `blob` of each path: `-` for a path that is not there. */
 const hashOf = (paths, blob) => sha256(paths.map((p) => `${p}\0${blob(p)}\n`).join(""));
-
-/** The seed of fast-check from a hash: its first 32 bits as a signed integer (RT-21; LATTICE_SEED, S0-41). */
-export const seedOf = (hash) => Number.parseInt(hash.slice("sha256:".length, "sha256:".length + 8), 16) | 0;
 
 /** The test sets of the tree: those that hold a test file vitest runs (test/**\/*.test.ts). */
 const setsOf = (tree) => [...new Set(tree.files.filter((p) => p.endsWith(".test.ts")).map(testSetOf).filter(Boolean))].sort();
@@ -122,8 +140,8 @@ function reasonsOf(input, changed) {
 }
 
 /**
- * Each test set of the repository at `dir` against the merge base of `base` and HEAD: `{set, run, reasons, hash, seed}`;
- * `run` — fitness, or the hash of its input differs from the base.
+ * Each test set of the repository at `dir` against the merge base of `base` and HEAD: `{set, run, reasons, hash, seed,
+ * reach}`; `run` — fitness, or the hash of its input differs from the base; `reach` — what its tests run as code.
  */
 export function select({ dir = process.cwd(), base = "origin/main" } = {}) {
   const from = git(dir, "merge-base", base, "HEAD").trim();
@@ -134,24 +152,20 @@ export function select({ dir = process.cwd(), base = "origin/main" } = {}) {
     const hash = hashOf(paths, tree.blob);
     const changed = hash === hashOf(paths, (p) => tree.base.get(p) ?? "-") ? [] : paths.filter((p) => tree.blob(p) !== (tree.base.get(p) ?? "-"));
     const fitness = FITNESS.includes(set);
-    return { set, run: fitness || changed.length > 0, reasons: fitness ? [FITNESS_REASON] : reasonsOf(input, changed), hash, seed: seedOf(hash) };
+    return { set, run: fitness || changed.length > 0, reasons: fitness ? [FITNESS_REASON] : reasonsOf(input, changed), hash, seed: seedOf(hash), reach: reachOf(tree, set) };
   });
   return { base: from, sets, files: tree.files };
 }
 
-/** The filters vitest takes for a test set: its folder, or the test files at the root of test/ for smoke. */
-const filtersOf = (set, files) => (set === "smoke" ? files.filter((p) => /^test\/[^/]+\.test\.ts$/.test(p)) : [`test/${set}/`]);
-
-function baseOf(args) {
-  const at = args.indexOf("--base");
-  return at === -1 ? "origin/main" : args[at + 1];
-}
+// `npm run prove --ready` gives npm the flag, and npm gives it to the script as npm_config_ready; `-- --ready` gives it as is.
+const readyOf = (args) => args.includes("--ready") || process.env.npm_config_ready === "true";
 
 if (isMain(import.meta.url)) {
   const log = resolve(".lattice", "prove.log");
+  const args = process.argv.slice(2);
   let chosen;
   try {
-    chosen = select({ base: baseOf(process.argv.slice(2)) });
+    chosen = select({ base: flagOf(args, "base", "origin/main") });
   } catch (error) {
     finish(log, "", { outcome: "failed", error: String(error instanceof Error ? error.message : error).trim(), log }, false);
     process.exit();
@@ -171,7 +185,17 @@ if (isMain(import.meta.url)) {
   const { results, text } = await runSteps([...steps, ...tests]);
   const resultOf = new Map(results.map((r) => [r.step, r]));
   const sets = running.map(({ set, reasons, hash, seed }) => ({ set, reasons, hash, seed, exit: resultOf.get(stepOf(hash)).exit, ms: resultOf.get(stepOf(hash)).ms }));
-  const ok = results.every((r) => r.exit === 0);
+  let ok = results.every((r) => r.exit === 0);
   const skipped = chosen.sets.filter((s) => !s.run).map((s) => s.set);
-  finish(log, text, { outcome: ok ? "passed" : "failed", base: chosen.base, sets, skipped, steps: results.slice(0, steps.length), log }, ok);
+  const outcome = { base: chosen.base, sets, skipped, steps: results.slice(0, steps.length), log };
+  // --ready (S0-44): the mutants of the changed hunks of src/, once the tests are green — a mutant of a red run proves nothing.
+  let red = "";
+  if (readyOf(args)) {
+    const { mutation } = await import("./mutate.mjs");
+    const { output = "", ...mutants } = ok ? await mutation({ dir: process.cwd(), base: chosen.base, chosen }) : { error: "the tests are red: no mutants run" };
+    if (mutants.error) ok = false;
+    if (output !== "") red = `# mutants: a test set group without a mutant\n${output}\n`;
+    outcome.mutants = mutants;
+  }
+  finish(log, `${text}${red}`, { outcome: ok ? "passed" : "failed", ...outcome }, ok);
 }

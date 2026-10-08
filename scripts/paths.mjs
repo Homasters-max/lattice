@@ -1,6 +1,6 @@
 // paths: the classifier of the paths of this repository (S0-42) — one home for what a path is to the tools of the
-// loop: its class, the test set that owns it, the test sets of fitness and the project `tools`.
-// scripts/prove.mjs, plan/tools/dev-loop/scope.mjs and the brief of plan/tools/dev-loop/context.mjs take the
+// loop: its class, the test set that owns it, the test sets of fitness and the project `tools`, how vitest is given a
+// test set and the seed of its run. scripts/prove.mjs, scripts/mutate.mjs, plan/tools/dev-loop/scope.mjs and the brief of plan/tools/dev-loop/context.mjs take the
 // classes from here; test/support/files.ts takes from here what a test set owns (ST-18).
 
 /** The class of a path: what a round of review reads in it and what the brief of an agent carries for it. */
@@ -51,6 +51,12 @@ const OWNS = {
   // that every file those documents name exists.
   tools: ["plan/", "scripts/", "discussion/tools/", ".claude/", "AGENTS.md", "CONVENTIONS.md", "test/structure/skeleton-files.txt", "test/support/assembly.ts"],
 };
+
+/** The filters vitest takes for a test set: its folder, or the test files at the root of test/ for smoke. */
+export const filtersOf = (set, files) => (set === "smoke" ? files.filter((p) => /^test\/[^/]+\.test\.ts$/.test(p)) : [`test/${set}/`]);
+
+/** The seed of fast-check for a test set from the hash of its input: its first 32 bits as a signed integer (RT-21; LATTICE_SEED, S0-41). */
+export const seedOf = (hash) => Number.parseInt(hash.slice("sha256:".length, "sha256:".length + 8), 16) | 0;
 
 /** The roots a test set owns: a folder ends with `/`, a file is itself, `""` is the whole repository. */
 function ownedRoots(set) {

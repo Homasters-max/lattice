@@ -19,7 +19,8 @@
     "plan:check": "node plan/tools/plan-check.mjs",
     "build": "tsc -p tsconfig.build.json",
     "verify": "node scripts/verify.mjs",
-    "prove": "node scripts/prove.mjs"
+    "prove": "node scripts/prove.mjs",
+    "mutate": "node scripts/mutate.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

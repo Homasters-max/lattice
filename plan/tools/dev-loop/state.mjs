@@ -1,7 +1,8 @@
 // state: состояние цикла и его переходы (plan/dev-loop.md, «Круги»). Чистые функции.
 // Состояние: {pr, task, branch, budget, wave, head, base, waves[], findings[], answers, decisions[], gaps[], triggers,
 //   pending — вопрос владельцу {why, question?, agent?, job?, findings?}, owner — ответ владельца агенту {text, agent, job?},
-//   tidied — круг tidy пройден, stopped, steps — шаги цикла и их время (clock.mjs)}.
+//   tidied — круг tidy пройден, stopped, mutants — решения авторов о мутантах {id: {decision, commit?, reason?, by}} (S0-44),
+//   steps — шаги цикла и их время (clock.mjs)}.
 // Статусы находки: open, dispute-kept, closed, dispute-accepted, advice, applied, deferred (+ deferredTo), declined, owner-closed.
 // Находка: {id, axis, severity, rule, where, quote, text, ratchet, late, wave, status, history[{wave, status, note}]}.
 import { LETTER } from "./protocol.mjs";
@@ -11,7 +12,16 @@ export const OWNER_ACTIONS = ["fix", "drop", "task", "gap", "stop"];
 const DUPLICATE_LINES = 3;
 
 export function initial({ pr, task, branch, gaps = [] }) {
-  return { pr, task, branch, budget: BUDGET, wave: 0, head: null, base: null, waves: [], findings: [], answers: null, decisions: [], gaps, triggers: null, pending: null, owner: null, tidied: false, stopped: false, steps: [] };
+  return { pr, task, branch, budget: BUDGET, wave: 0, head: null, base: null, waves: [], findings: [], answers: null, decisions: [], gaps, triggers: null, pending: null, owner: null, tidied: false, stopped: false, mutants: {}, steps: [] };
+}
+
+/** Решения автора о мутантах из его выхода (S0-44) — в состоянии по id мутанта: решённого dl больше не выносит. */
+export function rememberMutants(state, out, role) {
+  const given = Array.isArray(out?.mutants) ? out.mutants : [];
+  if (given.length === 0) return state;
+  const mutants = { ...(state.mutants ?? {}) };
+  for (const { id, decision, commit, reason } of given) mutants[id] = { decision, commit, reason, by: role };
+  return { ...state, mutants };
 }
 
 const isOpen = (f) => f.severity === "block" && (f.status === "open" || f.status === "dispute-kept");
@@ -100,7 +110,7 @@ export function decide(state) {
 // Ответ исправляющего (answer или tidy) → состояние. Советы и отложенное получают итоговый статус сразу;
 // исправленные блокирующие находки закрывает следующий круг.
 export function recordAnswer(state, out, job) {
-  const next = structuredClone(state);
+  const next = structuredClone(rememberMutants(state, out, "fixer"));
   next.answers = { wave: state.wave, job, head: out.head, items: out.answers ?? [] };
   for (const a of next.answers.items) {
     const f = next.findings.find((g) => g.id === a.id);
