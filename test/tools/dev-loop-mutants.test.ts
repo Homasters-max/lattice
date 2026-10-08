@@ -1,9 +1,10 @@
 // The author decides every mutant of the changed hunks of src/ that survived `npm run prove --ready` (S0-44): dl check
 // refuses an output of the executor or the fixer without the report on its head or with a survivor it did not decide —
 // killed by a test in a commit of the branch, equivalent or deferred with a reason; dl remembers a decision by the id of
-// the mutant and does not ask for it again; the brief of Spec carries the report and the decisions. What code can check
-// is checked (ST-13): that a test fails when a check is broken is shown by a run, not by the reviewer; what no operator
-// sees stays the review boundary of Spec.
+// the mutant and does not ask for it again; the brief of Spec carries the report and the decisions. As ST-13 has it for
+// an implementation, what code can check is checked: that a test fails when a check is broken is shown by a run, not by
+// the reviewer; what no operator sees stays the review boundary of Spec. The cases name no rule ID: they show the tool,
+// not a rule of the design.
 // Each case runs the tool on a throwaway repository with an origin; GitHub is a fake gh.
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -112,7 +113,7 @@ afterAll(() => {
 const TIMEOUT = 60_000;
 
 describe.concurrent("dev-loop check, the report of prove --ready", { timeout: TIMEOUT }, () => {
-  it("ST-13: refuses an output of the executor without the report, and with the report taken with uncommitted edits", async () => {
+  it("refuses an output of the executor without the report, and with the report taken with uncommitted edits", async () => {
     const l = await loop();
     expect(await executor(l)).toEqual([expect.stringMatching(/^mutants: нет отчёта — нужен \.lattice\/mutants\.json `npm run prove --ready` на head \w{7} без незакоммиченных правок: мутантов в изменённых hunk'ах src\/ — 2$/)]);
     const ids = await report(l, { boundary: "survived", refusal: "killed" }, { dirty: true });
@@ -121,7 +122,7 @@ describe.concurrent("dev-loop check, the report of prove --ready", { timeout: TI
     ]);
   });
 
-  it("ST-13: refuses the report taken at another commit, and the report that does not name a mutant of the head", async () => {
+  it("refuses the report taken at another commit, and the report that does not name a mutant of the head", async () => {
     const l = await loop();
     const before = await sh(l.work, git, ["rev-parse", "HEAD~1"]);
     await report(l, { boundary: "killed", refusal: "killed" }, { head: before });
@@ -135,7 +136,7 @@ describe.concurrent("dev-loop init, the decisions of the executor", { timeout: T
   // init without a state makes one, and with the state of start keeps it: either way the decisions of the executor,
   // checked before there was a state, go into it.
   for (const started of [false, true])
-    it(`ST-13: init ${started ? "into the state of start" : "of a new state"} carries the decisions of the executor: the fixer is not asked for them again`, async () => {
+    it(`init ${started ? "into the state of start" : "of a new state"} carries the decisions of the executor: the fixer is not asked for them again`, async () => {
       const l = await loop(false);
       const ids = await report(l, { boundary: "survived", refusal: "killed" });
       expect(await executor(l, { mutants: [{ id: ids.boundary, decision: "equivalent", reason: "no input below zero" }] })).toEqual([]);
@@ -146,7 +147,7 @@ describe.concurrent("dev-loop init, the decisions of the executor", { timeout: T
 });
 
 describe.concurrent("dev-loop check, the survivors of prove --ready", { timeout: TIMEOUT }, () => {
-  it("ST-13: refuses an output of the executor, and an output done of the fixer, with a survivor it did not decide and dl does not remember", async () => {
+  it("refuses an output of the executor, and an output done of the fixer, with a survivor it did not decide and dl does not remember", async () => {
     const l = await loop();
     const ids = await report(l, { boundary: "survived", refusal: "killed" });
     const undecided = `mutants: выживший ${ids.boundary} не решён — src/ledger/land.ts:2 boundary: < → <=; нужно killed, equivalent или deferred`;
@@ -155,7 +156,7 @@ describe.concurrent("dev-loop check, the survivors of prove --ready", { timeout:
     expect(await fixer(l, { mutants: [{ id: ids.boundary, decision: "deferred", reason: "G-01 of the plan" }] })).toEqual([]);
   });
 
-  it("ST-13: accepts a survivor decided equivalent or deferred with a reason, and killed only when the report at the head shows it killed", async () => {
+  it("accepts a survivor decided equivalent or deferred with a reason, and killed only when the report at the head shows it killed", async () => {
     const l = await loop();
     const ids = await report(l, { boundary: "survived", refusal: "killed" });
     const h = await head(l);
@@ -169,7 +170,7 @@ describe.concurrent("dev-loop check, the survivors of prove --ready", { timeout:
     expect(await executor(l, { mutants: [{ id: ids.boundary, decision: "killed", commit: h }] })).toEqual([]);
   });
 
-  it("ST-13: remembers a decision by the id of the mutant: the fixer is not asked for it again, and Spec gets the report with it", async () => {
+  it("remembers a decision by the id of the mutant: the fixer is not asked for it again, and Spec gets the report with it", async () => {
     const l = await loop();
     const ids = await report(l, { boundary: "survived", refusal: "killed" });
     expect(await executor(l, { mutants: [{ id: ids.boundary, decision: "equivalent", reason: "no input below zero" }] })).toEqual([]);

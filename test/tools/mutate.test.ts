@@ -2,7 +2,8 @@
 // a mutant runs against the test sets that reach its file, and its outcome — killed by a named test, survived, stopped
 // over its budget — goes to the report; a cache keeps the outcome while the mutant and its test sets stay the same. `mutate --at` runs one mutant
 // at a line. These cases run prove on a throwaway repository: its steps stand in for those of verify, and its test
-// runner, in place of vitest, runs the cases a test file exports and writes the JSON report vitest writes.
+// runner, in place of vitest, runs the cases a test file exports and writes the JSON report vitest writes. The cases name
+// no rule ID: they show the tool, not a hard check of ST-17.
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { OPERATORS } from "../../scripts/mutants.mjs";
