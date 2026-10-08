@@ -17,7 +17,7 @@
 | [S0-42](tasks/S0-42-verify-levels.md) | prove — доказательство затронутого, ratchet ST-18 | A | ✅ | [#48](https://github.com/Homasters-max/lattice/pull/48) | инструмент |
 | [S0-44](tasks/S0-44-mutate.md) | Мутации в prove --ready — выживших решает executor | A | ✅ | [#50](https://github.com/Homasters-max/lattice/pull/50) | инструмент |
 | [S0-45](tasks/S0-45-review-evidence.md) | Ревью по hunk'ам — вердикт оси как evidence | A | ✅ | [#51](https://github.com/Homasters-max/lattice/pull/51) | инструмент, разбор циклов |
-| [S0-43](tasks/S0-43-dl-gate.md) | Записи run'ов — ворота по ключам и shadow | A | ⬜ | | инструмент |
+| [S0-43](tasks/S0-43-dl-gate.md) | Записи run'ов — ворота по ключам и shadow | A | ✅ | [#52](https://github.com/Homasters-max/lattice/pull/52) | инструмент |
 | [S0-49](tasks/S0-49-fixture-pairs.md) | Фикстуры каждой пары «строка проверки × rule ID» | A | ✅ | [#45](https://github.com/Homasters-max/lattice/pull/45) | разбор циклов, в лимите SL-06 |
 | [S0-52](tasks/S0-52-verify-meet.md) | Тест параллельного verify без 2-секундного окна | A | ✅ | [#46](https://github.com/Homasters-max/lattice/pull/46) | инструмент, нестабильный тест |
 | [S0-03](tasks/S0-03-walking-skeleton.md) | Walking skeleton | B | ✅ | [#5](https://github.com/Homasters-max/lattice/pull/5) | G-14…G-18, Q-09…Q-27 |
