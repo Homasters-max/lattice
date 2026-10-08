@@ -7,8 +7,10 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import fc from "fast-check";
 import ts from "typescript";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import config from "../../vitest.config.js";
 import { DEFAULT_SEED, SAFEGUARD_MS, seedOf } from "./budget.js";
+import { setup } from "./global-setup.js";
 import { repoRoot } from "../structure/tree.js";
 
 /** A call `fc.assert(…)` or `fc.check(…)`: a run of a property. */
@@ -50,6 +52,22 @@ describe("the seed of a run", () => {
     }
   });
 
+  it("is printed once before any test, so a failed run names the seed that replays it", () => {
+    expect(config.test?.globalSetup).toEqual(["test/support/global-setup.ts"]);
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    try {
+      setup();
+      expect(log.mock.calls).toEqual([[`LATTICE_SEED=${seedOf(process.env.LATTICE_SEED)} — set it to replay this run`]]);
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it("is set with the base size of the generators in every test file", () => {
+    expect(config.test?.setupFiles).toEqual(["test/support/setup.ts"]);
+    expect(fc.readConfigureGlobal().baseSize).toBe("small");
+  });
+
   it("draws the same cases twice", () => {
     const draw = () => fc.sample(fc.array(fc.string()), 20);
     expect(draw()).toEqual(draw());
@@ -59,6 +77,10 @@ describe("the seed of a run", () => {
 describe("the time of a test", () => {
   it("is the safeguard, not the default timeout of vitest", ({ task }) => {
     expect(task.timeout).toBe(SAFEGUARD_MS);
+  });
+
+  it("of a hook is the same safeguard", () => {
+    expect([config.test?.testTimeout, config.test?.hookTimeout]).toEqual([SAFEGUARD_MS, SAFEGUARD_MS]);
   });
 });
 

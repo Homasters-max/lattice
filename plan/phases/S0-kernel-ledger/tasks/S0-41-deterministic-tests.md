@@ -40,7 +40,8 @@ Property-тесты берут случайный seed, а таймаут vitest
 
 `test/support/budget.test.ts` — рядом с `budget.ts`, вне `test/structure/`, которой владеет skeleton (ST-15):
 - seed прогона — `LATTICE_SEED` или `DEFAULT_SEED`; значение не 32-битное целое — ошибка, а не исправление; две выборки подряд равны;
-- тест без своего таймаута получает `SAFEGUARD_MS`, а не 5 с vitest;
+- `globalSetup` из `vitest.config.ts` подключает `global-setup.ts`, и его `setup()` печатает `LATTICE_SEED=<seed>`; `setupFiles` подключает `setup.ts`, и `baseSize` генераторов — `"small"`;
+- тест без своего таймаута получает `SAFEGUARD_MS`, а не 5 с vitest; `testTimeout` и `hookTimeout` в `vitest.config.ts` — оба `SAFEGUARD_MS`;
 - ratchet (ST-16): каждый `fc.assert` и `fc.check` в `test/` называет `numRuns` и не ставит свой `seed`; trigger и pass — строки кода в самом тесте.
 
 ## Готово, когда
