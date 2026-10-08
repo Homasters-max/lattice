@@ -39,7 +39,7 @@ rules: [TY-01, TY-02, TY-03, TY-05, TY-06, TY-07, TY-11, TY-12, TY-13, TY-14, TY
 - тест KR-01 берёт имена `std` из `std/source/` и, пока у типов S0-09 нет исходников, ещё из TY-Z02…TY-Z05 (`designTypeNames`): правило не сужается до типов S0;
 - тип судьи — `std/judge-adapter` (`std/source/judge-adapter.json`; Q-38, D212): порт судьи — `std/judge`, и тип с тем же id был бы второй сущностью;
 - порт `judge` привязан в `setup` отдельным полем `judge` `{mode, memo}`, у остальных привязок `adapter` и `executor` обязательны (RT-10, RT-31);
-- пробелы — G-31…G-36.
+- пробелы — G-31…G-37.
 
 ## Шаги
 
