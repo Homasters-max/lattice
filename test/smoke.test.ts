@@ -1,8 +1,8 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join, matchesGlob } from "node:path";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
-import config from "../vitest.config.js";
+import config, { owners, type Project, strays, testFiles } from "../vitest.config.js";
 
 describe("toolchain", () => {
   it("runs a property with fast-check", () => {
@@ -14,22 +14,14 @@ describe("toolchain", () => {
 // ST-12: the fitness tests run on every change request. The run is split into projects of vitest (S0-40):
 // `tools` holds the tests of the development tools, `lattice` the rest; `npm test` runs every project,
 // and every test file of test/ belongs to exactly one of them, so the split drops no test.
-type Project = { readonly name: string; readonly include: readonly string[]; readonly exclude: readonly string[] };
-
+// vitest.config.ts refuses to load otherwise; these tests show that check on the projects vitest gets.
 const root = join(import.meta.dirname, "..");
 const projects: readonly Project[] = (config.test?.projects ?? []).map((p) => {
   if (typeof p !== "object" || p instanceof Promise || p.test === undefined) throw new Error("bug: a project of vitest.config.ts is not written inline");
   const { name, include = [], exclude = [] } = p.test;
   return { name: typeof name === "string" ? name : "", include, exclude };
 });
-
-const testFiles = readdirSync(join(root, "test"), { recursive: true, encoding: "utf8" })
-  .map((f) => `test/${f.replaceAll("\\", "/")}`)
-  .filter((f) => f.endsWith(".test.ts"))
-  .sort();
-
-const owners = (file: string) =>
-  projects.filter((p) => p.include.some((g) => matchesGlob(file, g)) && !p.exclude.some((g) => matchesGlob(file, g))).map((p) => p.name);
+const files = testFiles(root);
 
 describe("toolchain, projects of the test run", () => {
   it("ST-12: npm test runs every project", () => {
@@ -39,11 +31,18 @@ describe("toolchain, projects of the test run", () => {
   });
 
   it("ST-12: every test file of test/ belongs to exactly one project", () => {
-    expect(testFiles.length).toBeGreaterThan(0);
-    expect(testFiles.filter((f) => owners(f).length !== 1)).toEqual([]);
+    expect(files.length).toBeGreaterThan(0);
+    expect(strays(files, projects)).toEqual([]);
+  });
+
+  it("ST-12: a test file dropped from its project, or put in two, is a stray", () => {
+    const dropped = projects.map((p) => (p.name === "lattice" ? { ...p, exclude: [...p.exclude, "test/smoke.test.ts"] } : p));
+    const twice = projects.map((p) => (p.name === "tools" ? { ...p, include: [...p.include, "test/smoke.test.ts"] } : p));
+    expect(strays(files, dropped)).toEqual(["test/smoke.test.ts"]);
+    expect(strays(files, twice)).toEqual(["test/smoke.test.ts"]);
   });
 
   it("puts in tools the tests of test/tools/ and no other", () => {
-    expect(testFiles.filter((f) => owners(f).includes("tools"))).toEqual(testFiles.filter((f) => f.startsWith("test/tools/")));
+    expect(files.filter((f) => owners(f, projects).includes("tools"))).toEqual(files.filter((f) => f.startsWith("test/tools/")));
   });
 });
