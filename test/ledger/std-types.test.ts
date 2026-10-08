@@ -1,36 +1,75 @@
-// The types of S0 as data (S0-08; TY-01…TY-16, RT-10, TR-29, GL-01): the
-// sources of std/source/ — one type body per file, named by the slug of its
-// id — and the session type of `core` that ledger code makes. Each passes the
-// check of the kernel as a record of `core/type@1`, each chain of `extends`
-// narrows its parent, and every type that has records has a valid and an
-// invalid example in test/ledger/examples/ (S0-28 reuses them). The kernel
-// resolves types only through the resolver a caller gives (KR-21): here, the
-// sources themselves, as the ledger of `std` will hold them (S0-24).
+// The types of std as data (S0-08, S0-09; TY-01…TY-16, RT-10, TR-29, GL-01):
+// the sources of std/source/ — one type body per file, named by the slug of
+// its id — and the session type of `core` that ledger code makes. Each passes
+// the check of the kernel as a record of `core/type@1`, each chain of
+// `extends` narrows its parent, and every type that has records has a valid
+// and an invalid example in test/ledger/examples/ (S0-28 reuses them). The
+// kernel resolves types only through the resolver a caller gives (KR-21):
+// here, the sources themselves, as the ledger of `std` will hold them (S0-24).
+// The types of S0-09 are drafts: they show that the subset of KR-18 says
+// what the design names before the kernel freezes as `1` (SL-03, KR-03);
+// what it does not say is in plan/phases/S0-kernel-ledger/std-schema-gaps.md.
 import { describe, expect, it } from "vitest";
-import { checkAgainstType, compare, hashRecord, isJsonObject, parseJson, rejectionsOf, ROOT, type JsonObject, type JsonValue, type ResolveType } from "../../src/kernel/index.js";
+import {
+  checkAgainstType,
+  compare,
+  hashRecord,
+  isJsonObject,
+  parseJson,
+  rejectionsOf,
+  ROOT,
+  validate,
+  type JsonObject,
+  type JsonValue,
+  type ResolveType,
+} from "../../src/kernel/index.js";
 import { SESSION_TYPE } from "../../src/ledger/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
-import { owned } from "../support/files.js";
+import { knowledge, owned } from "../support/files.js";
 
 const META = "core/type@1";
 const SESSION = "core/session@1";
 
-/** The types of S0 by TY-Z02…TY-Z05 and the scope of S0-08; the rest of `std` is S0-09. */
+/** The types of S0 by TY-Z02…TY-Z05 and the scope of S0-08. */
 const S0_TYPES = [
   ...["act", "alias", "behaviour", "clause", "code", "composition", "contract", "decision", "decision-point", "domain", "example", "fact"],
   ...["hint", "implementation", "invariant", "judge-adapter", "knowledge", "namespace-policy", "port", "prose", "quality-profile", "requirement", "retired"],
   ...["scenario", "section", "setup", "stage", "term", "test-set", "valid-period"],
 ];
 
+/**
+ * The drafts of S0-09: the rest of TY-Z03…TY-Z05, the bench set (BN-02), the tape entry of a run (RT-23) and the
+ * shape of a DecisionResult (DP-Z07); `decision-point` is in S0_TYPES and gets its fields here.
+ */
+const DRAFTS = [
+  ...["bench-item", "bench-set", "calibration", "code-commit", "decision-result", "delivery-attempt", "delivery-intent", "dismissed", "link", "live"],
+  ...["pipeline", "question", "report", "review-note", "run", "source-listing", "step", "tape-entry", "verdict"],
+];
+
+/** Every type of std, sorted. */
+const STD_TYPES = [...S0_TYPES, ...DRAFTS].sort();
+
 const BASES = ["behaviour", "composition", "contract", "decision-point", "hint", "implementation", "knowledge"];
+
+/** TR-29: the status fact types; BN-11 and TR-39 add the other facts of `knowledge`. */
+const STATUS_FACTS = ["retired", "alias", "live", "calibration", "verdict", "dismissed"];
+const FACTS = [...STATUS_FACTS, "report", "source-listing"];
+
+/** TY-Z05: the event types of `runtime`; `tape-entry` holds the tape entries of a run (RT-23). */
+const RUNTIME_EVENTS = ["step", "link", "run", "tape-entry", "question", "delivery-intent", "delivery-attempt", "code-commit"];
 
 /** TY-16: the base edge labels of `std`. */
 const LABELS = ["about", "caused-by", "decides", "derived-from", "implements", "measures", "part-of", "supersedes", "uses", "verifies"];
 
 /** A file as JSON, frozen deep: the sources reach `compare` and the resolver of the kernel as they are (§1.5). */
 function json(path: string): JsonValue {
-  const parsed = parseJson(owned.text(path));
-  if (!parsed.ok) throw new Error(`bug: ${path} is no JSON the kernel parses`);
+  return frozen(owned.text(path), path);
+}
+
+/** JSON text as the kernel parses it, frozen deep. */
+function frozen(text: string, what: string): JsonValue {
+  const parsed = parseJson(text);
+  if (!parsed.ok) throw new Error(`bug: ${what} is no JSON the kernel parses`);
   return deepFreeze(parsed.value);
 }
 
@@ -89,20 +128,20 @@ function recordOf(ref: string, value: JsonValue, kind: JsonValue) {
   return kind === "entity" ? { type: ref, rev: 1, body: value } : { type: ref, body: value };
 }
 
-const nonAbstract = () => S0_TYPES.filter((slug) => body(slug).abstract === false);
+const nonAbstract = () => STD_TYPES.filter((slug) => body(slug).abstract === false);
 
-describe("the sources of the types of S0 (S0-08)", () => {
-  it("TY-01, TY-02: std/source holds one type body per file, named by its slug — exactly the types of S0", () => {
-    expect([...std().bodies.keys()].sort()).toEqual(S0_TYPES);
+describe("the sources of the types of std (S0-08, S0-09)", () => {
+  it("TY-01, TY-02: std/source holds one type body per file, named by its slug — every type of std", () => {
+    expect([...std().bodies.keys()].sort()).toEqual(STD_TYPES);
   });
 
   it("TY-01, KR-14, KR-15, KR-18, KR-19: every source passes the check of the kernel as a record of core/type@1", () => {
-    const refused = S0_TYPES.map((slug) => [slug, check({ type: META, rev: 1, body: body(slug) })] as const).filter(([, r]) => r.length > 0);
+    const refused = STD_TYPES.map((slug) => [slug, check({ type: META, rev: 1, body: body(slug) })] as const).filter(([, r]) => r.length > 0);
     expect(refused).toEqual([]);
   });
 
   it("KR-15: every chain of extends narrows its parent or keeps it", () => {
-    const relations = S0_TYPES.flatMap((slug) => {
+    const relations = STD_TYPES.flatMap((slug) => {
       const [parent] = parentsOf(slug);
       return parent === undefined ? [] : [[slug, compare(schemaOf(slug), schemaOf(parent), "extends", std().resolve).relation] as const];
     });
@@ -115,11 +154,11 @@ describe("the sources of the types of S0 (S0-08)", () => {
       Object.entries(fieldsOf(slug))
         .flatMap(([name, s]) => (isJsonObject(s) && typeof s.card_order === "number" ? [[s.card_order, name] as const] : []))
         .sort(([a], [b]) => a - b);
-    for (const slug of S0_TYPES) {
+    for (const slug of STD_TYPES) {
       const orders = [slug, ...parentsOf(slug)].flatMap((s) => card(s).map(([o]) => o));
       expect([slug, new Set(orders).size]).toEqual([slug, card(slug).length]);
     }
-    const cards = ["requirement", "scenario", "decision", "invariant", "term", "clause", "prose", "example"].map((s) => [s, card(s).map(([, n]) => n)]);
+    const cards = ["requirement", "scenario", "decision", "invariant", "term", "clause", "prose", "example", "bench-item", "review-note"].map((s) => [s, card(s).map(([, n]) => n)]);
     expect(cards).toEqual([
       ["requirement", ["title", "statement"]],
       ["scenario", ["title", "when", "then"]],
@@ -129,14 +168,17 @@ describe("the sources of the types of S0 (S0-08)", () => {
       ["clause", ["cells"]],
       ["prose", ["text"]],
       ["example", ["text"]],
+      ["bench-item", []],
+      ["review-note", ["note"]],
     ]);
   });
 });
 
 describe("the base types and what extends them", () => {
-  it("TY-03, G-02: each base type is an abstract root entity type with an optional supersedes of pinned references, label supersedes", () => {
+  it("TY-03, G-02, G-39: each base type is a root entity type with an optional supersedes of pinned references, label supersedes; all but decision-point are abstract", () => {
+    const own: Record<string, readonly string[]> = { implementation: ["contract", "code"], "decision-point": ["candidates", "question", "judge", "policy", "bench", "targets"] };
     for (const base of BASES) {
-      expect([base, body(base).extends, body(base).abstract, body(base).kind, required(base)]).toEqual([base, undefined, true, "entity", base === "implementation" ? ["contract", "code"] : []]);
+      expect([base, body(base).extends, body(base).abstract, body(base).kind, required(base)]).toEqual([base, undefined, base !== "decision-point", "entity", own[base] ?? []]);
       expect([base, field(base, "supersedes")]).toEqual([
         base,
         {
@@ -150,13 +192,13 @@ describe("the base types and what extends them", () => {
 
   it("TY-03: every entity type with records extends one of the base types and keeps its supersedes", () => {
     const entities = nonAbstract().filter((slug) => body(slug).kind === "entity");
-    expect(entities.map((slug) => [slug, parentsOf(slug).at(-1)]).filter(([, root]) => root === undefined || !BASES.includes(root))).toEqual([]);
+    expect(entities.map((slug) => [slug, parentsOf(slug).at(-1) ?? slug]).filter(([, root]) => !BASES.includes(root))).toEqual([]);
     expect(entities.filter((slug) => fieldsOf(slug).supersedes === undefined)).toEqual([]);
   });
 
   it("TY-05, GL-01: domain and section extend composition; the content blocks are the knowledge and composition types", () => {
     const content = nonAbstract().filter((slug) => parentsOf(slug).some((p) => p === "knowledge" || p === "composition"));
-    expect(content).toEqual(["clause", "decision", "domain", "example", "invariant", "prose", "requirement", "scenario", "section", "term"]);
+    expect(content).toEqual(["bench-item", "bench-set", "clause", "decision", "domain", "example", "invariant", "prose", "requirement", "scenario", "section", "term"]);
     expect([parentsOf("domain"), parentsOf("section")]).toEqual([["composition"], ["composition"]]);
     expect(required("domain")).toEqual(["items"]);
     expect(required("section")).toEqual(["heading", "level", "items"]);
@@ -251,7 +293,7 @@ describe("behaviour", () => {
       if (typeof label === "string") used.add(label);
       Object.values(value).forEach(walk);
     };
-    S0_TYPES.forEach((slug) => walk(schemaOf(slug)));
+    STD_TYPES.forEach((slug) => walk(schemaOf(slug)));
     expect([...used].filter((l) => !LABELS.includes(l))).toEqual([]);
   });
 });
@@ -293,6 +335,191 @@ describe("events", () => {
       ["participant", "kind", "role", "purpose", "for", "parent", "software", "version", "certificate"],
     ]);
     expect(check({ type: META, rev: 1, body: SESSION_TYPE.body })).toEqual([]);
+  });
+});
+
+/** The fields of a type that carry the annotation `key`, in their order (KR-19, TR-28). */
+const keysOf = (slug: string) => Object.entries(fieldsOf(slug)).flatMap(([name, s]) => (isJsonObject(s) && s.key === true ? [name] : []));
+
+/** The `const` of the discriminator in each branch of a union, in order. */
+const branchesOf = (union: JsonObject) =>
+  list(union.oneOf).map((b) => {
+    const tag = object(object(b).properties)[String(union.discriminator)];
+    return object(tag).const;
+  });
+
+describe("the drafts of S0-09: behaviour, decision points and the bench", () => {
+  it("RT-01, RT-04, RT-05, G-40: a pipeline extends behaviour — stages that pin a stage contract with static params, reads, writes, on and fallback; bench and targets are optional (DP-31)", () => {
+    const stage = object(field("pipeline", "stages").items);
+    expect([parentsOf("pipeline"), required("pipeline"), Object.keys(object(stage.properties)), stage.required]).toEqual([
+      ["behaviour"],
+      ["stages"],
+      ["stage", "params", "reads", "writes", "on", "fallback"],
+      ["stage", "reads", "writes"],
+    ]);
+    const on = object(object(stage.properties).on);
+    expect([object(object(stage.properties).stage).ref, object(on.values).enum, object(object(stage.properties).fallback).ref]).toEqual([
+      { to: "std/stage@1", pin: "pinned", label: "uses" },
+      ["continue", "fallback", "escalate", "refuse"],
+      { to: "std/stage@1", pin: "pinned", label: "uses" },
+    ]);
+    expect([object(field("pipeline", "targets").values).type, field("pipeline", "bench").format]).toEqual(["number", "ref"]);
+  });
+
+  it("DP-01, DP-02, DP-05, DP-13, G-39, G-43: a decision point holds an allowed set, a question, a pinned judge, a policy of the closed operators, a bench set and targets", () => {
+    const question = object(field("decision-point", "question").properties);
+    expect([object(question.kind).enum, object(question.score_semantics).enum]).toEqual([
+      ["choice", "score", "binary"],
+      ["relevance", "confidence", "preference"],
+    ]);
+    expect(field("decision-point", "judge").ref).toEqual({ to: "std/judge-adapter@1", pin: "pinned", label: "uses" });
+    expect(branchesOf(field("decision-point", "policy"))).toEqual(["threshold", "top-k", "margin", "budget", "any", "all", "table"]);
+    expect(Object.keys(object(field("decision-point", "targets").properties))).toEqual(["precision", "consistency", "tolerance"]);
+  });
+
+  it("BN-01…BN-04, G-44: a bench item extends knowledge with its kind and variants; a bench set extends composition with pinned items and its salt", () => {
+    expect([parentsOf("bench-item"), field("bench-item", "kind").enum, required("bench-item")]).toEqual([["knowledge"], ["normal", "trap", "blank"], ["kind", "input", "expected"]]);
+    expect([parentsOf("bench-set"), required("bench-set"), object(field("bench-set", "items").items).ref]).toEqual([
+      ["composition"],
+      ["items", "salt"],
+      { to: "std/bench-item@1", pin: "pinned", label: "part-of" },
+    ]);
+  });
+
+  it("TY-04: a review note extends hint and names what it says is not met: a note without a subject is refused by its schema", () => {
+    expect([parentsOf("review-note"), required("review-note")]).toEqual([["hint"], ["about", "subject", "note"]]);
+    const note = check({ type: "std/review-note@1", rev: 1, body: { about: "demo/order-intake@2", note: "the scenario misses a refund" } });
+    expect(note.map((r) => [r.rule, r.path, r.expected])).toEqual([["KR-21", "/body/subject", { required: "present" }]]);
+  });
+});
+
+describe("the drafts of S0-09: facts and events", () => {
+  it("TY-14, TR-29, BN-11, TR-39, G-41: every fact type extends fact; of and the other fields of its key carry key; status facts and the value of each follow TR-29", () => {
+    const facts = STD_TYPES.filter((slug) => parentsOf(slug).includes("fact"));
+    expect(facts.sort()).toEqual([...FACTS].sort());
+    const shapes = FACTS.map((slug) => [slug, body(slug).kind, keysOf(slug), Object.keys(object(field(slug, "of").properties)), "value" in fieldsOf(slug)]);
+    expect(shapes).toEqual([
+      ["retired", "event", ["of"], ["entity"], false],
+      ["alias", "event", ["of"], ["entity"], true],
+      ["live", "event", ["of"], ["pipeline"], true],
+      ["calibration", "event", ["of", "question"], ["point", "judge", "set"], true],
+      ["verdict", "event", ["of", "participant"], ["subject"], true],
+      ["dismissed", "event", ["of", "rule"], ["subject"], false],
+      ["report", "event", ["of", "split"], ["subject", "set"], true],
+      ["source-listing", "event", ["of"], ["source"], true],
+    ]);
+    expect(FACTS.filter((slug) => list(required(slug)).some((k) => !keysOf(slug).includes(String(k))))).toEqual([]);
+    expect([Object.keys(object(field("live", "value").properties)), field("verdict", "value").enum, field("report", "split").enum]).toEqual([
+      ["pipeline", "setup", "tuple"],
+      ["for", "against"],
+      ["tune", "holdout"],
+    ]);
+    expect(object(object(field("report", "value").properties).runs).items).toMatchObject({ format: "ref", ref: { to: "std/run@1", label: "measures" } });
+  });
+
+  it("TY-14: no type of std extends a status fact", () => {
+    expect(STD_TYPES.filter((slug) => STATUS_FACTS.includes(parentsOf(slug)[0] ?? ""))).toEqual([]);
+  });
+
+  it("TY-Z05, OB-01, OB-02, OB-08, RT-14, RT-18, RT-23, RT-26: the events of runtime are root event types; a code-commit is keyed by its sha", () => {
+    expect(RUNTIME_EVENTS.map((slug) => [slug, body(slug).kind, body(slug).extends, body(slug).abstract])).toEqual(RUNTIME_EVENTS.map((slug) => [slug, "event", undefined, false]));
+    expect(RUNTIME_EVENTS.filter((slug) => keysOf(slug).length > 0).map((slug) => [slug, keysOf(slug)])).toEqual([["code-commit", ["sha"]]]);
+    expect([field("step", "kind").enum, field("step", "billing").enum, field("delivery-attempt", "status").enum]).toEqual([
+      ["skill", "tool", "land", "cite", "bench"],
+      ["api", "subscription", "local"],
+      ["started", "done", "failed"],
+    ]);
+    const model = object(field("tape-entry", "model").properties);
+    expect([field("tape-entry", "mode").enum, object(model.check).enum, required("tape-entry")]).toEqual([
+      ["service", "recorded", "fixture"],
+      ["verified", "reported", "none"],
+      ["operation", "request", "occurrence", "ms", "billing", "mode"],
+    ]);
+    expect(required("delivery-intent")).toEqual(["operation", "key", "payload", "stage"]);
+  });
+
+  it("RT-14, RT-15, DP-08: a run holds its pipeline, setup, input, fingerprint, execution tuple, commit, budget, spending, the outcome of every stage and its own; decide keeps its DecisionResult by $ref", () => {
+    expect(required("run")).toEqual(["pipeline", "setup", "input", "fingerprint", "tuple", "commit", "budget", "spending", "stages", "outcome"]);
+    expect(Object.keys(object(field("run", "tuple").properties))).toEqual(["implementations", "judges", "ports", "lattice", "pins"]);
+    expect(object(object(object(field("run", "stages").items).properties).result).$ref).toEqual("std/decision-result@1");
+  });
+
+  it("DP-08: a DecisionResult is an abstract union by status, each status with its closed set of reasons; selected has none", () => {
+    const union = schemaOf("decision-result");
+    const reasons = list(union.oneOf).map((b) => {
+      const reason = object(object(b).properties).reason;
+      if (reason === undefined) return null;
+      return object(reason).const ?? object(reason).enum;
+    });
+    expect([body("decision-result").abstract, branchesOf(union), reasons]).toEqual([
+      true,
+      ["selected", "none", "ambiguous", "insufficient", "unavailable"],
+      [null, "threshold", "margin", ["budget", "no-candidates"], ["timeout", "network", "schema", "model", "coverage"]],
+    ]);
+  });
+});
+
+/** The JSON of the fenced block `id` of a design file (RM-Z03): the examples of the design, as the design writes them. */
+function designBlock(file: string, id: string): JsonObject {
+  const text = knowledge.text(file).replaceAll("\r\n", "\n");
+  const found = new RegExp("```json " + id + "\\n([\\s\\S]*?)\\n```").exec(text)?.[1];
+  if (found === undefined) throw new Error(`bug: ${file} has no block ${id}`);
+  return object(frozen(found, `${file} ${id}`));
+}
+
+/** A record the design writes with its header inline: its `type`, and the body without `type` and `id`. */
+function recordOfDesign(example: JsonObject) {
+  const { type, id: _id, ...rest } = example;
+  if (typeof type !== "string") throw new Error("bug: a design example names no type");
+  return { type, rev: 1, body: rest };
+}
+
+describe("the examples of the design (S0-09)", () => {
+  it("DP-01: the decision point of DP-Z05 is valid by the draft of decision-point", () => {
+    const record = recordOfDesign(designBlock("08-decision.md", "DP-Z05"));
+    expect([record.type, check(record)]).toEqual(["std/decision-point@1", []]);
+  });
+
+  it("RT-01, G-38: the pipeline of RT-Z02 is valid by the draft of pipeline but for the static params, which the subset cannot type until the owner decides G-38", () => {
+    const record = recordOfDesign(designBlock("07-runtime.md", "RT-Z02"));
+    expect(record.type).toBe("std/pipeline@1");
+    expect(check(record).map((r) => [r.rule, r.path, r.expected])).toEqual([
+      ["KR-21", "/body/stages/0/params/pool_max", { properties: "absent" }],
+      ["KR-21", "/body/stages/1/params/point", { properties: "absent" }],
+    ]);
+  });
+
+  it("DP-08: DP-Z07 names the statuses, reasons and score semantics of the draft, and each status of it, filled in, is a valid DecisionResult", () => {
+    const template = designBlock("08-decision.md", "DP-Z07");
+    const alternatives = (value: JsonValue | undefined) => String(value).split(" | ");
+    const union = schemaOf("decision-result");
+    const evaluation = object(list(template.evaluations)[0]);
+    const branchReasons = list(union.oneOf).flatMap((b) => {
+      const reason = object(object(b).properties).reason;
+      return reason === undefined ? [] : list(object(reason).enum ?? [object(reason).const ?? null]);
+    });
+    const semantics = object(object(object(object(object(list(union.oneOf)[0]).properties).evaluations).items).properties).score_semantics;
+    expect([alternatives(template.status), alternatives(template.reason), alternatives(evaluation.score_semantics)]).toEqual([branchesOf(union), branchReasons, object(semantics).enum]);
+    const schemas = (ref: string): JsonObject | null => {
+      const slug = /^std\/(.+)@1$/.exec(ref)?.[1];
+      return slug === undefined || !std().bodies.has(slug) ? null : schemaOf(slug);
+    };
+    // Each status of DP-Z07 with the first reason of its own set, and its placeholders <ref@n> filled in.
+    const { reason: _reason, ...rest } = template;
+    const ref = "acme/tool-a@1";
+    const filled = list(union.oneOf).map((branch) => {
+      const props = object(object(branch).properties);
+      const reason = props.reason === undefined ? undefined : (object(props.reason).const ?? list(object(props.reason).enum)[0]);
+      const value: JsonObject = {
+        ...rest,
+        status: object(props.status).const ?? null,
+        selected: [ref],
+        evaluations: [{ ...evaluation, candidate: ref, score_semantics: "preference" }],
+        inputs: { ...object(template.inputs), point: "acme/pick-tool@1", candidates: [ref] },
+      };
+      return reason === undefined ? value : { ...value, reason };
+    });
+    expect(filled.map((v) => [v.status, validate(deepFreeze(v), union, schemas)])).toEqual(filled.map((v) => [v.status, { ok: true }]));
   });
 });
 
