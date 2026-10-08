@@ -55,6 +55,7 @@ export const checked = (config: ViteUserConfig, files: readonly string[]): ViteU
 // ST-12: the config does not load while a test file is outside every project or in two of them. The check runs here,
 // not only in test/smoke.test.ts, so an exclude that drops the smoke test stops the run instead of dropping the guard;
 // it reads the object vitest gets, root and projects, not the list of projects above.
+
 // A run is a function of its input (S0-41): one seed for fast-check, the
 // budget of a property in numRuns, and time only as a safeguard above it.
 export default checked(defineConfig({
