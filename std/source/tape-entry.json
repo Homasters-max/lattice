@@ -26,7 +26,7 @@
       },
       "answer": {
         "type": "object",
-        "description": "the answer of the port (RT-23); any value, which the subset cannot say: closed until the kernel takes the keyword of S0-53 (G-38)"
+        "description": "the answer of the port (RT-23); an entry holds exactly one of answer and error, which the subset cannot say without a discriminator, so both are optional (G-43); any value, which the subset cannot say: closed until the kernel takes the keyword of S0-53 (G-38)"
       },
       "error": {
         "type": "object",
@@ -55,7 +55,7 @@
           "code",
           "retryable"
         ],
-        "description": "an adapter error, never a body or headers of a vendor (RT-23)"
+        "description": "an adapter error, never a body or headers of a vendor (RT-23); in place of answer, which the subset cannot say (G-43)"
       },
       "ms": {
         "type": "integer",
@@ -109,7 +109,7 @@
           "id",
           "check"
         ],
-        "description": "the model that answered (RT-23)"
+        "description": "the model that answered, on every answer (RT-23, RT-25); an error has none, so it is optional, which the subset cannot tie to answer (G-43)"
       },
       "memo": {
         "type": "string",
