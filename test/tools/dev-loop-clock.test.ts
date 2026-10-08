@@ -11,6 +11,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const tool = join(import.meta.dirname, "../../plan/tools/dev-loop.mjs");
 let temp = "";
+// The fake gh of the tool: dl wave asks GitHub for the body of the PR for the brief of Spec (S0-48).
+let gh = "";
 const BRANCH = "s0-99-x";
 type Json = { [key: string]: unknown };
 type Loop = { work: string; dir: string };
@@ -83,7 +85,7 @@ async function loop(): Promise<Loop> {
 }
 
 async function dl(l: Loop, when: At, ...args: string[]): Promise<Json> {
-  const env: NodeJS.ProcessEnv = { ...process.env, DEV_LOOP_NOW: when.at };
+  const env: NodeJS.ProcessEnv = { ...process.env, DEV_LOOP_GH: gh, DEV_LOOP_NOW: when.at };
   if (when.red === true) env.RED = "1";
   else delete env.RED;
   return JSON.parse(await sh(l.work, process.execPath, [tool, ...args, "--dir", l.dir], env)) as Json;
@@ -151,9 +153,8 @@ function comments(l: Loop): string {
 
 beforeAll(() => {
   temp = mkdtempSync(join(tmpdir(), "dev-loop-clock-"));
-  // dl wave asks GitHub for the body of the PR for the brief of Spec (S0-48): a fake gh answers instead.
-  process.env.DEV_LOOP_GH = join(temp, "gh.mjs");
-  writeFileSync(process.env.DEV_LOOP_GH, 'console.log(JSON.stringify({ body: "PR body" }));\n');
+  gh = join(temp, "gh.mjs");
+  writeFileSync(gh, 'console.log(JSON.stringify({ body: "PR body" }));\n');
 });
 
 afterAll(() => {
