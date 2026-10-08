@@ -294,14 +294,17 @@ describe("prove, the records of its runs (S0-43)", { timeout: 60_000 }, () => {
     expect([stand.exists(`.lattice/verify-runs/${key}.json`), other.exists(`linked/.lattice/verify-runs/${key}.json`)]).toEqual([true, false]);
   });
 
-  it("ST-12: a red test set gets outcome failed and its failed tests; one over its budget gets budget-exceeded", async () => {
+  it("ST-12: a red test set gets outcome failed and its failed tests; budget-exceeded only when each failure is over its budget", async () => {
     stand.write("src/ledger/b.ts", 'import { a } from "../kernel/a.js";\nexport const b = a + 2;\n');
     stand.write("red", "ledger\n");
     const red = (await proveRun()).report.sets.find((s) => s.set === "ledger")!;
     expect(record(red.key)).toMatchObject({ outcome: "failed", failed: ["test/ledger/x.test.ts > x fails"] });
+    // `red` is ignored by git, so the key stays: each run below writes over the record of `red.key`.
     stand.write("red", "ledger timeout\n");
-    const slow = (await proveRun()).report.sets.find((s) => s.set === "ledger")!;
-    expect([slow.key, record(slow.key).outcome, record(slow.key).failed]).toEqual([red.key, "budget-exceeded", ["test/ledger/x.test.ts > x timeout"]]);
+    expect(await proveRun().then(() => record(red.key))).toMatchObject({ outcome: "budget-exceeded", failed: ["test/ledger/x.test.ts > x timeout"] });
+    // A failure beside one over the budget: the set is red, not slow (S0-41).
+    stand.write("red", "ledger\nledger timeout\n");
+    expect(await proveRun().then(() => record(red.key))).toMatchObject({ outcome: "failed", failed: ["test/ledger/x.test.ts > x fails", "test/ledger/x.test.ts > x timeout"] });
   });
 
   it("ST-12: a red step fails the record of each fitness set, and of no other: the steps are fitness tests over the same repository", async () => {
