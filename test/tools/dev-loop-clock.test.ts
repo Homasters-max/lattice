@@ -94,8 +94,8 @@ const steps = (l: Loop) => read(join(l.dir, "state.json")).steps as Step[];
 const BLOCK = { kind: "rule", rule: "CONVENTIONS §1", where: "src/ledger/land.ts:2", quote: "return 2;", text: "magic number; use the constant" };
 
 // A review round from dl wave to dl merge: reviewer-standards finds `findings`, the rest find nothing.
-async function round(l: Loop, from: At, to: At, findings: Json[] = [], ...flags: string[]): Promise<Json> {
-  const w = await dl(l, from, "wave", "--worktree", l.work, ...flags);
+async function round(l: Loop, from: At, to: At, findings: Json[] = []): Promise<Json> {
+  const w = await dl(l, from, "wave", "--worktree", l.work);
   const h = await head(l);
   for (const a of agents(w)) out(a.brief, { axis: read(a.brief).axis, head: h, summary: "checked", statuses: [], findings: a.agent === "reviewer-standards" ? findings : [] });
   return dl(l, to, "merge");
@@ -193,7 +193,9 @@ describe.concurrent("dev-loop, the time of every step", { timeout: 60_000 }, () 
     expect(report).toMatch(/^\| fixer-answer \| 1 \| \d+ \| \d+ \|$/m);
     expect(report).toMatch(/^\| verifier \| 1 \| \d+ \| \d+ \|$/m);
   });
+});
 
+describe.concurrent("dev-loop, the reason of each round", { timeout: 60_000 }, () => {
   it("names a round after tidy and a round after a rebase by their reason", async () => {
     const l = await loop();
     await dl(l, t(0), "init", "--pr", "9", "--task", "S0-99", "--branch", BRANCH);

@@ -6,9 +6,8 @@
 //   owner  — от dl escalate до dl owner.
 // Время — ISO-строки UTC: их порядок — порядок строк.
 
-export const STEP_KINDS = ["agent", "gate", "review", "owner"];
 // Причина круга: первый; ответ на блокирующие находки; хвосты tidy; решение или поручение владельца; пересборка на main.
-export const REASONS = ["first", "block", "tidy", "owner", "rebase"];
+const REASONS = ["first", "block", "tidy", "owner", "rebase"];
 
 const same = (a, b) => a.kind === b.kind && a.role === b.role && a.job === b.job;
 
