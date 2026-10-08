@@ -26,7 +26,7 @@
       },
       "answer": {
         "type": "object",
-        "description": "the answer of the port (RT-23); any value, which the subset cannot say: closed until the owner decides (G-38)"
+        "description": "the answer of the port (RT-23); any value, which the subset cannot say: closed until the kernel takes the keyword of S0-53 (G-38)"
       },
       "error": {
         "type": "object",

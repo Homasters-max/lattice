@@ -41,7 +41,7 @@
       },
       "input": {
         "type": "object",
-        "description": "the input: a need, a point state or any pipeline input (BN-01); any value, which the subset cannot say: closed until the owner decides (G-38)"
+        "description": "the input: a need, a point state or any pipeline input (BN-01); any value, which the subset cannot say: closed until the kernel takes the keyword of S0-53 (G-38)"
       },
       "expected": {
         "type": "object",
@@ -57,7 +57,7 @@
           },
           "value": {
             "type": "object",
-            "description": "an expected value (BN-01); any value, which the subset cannot say: closed until the owner decides (G-38)"
+            "description": "an expected value (BN-01); any value, which the subset cannot say: closed until the kernel takes the keyword of S0-53 (G-38)"
           }
         },
         "required": [],
@@ -67,7 +67,7 @@
         "type": "array",
         "items": {
           "type": "object",
-          "description": "a paraphrase or a translation of the input; any value, which the subset cannot say: closed until the owner decides (G-38)"
+          "description": "a paraphrase or a translation of the input; any value, which the subset cannot say: closed until the kernel takes the keyword of S0-53 (G-38)"
         },
         "description": "paraphrases and translations of its input with the same expected answer (BN-03)"
       }

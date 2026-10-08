@@ -192,7 +192,7 @@ describe("the examples of the design (S0-09)", () => {
     expect([record.type, check(record)]).toEqual(["std/decision-point@1", []]);
   });
 
-  it("RT-01, G-38: the pipeline of RT-Z02 is valid by the draft of pipeline but for the static params, which the subset cannot type until the owner decides G-38", () => {
+  it("RT-01, G-38: the pipeline of RT-Z02 is valid by the draft of pipeline but for the static params, which the subset cannot type until S0-53 (G-38)", () => {
     const record = recordOfDesign(designBlock("07-runtime.md", "RT-Z02"));
     expect(record.type).toBe("std/pipeline@1");
     expect(check(record).map((r) => [r.rule, r.path, r.expected])).toEqual([

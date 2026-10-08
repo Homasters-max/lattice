@@ -35,7 +35,7 @@
             },
             "params": {
               "type": "object",
-              "description": "the static params of the stage, checked against the params type of its contract when the pipeline is validated (RT-02); any value, which the subset cannot say: closed until the owner decides (G-38)"
+              "description": "the static params of the stage, checked against the params type of its contract when the pipeline is validated (RT-02); any value, which the subset cannot say: closed until the kernel takes the keyword of S0-53 (G-38)"
             },
             "reads": {
               "type": "array",

@@ -26,7 +26,7 @@
       },
       "input": {
         "type": "object",
-        "description": "the input of the run (RT-14); any value, which the subset cannot say: closed until the owner decides (G-38)"
+        "description": "the input of the run (RT-14); any value, which the subset cannot say: closed until the kernel takes the keyword of S0-53 (G-38)"
       },
       "fingerprint": {
         "type": "string",
@@ -306,7 +306,7 @@
       },
       "output": {
         "type": "object",
-        "description": "its output; none when it stopped early (RT-15); any value, which the subset cannot say: closed until the owner decides (G-38)"
+        "description": "its output; none when it stopped early (RT-15); any value, which the subset cannot say: closed until the kernel takes the keyword of S0-53 (G-38)"
       },
       "previous": {
         "type": "string",
