@@ -124,9 +124,9 @@ describe.concurrent("dev-loop start", { timeout: 30_000 }, () => {
     const brief = await exec(r.work, process.execPath, [tool, "brief", "executor", "--task", "S0-98", "--worktree", work, "--dir", s.dir as string]);
     const briefPath = (JSON.parse(brief.stdout) as Json).brief as string;
     expect(JSON.parse(readFileSync(briefPath, "utf8"))).toMatchObject({ pr: 77, branch: "s0-98-new-thing" });
-    expect(await start(r, github, "--task", "S0-98")).toMatchObject({ pr: 77, created: false, interrupted: false, opened: false, next: "executor" });
+    expect(await start(r, github, "--task", "S0-98")).toMatchObject({ pr: 77, created: false, interrupted: false, opened: false, next: "executor", brief: null });
     writeFileSync(join(work, "half.txt"), "x");
-    expect(await start(r, github, "--task", "S0-98")).toMatchObject({ created: false, interrupted: true, opened: false });
+    expect(await start(r, github, "--task", "S0-98")).toMatchObject({ created: false, interrupted: true, opened: false, brief: briefPath });
   });
 
   it("keeps the gaps of the executor when init meets the state start wrote", async () => {
