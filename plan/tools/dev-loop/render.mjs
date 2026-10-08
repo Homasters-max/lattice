@@ -114,7 +114,7 @@ function audit(t) {
   return [...t.skeleton.map((p) => `skeleton \`${p}\``), ...t.newModules.map((m) => `новый модуль ${m}`), ...t.newPorts.map((p) => `новый порт \`${p}\``), ...(t.modules.length ? [`модулей: ${t.modules.join(", ")}`] : [])];
 }
 
-export function final(state, { scope } = {}) {
+export function final(state, { scope, conventions = [] } = {}) {
   const out = [header("final", state), title(state, "Итог цикла"), ""];
   out.push(`Head \`${short(state.head ?? scope?.head)}\` · \`npm run verify\` зелёный · кругов: ${state.waves.length} из ${state.budget}`);
   if (!state.waves.length && scope) out.push("", `Ревью не требовался: изменения вне кода (${scope.lines} строк).`);
@@ -131,6 +131,7 @@ export function final(state, { scope } = {}) {
     ...openFindings(state).filter((f) => f.late).map((f) => `- находка вне дельты ${f.id} · ${f.rule} · \`${f.where}\`: ${f.text}`),
     ...of("advice").map((f) => `- совет ${f.id} · \`${f.where}\`: ${f.text}`),
     ...state.gaps.map((g) => `- пробел ${g} в PLAN.md: решение до merge`),
+    ...conventions.map((l) => `- строка CONVENTIONS.md из main изменена или убрана: «${l.length > 200 ? `${l.slice(0, 200)}…` : l}»`),
   ];
   out.push("", "### Решить владельцу до merge", "", ...(todo.length ? todo : ["нечего"]));
   const ratchet = state.findings.filter((f) => f.ratchet).map((f) => f.id);

@@ -11,7 +11,7 @@
 //   answer --dir D [--job tidy]                               ответ исправляющего → состояние, комментарий
 //   escalate --dir D --why текст [--from файл.out.json]       вопрос владельцу: комментарий и questions
 //   owner --dir D (--answers файл.json | --text текст)        решение владельца → состояние, комментарий
-//   final --dir D                                             итоговый комментарий
+//   final --dir D --worktree W                                итоговый комментарий
 //   restore --dir D --comments файл.json                      состояние из `gh pr view --json comments` (отладка; start делает сам)
 // Файлы цикла в D: state.json, waves/<n>/<агент>.in.json и .out.json, waves/<n>/scope.json, comments/<NN>-<вид>.md.
 import { execFileSync } from "node:child_process";
@@ -19,7 +19,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { join, resolve } from "node:path";
 import { check, FIXER_JOBS } from "./dev-loop/protocol.mjs";
 import { answer, decision, escalation, final, parseHeader, questions, review } from "./dev-loop/render.mjs";
-import { changedLines, scope } from "./dev-loop/scope.mjs";
+import { changedLines, conventionsChanged, scope } from "./dev-loop/scope.mjs";
 import { answerFindings, answerText, ask, entryOf, initial, looseFindings, mergeWave, openFindings, planWave, recordAnswer } from "./dev-loop/state.mjs";
 
 const COMMENT_MAX = 65000;
@@ -330,7 +330,8 @@ const commands = {
   final: () => {
     const state = load();
     const first = join(dir(), "waves", "1", "scope.json");
-    print({ ok: true, comment: comment("final", final(state, { scope: existsSync(first) ? read(first) : undefined })) });
+    const conventions = conventionsChanged({ dir: need("worktree") });
+    print({ ok: true, comment: comment("final", final(state, { scope: existsSync(first) ? read(first) : undefined, conventions })) });
   },
   restore,
 };

@@ -34,14 +34,14 @@ function commit(work: string, files: { [path: string]: string }, message: string
 const land = (n: number) => `export function land(): number {\n  return ${n};\n}\n`;
 
 // A work tree with an origin whose main is the base, a branch with one change of a body, and an initialised loop.
-function loop(change: { [path: string]: string } = { "src/ledger/land.ts": land(2) }): Loop {
+function loop(change: { [path: string]: string } = { "src/ledger/land.ts": land(2) }, main: { [path: string]: string } = {}): Loop {
   const root = mkdtempSync(join(tmpdir(), "dev-loop-flow-"));
   dirs.push(root);
   const work = join(root, "work");
   mkdirSync(work);
   sh(root, "git", ["init", "-q", "--bare", "origin.git"]);
   for (const args of [["init", "-q"], ["config", "user.email", "t@t"], ["config", "user.name", "t"], ["config", "core.autocrlf", "false"], ["remote", "add", "origin", join(root, "origin.git")]]) sh(work, "git", args);
-  commit(work, { "src/ledger/land.ts": land(1) }, "base");
+  commit(work, { "src/ledger/land.ts": land(1), ...main }, "base");
   sh(work, "git", ["push", "-q", "origin", "HEAD:refs/heads/main"]);
   sh(work, "git", ["fetch", "-q", "origin"]);
   commit(work, change, "task");
@@ -97,7 +97,7 @@ describe("dev-loop, a loop that converges", { timeout: 30_000 }, () => {
     expect(dl(l, "merge")).toMatchObject({ ok: true, wave: 2, next: "done", open: [] });
     expect(dl(l, "merge")).toMatchObject({ ok: false, error: "нет круга 3: сначала wave" });
 
-    const fin = dl(l, "final").comment as string;
+    const fin = dl(l, "final", "--worktree", l.work).comment as string;
     expect(readFileSync(fin, "utf8")).toContain("| 2 | проверка закрытия | Проверка закрытия | — | W1-T1 |");
     expect(dl(l, "restore", "--comments", comments(l))).toMatchObject({ ok: true, entry: "final", wave: 2, next: "end" });
   });
@@ -187,6 +187,13 @@ describe("dev-loop, nothing is lost before the end", { timeout: 30_000 }, () => 
     expect(dl(l, "answer", "--job", "tidy")).toMatchObject({ ok: true, status: "done" });
   });
 
+  it("does not stop on a rule of main the branch rewrote and lists it for the owner in the final report", () => {
+    const l = loop({ "CONVENTIONS.md": "# C\n\n- two rule\n- own rule\n- one rule, except configs\n" }, { "CONVENTIONS.md": "# C\n\n- one rule\n- two rule\n" });
+    expect(round(l, [])).toMatchObject({ ok: true, wave: 1, next: "done" });
+    const fin = readFileSync(dl(l, "final", "--worktree", l.work).comment as string, "utf8");
+    expect(fin.match(/^- строка CONVENTIONS\.md .*$/gm)).toEqual(["- строка CONVENTIONS.md из main изменена или убрана: «- one rule»"]);
+  });
+
   it("sends advice to a tidy round that records what is deferred in the plan", () => {
     const l = loop();
     const advice = { ...BLOCK, kind: "advice", rule: "", text: "a fixture would show the path" };
@@ -201,6 +208,6 @@ describe("dev-loop, nothing is lost before the end", { timeout: 30_000 }, () => 
     const w2 = dl(l, "wave", "--worktree", l.work);
     for (const a of agents(w2)) out(a.brief, { axis: read(a.brief).axis, head: rec, summary: "checked", statuses: [], findings: [] });
     expect(dl(l, "merge")).toMatchObject({ ok: true, next: "done" });
-    expect(readFileSync(dl(l, "final").comment as string, "utf8")).toContain("→ `plan/phases/S0/tasks/S0-98-x.md`");
+    expect(readFileSync(dl(l, "final", "--worktree", l.work).comment as string, "utf8")).toContain("→ `plan/phases/S0/tasks/S0-98-x.md`");
   });
 });
