@@ -28,7 +28,7 @@ rules: [ST-12]
 - **RM-Z04**: ST-18 в строке «structure and fitness tests»;
 - `rules` задачи S0-42 пополняется `ST-18`; `RULES.md` — `plan-check --rules`.
 
-Не входит: код и тесты — S0-40…S0-44.
+Не входит: код и тесты — S0-40…S0-44. Исключение по решению владельца 2026-10-08: явный таймаут 30 с у теста `test/codec/model.test.ts` «LG-42: no file of src/ but src/codec/build.ts casts…» — в составе `npm run verify` он шёл 5.2–6.4 с при таймауте vitest по умолчанию 5 с и валил `verify` и на `main`; ожидание теста не меняется. Остальные тесты на таймауте по умолчанию — S0-41.
 
 Попутно: G-29 в `PLAN.md`, вопросы 45 и 46 в `plan/bench/questions.md`, хелпер `scratch` в ratchet S0-42 и в разделе 8 `PLAN.md`.
 
