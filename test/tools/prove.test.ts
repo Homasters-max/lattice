@@ -46,6 +46,10 @@ const FILES: { readonly [path: string]: string } = {
   "scripts/run.mjs": 'import { lib } from "./lib.mjs";\nexport const run = lib;\n',
   "scripts/lib.mjs": "export const lib = 1;\n",
   "discussion/tools/l.mjs": "export const l = 1;\n",
+  "AGENTS.md": "# Agents\n",
+  "CONVENTIONS.md": "# Conventions\n",
+  ".claude/skills/s/SKILL.md": "# Skill\n",
+  "plan/STATUS.md": "# Status\n",
 };
 
 let stand: Scratch;
@@ -122,6 +126,12 @@ describe("prove, the choice of test sets by the hash of their input", () => {
   for (const path of ["plan/tools/t.mjs", "scripts/s.mjs", "discussion/tools/l.mjs"]) {
     it(`ST-12: an edit of ${path} runs the project tools`, () => {
       expect(chosen({ [path]: "export const changed = 2;\n" })).toEqual({ tools: [`owned: ${path}`], structure: FITNESS_REASON });
+    });
+  }
+
+  for (const path of ["AGENTS.md", "CONVENTIONS.md", ".claude/skills/s/SKILL.md", "plan/STATUS.md"]) {
+    it(`ST-18: an edit of ${path}, a document the tools check, runs the project tools`, () => {
+      expect(chosen({ [path]: "# Changed\n" })).toEqual({ tools: [`owned: ${path}`], structure: FITNESS_REASON });
     });
   }
 });
