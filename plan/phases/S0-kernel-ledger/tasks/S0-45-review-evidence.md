@@ -5,7 +5,7 @@ phase: S0
 stage: A
 size: M
 modules: []
-depends: [S0-44, S0-48]
+depends: [S0-44]
 rules: []
 ---
 
@@ -26,7 +26,7 @@ rules: []
 - **старт круга**: Architecture и Standards стартуют вместе с `dl gate`, Spec — когда готов отчёт `prove --ready` (S0-44); красные ворота отменяют вердикты только hunk'ов, которые задело исправление;
 - **brief ревьюера** (S0-48) — hunk'и, которые оси выбраны, и причина выбора каждого;
 - **tidy внутри `answer`**: если в круге есть блокирующие находки, fixer `answer` в том же запуске решает и советы, и находки `late` — `fixed`, `deferred` или `declined`, как в tidy; отдельный круг `tidy` остаётся только после круга без блокирующих находок, где есть советы;
-- **контракт**: `plan/dev-loop.md` «Круги», «Ничего не теряется» и роли reviewer и fixer, `.claude/skills/dev-loop/SKILL.md` «Переходы» и «Ворота».
+- **контракт**: `plan/dev-loop.md` «Круги», «Ничего не теряется» и схемы; тела агентов (S0-48): `fixer.md` — `answer` решает и советы, `verifier.md` — без режимов `close`, `status`, `delta`, `reviewer-architecture.md` — запуск по триггерам, все ревьюеры — только hunk'и из brief; `.claude/skills/dev-loop/SKILL.md` «Переходы» и «Ворота».
 
 Не входит: изменение осей и критериев `kind`.
 
