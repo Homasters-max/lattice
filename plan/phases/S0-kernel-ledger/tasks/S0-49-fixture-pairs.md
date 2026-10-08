@@ -20,7 +20,7 @@ ST-17 требует фикстуры trigger и pass у каждого rule ID 
 ## Объём
 
 Входит:
-- проверка в `test/fixtures/coverage.test.ts`: у каждой строки `checks.ts` для каждого ID из её `enforces` есть хотя бы одна фикстура trigger и одна pass, которые идут через эту строку; нарушение — отказ ST-17 с названной парой;
+- проверка в `test/fixtures/coverage.ts` (поле `checks` входа `auditCoverage`, аудит `auditPairs`), тест — в `test/fixtures/coverage.test.ts`: у каждой строки `checks.ts` для каждого ID из её `enforces` есть хотя бы одна фикстура trigger и одна pass, которые идут через эту строку; нарушение — отказ ST-17 с названной парой;
 - недостающие фикстуры для четырёх пар.
 
 Не входит: новые проверки в `src/`.
