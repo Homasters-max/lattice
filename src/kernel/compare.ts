@@ -9,12 +9,13 @@
 // schemas met again on the way is assumed to hold — the values under it are
 // smaller, and a cycle of `$ref` that never descends admits no value. The
 // walk stops at a depth and a number of steps: past them nothing is shown
-// (G-27).
+// (G-27). `type: any` holds every value, so every schema is narrower than it
+// or, when it says `type: any` too, the same (G-38).
 import { annotationsShown, aspectsIn } from "./compare-annotations.js";
 import { ASPECTS, join, SAME, shown, UNSHOWN, type Aspect, type Shown } from "./compare-shown.js";
 import { isListed, valuesWithin } from "./compare-values.js";
 import { isJsonObject, own, serialize, type JsonValue } from "./json.js";
-import { branchesOf, propertiesOf, requiredOf, typesOf, type Branch } from "./read-schema.js";
+import { branchesOf, isAny, propertiesOf, requiredOf, typesOf, type Branch } from "./read-schema.js";
 import type { Schema } from "./schema.js";
 import { schemasOf, type ResolveType } from "./type.js";
 import type { Resolve } from "./validate.js";
@@ -110,9 +111,11 @@ function inner(a: Schema, b: Schema, walk: Walk): Shown {
   return join(both("array") ? items(a, b, walk) : SAME, objects);
 }
 
-/** The values of A against those of B: through `$ref`, by branch of a union, or keyword by keyword. */
+/** The values of A against those of B: through `$ref`, against `type: any`, by branch of a union, or keyword by keyword. */
 function validity(a: Schema, b: Schema, walk: Walk): Shown {
   if (typeof a.$ref === "string" || typeof b.$ref === "string") return refs(a, b, walk);
+  // Every value is a value of `type: any`; no other schema of the subset holds them all: objects are closed (G-38).
+  if (isAny(a) || isAny(b)) return shown(isAny(b), isAny(a), "validity");
   if (a.oneOf !== undefined || b.oneOf !== undefined) return unions(a, b, walk);
   const values = shown(valuesWithin(a, b, walk.schemas), valuesWithin(b, a, walk.schemas), "validity");
   return join(values, inner(a, b, walk));

@@ -2,8 +2,9 @@
 // KR-18, each only where it applies and in its form, and the annotations of
 // KR-19; anything else is refused, never ignored — a new keyword is a new
 // kernel version. Objects are always closed: a schema that would admit any
-// value — no `type`, `$ref`, `oneOf`, `enum` or `const` — is refused too. The
-// forms the rule leaves open are G-22. The check walks with its own stack, so
+// value — no `type`, `$ref`, `oneOf`, `enum` or `const` — is refused too; any
+// value is said by `type: any` alone (G-38). The forms the rule leaves open are
+// G-22. The check walks with its own stack, so
 // no depth of nesting overflows. Whether `$ref` names an abstract type needs
 // the type of its target: the Type check asks it (S0-07). What a schema holds
 // is read by read-schema.ts, as every other reader reads it.
@@ -11,7 +12,7 @@ import { annotationRejections, isAnnotation, type Site } from "./annotations.js"
 import { FORMATS, isSchemaFormat } from "./formats.js";
 import type { Kind } from "./id.js";
 import { isJsonArray, isJsonObject, own, pointer, serialize, type JsonObject, type JsonValue } from "./json.js";
-import { childrenOf, isJsonType, isTypePair, propertiesOf, requiredOf, tagOf, typesOf, type Node } from "./read-schema.js";
+import { ANY, childrenOf, isAny, isJsonType, isTypePair, propertiesOf, requiredOf, tagOf, typesOf, type Node } from "./read-schema.js";
 import { isPinned } from "./ref.js";
 import { refuse, refused, reject, type Place, type Rejection, type Result } from "./rejection.js";
 import { KR_18 } from "./rules.js";
@@ -42,7 +43,11 @@ const SUBSCHEMA = { expected: "a schema", fits: () => true } as const;
 
 /** KR-18: the keywords of the subset, where each applies and its form. */
 const KEYWORDS: { readonly [keyword: string]: Keyword } = {
-  type: { applies: "any", expected: "string, integer, number, boolean, object, array or null, or a pair of one with null", fits: (v) => isJsonType(v) || isTypePair(v) },
+  type: {
+    applies: "any",
+    expected: "string, integer, number, boolean, object, array or null, a pair of one with null, or any",
+    fits: (v) => v === ANY || isJsonType(v) || isTypePair(v),
+  },
   properties: { applies: ["object"], expected: "an object of field schemas", fits: isJsonObject },
   required: { applies: ["object"], expected: "an array of field names", fits: (v) => isJsonArray(v) && v.every((s) => typeof s === "string") },
   values: { applies: ["object"], ...SUBSCHEMA },
@@ -75,7 +80,8 @@ function applies(applied: Applies, types: readonly string[]): boolean {
 function keywordRejections(schema: Schema, key: string, path: string, intent: string | null): Rejection[] {
   const keyword = KEYWORDS[key];
   if (keyword === undefined) throw new Error(`bug: ${key} is not a keyword of KR-18`);
-  // A `type` out of its form is refused by its own key; no keyword is refused for where it sits beside it.
+  // A `type` out of its form is refused by its own key; no keyword is refused for where it sits beside it. Beside
+  // `type: any` every keyword but a description is refused once, by besideRejections (G-38).
   const typed = schema.type === undefined || isJsonType(schema.type) || isTypePair(schema.type);
   const at = pointer(path, key);
   if (typed && !applies(keyword.applies, typesOf(schema))) {
@@ -93,12 +99,25 @@ function keyRejections(site: Site, key: string, kind: Kind, intent: string | nul
   return [reject(KR_18, { intent, path: pointer(site.path, key), expected: "a keyword or an annotation of the closed subset", got: key })];
 }
 
-/** What a schema may hold beside `$ref` or `oneOf`, annotations aside (G-22). */
-const BESIDE: { readonly [head: string]: readonly string[] } = { $ref: ["$ref", "description"], oneOf: ["oneOf", "discriminator", "description"] };
+/** What a schema may hold beside `$ref`, `oneOf` or `type: any`, annotations aside (G-22, G-38). */
+const BESIDE: { readonly [head: string]: readonly string[] } = {
+  $ref: ["$ref", "description"],
+  oneOf: ["oneOf", "discriminator", "description"],
+  "type any": ["type", "description"],
+};
 
-/** G-22: `$ref` stands alone, `oneOf` with its discriminator; a description and annotations may sit beside either. */
-function besideRejections(schema: Schema, path: string, intent: string | null): Rejection[] {
+/** The keyword that leaves no room for others beside it: `$ref`, else `oneOf`, else `type: any`. */
+function headOf(schema: Schema): string | undefined {
   const head = ["$ref", "oneOf"].find((k) => schema[k] !== undefined);
+  return head ?? (isAny(schema) ? "type any" : undefined);
+}
+
+/**
+ * G-22, G-38: `$ref` stands alone, `oneOf` with its discriminator, `type: any` alone — the kernel never looks into
+ * its value; a description and annotations may sit beside each.
+ */
+function besideRejections(schema: Schema, path: string, intent: string | null): Rejection[] {
+  const head = headOf(schema);
   const allowed = head === undefined ? undefined : BESIDE[head];
   if (allowed === undefined) return [];
   return Object.keys(schema)
