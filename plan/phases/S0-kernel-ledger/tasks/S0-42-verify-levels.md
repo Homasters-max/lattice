@@ -28,6 +28,12 @@ rules: [ST-12, ST-18]
 
 Не входит: мутации и `--ready` — S0-44; записи run'ов, ворота по ключам — S0-43.
 
+Как сделано (исполнитель):
+- классификатор — `scripts/paths.mjs` (типы для тестов — `paths.d.mts`): `classOf` и `ST_BY_CLASS` переехали из `scope.mjs`, `testSetOf` (файлы в корне `test/` — `smoke`), `FITNESS`, `isTool`, `ownedRoots` и `owns`. Чем test set владеет сверх своей папки — файлы, которые его тесты читают как данные (G-30): `cli` — `src/` и конфиги сборки, `codec` — `src/` (аудиты через `repoTree`), `kernel` — `test/vectors/`, `support` — `test/`, `tools` — `plan/`, `scripts/`, `discussion/tools/`, `.claude/`, `AGENTS.md`, `CONVENTIONS.md` и два файла `test/`, которые называют документы цикла; fitness-наборы владеют всем репозиторием;
+- hash test set — git blob (текст с LF) каждого входа: owned-файлы, импорты файлов `test/<set>/` и конфига прогона (`package.json`, lockfile, `tsconfig.json`, `vitest.config.ts`, setup из `test/support/`) транзитивно, программы `program("<entry>")` с их импортами, `docs/design`, если файл набора импортирует `knowledge`. Набор идёт, если hash по рабочему дереву отличается от hash на merge base; причина — изменившиеся входы с видом (`owned`, `import`, `program`, `knowledge`, `config`). Наборы одного hash (все fitness) идут одним прогоном vitest; прогоны vitest идут друг за другом, рядом с прочими шагами `verify` (`runSteps` и `queue` в `scripts/verify.mjs`);
+- хелперы — `test/support/files.ts` (`owned`, `knowledge`, `scratch`) и `test/support/program.ts` (`program`: node-программа проекта, программа, собранная тестом в своём `scratch`, или инструмент окружения — `git`); `owned` знает test set по выполняемому файлу теста (`expect.getState().testPath`) и отказывает с ST-18 на чужой файл;
+- AST-тест ST-18 — `test/structure/audit-reads.ts` и `reads.test.ts`; его trigger и pass — случаи в самом тесте, как у прочих проверок ST: папки `test/fixtures/<RULE-ID>/` — для rule ID из реестров `src/**/rules.ts` (ST-17, `coverage.ts`).
+
 ## Тесты и фикстуры
 
 - Классификатор и выбор: правка файла модуля выбирает его test-set и тех, кто его импортирует; правка `docs/design` — test-sets, читающие знание; правка `plan/tools/**`, `scripts/**` или `discussion/tools/**` — project `tools`.

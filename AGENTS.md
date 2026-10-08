@@ -24,7 +24,7 @@ LATTICE — governance substrate: дизайн с правилами по ID в 
 
 ## Зелёный
 
-`npm run verify` — с S0-01; до неё — `node discussion/tools/lint-ids.mjs` и `node plan/tools/plan-check.mjs`.
+`npm run prove` — с S0-42: шаги `verify` без тестов, весь fitness и test-sets, чей hash входа изменился против `origin/main` (`--base <ref>` — другая база). Итог — `outcome` в JSON последней строки и код выхода; вывод не режется `| tail`, полный лог — `.lattice/prove.log`. `npm run verify` — полный прогон, для CI и владельца.
 
 ## Задача плана
 
