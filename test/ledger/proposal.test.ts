@@ -85,14 +85,10 @@ describe("canonical order and the hash of a proposal (LG-06, LG-10, G-03)", () =
     const expected = proposalHash(proposal(intents), MARKS);
     fc.assert(
       fc.property(fc.shuffledSubarray(intents, { minLength: intents.length }), (shuffled) => {
-        expect(canonicalIntents(proposal(shuffled).intents, MARKS).map((i: Intent) => i.id)).toEqual([
-          "demo/a",
-          "01JB2X0000000000000000000A",
-          "01JB2X0000000000000000000B",
-          "01JB2X0000000000000000000C",
-        ]);
+        expect(canonicalIntents(proposal(shuffled).intents, MARKS).map((i: Intent) => i.id)).toEqual(["demo/a", "01JB2X0000000000000000000A", "01JB2X0000000000000000000B", "01JB2X0000000000000000000C"]);
         expect(proposalHash(proposal(shuffled), MARKS)).toBe(expected);
       }),
+      { numRuns: 100 },
     );
   });
 
@@ -103,6 +99,7 @@ describe("canonical order and the hash of a proposal (LG-06, LG-10, G-03)", () =
       fc.property(fc.shuffledSubarray(intents, { minLength: intents.length }), (shuffled) => {
         expect(proposalHash(proposal(shuffled), MARKS)).toBe(expected);
       }),
+      { numRuns: 100 },
     );
   });
 

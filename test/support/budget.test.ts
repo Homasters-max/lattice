@@ -1,14 +1,15 @@
 // A run of the tests is a function of its input (ST-12; RT-21 after S0-39;
 // S0-41): fast-check draws from one seed — `LATTICE_SEED`, or a fixed one
-// without it — every property names its budget of cases, and no test takes
-// the default timeout of vitest: time is a safeguard set above the budget.
+// without it — every property names its budget of cases and no seed of its
+// own, and no test takes the default timeout of vitest: time is a safeguard
+// set above the budget.
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import fc from "fast-check";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SEED, SAFEGUARD_MS, seedOf } from "../support/budget.js";
-import { repoRoot } from "./tree.js";
+import { DEFAULT_SEED, SAFEGUARD_MS, seedOf } from "./budget.js";
+import { repoRoot } from "../structure/tree.js";
 
 /** A call `fc.assert(…)` or `fc.check(…)`: a run of a property. */
 const isRun = (node: ts.Node, file: ts.SourceFile): node is ts.CallExpression =>
@@ -17,18 +18,19 @@ const isRun = (node: ts.Node, file: ts.SourceFile): node is ts.CallExpression =>
   ["assert", "check"].includes(node.expression.name.text) &&
   node.expression.expression.getText(file) === "fc";
 
-/** The parameters of a run name `numRuns`: its budget is counted in cases. */
-const counted = (call: ts.CallExpression, file: ts.SourceFile): boolean => {
+/** The parameters of a run name `numRuns` and no `seed` of their own: its budget is counted in cases, its seed is the run's. */
+const inBudget = (call: ts.CallExpression, file: ts.SourceFile): boolean => {
   const params = call.arguments[1];
-  return params !== undefined && ts.isObjectLiteralExpression(params) && params.properties.some((p) => p.name?.getText(file) === "numRuns");
+  const names = params !== undefined && ts.isObjectLiteralExpression(params) ? params.properties.map((p) => p.name?.getText(file)) : [];
+  return names.includes("numRuns") && !names.includes("seed");
 };
 
-/** `path:line` of each run of a property whose parameters do not name `numRuns`. */
+/** `path:line` of each run of a property that does not name `numRuns` or names a `seed` of its own. */
 function unbudgeted(path: string, text: string): string[] {
   const file = ts.createSourceFile(path, text, ts.ScriptTarget.ES2023, true);
   const found: string[] = [];
   const visit = (node: ts.Node): void => {
-    if (isRun(node, file) && !counted(node, file)) found.push(`${path}:${file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1}`);
+    if (isRun(node, file) && !inBudget(node, file)) found.push(`${path}:${file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1}`);
     ts.forEachChild(node, visit);
   };
   visit(file);
@@ -61,13 +63,14 @@ describe("the time of a test", () => {
 });
 
 describe("the budget of a property", () => {
-  it("is named by numRuns in every run of a property", () => {
+  it("is named by numRuns in every run of a property, and the seed is the run's", () => {
     expect(unbudgeted("x.test.ts", "fc.assert(fc.property(fc.nat(), (n) => n >= 0));\n")).toEqual(["x.test.ts:1"]);
     expect(unbudgeted("x.test.ts", "const p = fc.property(fc.nat(), (n) => n >= 0);\nfc.check(p, { seed: 1 });\n")).toEqual(["x.test.ts:2"]);
+    expect(unbudgeted("x.test.ts", "fc.assert(fc.property(fc.nat(), (n) => n >= 0), { numRuns: 100, seed: 7 });\n")).toEqual(["x.test.ts:1"]);
     expect(unbudgeted("x.test.ts", "fc.assert(fc.property(fc.nat(), (n) => n >= 0), { numRuns: 100 });\n")).toEqual([]);
   });
 
-  it("every property test of the repository names its numRuns", () => {
+  it("every property test of the repository names its numRuns and takes the seed of the run", () => {
     const paths = readdirSync(join(repoRoot, "test"), { recursive: true, encoding: "utf8" })
       .map((p) => `test/${p.replaceAll("\\", "/")}`)
       .filter((p) => p.endsWith(".ts"))
