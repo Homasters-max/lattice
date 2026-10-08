@@ -154,15 +154,18 @@ export function answerFindings(state, answers) {
 }
 
 // Ответ владельца текстом: стоп, ответ агенту, который спрашивал, или поручение исправляющему.
+// Остановленный цикл ответ владельца возобновляет: «продолжить» — к воротам и следующему кругу, иной текст — поручение.
 export function answerText(state, text) {
-  if (!state.pending) return { errors: ["владельца ни о чём не спрашивали"] };
+  if (!state.pending && !state.stopped) return { errors: ["владельца ни о чём не спрашивали"] };
   const next = structuredClone(state);
-  const agent = state.pending.agent;
+  const agent = state.pending?.agent;
   next.pending = null;
   if (/^\s*стоп\s*$/i.test(text)) {
     next.stopped = true;
     return { errors: [], state: next, next: "stop", why: "владелец остановил цикл" };
   }
+  next.stopped = false;
+  if (state.stopped && /^\s*продолжить\s*$/i.test(text)) return { errors: [], state: next, next: "gate", why: "владелец возобновил цикл" };
   next.owner = agent ? { text, agent, job: state.pending.job } : { text, agent: "fixer", job: "owner" };
   return { errors: [], state: next, ...resumeOf(next) };
 }
@@ -176,5 +179,7 @@ export function entryOf(kind, state) {
   if (kind === "escalation" || state.pending) return { next: "ask", why: state.pending?.why };
   if (state.owner) return resumeOf(state);
   if (kind === "answer") return { next: "gate", why: "ответ на ревью опубликован" };
+  // Решение владельца без поручения после ответа, который круг ещё не ревьюировал, — возобновлённый цикл.
+  if (kind === "decision" && !state.decisions.length && state.answers && state.answers.head !== state.head) return { next: "gate", why: "владелец возобновил цикл" };
   return decide(state);
 }
