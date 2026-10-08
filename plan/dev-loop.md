@@ -106,7 +106,7 @@ Push автора — `git push origin HEAD:refs/heads/<branch>` (worktree в de
 
 ## Самопроверка
 
-Executor перед выходом `ready`, fixer перед push — на своём diff или дельте. Список дел даёт `dl step selfcheck --task <ID>`: сработавшие триггеры Architecture и опись `plan/closure-check.md` по ним, пункты `CONVENTIONS.md` по путям diff, строки таблицы «Правила» PR; пустой `todo` — по списку делать нечего. Сверх списка:
+Executor перед выходом `ready`, fixer перед push — на своём diff или дельте. Список дел по закоммиченному diff ветки даёт `dl step selfcheck --task <ID>`: сработавшие триггеры Architecture и опись `plan/closure-check.md` по ним, пункты `CONVENTIONS.md` по путям diff, строки таблицы «Правила» PR; пустой `todo` — по списку делать нечего. Сверх списка:
 
 - **Standards**: `AGENTS.md`, ST-01…ST-18 (`docs/design/13-structure.md`), имена по глоссарию (ST-03). Чаще всего ловят: адаптеры для тестов собирает только `test/support/assembly.ts` (CONVENTIONS §1.8), отказ называет rule ID (ST-17);
 - **Architecture**: у каждой строки описи из `architecture.inventory` — вердикт по `closure`;
