@@ -33,24 +33,35 @@ const FILES: { readonly [path: string]: string } = {
   "src/ledger/b.ts": 'import { a } from "../kernel/a.js";\nexport const b = a + 1;\n',
   "src/trust/c.ts": "export const c = 3;\n",
   "test/support/files.ts": "export const knowledge = {};\n",
+  "test/support/setup.ts": 'import { seed } from "./seed.js";\nexport const s = seed;\n',
+  "test/support/seed.ts": "export const seed = 1;\n",
   "test/kernel/a.test.ts": 'import { a } from "../../src/kernel/a.js";\nexport const t = a;\n',
   "test/ledger/b.test.ts": 'import { b } from "../../src/ledger/b.js";\nexport const t = b;\n',
+  "test/ledger/run.test.ts": 'const run = program("scripts/run.mjs");\nexport const t = run;\n',
   "test/trust/c.test.ts": 'import { knowledge } from "../support/files.js";\nimport { c } from "../../src/trust/c.js";\nexport const t = [knowledge, c];\n',
   "test/structure/s.test.ts": "export const t = 0;\n",
   "test/tools/t.test.ts": 'export const t = "t";\n',
   "plan/tools/t.mjs": "export const t = 1;\n",
   "scripts/s.mjs": "export const s = 1;\n",
+  "scripts/run.mjs": 'import { lib } from "./lib.mjs";\nexport const run = lib;\n',
+  "scripts/lib.mjs": "export const lib = 1;\n",
   "discussion/tools/l.mjs": "export const l = 1;\n",
 };
 
 let stand: Scratch;
+
+/** Runs git in the stand; each command must succeed. */
+function inStand(...commands: readonly (readonly string[])[]) {
+  for (const args of commands) expect(git.run(args, { cwd: stand.dir }).status).toBe(0);
+}
+
+const COMMIT = ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-a", "-m"];
+
 beforeEach(() => {
   stand = scratch("prove-");
   stands.push(stand);
   for (const [path, text] of Object.entries(FILES)) stand.write(path, text);
-  for (const args of [["init", "-q", "-b", "main"], ["add", "-A"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "base"]]) {
-    expect(git.run(args, { cwd: stand.dir }).status).toBe(0);
-  }
+  inStand(["init", "-q", "-b", "main"], ["add", "-A"], [...COMMIT, "base"]);
 });
 
 /** The sets prove runs after the edits, with their reasons; the others are left out. */
@@ -113,6 +124,30 @@ describe("prove, the choice of test sets by the hash of their input", () => {
       expect(chosen({ [path]: "export const changed = 2;\n" })).toEqual({ tools: [`owned: ${path}`], structure: FITNESS_REASON });
     });
   }
+});
+
+describe("prove, the input beyond the files of a test set: programs, the config of a run, the base", () => {
+  it("ST-18: an edit of a program a test starts, or of what it imports, runs that test set and names the program", () => {
+    expect(chosen({ "scripts/run.mjs": 'import { lib } from "./lib.mjs";\nexport const run = lib + 1;\n', "scripts/lib.mjs": "export const lib = 2;\n" })).toEqual({
+      ledger: ["import: scripts/lib.mjs", "program: scripts/run.mjs"],
+      tools: ["owned: scripts/lib.mjs", "owned: scripts/run.mjs"],
+      structure: FITNESS_REASON,
+    });
+  });
+
+  it("ST-18: an edit of a file the setup of the config imports runs every test set", () => {
+    const reason = ["import: test/support/seed.ts"];
+    expect(chosen({ "test/support/seed.ts": "export const seed = 2;\n" })).toEqual({ kernel: reason, ledger: reason, structure: FITNESS_REASON, tools: reason, trust: reason });
+  });
+
+  it("ST-12: the base of a change request is the merge base of --base and HEAD: a commit of the branch counts, a later commit of the base does not", () => {
+    inStand(["checkout", "-q", "-b", "topic"]);
+    stand.write("src/trust/c.ts", "export const c = 4;\n");
+    inStand([...COMMIT, "branch"], ["checkout", "-q", "main"]);
+    stand.write("src/kernel/a.ts", "export const a = 2;\n");
+    inStand([...COMMIT, "main"], ["checkout", "-q", "topic"]);
+    expect(chosen({})).toEqual({ trust: ["import: src/trust/c.ts"], structure: FITNESS_REASON });
+  });
 
   it("ST-18: an edit of the lockfile runs every test set", () => {
     expect(Object.keys(chosen({ "package-lock.json": '{"lockfileVersion": 3}\n' })).sort()).toEqual(["kernel", "ledger", "structure", "tools", "trust"]);
