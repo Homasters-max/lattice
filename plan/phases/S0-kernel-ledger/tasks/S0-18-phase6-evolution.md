@@ -6,7 +6,7 @@ stage: F
 size: L
 modules: [ledger, cli]
 depends: [S0-13, S0-14, S0-07]
-rules: [RF-12, RF-13, RF-14, RF-15, RF-16, RF-17, RF-18, RF-19, RF-22, TY-08, TR-44, RT-32]
+rules: [RF-12, RF-13, RF-14, RF-15, RF-16, RF-17, RF-18, RF-19, RF-22, TY-08, TY-14, TR-29, TR-44, RT-32]
 ---
 
 # S0-18 · Фаза 6 — эволюция типов и контрактов, identity, migrate
@@ -22,6 +22,7 @@ rules: [RF-12, RF-13, RF-14, RF-15, RF-16, RF-17, RF-18, RF-19, RF-22, TY-08, TR
 - **новая запись** — по latest ревизии типа; существующий блок переходит на новую ревизию типа только новой своей ревизией; более строгий тип не мешает вывести из use (RF-14);
 - **классы контракта** (RF-15): `same-shape`, `consumer-compatible`, `breaking` — по `compare` input, params, output, статусов, `uses`, операций порта; `breaking` как ревизия того же `id` — отказ (RF-16, RF-17); breaking — новый `id` с `supersedes` (RF-18, TY-08);
 - **пины контракта** (RF-19): новый пин — на current revision; ветка «ревизия, которую пинит `live` pipeline» — S1;
+- **status facts** (TY-14, TR-29, G-32): тип, чей `extends` называет status fact, — отказ TY-14; неотозванный `alias` без `value` — отказ TR-29;
 - **identity** (RF-12): новый блок перечисляет в `supersedes` pinned последние ревизии заменяемых; старый получает `retired`; преемники читаются из referrers;
 - **живучесть policy** (TR-44): после коммита policy проектного namespace держит ключ владельца и ключ участника `land`;
 - **impact** (RF-22): замыкание referrers изменённой цели по меткам команды;
@@ -43,3 +44,4 @@ rules: [RF-12, RF-13, RF-14, RF-15, RF-16, RF-17, RF-18, RF-19, RF-22, TY-08, TR
 
 - Если сверх L — делить на «типы и `migrate`» и «контракты и пины».
 - От S0-07: `compare(a, b, mode, resolve)` возвращает `{relation, aspects}`, `aspects` — список имён `validity`, `ref`, `edge`, `unique`, `key`, `card_order`, `description` в этом порядке (G-27); `same-shape` RF-15 — каждый аспект из `card_order`, `description`.
+- От S0-08: схема `fact` не выражает закрытость status facts (TY-14), а схема `alias` — что у неотозванного `alias` есть `value` (TR-29): `revoked` необязателен, `oneOf` различает ветви только по `const`; оба отказа — эта фаза по `after` (G-32).

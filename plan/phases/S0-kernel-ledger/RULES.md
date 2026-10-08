@@ -80,15 +80,15 @@
 | TY-02 | полностью | [S0-08](tasks/S0-08-std-types-s0.md), [S0-09](tasks/S0-09-std-schemas-drafts.md), [S0-24](tasks/S0-24-std-ledger.md) |
 | TY-03 | полностью | [S0-08](tasks/S0-08-std-types-s0.md) |
 | TY-05 | полностью | [S0-08](tasks/S0-08-std-types-s0.md) |
-| TY-06 | полностью | [S0-08](tasks/S0-08-std-types-s0.md) |
+| TY-06 | полностью | [S0-08](tasks/S0-08-std-types-s0.md), [S0-15](tasks/S0-15-phase4-references.md) |
 | TY-07 | полностью | [S0-08](tasks/S0-08-std-types-s0.md) |
 | TY-08 | полностью | [S0-18](tasks/S0-18-phase6-evolution.md) |
 | TY-09 | полностью | [S0-15](tasks/S0-15-phase4-references.md) |
 | TY-10 | полностью | [S0-15](tasks/S0-15-phase4-references.md) |
 | TY-11 | полностью | [S0-08](tasks/S0-08-std-types-s0.md) |
-| TY-12 | полностью | [S0-08](tasks/S0-08-std-types-s0.md) |
+| TY-12 | полностью | [S0-08](tasks/S0-08-std-types-s0.md), [S0-15](tasks/S0-15-phase4-references.md) |
 | TY-13 | полностью | [S0-08](tasks/S0-08-std-types-s0.md) |
-| TY-14 | полностью | [S0-08](tasks/S0-08-std-types-s0.md), [S0-09](tasks/S0-09-std-schemas-drafts.md) |
+| TY-14 | полностью | [S0-08](tasks/S0-08-std-types-s0.md), [S0-09](tasks/S0-09-std-schemas-drafts.md), [S0-18](tasks/S0-18-phase6-evolution.md) |
 | TY-15 | полностью | [S0-08](tasks/S0-08-std-types-s0.md) |
 | TY-16 | полностью | [S0-08](tasks/S0-08-std-types-s0.md) |
 
@@ -192,7 +192,7 @@
 | TR-26 | полностью | [S0-14](tasks/S0-14-standing.md) |
 | TR-27 | полностью | [S0-14](tasks/S0-14-standing.md) |
 | TR-28 | полностью | [S0-14](tasks/S0-14-standing.md) |
-| TR-29 | полностью | [S0-08](tasks/S0-08-std-types-s0.md), [S0-14](tasks/S0-14-standing.md), [S0-15](tasks/S0-15-phase4-references.md) |
+| TR-29 | полностью | [S0-08](tasks/S0-08-std-types-s0.md), [S0-14](tasks/S0-14-standing.md), [S0-15](tasks/S0-15-phase4-references.md), [S0-18](tasks/S0-18-phase6-evolution.md) |
 | TR-31 | полностью | [S0-14](tasks/S0-14-standing.md) |
 | TR-40 | полностью | [S0-02](tasks/S0-02-code-conventions.md) |
 
