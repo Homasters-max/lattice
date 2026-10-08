@@ -221,4 +221,14 @@ describe.concurrent("dev-loop gate, the records of runs", { timeout: 60_000 }, (
     expect(await dl(l, t(5), "owner", "--text", "стоп")).toMatchObject({ next: "stop" });
     expect(await dl(l, t(6), "owner", "--text", "продолжить")).toMatchObject({ next: "gate" });
   });
+
+  it("sends «продолжить» to the gate when the last gate on the head is red, though an earlier gate on it was green", async () => {
+    const l = await loop();
+    await dl(l, t(0), "init", "--pr", "9", "--task", "S0-99", "--branch", BRANCH);
+    expect(await dl(l, t(1), "gate", "--worktree", l.work)).toMatchObject({ green: true });
+    expect(await dl(l, red(2), "gate", "--worktree", l.work)).toMatchObject({ green: false, next: "red" });
+    await dl(l, t(3), "escalate", "--why", "проверить");
+    expect(await dl(l, t(4), "owner", "--text", "стоп")).toMatchObject({ next: "stop" });
+    expect(await dl(l, t(5), "owner", "--text", "продолжить")).toMatchObject({ next: "gate" });
+  });
 });
