@@ -32,7 +32,7 @@
 | [S0-36](tasks/S0-36-record-against-type.md) | Запись против своего типа — один вход фазы 2 и чтение схемы | C | ✅ | [#28](https://github.com/Homasters-max/lattice/pull/28) | разбор волны 2, Q-33, G-28 |
 | [S0-37](tasks/S0-37-check-result.md) | Одна форма результата жёсткой проверки и одна грамматика rule ID | C | ✅ | [#29](https://github.com/Homasters-max/lattice/pull/29) | разбор волны 2 |
 | [S0-08](tasks/S0-08-std-types-s0.md) | core и std — типы S0 как данные | D | ✅ | [#53](https://github.com/Homasters-max/lattice/pull/53) | |
-| [S0-09](tasks/S0-09-std-schemas-drafts.md) | Черновики всех схем std — проверка подмножества до заморозки ядра | D | ⬜ | | может перейти в SW |
+| [S0-09](tasks/S0-09-std-schemas-drafts.md) | Черновики всех схем std — проверка подмножества до заморозки ядра | D | ✅ | [#54](https://github.com/Homasters-max/lattice/pull/54) | может перейти в SW |
 | [S0-53](tasks/S0-53-any-value-keyword.md) | «Любое значение» в подмножестве схем — ключевое слово ядра до заморозки | D | ⬜ | | решение владельца по G-38 |
 | [S0-10](tasks/S0-10-proposal-commit.md) | Proposal и commit — форматы, hash, подписи, цепочка | E | ✅ | [#21](https://github.com/Homasters-max/lattice/pull/21) | G-03, G-10, G-24 |
 | [S0-11](tasks/S0-11-store-port.md) | Порт store — адаптеры memory и jsonl, контракт-тесты | E | ⬜ | | |
