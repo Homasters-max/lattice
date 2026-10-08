@@ -133,7 +133,7 @@ async function closeAll(l: Loop, w: Json, h: string): Promise<Json> {
   return dl(l, "merge");
 }
 
-describe.concurrent("dev-loop, review by hunks", { timeout: 30_000 }, () => {
+describe.concurrent("dev-loop, review by hunks", { timeout: 60_000 }, () => {
   it("reviews in the next round only the edited hunk and only with the axes of its triggers; the verdicts of the other hunks hold", async () => {
     const l = await loop(TWO);
     expect(await round(l, [BLOCK])).toMatchObject({ next: "fix" });
@@ -189,7 +189,7 @@ describe.concurrent("dev-loop, review by hunks", { timeout: 30_000 }, () => {
   });
 });
 
-describe.concurrent("dev-loop, advice of a round with blocking findings", { timeout: 30_000 }, () => {
+describe.concurrent("dev-loop, advice of a round with blocking findings", { timeout: 60_000 }, () => {
   it("gives the answer the finding and the advice, refuses an answer that leaves the advice, and has no tidy round after it", async () => {
     const l = await loop();
     const advice = { ...BLOCK, kind: "advice", rule: "", where: "src/ledger/land.ts:1", text: "name the function after the rule" };

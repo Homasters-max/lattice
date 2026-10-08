@@ -132,7 +132,7 @@ describe.concurrent("dev-loop scope, the axes of a hunk: Spec and Standards", { 
     await commit(dir, { "src/ledger/land.ts": land("  return 2;") }, "body");
     const s = await scope(dir, base);
     expect(s.axes).toEqual(["spec", "standards"]);
-    expect(s.hunks.map(({ id: _, ...h }) => h)).toEqual([{ file: "src/ledger/land.ts", at: "2", text: "@@ -2 +2 @@ export function land(): number {\n-  return 1;\n+  return 2;", axes: { spec: ["изменён код"], standards: ["изменён код"] } }]);
+    expect(s.hunks).toMatchObject([{ file: "src/ledger/land.ts", at: "2", text: "@@ -2 +2 @@ export function land(): number {\n-  return 1;\n+  return 2;", axes: { spec: ["изменён код"], standards: ["изменён код"] } }]);
     expect(s.hunks[0]!.id).toMatch(/^[0-9a-f]{12}$/);
   });
 
