@@ -26,9 +26,6 @@ export const ST_BY_CLASS = {
 /** The test sets of fitness: they run on every change request (ST-12), whatever it changes. */
 export const FITNESS = ["structure", "fixtures", "e2e", "smoke"];
 
-/** The project of the tests of the development tools (vitest.config.ts): it runs when a tool changes. */
-export const TOOLS = "tools";
-
 /** A file of the development tools: `plan/tools/**`, `scripts/**`, `discussion/tools/**`. */
 export const isTool = (path) => /^(plan\/tools|scripts|discussion\/tools)\//.test(path);
 
