@@ -107,30 +107,31 @@ afterAll(() => {
   temp.remove();
 });
 
-describe.concurrent("dev-loop check, the survivors of prove --ready", { timeout: 30_000 }, () => {
-  it("ST-13: refuses an output of the executor without the report on its head, and with a survivor it did not decide", async () => {
+// A case runs dl check some times, and each run loads typescript to find the mutants: under the load of a whole run
+// of the tests that takes more than the default.
+const TIMEOUT = 60_000;
+
+describe.concurrent("dev-loop check, the report of prove --ready", { timeout: TIMEOUT }, () => {
+  it("ST-13: refuses an output of the executor without the report, and with the report taken with uncommitted edits", async () => {
     const l = await loop();
     expect(await executor(l)).toEqual([expect.stringMatching(/^mutants: нет отчёта — нужен \.lattice\/mutants\.json `npm run prove --ready` на head \w{7} без незакоммиченных правок: мутантов в изменённых hunk'ах src\/ — 2$/)]);
-    const ids = await report(l, { boundary: "survived", refusal: "killed" });
-    expect(await executor(l)).toEqual([`mutants: выживший ${ids.boundary} не решён — src/ledger/land.ts:2 boundary: < → <=; нужно killed, equivalent или deferred`]);
-    await report(l, { boundary: "survived", refusal: "killed" }, { dirty: true });
+    const ids = await report(l, { boundary: "survived", refusal: "killed" }, { dirty: true });
     expect(await executor(l, { mutants: [{ id: ids.boundary, decision: "equivalent", reason: "no input below zero" }] })).toEqual([
       expect.stringMatching(/^mutants: отчёт снят с незакоммиченными правками — /),
     ]);
+  });
+
+  it("ST-13: refuses the report taken at another commit, and the report that does not name a mutant of the head", async () => {
+    const l = await loop();
     const before = await sh(l.work, git, ["rev-parse", "HEAD~1"]);
     await report(l, { boundary: "killed", refusal: "killed" }, { head: before });
     expect(await executor(l)).toEqual([expect.stringMatching(new RegExp(`^mutants: отчёт на ${before.slice(0, 7)} — нужен .* на head \\w{7} `))]);
-    await report(l, { boundary: "killed" });
+    const ids = await report(l, { boundary: "killed" });
     expect(await executor(l)).toEqual([`mutants: отчёт на head не называет мутантов: ${ids.refusal} src/ledger/land.ts:2 — нужен новый \`npm run prove --ready\``]);
   });
+});
 
-  it("ST-13: refuses an output done of the fixer with a survivor it did not decide and dl does not remember", async () => {
-    const l = await loop();
-    const ids = await report(l, { boundary: "survived", refusal: "killed" });
-    expect(await fixer(l)).toEqual([`mutants: выживший ${ids.boundary} не решён — src/ledger/land.ts:2 boundary: < → <=; нужно killed, equivalent или deferred`]);
-    expect(await fixer(l, { mutants: [{ id: ids.boundary, decision: "deferred", reason: "G-01 of the plan" }] })).toEqual([]);
-  });
-
+describe.concurrent("dev-loop init, the decisions of the executor", { timeout: TIMEOUT }, () => {
   // init without a state makes one, and with the state of start keeps it: either way the decisions of the executor,
   // checked before there was a state, go into it.
   for (const started of [false, true])
@@ -142,6 +143,17 @@ describe.concurrent("dev-loop check, the survivors of prove --ready", { timeout:
       expect(await dl(l, "init", "--task", "S0-99", "--from", join(l.dir, "executor.out.json"))).toMatchObject({ ok: true, existed: started });
       expect(await fixer(l)).toEqual([]);
     });
+});
+
+describe.concurrent("dev-loop check, the survivors of prove --ready", { timeout: TIMEOUT }, () => {
+  it("ST-13: refuses an output of the executor, and an output done of the fixer, with a survivor it did not decide and dl does not remember", async () => {
+    const l = await loop();
+    const ids = await report(l, { boundary: "survived", refusal: "killed" });
+    const undecided = `mutants: выживший ${ids.boundary} не решён — src/ledger/land.ts:2 boundary: < → <=; нужно killed, equivalent или deferred`;
+    expect(await executor(l)).toEqual([undecided]);
+    expect(await fixer(l)).toEqual([undecided]);
+    expect(await fixer(l, { mutants: [{ id: ids.boundary, decision: "deferred", reason: "G-01 of the plan" }] })).toEqual([]);
+  });
 
   it("ST-13: accepts a survivor decided equivalent or deferred with a reason, and killed only when the report at the head shows it killed", async () => {
     const l = await loop();
