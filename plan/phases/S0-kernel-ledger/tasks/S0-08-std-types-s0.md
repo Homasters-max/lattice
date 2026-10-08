@@ -22,7 +22,7 @@ rules: [TY-01, TY-02, TY-03, TY-05, TY-06, TY-07, TY-11, TY-12, TY-13, TY-14, TY
 - **базовые типы** TY-Z02 с полем `supersedes` (TY-03): `knowledge`, `composition`, `contract`, `implementation`, `behaviour`, `decision-point`, `hint` — abstract (G-02);
 - **знания** TY-Z03: `requirement`, `scenario`, `decision`, `invariant`, `term`, `clause`, `prose`, `example`; поля кодека `refs`, `table`, `list` (G-01); `card_order` по колонке Card;
 - **композиции** TY-05: `domain`, `section` (`heading`, `level`, `items`);
-- **контракты и код** TY-06, TY-07, TY-11…TY-13: `stage`, `port` (операции с `class` и `memo`), abstract форма `code {module, hash}`, `implementation`, `judge`, `test-set`;
+- **контракты и код** TY-06, TY-07, TY-11…TY-13: `stage`, `port` (операции с `class` и `memo`), abstract форма `code {module, hash}`, `implementation`, `judge-adapter` (Q-38), `test-set`;
 - **behaviour** TY-Z04: `setup` (RT-10 — как тип), `namespace-policy` (поля TR-02; Q-37), `quality-profile` (ST-09), `test-set`;
 - **события**: `act` (TR-14), abstract форма `fact` (TY-14) с аннотациями `key`, status facts `retired`, `alias` (TR-29); формы `valid-period` (TY-15);
 - **метки рёбер** TY-16 — как `labels` в политике namespace `std` (TR-03), а не как отдельный механизм.
@@ -37,6 +37,7 @@ rules: [TY-01, TY-02, TY-03, TY-05, TY-06, TY-07, TY-11, TY-12, TY-13, TY-14, TY
 - примеры — `test/ledger/examples/std/<slug>.json` и `test/ledger/examples/core/session.json`: `valid` — тела записей, `invalid` — тело с путём и ключевым словом нарушения; тест — `test/ledger/std-types.test.ts`, test set `ledger` владеет `std/` (`scripts/paths.mjs`);
 - имя формы `code` (TY-11) — слово, которое ядро писало в `parse.ts` как имя кодовой единицы: переменная переименована в `unit`, а аудит KR-01 не считает имена, которые объявляет платформа (`charCodeAt`, `fromCharCode`);
 - тест KR-01 берёт имена `std` из `std/source/` и, пока у типов S0-09 нет исходников, ещё из TY-Z02…TY-Z05 (`designTypeNames`): правило не сужается до типов S0;
+- тип судьи — `std/judge-adapter` (`std/source/judge-adapter.json`; Q-38, D212): порт судьи — `std/judge`, и тип с тем же id был бы второй сущностью;
 - порт `judge` привязан в `setup` отдельным полем `judge` `{mode, memo}`, у остальных привязок `adapter` и `executor` обязательны (RT-10, RT-31);
 - пробелы — G-31…G-36.
 

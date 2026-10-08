@@ -18,7 +18,7 @@ const SESSION = "core/session@1";
 /** The types of S0 by TY-Z02…TY-Z05 and the scope of S0-08; the rest of `std` is S0-09. */
 const S0_TYPES = [
   ...["act", "alias", "behaviour", "clause", "code", "composition", "contract", "decision", "decision-point", "domain", "example", "fact"],
-  ...["hint", "implementation", "invariant", "judge", "knowledge", "namespace-policy", "port", "prose", "quality-profile", "requirement", "retired"],
+  ...["hint", "implementation", "invariant", "judge-adapter", "knowledge", "namespace-policy", "port", "prose", "quality-profile", "requirement", "retired"],
   ...["scenario", "section", "setup", "stage", "term", "test-set", "valid-period"],
 ];
 
@@ -191,10 +191,10 @@ describe("contracts and implementations", () => {
     ]);
   });
 
-  it("TY-11, TY-12: code is the abstract shape {module, hash}; an implementation holds a contract, label implements, and code; judge adds model", () => {
+  it("TY-11, TY-12: code is the abstract shape {module, hash}; an implementation holds a contract, label implements, and code; judge-adapter adds model", () => {
     expect([body("code").abstract, required("code")]).toEqual([true, ["module", "hash"]]);
     expect([field("implementation", "contract").ref, field("implementation", "code").$ref]).toEqual([{ to: "std/contract@1", pin: "pinned", label: "implements" }, "std/code@1"]);
-    expect([parentsOf("judge"), required("judge"), field("judge", "contract").ref]).toEqual([
+    expect([parentsOf("judge-adapter"), required("judge-adapter"), field("judge-adapter", "contract").ref]).toEqual([
       ["implementation"],
       ["contract", "code", "model"],
       { to: "std/port@1", pin: "pinned", label: "implements" },
