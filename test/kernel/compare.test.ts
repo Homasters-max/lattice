@@ -19,6 +19,7 @@ const TYPES: { readonly [ref: string]: JsonValue } = {
   "demo/span@3": { abstract: true, kind: "entity", schema: { type: "object", properties: { n: { type: "integer", maximum: 10 } }, required: ["n"] } },
   "demo/tree@1": { abstract: true, kind: "entity", schema: { type: "object", properties: { kids: { type: "array", items: { $ref: "demo/tree@1" } } } } },
   "demo/tree@2": { abstract: true, kind: "entity", schema: { type: "object", properties: { kids: { type: "array", items: { $ref: "demo/tree@2" } } } } },
+  "demo/anything@1": { abstract: true, kind: "entity", schema: { type: "any" } },
   "demo/odd@1": { abstract: true, kind: "entity", schema: { type: "array", const: [1], items: 5 } },
   "demo/oddchild@1": { extends: "demo/base@1", abstract: false, kind: "entity", schema: { type: "array", const: [1], items: 5 } },
 };
@@ -35,6 +36,7 @@ const object = (properties: { readonly [name: string]: Schema }, optional: reado
 });
 
 const S: Schema = { type: "string" };
+const ANY: Schema = { type: "any" };
 const REF = (ref: { readonly [k: string]: string }): Schema => ({ type: "string", format: "ref", ref: { to: "demo/base@1", pin: "any", label: "about", ...ref } });
 
 type Row = readonly [string, Schema, Schema, Mode, Comparison];
@@ -90,6 +92,20 @@ const rows: readonly Row[] = [
   ["$ref: a target and its schema inline are the same", object({ n: { type: "integer", maximum: 10 } }), { $ref: "demo/span@1" }, "revision", { relation: "same", aspects: [] }],
   ["$ref: an unknown target is incomparable", { $ref: "demo/none@1" }, { $ref: "demo/span@1" }, "revision", { relation: "incomparable", aspects: ["validity"] }],
   ["$ref: a recursive target compares by assumption", { $ref: "demo/tree@2" }, { $ref: "demo/tree@1" }, "revision", { relation: "same", aspects: [] }],
+  // any value (G-38): every schema is narrower than it
+  ["any: any value is the same as any value", { type: "any", description: "x" }, ANY, "revision", { relation: "same", aspects: ["description"] }],
+  ["any: a string is narrower than any value", S, ANY, "revision", { relation: "narrower", aspects: ["validity"] }],
+  ["any: a closed object is narrower than any value", object({ a: S }), ANY, "revision", { relation: "narrower", aspects: ["validity"] }],
+  ["any: a $ref is narrower than any value", { $ref: "demo/span@1" }, ANY, "revision", { relation: "narrower", aspects: ["validity"] }],
+  ["any: a $ref to any value is the same as any value", { $ref: "demo/anything@1" }, ANY, "revision", { relation: "same", aspects: [] }],
+  ["any: a $ref the kernel cannot read is incomparable even to any value", { $ref: "demo/none@1" }, ANY, "revision", { relation: "incomparable", aspects: ["validity"] }],
+  ["any: an enum is narrower than any value", { enum: ["a", 1] }, ANY, "revision", { relation: "narrower", aspects: ["validity"] }],
+  ["any: any value is wider than a type paired with null", ANY, { type: ["string", "null"] }, "revision", { relation: "wider", aspects: ["validity"] }],
+  ["any: a field narrowed from any value is narrower", object({ a: S }), object({ a: ANY }), "revision", { relation: "narrower", aspects: ["validity"] }],
+  ["any: a field widened to any value is wider", object({ a: ANY }), object({ a: S }), "revision", { relation: "wider", aspects: ["validity"] }],
+  ["any: extends — a field of B narrowed from any value is narrower", object({ a: S, b: S }), object({ a: ANY }), "extends", { relation: "narrower", aspects: ["validity"] }],
+  ["any: extends — a field of B kept as any value is the same", object({ a: ANY, b: S }), object({ a: ANY }), "extends", { relation: "same", aspects: [] }],
+  ["any: extends — a field of B widened to any value is wider", object({ a: ANY, b: S }), object({ a: S }), "extends", { relation: "wider", aspects: ["validity"] }],
 ];
 
 /** A tagged union of these branches, by `kind`. */
@@ -101,7 +117,9 @@ const union = (...branches: readonly (readonly [string, Schema])[]): Schema => (
 const unions: readonly Row[] = [
   ["oneOf: an added branch is wider", union(["a", {}], ["b", {}]), union(["a", {}]), "revision", { relation: "wider", aspects: ["validity"] }],
   ["oneOf: a narrowed branch is narrower", union(["a", { properties: { n: { type: "integer" } } }]), union(["a", { properties: { n: { type: "number" } } }]), "revision", { relation: "narrower", aspects: ["validity"] }],
-  ["oneOf: another discriminator is incomparable", { ...union(["a", {}]), discriminator: "tag" }, union(["a", {}]), "revision", { relation: "incomparable", aspects: ["validity"] }],
+  ["any: a tagged union is narrower than any value", union(["a", {}]), { type: "any" }, "revision", { relation: "narrower", aspects: ["validity"] }],
+  ["any: a branch field widened to any value is wider", union(["a", { properties: { n: { type: "any" } } }]), union(["a", { properties: { n: { type: "integer" } } }]), "revision", { relation: "wider", aspects: ["validity"] }],
+  ["oneOf: another discriminator is incomparable",{ ...union(["a", {}]), discriminator: "tag" }, union(["a", {}]), "revision", { relation: "incomparable", aspects: ["validity"] }],
 ];
 
 describe("compare (KR-22)", () => {

@@ -129,6 +129,24 @@ describe("objects, maps and arrays (KR-21, KR-20)", () => {
   });
 });
 
+describe("any value (KR-21, G-38)", () => {
+  const values: readonly JsonValue[] = ["a", 1.5, -3, true, null, [], [1, "a", { Bad: [] }], {}, { Bad: { "a/b": null }, kids: [1, {}] }];
+
+  it("KR-21: type any takes a string, a number, a boolean, null, an array and an object", () => {
+    for (const value of values) expect([value, validate(deepFreeze(value), deepFreeze({ type: "any" }), NONE)]).toEqual([value, { ok: true }]);
+  });
+
+  it("KR-21: type any does not descend into its value — no key grammar, no closed object inside it", () => {
+    const holder = { type: "object", properties: { input: { type: "any", description: "anything" }, n: { type: "integer" } }, required: ["input"] };
+    for (const input of values) expect([input, violations({ input }, holder)]).toEqual([input, []]);
+    expect(violations({ n: "x" }, holder)).toEqual([
+      ["/input", "required"],
+      ["/n", "type"],
+    ]);
+    expect(violations([{ Bad: 1 }, "a"], { type: "array", items: { type: "any" } })).toEqual([]);
+  });
+});
+
 describe("oneOf and $ref (KR-21)", () => {
   const branch = (tag: JsonValue, properties: object = {}) => ({ type: "object", properties: { kind: { const: tag }, ...properties }, required: ["kind"] });
   const union = { oneOf: [branch("a", { x: { type: "string" } }), branch("b")], discriminator: "kind" };
