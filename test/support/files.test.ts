@@ -58,10 +58,12 @@ describe("program (ST-18)", () => {
   it("ST-18: runs a program of this project and a tool of the environment", async () => {
     expect(program("scripts/paths.mjs").run([]).status).toBe(0);
     expect((await program("git").start(["--version"])).stdout).toMatch(/^git version /);
+    expect(program("tsc").run(["--version"]).stdout).toMatch(/^Version /);
   });
 
   it("ST-18: refuses what is no program of this project nor a tool of the environment", () => {
-    expect(() => program("curl")).toThrow("ST-18: curl is no program of this project nor a tool its environment names (git)");
+    expect(() => program("curl")).toThrow("ST-18: curl is no program of this project nor a tool its environment names (git, tsc)");
+    expect(() => program("node_modules/typescript/bin/tsc")).toThrow("ST-18: node_modules/typescript/bin/tsc is a dependency, no program of this project");
     expect(() => program(join(own.dir, "..", "x.mjs"))).toThrow("is not in a scratch folder of this run");
   });
 });
