@@ -61,6 +61,7 @@ describe("the order of violations (KR-21)", () => {
         const again = validate(deepFreeze(shuffled(value, seed)), deepFreeze(shuffled(SCHEMA, seed + 1) as Schema), resolve);
         expect(again).toEqual(once);
       }),
+      { numRuns: 100 },
     );
   });
 });

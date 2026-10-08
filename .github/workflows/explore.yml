@@ -1,0 +1,37 @@
+# Once a week the tests of main run from a random seed (S0-41, PLAN.md of S0,
+# section 8): a run of CI is a function of its input and repeats the same
+# cases, so a case the fixed seed never draws is found here. A failed run
+# names its seed; `LATTICE_SEED=<seed> npm test` replays it.
+name: explore
+
+on:
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+jobs:
+  explore:
+    name: explore (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: random seed
+        shell: bash
+        run: echo "LATTICE_SEED=$(node -e 'console.log(require("node:crypto").randomInt(-(2 ** 31), 2 ** 31))')" >> "$GITHUB_ENV"
+      - name: test
+        run: npm test
+      - name: seed of the failed run
+        if: failure()
+        shell: bash
+        run: echo "::error::explore failed with LATTICE_SEED=$LATTICE_SEED; replay it with LATTICE_SEED=$LATTICE_SEED npm test"

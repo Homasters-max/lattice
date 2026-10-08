@@ -28,9 +28,26 @@ Property-тесты берут случайный seed, а таймаут vitest
 
 Не входит: вычисление seed из hash входа и исход `budget-exceeded` в записи — S0-42, S0-43.
 
+## Как сделано
+
+- `test/support/budget.ts` — `DEFAULT_SEED`, `SAFEGUARD_MS` и `seedOf(LATTICE_SEED)`; `test/support/setup.ts` (setupFile) — `fc.configureGlobal({ seed, baseSize: "small" })`; seed печатает один раз `test/support/global-setup.ts` (globalSetup): setupFile идёт в каждом файле тестов и печатал бы его десятки раз.
+- Размер генераторов без явной границы задан глобально — `baseSize: "small"`, значение fast-check по умолчанию, теперь записанное; явные границы генераторов в тестах не менялись.
+- `numRuns` дописан там, где его не было, со значением fast-check по умолчанию — 100: число случаев не изменилось (PR-11).
+- `testTimeout` и `hookTimeout` vitest — `SAFEGUARD_MS` (30 с); явные таймауты 30 с у тяжёлых тестов остались и равны страховке, 120 с у `test/cli/bin.test.ts` — выше неё.
+- Соглашение записано в `CONVENTIONS.md` §9 («Прогон тестов — функция входа»), там же — исключение из запрета `default`: конфигурация инструмента и её импорт в тесте (`budget.test.ts` читает `vitest.config.ts`); правку строки §9 из `main` принял владелец (решение 2026-10-08, PR #35). В `test/ledger/proposal.test.ts` ожидаемый массив сведён в одну строку, чтобы `describe` с дописанным `numRuns` уложился в 50 строк профиля качества; значения те же.
+- `.github/workflows/explore.yml` — по понедельникам и вручную, ubuntu и windows, `npm test` со случайным `LATTICE_SEED`; упавший прогон печатает seed и как его повторить.
+
+## Тесты и фикстуры
+
+`test/support/budget.test.ts` — рядом с `budget.ts`, вне `test/structure/`, которой владеет skeleton (ST-15):
+- seed прогона — `LATTICE_SEED` или `DEFAULT_SEED`; значение не 32-битное целое — ошибка, а не исправление; две выборки подряд равны;
+- `globalSetup` из `vitest.config.ts` подключает `global-setup.ts`, и его `setup()` печатает `LATTICE_SEED=<seed>`; `setupFiles` подключает `setup.ts`, и `baseSize` генераторов — `"small"`;
+- тест без своего таймаута получает `SAFEGUARD_MS`, а не 5 с vitest; `testTimeout` и `hookTimeout` в `vitest.config.ts` — оба `SAFEGUARD_MS`;
+- ratchet (ST-16): каждый `fc.assert` и `fc.check` в `test/` называет `numRuns` и не ставит свой `seed`; trigger и pass — строки кода в самом тесте.
+
 ## Готово, когда
 
-- [ ] два прогона подряд дают одни и те же случаи
-- [ ] ни один тест не опирается на таймаут vitest по умолчанию
-- [ ] еженедельный explore-workflow есть
-- [ ] `npm run verify` зелёный
+- [x] два прогона подряд дают одни и те же случаи
+- [x] ни один тест не опирается на таймаут vitest по умолчанию
+- [x] еженедельный explore-workflow есть
+- [x] `npm run verify` зелёный
