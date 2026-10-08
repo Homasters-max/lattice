@@ -28,6 +28,26 @@ function need(errors, ok, message) {
   if (!ok) errors.push(message);
 }
 
+// Ошибка называет, что пришло, рядом с тем, что нужно: «axis: нет — нужно verify».
+const shown = (v) => {
+  if (v === undefined) return "нет";
+  if (v === "") return "пусто";
+  const s = typeof v === "string" ? v : JSON.stringify(v);
+  return s.length > 40 ? `${s.slice(0, 40)}…` : s;
+};
+
+// Поля выхода по схеме роли (plan/dev-loop.md, «Роли: вход и выход»); других полей в out.json нет.
+const FIELDS = {
+  executor: ["status", "pr", "branch", "head", "question", "gaps"],
+  reviewer: ["axis", "head", "summary", "statuses", "findings"],
+  fixer: ["status", "head", "answers", "conflicts", "question", "gaps"],
+};
+
+function fields(errors, out, role) {
+  const extra = Object.keys(out).filter((k) => !FIELDS[role].includes(k));
+  need(errors, extra.length === 0, `лишние поля: ${extra.join(", ")} — схема ${role} в plan/dev-loop.md, «Роли: вход и выход»: ${FIELDS[role].join(", ")}`);
+}
+
 // Ссылки на пункты CONVENTIONS.md в text: каждая называет пункт §N.M, который есть в файле worktree.
 function references(errors, text, repo, at) {
   if (typeof text !== "string" || !text.includes("CONVENTIONS")) return;
@@ -36,7 +56,7 @@ function references(errors, text, repo, at) {
 }
 
 function list(errors, value, name) {
-  need(errors, Array.isArray(value) && value.every(isObject), `${name}: список объектов`);
+  need(errors, Array.isArray(value) && value.every(isObject), `${name}: ${shown(value)} — нужен список объектов, пустой, если нечего`);
   return Array.isArray(value) ? value.filter(isObject) : [];
 }
 
@@ -52,12 +72,13 @@ function author(out, errors, repo, branch) {
   need(errors, out.gaps === undefined || (Array.isArray(out.gaps) && out.gaps.every((g) => GAP.test(g))), "gaps: список G-NN");
   if (out.status === "needs_owner") question(errors, out.question);
   if (out.status === "needs_owner" && out.head === undefined) return;
-  need(errors, sameSha(out.head, repo.head()), "head: не равен HEAD worktree — не всё закоммичено");
+  need(errors, sameSha(out.head, repo.head()), `head: ${shown(out.head)} — не равен HEAD worktree ${repo.head()}: не всё закоммичено`);
   need(errors, sameSha(out.head, repo.remote(branch)), `head: не запушен в origin/${branch}`);
 }
 
 function executor(out, errors, repo) {
-  need(errors, ["ready", "needs_owner"].includes(out.status), "status: ready | needs_owner");
+  fields(errors, out, "executor");
+  need(errors, ["ready", "needs_owner"].includes(out.status), `status: ${shown(out.status)} — нужно ready | needs_owner`);
   if (out.status === "ready") {
     need(errors, Number.isInteger(out.pr), "pr: номер PR");
     need(errors, text(out.branch, 100), "branch: ветка задачи");
@@ -89,9 +110,10 @@ function status(errors, s, assigned, disputed) {
 
 function reviewer(brief, out, errors, repo) {
   need(errors, REVIEW_JOBS.includes(brief.job), `brief.job: ${REVIEW_JOBS.join(" | ")}`);
-  need(errors, out.axis === brief.axis, `axis: ${brief.axis}`);
-  need(errors, sameSha(out.head, brief.head), `head: ${brief.head}`);
-  need(errors, text(out.summary, LIMITS.summary), `summary: что проверено, до ${LIMITS.summary} знаков`);
+  fields(errors, out, "reviewer");
+  need(errors, out.axis === brief.axis, `axis: ${shown(out.axis)} — нужно ${brief.axis}`);
+  need(errors, sameSha(out.head, brief.head), `head: ${shown(out.head)} — нужно ${brief.head}`);
+  need(errors, text(out.summary, LIMITS.summary), `summary: ${typeof out.summary === "string" ? `${out.summary.length} знаков` : shown(out.summary)} — нужно что проверено, до ${LIMITS.summary} знаков`);
   const assigned = new Set(brief.findings.map((f) => f.id));
   const disputed = new Set(brief.disputed ?? []);
   const statuses = list(errors, out.statuses, "statuses");
@@ -145,7 +167,8 @@ function answers(brief, out, errors, repo) {
 
 function fixer(brief, out, errors, repo) {
   need(errors, FIXER_JOBS.includes(brief.job), `brief.job: ${FIXER_JOBS.join(" | ")}`);
-  need(errors, ["done", "needs_owner"].includes(out.status), "status: done | needs_owner");
+  fields(errors, out, "fixer");
+  need(errors, ["done", "needs_owner"].includes(out.status), `status: ${shown(out.status)} — нужно done | needs_owner`);
   author(out, errors, repo, brief.branch);
   need(errors, out.conflicts === undefined || (Array.isArray(out.conflicts) && out.conflicts.every((c) => text(c, 300))), "conflicts: список файлов");
   if (brief.job in ACTIONS && out.status === "done") answers(brief, out, errors, repo);
