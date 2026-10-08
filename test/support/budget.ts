@@ -14,6 +14,6 @@ const INT32 = 2 ** 31;
 export function seedOf(text: string | undefined): number {
   if (text === undefined || text === "") return DEFAULT_SEED;
   const n = /^-?\d{1,10}$/.test(text) ? Number(text) : Number.NaN;
-  if (!(n >= -INT32 && n < INT32)) throw new Error(`LATTICE_SEED is a 32-bit integer from ${-INT32} to ${INT32 - 1}, got "${text}"`);
+  if (!(n >= -INT32 && n < INT32)) throw new Error(`RT-21: LATTICE_SEED is a 32-bit integer from ${-INT32} to ${INT32 - 1}, got "${text}"`);
   return n;
 }

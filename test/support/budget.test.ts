@@ -40,19 +40,19 @@ function unbudgeted(path: string, text: string): string[] {
 }
 
 describe("the seed of a run", () => {
-  it("is LATTICE_SEED, or a fixed seed without it", () => {
+  it("ST-12: is LATTICE_SEED, or a fixed seed without it", () => {
     expect(fc.readConfigureGlobal().seed).toBe(seedOf(process.env.LATTICE_SEED));
     expect(["", "42", "-2147483648", "2147483647"].map(seedOf)).toEqual([DEFAULT_SEED, 42, -2147483648, 2147483647]);
     expect(seedOf(undefined)).toBe(DEFAULT_SEED);
   });
 
-  it("refuses a seed that is not a 32-bit integer rather than correcting it", () => {
+  it("ST-12: refuses a seed that is not a 32-bit integer rather than correcting it", () => {
     for (const text of ["x", "1.5", " 1", "0x10", "2147483648", "-2147483649"]) {
-      expect(() => seedOf(text)).toThrow(`LATTICE_SEED is a 32-bit integer from -2147483648 to 2147483647, got "${text}"`);
+      expect(() => seedOf(text)).toThrow(`RT-21: LATTICE_SEED is a 32-bit integer from -2147483648 to 2147483647, got "${text}"`);
     }
   });
 
-  it("is printed once before any test, so a failed run names the seed that replays it", () => {
+  it("ST-12: is printed once before any test, so a failed run names the seed that replays it", () => {
     expect(config.test?.globalSetup).toEqual(["test/support/global-setup.ts"]);
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
     try {
@@ -63,36 +63,36 @@ describe("the seed of a run", () => {
     }
   });
 
-  it("is set with the base size of the generators in every test file", () => {
+  it("ST-12: is set with the base size of the generators in every test file", () => {
     expect(config.test?.setupFiles).toEqual(["test/support/setup.ts"]);
     expect(fc.readConfigureGlobal().baseSize).toBe("small");
   });
 
-  it("draws the same cases twice", () => {
+  it("ST-12: draws the same cases twice", () => {
     const draw = () => fc.sample(fc.array(fc.string()), 20);
     expect(draw()).toEqual(draw());
   });
 });
 
 describe("the time of a test", () => {
-  it("is the safeguard, not the default timeout of vitest", ({ task }) => {
+  it("ST-12: is the safeguard, not the default timeout of vitest", ({ task }) => {
     expect(task.timeout).toBe(SAFEGUARD_MS);
   });
 
-  it("of a hook is the same safeguard", () => {
+  it("ST-12: of a hook is the same safeguard", () => {
     expect([config.test?.testTimeout, config.test?.hookTimeout]).toEqual([SAFEGUARD_MS, SAFEGUARD_MS]);
   });
 });
 
 describe("the budget of a property", () => {
-  it("is named by numRuns in every run of a property, and the seed is the run's", () => {
+  it("ST-12: is named by numRuns in every run of a property, and the seed is the run's", () => {
     expect(unbudgeted("x.test.ts", "fc.assert(fc.property(fc.nat(), (n) => n >= 0));\n")).toEqual(["x.test.ts:1"]);
     expect(unbudgeted("x.test.ts", "const p = fc.property(fc.nat(), (n) => n >= 0);\nfc.check(p, { seed: 1 });\n")).toEqual(["x.test.ts:2"]);
     expect(unbudgeted("x.test.ts", "fc.assert(fc.property(fc.nat(), (n) => n >= 0), { numRuns: 100, seed: 7 });\n")).toEqual(["x.test.ts:1"]);
     expect(unbudgeted("x.test.ts", "fc.assert(fc.property(fc.nat(), (n) => n >= 0), { numRuns: 100 });\n")).toEqual([]);
   });
 
-  it("every property test of the repository names its numRuns and takes the seed of the run", () => {
+  it("ST-12: every property test of the repository names its numRuns and takes the seed of the run", () => {
     const paths = readdirSync(join(repoRoot, "test"), { recursive: true, encoding: "utf8" })
       .map((p) => `test/${p.replaceAll("\\", "/")}`)
       .filter((p) => p.endsWith(".ts"))
