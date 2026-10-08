@@ -1,8 +1,9 @@
 // protocol: проверка выхода агента против его brief (plan/dev-loop.md, «Роли: вход и выход»).
 // check(brief, out, repo) → {errors, warnings, value}: errors — выход не принят, агент переделывает;
 // warnings — выход принят и нормализован (value).
-// repo — {head(), remote(branch), commits(from, to), changed(from, to), conventions()} в worktree агента;
-// conventions() — текст CONVENTIONS.md worktree, пустой, если файла нет.
+// repo — {head(), remote(branch), commits(from, to), changed(from, to), conventions(), items()} в worktree агента;
+// conventions() — текст CONVENTIONS.md worktree, пустой, если файла нет; items() — пункты «Готово, когда»
+// файла задачи brief.task, null, если файла нет.
 import { conventionsOf, unknownReferences } from "./conventions.mjs";
 
 export const AXES = ["spec", "standards", "architecture", "verify"];
@@ -38,7 +39,7 @@ const shown = (v) => {
 
 // Поля выхода по схеме роли (plan/dev-loop.md, «Роли: вход и выход»); других полей в out.json нет.
 const FIELDS = {
-  executor: ["status", "pr", "branch", "head", "question", "gaps"],
+  executor: ["status", "pr", "branch", "head", "done", "question", "gaps"],
   reviewer: ["axis", "head", "summary", "statuses", "findings"],
   fixer: ["status", "head", "answers", "conflicts", "question", "gaps"],
 };
@@ -76,6 +77,17 @@ function author(out, errors, repo, branch) {
   need(errors, sameSha(out.head, repo.remote(branch)), `head: не запушен в origin/${branch}`);
 }
 
+// done — пункты «Готово, когда», которые executor выполнил, словами файла задачи: по ним `dl ready` ставит [x] (S0-51).
+function done(errors, out, repo) {
+  if (out.status !== "ready" && out.done === undefined) return;
+  const ok = Array.isArray(out.done) && out.done.length > 0 && out.done.every((d) => text(d, 500));
+  need(errors, ok, `done: ${shown(out.done)} — нужен список выполненных пунктов «Готово, когда», словами файла задачи`);
+  if (!ok) return;
+  const items = repo.items();
+  need(errors, items !== null, "done: нет файла задачи в plan/phases/*/tasks — пункты не с чем сверить");
+  if (items !== null) out.done.forEach((d, i) => need(errors, items.includes(d.trim()), `done[${i}]: «${shown(d)}» — нет такого пункта «Готово, когда» в файле задачи`));
+}
+
 function executor(out, errors, repo) {
   fields(errors, out, "executor");
   need(errors, ["ready", "needs_owner"].includes(out.status), `status: ${shown(out.status)} — нужно ready | needs_owner`);
@@ -83,6 +95,7 @@ function executor(out, errors, repo) {
     need(errors, Number.isInteger(out.pr), "pr: номер PR");
     need(errors, text(out.branch, 100), "branch: ветка задачи");
   }
+  done(errors, out, repo);
   author(out, errors, repo, out.branch);
   return out;
 }

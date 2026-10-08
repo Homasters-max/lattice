@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 // dev-loop: инструмент оркестратора /dev-loop (plan/dev-loop.md). Каждая команда печатает одну строку JSON.
 //   scope <base> [<head>] [--delta] [--main <ref>]          режим и оси круга
-//   start (--task T | --pr N) [--root R]                      старт или продолжение: копия на main, PR, worktree, npm ci, следующий шаг
+//   start (--task T | --pr N) [--root R]                      старт или продолжение: копия на main, worktree, npm ci, PR задачи —
+//                                                             у новой задачи ветка, коммит «T: start» и draft PR (S0-51), следующий шаг
 //   brief executor --dir D --task T --worktree W [--owner текст]
 //   init --dir D --task T (--from executor.out.json | --pr N --branch B)
+//   ready --dir D --worktree W --from executor.out.json       сдача (шаг 6 plan-task): пункты done → [x], доска, фаза, plan-check, push, PR ready
 //   gate --dir D --worktree W                                 ворота: verify на запушенном head в D/verify.log, следующий шаг
 //   wave --dir D --worktree W [--conflicts a,b]               следующий круг: briefs агентов
 //   check <файл.out.json> [--dir D]                           выход агента против его brief; с --dir — конец шага агента
@@ -25,6 +27,7 @@ import { check, FIXER_JOBS } from "./dev-loop/protocol.mjs";
 import { answer, decision, escalation, final, parseHeader, questions, review } from "./dev-loop/render.mjs";
 import { changedLines, conventionsChanged, scope } from "./dev-loop/scope.mjs";
 import { answerFindings, answerText, ask, entryOf, initial, looseFindings, mergeWave, openFindings, planWave, recordAnswer } from "./dev-loop/state.mjs";
+import { advancePhase, closeOnBoard, findTask, itemsOf, markItems } from "./dev-loop/task.mjs";
 
 const COMMENT_MAX = 65000;
 const [command, ...rest] = process.argv.slice(2);
@@ -65,12 +68,16 @@ function stamp(change) {
   write(stepsPath(), change(existsSync(stepsPath()) ? read(stepsPath()) : []));
 }
 const git = (worktree, ...args) => execFileSync("git", args, { cwd: worktree, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
-const repoOf = (worktree) => ({
+const repoOf = (worktree, task) => ({
   head: () => git(worktree, "rev-parse", "HEAD"),
   remote: (branch) => (branch ? git(worktree, "ls-remote", "origin", `refs/heads/${branch}`).split("\t")[0] : ""),
   commits: (from, to) => git(worktree, "rev-list", `${from}..${to}`).split("\n").filter(Boolean),
   changed: (from, to) => git(worktree, "diff", "--name-only", from, to).split("\n").filter(Boolean),
   conventions: () => (existsSync(join(worktree, "CONVENTIONS.md")) ? readFileSync(join(worktree, "CONVENTIONS.md"), "utf8") : ""),
+  items: () => {
+    const found = task ? findTask(worktree, task) : null;
+    return found ? itemsOf(found.text).map((i) => i.text) : null;
+  },
 });
 const slim = ({ id, axis, kind, severity, rule, where, quote, text, late, history }) => ({ id, axis, kind, severity, rule, where, quote, text, late, history });
 
@@ -88,7 +95,7 @@ function checked(outFile) {
   const brief = read(outFile.replace(/\.out\.json$/, ".in.json"));
   if (!existsSync(outFile)) return { brief, errors: [`нет выхода ${outFile}`], warnings: [], value: null };
   try {
-    return { brief, ...check(brief, read(outFile), repoOf(brief.worktree)) };
+    return { brief, ...check(brief, read(outFile), repoOf(brief.worktree, brief.task)) };
   } catch (e) {
     return { brief, errors: [`выход не проверить: ${e.message.split("\n")[0]}`], warnings: [], value: null };
   }
@@ -168,7 +175,8 @@ function executorBrief() {
   const file = join(dir(), "executor.in.json");
   mkdirSync(dir(), { recursive: true });
   const state = existsSync(statePath()) ? read(statePath()) : null;
-  write(file, { role: "executor", task: need("task"), worktree: need("worktree"), owner: flags.owner ?? state?.owner?.text, out: join(dir(), "executor.out.json") });
+  // pr и branch — PR, который открыл start (S0-51); без состояния их нет, и шаг 1 делает executor.
+  write(file, { role: "executor", task: need("task"), pr: state?.pr, branch: state?.branch, worktree: need("worktree"), owner: flags.owner ?? state?.owner?.text, out: join(dir(), "executor.out.json") });
   stamp((steps) => begin(steps, { kind: "agent", role: "executor", job: null, wave: state?.wave ?? 0, briefs: { executor: statSync(file).size } }, now()));
   print({ ok: true, brief: file });
 }
@@ -240,11 +248,12 @@ function init() {
   mkdirSync(dir(), { recursive: true });
   const early = existsSync(stepsPath()) ? read(stepsPath()) : [];
   const existed = existsSync(statePath());
+  const from = flags.from ? read(flags.from) : {};
   if (existed) {
+    // Состояние могло прийти от start; пробелы executor не теряются.
     const state = load();
-    save({ ...state, steps: [...stepsOf(state), ...early] });
+    save({ ...state, gaps: [...new Set([...(state.gaps ?? []), ...(from.gaps ?? [])])], steps: [...stepsOf(state), ...early] });
   } else {
-    const from = flags.from ? read(flags.from) : {};
     const pr = from.pr ?? Number(need("pr"));
     const branch = from.branch ?? need("branch");
     save({ ...initial({ pr, task: flags.task ?? null, branch, gaps: from.gaps ?? [] }), steps: early });
@@ -287,11 +296,13 @@ function restore() {
   print({ ok: true, ...restoreFrom(read(need("comments")).comments ?? []) });
 }
 
-const gh = (...args) => {
+// gh — вывод как текст; gh — разобранный JSON. DEV_LOOP_GH — fake gh тестов.
+const ghText = (...args) => {
   const fake = process.env.DEV_LOOP_GH;
   const [cmd, argv] = fake ? [process.execPath, [fake, ...args]] : ["gh", args];
-  return JSON.parse(execFileSync(cmd, argv, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }));
+  return execFileSync(cmd, argv, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 };
+const gh = (...args) => JSON.parse(ghText(...args));
 const PR_FIELDS = "number,title,headRefName,isDraft";
 
 function findPr() {
@@ -338,12 +349,32 @@ function syncCopy(repo) {
   return { branch: "main", synced: true, behind: 0, from: branch === "main" ? undefined : branch };
 }
 
+// Шаг 1 plan-task для новой задачи (S0-51): ветка s0-NN-<slug> от свежего main, пустой коммит «S0-NN: start»,
+// draft PR «S0-NN · <название>». Ветка, оставшаяся от прерванного старта, берётся как есть.
+function openPr(work, task) {
+  const found = findTask(work, task) ?? fail(`нет файла задачи ${task} в plan/phases/*/tasks на origin/main`);
+  const branch = found.branch;
+  if (git(work, "ls-remote", "origin", `refs/heads/${branch}`) !== "") {
+    git(work, "fetch", "-q", "origin", branch);
+    git(work, "checkout", "-q", "--detach", "FETCH_HEAD");
+  } else {
+    git(work, "checkout", "-q", "--detach", "origin/main");
+    git(work, "commit", "-q", "--allow-empty", "-m", `${task}: start`);
+    git(work, "push", "-q", "origin", `HEAD:refs/heads/${branch}`);
+  }
+  const title = `${task} · ${found.title}`;
+  const body = `Задача: \`${found.path}\`\n\nВ работе: описание по шаблону plan-task пишет исполнитель.\n`;
+  const url = ghText("pr", "create", "--draft", "--base", "main", "--head", branch, "--title", title, "--body", body);
+  const number = Number(/\/pull\/(\d+)/.exec(url)?.[1] ?? fail(`gh pr create: нет номера PR в «${url}»`));
+  return { number, title, headRefName: branch, isDraft: true };
+}
+
 // Старт или продолжение цикла: PR задачи, worktree, зависимости, состояние и следующий шаг.
 function start() {
   const repo = git(".", "rev-parse", "--show-toplevel");
   git(repo, "fetch", "-q", "origin");
   const copy = syncCopy(repo);
-  const pr = findPr();
+  let pr = findPr();
   const task = flags.task ?? /^(S\d-\d{2})\b/.exec(pr?.title ?? "")?.[1] ?? null;
   const loop = flags.dir ?? join(flags.root ?? join("D:/tmp", repo.split("/").at(-1), "dev-loop"), task ?? `pr-${pr.number}`);
   flags.dir = loop;
@@ -357,19 +388,67 @@ function start() {
   const interrupted = !created && (git(work, "status", "--porcelain") !== "" || (pr !== null && git(work, "rev-list", "--count", `${ref}..HEAD`) !== "0"));
   if (existsSync(join(work, "package.json")) && !existsSync(join(work, "node_modules")))
     execFileSync("npm", ["ci"], { cwd: work, shell: process.platform === "win32", stdio: ["ignore", "ignore", "pipe"] });
+  const opened = !pr && !interrupted && task !== null;
+  if (opened) pr = openPr(work, task);
   let route = { entry: "none", next: "executor" };
   if (pr) {
-    route = restoreFrom(gh("pr", "view", String(pr.number), "--json", "comments").comments ?? []);
-    if (route.entry === "none" && !pr.isDraft) {
+    route = opened ? route : restoreFrom(gh("pr", "view", String(pr.number), "--json", "comments").comments ?? []);
+    if (route.entry === "none") {
+      // PR без комментариев цикла: состояние с pr и branch — их берёт brief executor.
       if (!existsSync(statePath())) save(initial({ pr: pr.number, task, branch: pr.headRefName }));
-      route = { entry: "none", next: "gate" };
-    } else if (route.entry === "none") route = { entry: "none", next: "executor" };
+      route = { entry: "none", next: pr.isDraft ? "executor" : "gate" };
+    }
   }
-  print({ ok: true, task, pr: pr?.number ?? null, branch: pr?.headRefName ?? null, dir: loop, work, created, interrupted, brief: interrupted ? lastBrief(loop) : null, copy, ...route });
+  print({ ok: true, task, pr: pr?.number ?? null, branch: pr?.headRefName ?? null, dir: loop, work, created, interrupted, opened, brief: interrupted ? lastBrief(loop) : null, copy, ...route });
+}
+
+// Изменения сдачи в worktree: пункты done → [x], задача ✅ со ссылкой на PR на доске, фаза → 🔄 или 🔍.
+// → {files: {путь: текст}} или {missing: [пункт]} — пункты, которых executor не назвал выполненными, или {error}.
+function closing(worktree, task, out) {
+  const found = findTask(worktree, task) ?? fail(`нет файла задачи ${task} в plan/phases/*/tasks`);
+  const missing = itemsOf(found.text).filter((i) => !(out.done ?? []).some((d) => d.trim() === i.text)).map((i) => i.text);
+  if (missing.length) return { missing };
+  const url = gh("pr", "view", String(out.pr), "--json", "url").url;
+  const board = closeOnBoard(readFileSync(join(worktree, found.board), "utf8"), task, `[#${out.pr}](${url})`);
+  if (board.error) return { error: `${found.board}: ${board.error}` };
+  const phase = advancePhase(readFileSync(join(worktree, "plan/STATUS.md"), "utf8"), found.phase, { last: board.last, date: now().slice(0, 10) });
+  if (phase.error) return { error: phase.error };
+  return { files: { [found.path]: markItems(found.text, out.done), [found.board]: board.text, "plan/STATUS.md": phase.text } };
+}
+
+// Шаг 6 plan-task (S0-51) по выходу executor: последний коммит ветки — отметки, доска и фаза; plan-check; PR → ready.
+// Пункт, которого executor не назвал, — не сдача: вопрос владельцу по plan-task «Отступления», в worktree ничего не меняется.
+function ready() {
+  const worktree = need("worktree");
+  const from = need("from");
+  const out = read(from);
+  const task = flags.task ?? read(from.replace(/\.out\.json$/, ".in.json")).task;
+  if (out.status !== "ready") fail(`executor не сдал задачу: status ${out.status}`);
+  if (git(worktree, "status", "--porcelain") !== "") fail("в worktree есть изменения: сдача коммитит только свои");
+  if (git(worktree, "rev-parse", "HEAD") !== repoOf(worktree).remote(out.branch))
+    fail(`HEAD worktree не равен origin/${out.branch}`);
+  const change = closing(worktree, task, out);
+  if (change.missing)
+    return print({ ok: true, next: "escalate", missing: change.missing, why: `${task}: не выполнены пункты «Готово, когда»: ${change.missing.map((m) => `«${m}»`).join(", ")} — перенос в новую задачу только с согласия владельца (plan-task, «Отступления»)` });
+  if (change.error) fail(change.error);
+  for (const [path, text] of Object.entries(change.files)) write(join(worktree, path), text);
+  const check = spawnSync(process.execPath, ["plan/tools/plan-check.mjs"], { cwd: worktree, encoding: "utf8" });
+  if (check.status !== 0) {
+    git(worktree, "checkout", "--", ...Object.keys(change.files));
+    return print({ ok: false, error: "plan-check красный — сдача не записана", log: `${check.stdout}${check.stderr}`.trim().split("\n").slice(-20) });
+  }
+  if (git(worktree, "status", "--porcelain") !== "") {
+    git(worktree, "add", "--", ...Object.keys(change.files));
+    git(worktree, "commit", "-q", "-m", `${task}: сдача — «Готово, когда», доска, фаза`);
+  }
+  git(worktree, "push", "-q", "origin", `HEAD:refs/heads/${out.branch}`);
+  ghText("pr", "ready", String(out.pr));
+  print({ ok: true, head: git(worktree, "rev-parse", "HEAD"), next: "gate" });
 }
 
 const commands = {
   start,
+  ready,
   scope: () => print(scope({ base: positional[0] ?? fail("нужен base"), head: positional[1], delta: flags.delta === true, main: flags.main })),
   brief,
   init,

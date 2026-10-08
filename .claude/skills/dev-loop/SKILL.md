@@ -42,7 +42,7 @@ argument-hint: "[S0-NN | PR <n>]"
 
 Аргумент `S0-NN` — `--task S0-NN`; `PR <n>` или `#<n>` — `--pr <n>`. Без аргумента — первая из «готовы к старту» по `node plan/tools/plan-check.mjs`; скажи владельцу одной строкой, какую задачу берёшь.
 
-`node plan/tools/dev-loop.mjs start --task <ID> | --pr <n>` из рабочей копии — одна команда. Она переводит рабочую копию на свежий `main`, если копия чистая и стоит на `main` или на ветке со смерженным PR; находит открытый PR задачи, создаёт или проверяет worktree, ставит зависимости, восстанавливает состояние из комментариев и печатает `dir` (`<папка>`), `work` (`<work>`) и `next`.
+`node plan/tools/dev-loop.mjs start --task <ID> | --pr <n>` из рабочей копии — одна команда. Она переводит рабочую копию на свежий `main`, если копия чистая и стоит на `main` или на ветке со смерженным PR; находит открытый PR задачи, а у новой задачи открывает его — ветка `s0-NN-<slug>` от `main`, коммит `S0-NN: start`, draft PR `S0-NN · <название>` (`opened: true`); создаёт или проверяет worktree, ставит зависимости, восстанавливает состояние из комментариев и печатает `dir` (`<папка>`), `work` (`<work>`) и `next`.
 
 - `copy.synced: false` — копия не обновлена: скажи владельцу одной строкой `copy.why` и на сколько коммитов (`copy.behind`) она отстаёт от `main`; цикл идёт дальше.
 - `next: executor` — «Исполнитель».
@@ -53,9 +53,9 @@ argument-hint: "[S0-NN | PR <n>]"
 
 ## Исполнитель
 
-`dl brief executor --task <ID> --worktree <work>` → агент `executor` → `dl check <out>`.
+`dl brief executor --task <ID> --worktree <work>` → агент `executor` → `dl check <out>`. Brief несёт `pr` и `branch` PR, который открыл `start`; шаги 1 и 6 `plan-task` делает `dl`, executor — шаги 2–5 и описание PR.
 
-- `ready` — `dl init --task <ID> --from <out>` → «Ворота».
+- `ready` — `dl init --task <ID> --from <out>`, затем `dl ready --worktree <work> --from <out>` — сдача по `done`: отметки «Готово, когда», ✅ и ссылка на доске, фаза, `plan-check`, последний коммит, PR в ready. Дальше по `next`: `gate` — «Ворота»; `escalate` — executor не назвал пункт «Готово, когда», «Эскалация» с `--why` из вывода и `--from <out>`. `ok: false` — `plan-check` красный, сдача не записана: `SendMessage` исполнителю `DEV-LOOP-ERRORS` с `error` и `log`, затем `dl check` и `dl ready` снова.
 - `needs_owner` с `pr` — `dl init --task <ID> --from <out>`, затем «Эскалация» с `--why "вопрос исполнителя" --from <out>`. Без `pr` (PR ещё не открыт) — `AskUserQuestion` из `question` в выводе `dl check`, ответ агенту `DEV-LOOP-OWNER <ответ>`.
 
 ## Ворота
@@ -67,7 +67,7 @@ argument-hint: "[S0-NN | PR <n>]"
 ## Сдать
 
 - `git merge-base --is-ancestor origin/main HEAD` ложно — `dl brief fixer --worktree <work> --job rebase` → агент `fixer` → `dl check <out>` → `dl gate --worktree <work>`: `red` и `escalate` — по «Переходам», зелёный — дальше здесь. `conflicts` задевают `src/` или `test/` — `dl wave --worktree <work> --conflicts <файлы через запятую>`, дальше по `next`. Иначе — к следующему пункту.
-- `dl final --worktree <work>` → пост. `gh pr ready <n>`; метка `blocked` на PR есть (`gh pr view <n> --json labels`) — `gh pr edit <n> --remove-label blocked`.
+- `dl final --worktree <work>` → пост. `gh pr ready <n>` — PR в ready перевёл `dl ready`, но эскалация возвращает его в draft; метка `blocked` на PR есть (`gh pr view <n> --json labels`) — `gh pr edit <n> --remove-label blocked`.
 - Владельцу: задача, число кругов, ссылка на PR; что отложено в план и куда, что отклонено, что решить до merge — по разделам итога, без пересказа. Merge делает владелец. Защита ветки `main` пускает merge, только когда PR стоит на tail `main` и CI зелёный; ушёл `main` после «Сдать» — «Update branch» с rebase в PR, а при конфликте — `/dev-loop PR <n>`.
 
 ## Эскалация
