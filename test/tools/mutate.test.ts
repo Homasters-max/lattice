@@ -52,6 +52,11 @@ export function refusal(n: number): number {
   if (n === 0) throw new Error("ST-17: zero");
   return n;
 }
+export function returned(ok: boolean): object | boolean {
+  if (!ok) return reject("ST-17", { path: "p" });
+  return ok;
+}
+export const chosen = (ok: boolean) => (ok ? ok : reject("ST-17", { id: "c" }));
 export const logical = (a: boolean, b: boolean) => a && b;
 export const boundary = (n: number) => n < 10;
 export const field = (intent: string) => reject("ST-17", { intent });
@@ -63,12 +68,25 @@ export const sorted = (xs: number[]) => [...xs].sort((a, b) => b - a);
 `;
 const BOUNDARY_LINE = OPS.split("\n").findIndex((l) => l.includes("n < 10")) + 1;
 
-const STRONG = `import { boundary, field, hashed, logical, refusal, signed, sorted } from "../../src/kernel/ops.ts";
+// The kinds of site an operator has, each a mutant of its own: a refusal is a throw, a returned call of reject and the
+// refusing branch of a conditional; a hash input is a field of a literal and an argument in the place of another.
+const SITES: readonly { operator: string; before: string; after: string }[] = [
+  { operator: "refusal", before: 'throw new Error("ST-17: zero");', after: ";" },
+  { operator: "refusal", before: 'return reject("ST-17", { path: "p" });', after: ";" },
+  { operator: "refusal", before: 'ok ? ok : reject("ST-17", { id: "c" })', after: "(ok)" },
+  { operator: "hash-input", before: "{ name }", after: "{ }" },
+  { operator: "hash-input", before: "body", after: "key" },
+  { operator: "hash-input", before: "key", after: "body" },
+];
+
+const STRONG = `import { boundary, chosen, field, hashed, logical, refusal, returned, signed, sorted } from "../../src/kernel/ops.ts";
 const same = (a: unknown, b: unknown) => {
   if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(JSON.stringify(a) + " is not " + JSON.stringify(b));
 };
 export const cases = {
   "refusal: refuses zero": () => same((() => { try { refusal(0); return false; } catch { return true; } })(), true),
+  "refusal: returns the refusal": () => [same(returned(false), { rule: "ST-17", path: "p" }), same(returned(true), true)],
+  "refusal: the refusing branch": () => [same(chosen(false), { rule: "ST-17", id: "c" }), same(chosen(true), true)],
   "logical: both sides count": () => [same(logical(true, false), false), same(logical(false, true), false)],
   "boundary: ten is out": () => same(boundary(10), false),
   "field: names its place": () => same(field("i1"), { rule: "ST-17", intent: "i1" }),
@@ -111,7 +129,7 @@ beforeAll(() => {
   stand.write("src/trust/ops.ts", OPS);
 });
 
-type Entry = { id: string; file: string; line: number; operator: string; tests: string[]; outcome: string; killer: string | null; cached: boolean };
+type Entry = { id: string; file: string; line: number; operator: string; before: string; after: string; tests: string[]; outcome: string; killer: string | null; cached: boolean };
 type Summary = { report: string; total: number; killed: number; survived: number; ran: number; survivors: string[] };
 
 // The copies of the working tree go to the temporary folder of the system: here, a folder of the stand.
@@ -136,6 +154,10 @@ describe("prove --ready, the operators", { timeout: 120_000 }, () => {
       expect([operator, of("src/kernel/ops.ts").length > 0, of("src/trust/ops.ts").length > 0]).toEqual([operator, true, true]);
       expect([operator, ...new Set(of("src/kernel/ops.ts"))]).toEqual([operator, "killed"]);
       expect([operator, ...new Set(of("src/trust/ops.ts"))]).toEqual([operator, "survived"]);
+    }
+    for (const site of SITES) {
+      const of = (file: string) => run.entries.filter((e) => e.file === file && e.operator === site.operator && e.before === site.before && e.after === site.after).map((e) => e.outcome);
+      expect([site, of("src/kernel/ops.ts"), of("src/trust/ops.ts")]).toEqual([site, ["killed"], ["survived"]]);
     }
     const boundary = run.entries.find((e) => e.file === "src/kernel/ops.ts" && e.operator === "boundary")!;
     expect(boundary).toMatchObject({ line: BOUNDARY_LINE, tests: ["kernel"], killer: "test/kernel/ops.test.ts > boundary: ten is out" });
