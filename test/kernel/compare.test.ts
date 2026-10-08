@@ -119,7 +119,7 @@ const unions: readonly Row[] = [
   ["oneOf: a narrowed branch is narrower", union(["a", { properties: { n: { type: "integer" } } }]), union(["a", { properties: { n: { type: "number" } } }]), "revision", { relation: "narrower", aspects: ["validity"] }],
   ["any: a tagged union is narrower than any value", union(["a", {}]), { type: "any" }, "revision", { relation: "narrower", aspects: ["validity"] }],
   ["any: a branch field widened to any value is wider", union(["a", { properties: { n: { type: "any" } } }]), union(["a", { properties: { n: { type: "integer" } } }]), "revision", { relation: "wider", aspects: ["validity"] }],
-  ["oneOf: another discriminator is incomparable",{ ...union(["a", {}]), discriminator: "tag" }, union(["a", {}]), "revision", { relation: "incomparable", aspects: ["validity"] }],
+  ["oneOf: another discriminator is incomparable", { ...union(["a", {}]), discriminator: "tag" }, union(["a", {}]), "revision", { relation: "incomparable", aspects: ["validity"] }],
 ];
 
 describe("compare (KR-22)", () => {
