@@ -189,9 +189,11 @@ describe.concurrent("dev-loop, the owner decides", { timeout: 60_000 }, () => {
     expect(await dl(l, "owner", "--text", "верни константу")).toMatchObject({ ok: true, next: "instruct" });
     expect(await dl(l, "owner", "--text", "x")).toMatchObject({ ok: false, errors: ["владельца ни о чём не спрашивали"] });
   });
+});
 
-  // An advice the owner asks to apply after the round is answered by the fixer of the job owner: the brief carries it,
-  // an answer to an id the brief did not give is refused, and dl check records the answer, so the final report drops it.
+// An advice the owner asks to apply after the round is answered by the fixer of the job owner: the brief carries it,
+// an answer to an id the brief did not give is refused, and dl check records the answer, so the final report drops it.
+describe.concurrent("dev-loop, an instruction of the owner that names findings", { timeout: 60_000 }, () => {
   it("gives the fixer of an instruction the findings it names, refuses an answer to another and records the answer", async () => {
     const l = await loop();
     expect(await round(l, [{ ...BLOCK, kind: "advice", rule: "", text: "a fixture would show the path" }])).toMatchObject({ next: "tidy" });

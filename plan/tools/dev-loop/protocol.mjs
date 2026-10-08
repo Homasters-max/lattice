@@ -202,7 +202,7 @@ function answer(errors, a, ctx) {
   need(errors, a.note === undefined || text(a.note, LIMITS.note), `answers.${a.id}.note: до ${LIMITS.note} знаков`);
   if (a.action === "fixed")
     need(errors, Array.isArray(a.commits) && a.commits.length > 0 && a.commits.every((c) => range.some((r) => sameSha(r, c))),
-      `answers.${a.id}: commits — коммиты из ${from.slice(0, 7)}..head`);
+      `answers.${a.id}: commits — коммиты из ${short(from)}..head`);
   if (a.action === "disputed") {
     need(errors, !advice.has(a.id) && RULE.test(a.note ?? ""), `answers.${a.id}: спор — только о блокирующей находке и с правилом`);
     references(errors, a.note, repo, `answers.${a.id}.note`);
@@ -225,9 +225,10 @@ function answers(brief, out, errors, repo) {
   for (const id of expected) need(errors, ids.includes(id), `answers: нет ответа на ${id}`);
   need(errors, new Set(ids).size === ids.length, "answers: на находку — ровно один ответ");
   // tidy: хвост мог закрыть любой коммит ветки — например, поручение владельца до последнего круга.
+  // Коммиты и файлы ответа git считает, только если ответ их называет: у поручения владельца до первого круга base нет.
   const from = brief.job === "tidy" ? brief.since : brief.base;
-  const range = isSha(out.head) ? repo.commits(from, out.head) : [];
-  const changed = isSha(out.head) ? repo.changed(brief.base, out.head) : [];
+  const range = items.some((a) => a.action === "fixed") && isSha(out.head) && from ? repo.commits(from, out.head) : [];
+  const changed = items.some((a) => a.action === "deferred") && isSha(out.head) && brief.base ? repo.changed(brief.base, out.head) : [];
   for (const a of items) {
     need(errors, expected.includes(a.id), `answers: ${a.id} не поручен`);
     answer(errors, a, { brief, from, range, changed, advice, deferrable, repo });
