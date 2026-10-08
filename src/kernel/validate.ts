@@ -1,14 +1,14 @@
 // validate (KR-21): a value against a schema of the subset (KR-18) returns ok
-// or its violations {path, keyword, expected, got}, sorted (CONVENTIONS.md
-// §5). `$ref` is resolved only through the caller's function; the kernel never
-// reads a store. Formats are read by the kernel's own predicates — KR-11
-// `isFormat`, KR-23 `parseRef`, KR-24 `isUri` — and a broken one is a
-// violation of the schema, not a refusal of those rules. Annotations are not
-// checked here: `ref.pin` and `label` are phase 4's (S0-15). A string is
-// measured in code points (G-22). The walk keeps its own stack, so no depth of
-// nesting overflows; a `$ref` that comes back to itself before the value
-// descends is a violation, not a loop. What the schema holds is read by
-// read-schema.ts.
+// or its violations {path, keyword, expected, got}, sorted
+// (CONVENTIONS.md §5.1). `$ref` is resolved only through the caller's
+// function; the kernel never reads a store. Formats are read by the kernel's
+// own predicates — KR-11 `isFormat`, KR-23 `parseRef`, KR-24 `isUri` — and a
+// broken one is a violation of the schema, not a refusal of those rules.
+// Annotations are not checked here: `ref.pin` and `label` are phase 4's
+// (S0-15). A string is measured in code points (G-22). The walk keeps its own
+// stack, so no depth of nesting overflows; a `$ref` that comes back to itself
+// before the value descends is a violation, not a loop. What the schema holds
+// is read by read-schema.ts.
 import { isFormat, isSchemaFormat, type Format } from "./formats.js";
 import { compareText, gotOf, isJsonArray, isJsonObject, own, pointer, serialize, type JsonObject, type JsonValue } from "./json.js";
 import { branchesOf, fitsType, numberOf, propertiesOf, requiredOf } from "./read-schema.js";
