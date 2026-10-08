@@ -1,0 +1,47 @@
+# Пробелы подмножества схем — отчёт S0-09
+
+SL-03 (2): к переключению подмножество схем KR-18 покрывает каждый тип `std`, который называет дизайн, и ядро замораживается как `1`. S0-09 набросала черновики всех оставшихся типов `std` в `std/source/` и проверила их ядром; этот отчёт — что не выразилось или выразилось натянуто, и что с этим делать, пока ядро `0` (KR-03, R4).
+
+## Что проверено
+
+- **Исходники** — `std/source/<slug>.json`, по типу на файл: каждый проходит `checkAgainstType` как запись `core/type@1`, цепочка `extends` сужает родителя (`compare`, KR-15), `card_order` уникален по цепочке (`test/ledger/std-types.test.ts`).
+- **Примеры** — у каждого не-abstract типа валидный и невалидный пример в `test/ledger/examples/std/`; лишнее поле отклоняется (KR-21).
+- **Примеры дизайна** читаются из `docs/design` как есть: DP-Z05 валиден по `std/decision-point@1`; RT-Z02 валиден по `std/pipeline@1`, кроме `params` стадий (G-38); DP-Z07 — шаблон, а не запись (альтернативы через `|`, `<ref@n>`), поэтому тест сверяет его статусы, причины и `score_semantics` с черновиком `decision-result` и проверяет каждый статус, заполненный по шаблону.
+- **Полнота** — тест структуры: у каждого имени TY-Z02…TY-Z05 есть исходник, и KR-01 читает имена `std` только из `std/source/`.
+
+## Типы
+
+| Тип | Расширяет | Как выразился |
+|---|---|---|
+| `pipeline` | `behaviour` | стадии — pinned `stage`, `reads`, `writes`, `on`, `fallback`; `bench`, `targets`, `tolerance` необязательны (DP-31); `params` — G-38, `on` — G-40 |
+| `decision-point` | — (базовый) | не abstract (G-39); `policy` — `oneOf` по `op` (G-43); `candidates.source` — строка без `format` (G-43) |
+| `decision-result` | — (форма) | abstract `oneOf` по `status`; причина каждого статуса — свой `const` или `enum` (DP-08): выразилось естественно |
+| `bench-item` | `knowledge` | `kind`, `input`, `expected`, `variants`; любые значения — G-38; «ровно одно из `refs` и `value`» — G-43 |
+| `bench-set` | `composition` | pinned `items`, метка `part-of`, и `salt` (G-44); имя типа — G-42 |
+| `review-note` | `hint` | `about`, `subject`, `note`; без `subject` — отказ схемы (TY-04): естественно |
+| `live`, `calibration`, `verdict`, `dismissed` | `fact` | status facts с ключами TR-29: ссылки — в `of`, прочие части ключа — поля с `key` рядом с `of` (G-41) |
+| `report`, `source-listing` | `fact` | ключи BN-11 и TR-39 (G-41) |
+| `step`, `link`, `run`, `tape-entry`, `question`, `delivery-intent`, `delivery-attempt`, `code-commit` | — | события `runtime`; `code-commit` с ключом `sha` (OB-08) — естественно; `input`, `output`, `answer` — G-38; поля, которых дизайн не перечисляет, — G-43; имя `tape-entry` — G-42 |
+
+## Пробелы
+
+| ID | Что | Чем закрыть | Кому решать |
+|---|---|---|---|
+| G-38 | «любое значение» не выражается: объекты закрыты, `values` — одна схема, пара типов — только с `null`, `oneOf` — только объекты (KR-18, G-22). Задевает `params` стадии pipeline (RT-02, RT-Z02), `input` и `output` run (RT-14, RT-15), `answer` ленты (RT-23), `input`, `expected.value` и `variants` bench item (BN-01, BN-03) и `value` формы `fact` (TY-14, G-32) | **ключевое слово ядра до заморозки** — схема «любое I-JSON значение» (KR-10), которое проверяет не ядро, а тот, кто знает тип: `params` — тип `params` контракта при валидации pipeline (RT-02), `input` — тип входа первой стадии. Иначе — правка дизайна: такие значения хранятся по hash как содержимое `runtime` (OB-05), и RT-Z02 теряет статические `params` | владелец: правка KR-18 или дизайна |
+| G-39 | `decision-point` — базовый тип (TY-Z02), базовые типы abstract (G-02), а DP-01 и DP-Z05 пишут записи типа `std/decision-point@1` | `decision-point` — не abstract: единственный базовый тип с записями; проект сужает его через `extends` | правка типа |
+| G-40 | действие `fallback: <stage@n>` (RT-04) — объект рядом со строками `continue`, `escalate`, `refuse`; значение map — одна схема | `on` — `{status: continue \| fallback \| escalate \| refuse}`, запасная стадия — поле `fallback` стадии; RT-Z02 не меняется | правка типа; формулировку RT-04 уточнить при ближайшей правке дизайна |
+| G-41 | `of` — `{role: ref@n}` (TY-14), а части ключей TR-29, BN-11 — не ссылки: участник `verdict`, rule ID `dismissed`, hash вопроса `calibration`, split `report`; ключ `source-listing` (TR-39) не назван, а источник — внешняя система без `id` | ссылки — в `of`, прочие части ключа — поля с `key: true` рядом с `of` (TR-28: тип объявляет поля ключа); ключ `source-listing` — `of.source`, внешняя ссылка `format: uri` | правка типа; TY-14 уточнить при ближайшей правке дизайна |
+| G-42 | имён нет у типа записи ленты (RT-23, «tape entries» TY-Z05), типа набора bench (BN-02) и формы DecisionResult (DP-Z07); ни одна метка TY-16 не значит «измеряется на» (`bench` у pipeline и point); `pin` аннотации `ref` (KR-19) — понятие сущности, а у ссылки на событие — ULID без `@n` | `tape-entry`, `bench-set`, `decision-result`; `bench` — `format: ref` без аннотации, как в G-31; ссылка на событие — `pin: any` | правка типа; метку и `pin` событий решает S0-15 (RF-07) |
+| G-43 | дизайн не задаёт поля: параметры операторов политики и их сочетание — «`top-k` + `budget`» (DP-13, DP-Z08); `candidates.source` — ссылка или слово `scope` (DP-05); bench item держит ровно одно из `refs` и `value` (BN-01) — без дискриминатора подмножество «ровно одно» не скажет; набор статусов step (OB-02); поля `question` (RT-18) и `delivery-attempt` (RT-26) | `policy` — один оператор, `oneOf` по `op`: `threshold.min`, `top-k.k`, `margin.min`, `table.table`, у `budget`, `any`, `all` параметров нет; сочетание — решить с `measure` (S2); `source` — строка без `format`; `refs` и `value` оба необязательны; статус step — строка; `question` — `{run, stage, status}`; `delivery-attempt` — `{intent, status}` | правка типа; сочетание операторов — с задачей `measure` |
+| G-44 | `bench-set` расширяет `composition` (BN-02), а `composition` держит «только ссылки и структурные метки» (TY-Z02); `salt` (BN-04) — ни то ни другое | `salt` — параметр разбиения, не свободный текст: поле `composition` допустимо | правка типа; TY-Z02 уточнить при ближайшей правке дизайна |
+
+## Выразилось, но натянуто — без отдельного пробела
+
+- **hash** — строка `minLength: 1`: `pattern` в подмножестве нет, `format` hash — тоже (как `code.hash`, S0-08).
+- **значение факта при `revoked`** — что у неотозванного `live`, `calibration`, `verdict`, `report`, `source-listing` есть `value`, схема не выражает, как у `alias` (G-32): это фаза 4 (S0-15).
+- **закрытость status facts** — `live`, `calibration`, `verdict`, `dismissed`, как `retired` и `alias`, закрывает фаза 6 (S0-18, G-32).
+- **примеры дизайна** пишут заголовок записи в теле (`type`, `id` рядом с полями тела) — не форма KR-04; тест читает `type` и берёт остальное без `id` как тело.
+
+## Итог для заморозки
+
+Ключевое слово ядра нужно только для G-38; остальное закрывается правкой типов и уточнением формулировок дизайна. Без решения G-38 RT-Z02 не валиден по своему черновику — пункт «примеры из дизайна валидны по своим черновикам» ждёт ответа владельца.
