@@ -166,7 +166,7 @@ describe("the base types and what extends them", () => {
     ]);
   });
 
-  it("G-01: refs sit on the base knowledge, table and list on clause, prose and example", () => {
+  it("LG-42, KR-18, G-01: refs sit on the base knowledge, table and list on clause, prose and example", () => {
     expect(object(field("knowledge", "refs").items).ref).toEqual({ to: "std/knowledge@1", pin: "floating", label: "about" });
     const attached = ["clause", "prose", "example", "requirement", "term"].map((slug) => [slug, "table" in fieldsOf(slug), "list" in fieldsOf(slug)]);
     expect(attached).toEqual([
