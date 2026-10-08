@@ -117,8 +117,8 @@ describe("the drafts of S0-09: events", () => {
     expect(required("delivery-intent")).toEqual(["operation", "key", "payload", "stage"]);
   });
 
-  it("RT-14, RT-15, DP-08: a run holds its pipeline, setup, input, fingerprint, execution tuple, commit, budget, spending, the outcome of every stage and its own; decide keeps its DecisionResult by $ref", () => {
-    expect(required("run")).toEqual(["pipeline", "setup", "input", "fingerprint", "tuple", "commit", "budget", "spending", "stages", "outcome"]);
+  it("RT-14, RT-15, DP-08: a run holds its pipeline, setup, input, fingerprint, execution tuple, the environment beside it, commit, budget, spending, the outcome of every stage and its own; decide keeps its DecisionResult by $ref", () => {
+    expect(required("run")).toEqual(["pipeline", "setup", "input", "fingerprint", "tuple", "environment", "commit", "budget", "spending", "stages", "outcome"]);
     expect(Object.keys(object(field("run", "tuple").properties))).toEqual(["implementations", "judges", "ports", "lattice", "pins"]);
     expect(object(object(object(field("run", "stages").items).properties).result).$ref).toEqual("std/decision-result@1");
   });

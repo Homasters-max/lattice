@@ -335,6 +335,7 @@
       "input",
       "fingerprint",
       "tuple",
+      "environment",
       "commit",
       "budget",
       "spending",
