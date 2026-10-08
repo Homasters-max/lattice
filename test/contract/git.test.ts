@@ -10,8 +10,12 @@ import { scratch, type Scratch } from "../support/files.js";
 
 const dirs: Scratch[] = [];
 afterAll(() => dirs.forEach((d) => d.remove()));
-/** Whether a path is there, in a scratch folder of this run. */
-const exists = (path: string) => dirs[0]?.exists(path) ?? false;
+/** Whether a path is there, in a scratch folder of this run: any of them reads a path inside every one (ST-18). */
+function exists(path: string): boolean {
+  // Without a scratch folder a "false" would hold for any path, and the checks of a released worktree would pass.
+  if (dirs[0] === undefined) throw new Error(`bug: no scratch folder of this run to look for ${path} in`);
+  return dirs[0].exists(path);
+}
 
 const BRANCHES: GitFixtureOptions["branches"] = {
   main: { files: { "README.md": "one\n", "src/a.ts": "a\n" } },
