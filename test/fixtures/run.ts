@@ -1,5 +1,11 @@
 // Runs one rule fixture through the hard check it names (ST-17, LG-17).
-// Layout and format: CONVENTIONS.md §4.
+// A fixture is test/fixtures/<RULE-ID>/trigger/<case>.json or pass/<case>.json:
+// `{ "check", "input", "expect" }` — `check` names a row of checks.ts, `input`
+// is what that row feeds its check, and a trigger's `expect` is
+// `{ rule, path, intent? }` with the rule of its folder. A trigger passes when
+// the check refuses and one rejection has that rule and path (and intent, if
+// given) — others beside it are allowed; a pass has no `expect` and passes when
+// the check accepts the input whole. What a fixture breaks: CONVENTIONS.md §4.2.
 
 type Refusal = {
   readonly rule: string;
@@ -12,7 +18,7 @@ export type CheckOutcome = { readonly ok: true } | { readonly ok: false; readonl
 
 /**
  * A hard check as the fixture table sees it: the rule IDs it enforces and a function over the fixture's `input` —
- * asynchronous where the check waits on a port, as landing does (CONVENTIONS.md §2).
+ * asynchronous where the check waits on a port, as landing does (CONVENTIONS.md §2.5).
  */
 export interface FixtureCheck {
   readonly enforces: readonly string[];

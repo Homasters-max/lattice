@@ -141,7 +141,7 @@ describe("a type body by the meta-type (KR-14, KR-15, KR-22)", () => {
   });
 });
 
-describe("the place of the record (LG-16, CONVENTIONS.md §5)", () => {
+describe("the place of the record (LG-16, CONVENTIONS.md §5.2)", () => {
   const record = { type: "demo/shape@1", body: { text: "abcdef" } };
 
   it("LG-16: refusals from rev, the type and the body come sorted by path", () => {

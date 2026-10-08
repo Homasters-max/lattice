@@ -183,7 +183,7 @@ function readText(text: string, root: Place): { readonly value: JsonValue; reado
 
 /**
  * KR-10: the text of UTF-8 bytes, refused at the place the caller names — where the bytes sit in their input — when
- * they are not UTF-8. Bytes are no JSON value: the refusal names them by their hash (CONVENTIONS.md §3, Q-19).
+ * they are not UTF-8. Bytes are no JSON value: the refusal names them by their hash (CONVENTIONS.md §3.3, Q-19).
  */
 export function decodeUtf8(bytes: Uint8Array, place: Place = ROOT): Result<string> {
   try {

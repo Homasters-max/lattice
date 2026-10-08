@@ -33,7 +33,7 @@ export const JSON_VALUE: Member<JsonValue> = { expected: "a JSON value", fits: (
 /**
  * The fields of `value` against `members`, refused by `rule` at the place the caller names: a field outside the
  * table expects `absent`, a member that does not fit expects what the table says. Every path is a JSON Pointer
- * (G-13); the rejections come sorted (CONVENTIONS.md §5).
+ * (G-13); the rejections come sorted (CONVENTIONS.md §5.2).
  */
 export function closedRejections(value: JsonObject, members: Members, rule: Rule, place: Place): Rejection[] {
   const at = (name: string) => ({ intent: place.intent, path: pointer(place.path, name) });

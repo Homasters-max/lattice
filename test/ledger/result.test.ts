@@ -1,4 +1,4 @@
-// One form of the outcome of a hard check (CONVENTIONS.md §2, §3; LG-17):
+// One form of the outcome of a hard check (CONVENTIONS.md §2.1, §3.2; LG-17):
 // every hard check the ledger exports returns a Result — the value it checked
 // or its rejections, sorted — and takes the place where its input sits (G-13).
 import { describe, expect, it } from "vitest";
@@ -22,7 +22,7 @@ const proposal = (id: string): JsonValue => ({
   sig: null,
 });
 
-/** A refused outcome's rejections are in the order of CONVENTIONS.md §5. */
+/** A refused outcome's rejections are in the order of CONVENTIONS.md §5.2. */
 const sorted = (r: Result<unknown>): boolean => !r.ok && JSON.stringify(r.rejections) === JSON.stringify(sortRejections(r.rejections));
 
 function read(value: JsonValue): Proposal {
@@ -31,7 +31,7 @@ function read(value: JsonValue): Proposal {
   return out.value;
 }
 
-describe("a hard check of the ledger returns a Result (CONVENTIONS.md §2, LG-17)", () => {
+describe("a hard check of the ledger returns a Result (CONVENTIONS.md §2.2, LG-17)", () => {
   it("LG-04, LG-05, LG-06: verifyChain gives the commits it verified, and refuses at the place given", () => {
     const commits = deepFreeze(landedChain([proposal("demo/a"), proposal("demo/b")]));
     expect(verifyChain(commits, keyOfLand, STORE)).toEqual({ ok: true, value: commits });
@@ -41,7 +41,7 @@ describe("a hard check of the ledger returns a Result (CONVENTIONS.md §2, LG-17
     expect(rejectionsOf(out).every((r) => r.intent === null && r.path.startsWith("/store/knowledge.jsonl/"))).toBe(true);
   });
 
-  it("LG-04, LG-05, LG-06: the rejections of verifyChain come sorted (CONVENTIONS.md §5) — not in the order of its lines and checks", () => {
+  it("LG-04, LG-05, LG-06: the rejections of verifyChain come sorted (CONVENTIONS.md §5.2) — not in the order of its lines and checks", () => {
     const commits = deepFreeze(landedChain([proposal("demo/a"), proposal("demo/b")]));
     const out = verifyChain(deepFreeze([commits[1]!, commits[0]!]), NO_KEYS, STORE);
     expect(rejectionsOf(out).map((r) => [r.rule, r.path])).toEqual([
@@ -69,7 +69,7 @@ describe("a hard check of the ledger returns a Result (CONVENTIONS.md §2, LG-17
   });
 });
 
-describe("a hard check of the ledger takes the intent of its place too (CONVENTIONS.md §3, G-13)", () => {
+describe("a hard check of the ledger takes the intent of its place too (CONVENTIONS.md §3.2, G-13)", () => {
   it("LG-04, LG-05, LG-06: verifyChain refuses under the place given, its intent too", () => {
     const commits = deepFreeze(landedChain([proposal("demo/a")]));
     const out = verifyChain(commits, NO_KEYS, HELD);

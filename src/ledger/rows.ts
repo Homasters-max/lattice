@@ -24,7 +24,7 @@ export const currentKey = (id: string): string => `current:${id}`;
 
 const order = (a: Row, b: Row) => compareText(a.key, b.key) || a.from - b.from;
 
-/** Rows by key, then by `from` (CONVENTIONS.md §5). */
+/** Rows by key, then by `from` (CONVENTIONS.md §5.5). */
 export const sortRows = (rows: readonly Row[]): Row[] => [...rows].sort(order);
 
 /** The rows after a delta: a closed row replaces the open one it closes, an opened row is added. */

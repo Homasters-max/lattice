@@ -86,7 +86,7 @@ function chainRejections(type: Type, resolve: ResolveType, place: Place): Reject
 /**
  * KR-14…KR-19: the body of a type, refused at the place the caller names — where the body sits in its input, `/body`
  * of an intent. Parents and `$ref` targets come from `resolve`; the chain and the targets are checked only on a body
- * in form. The rejections come sorted (CONVENTIONS.md §5).
+ * in form. The rejections come sorted (CONVENTIONS.md §5.2).
  */
 export function checkType(body: JsonValue, resolve: ResolveType, place: Place): Rejection[] {
   if (!isJsonObject(body)) return [reject(KR_14, { ...place, expected: "a type body {extends, abstract, kind, schema}", got: body })];

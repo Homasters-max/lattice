@@ -1,4 +1,4 @@
-// The form of a refusal (LG-17, CONVENTIONS.md §2–3, §5–6): a hard check
+// The form of a refusal (LG-17, CONVENTIONS.md §2.1, §3.2, §3.4, §5.2, §6.1): a hard check
 // returns a Result and takes the Place where its input sits; a rejection
 // names its rule ID and is made only by `reject` from a row of a rule
 // registry. The grammar of an ID (RM-02) is written here once, beside
@@ -78,7 +78,7 @@ function compare(a: Rejection, b: Rejection): number {
   return first < 0 ? 0 : compareText(ka[first] ?? "", kb[first] ?? "");
 }
 
-/** CONVENTIONS.md §5: by intent (null first), path, rule, id, then canonical expected and got. */
+/** CONVENTIONS.md §5.2: by intent (null first), path, rule, id, then canonical expected and got. */
 export function sortRejections(rejections: readonly Rejection[]): Rejection[] {
   return [...rejections].sort(compare);
 }

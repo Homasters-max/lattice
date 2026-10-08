@@ -2,12 +2,11 @@
 // clauses is one item of its section, the ID of a block is read from its
 // text, and a document that `print` would not write back is refused when it
 // is built — what the types do not say is checked there, so `print` refuses
-// nothing.
+// nothing. That only the builders cast to a type of the model is a structure
+// test (test/structure/form.test.ts).
 import { describe, expect, it } from "vitest";
-import ts from "typescript";
 import { clause, clauses, document, example, idOf, print, prose, type Clause, type Field, type Item } from "../../src/codec/index.js";
 import { ROOT, type Place, type Result } from "../../src/kernel/index.js";
-import { repoTree } from "../structure/tree.js";
 
 const value = <T>(out: Result<T>): T => {
   if (!out.ok) throw new Error(out.rejections.map((r) => `${r.rule} ${r.path} ${JSON.stringify(r.got)}`).join("; "));
@@ -144,29 +143,4 @@ describe("a document whose sections print does not write back is not built (LG-4
     expect(doc.ok ? [] : doc.rejections.map((r) => [r.rule, r.path, r.intent])).toEqual([["LG-42", "/docs/a.md/items/0/level", "x"]]);
     expect(refusals(prose({ text: "AA-Z01. a\nb" }, ROOT))).toEqual([["LG-42", ""]]);
   });
-});
-
-describe("a value of the model is made by its builders only (LG-42, CONVENTIONS §1)", () => {
-  // The program and its checker over the whole repository take longer than the
-  // timeout of a test under the load of the whole run.
-  it("LG-42: no file of src/ but src/codec/build.ts casts to a type of the model with `as`", () => {
-    const tree = repoTree();
-    const checker = tree.program().getTypeChecker();
-    const marked = (type: ts.Type): boolean =>
-      type.isUnion() ? type.types.some(marked) : type.getProperties().some((p) => /^__@(BUILT|WHOLE)@/.test(String(p.escapedName)));
-    const casts = new Map<string, string[]>();
-    for (const [path, sf] of tree.files) {
-      const visit = (node: ts.Node): void => {
-        if ((ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)) && marked(checker.getTypeFromTypeNode(node.type))) {
-          casts.set(path, [...(casts.get(path) ?? []), `${sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1} ${node.type.getText(sf)}`]);
-        }
-        ts.forEachChild(node, visit);
-      };
-      visit(sf);
-    }
-    // build.ts casts after its checks, so the search finds what it looks for
-    expect(casts.get("src/codec/build.ts")?.length).toBeGreaterThan(0);
-    casts.delete("src/codec/build.ts");
-    expect(Object.fromEntries(casts)).toEqual({});
-  }, 30_000);
 });

@@ -1,11 +1,11 @@
 // The table of hard checks the rule fixtures run against (ST-17): the name a
 // fixture gives in `check` → the rule IDs the check enforces and a function
 // that feeds it the fixture's `input`. A task that adds a hard check adds its
-// row here; the input is built only through public functions (CONVENTIONS.md §4).
+// row here; the input is built only through public functions (CONVENTIONS.md §4.3).
 // The checks of landing run through `land` itself, as a dry run on a
 // `git-fixture` of the fixture's branches; the checks with no glue around them
 // — a JSON text, a proposal value, apply, the lines of a store — run alone.
-// A row hands on the Result of its check as it is (CONVENTIONS.md §2); a
+// A row hands on the Result of its check as it is (CONVENTIONS.md §2.1); a
 // check placed by its caller is placed at the root of the input, `ROOT`.
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";

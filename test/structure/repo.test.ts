@@ -5,6 +5,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import ts from "typescript";
 import { beforeAll, describe, expect, it } from "vitest";
+import { auditForm, defaultExports, modelCasts } from "./audit-form.js";
 import { auditImports, portEntries } from "./audit-imports.js";
 import { auditKernelFiles, auditStdNames, stdTypeNames } from "./audit-kernel.js";
 import { auditPurity } from "./audit-purity.js";
@@ -57,7 +58,24 @@ describe("structure of this repository", () => {
     expect(auditPurity(repo)).toEqual([]);
   });
 
-  it("CONVENTIONS §9: src/ and test/support/ are written in English — no Cyrillic letter in code or comments", () => {
+  it("ST-03, LG-17, ST-16, LG-42: src/ holds the norms of form — readonly data at module level, ROOT, named exports, casts to the md model only in its builders", () => {
+    expect(auditForm(repo)).toEqual([]);
+  });
+
+  it("LG-42: the search for casts to the md model finds those of src/codec/build.ts, after its checks", () => {
+    expect(modelCasts(repo).filter((c) => c.path === "src/codec/build.ts").length).toBeGreaterThan(0);
+  });
+
+  it("ST-16: test/ and scripts/ export by name too", () => {
+    const files = ["test", "scripts"].flatMap((dir) =>
+      readdirSync(join(repoRoot, dir), { recursive: true, encoding: "utf8" })
+        .filter((f) => /\.(ts|mjs|js)$/.test(f))
+        .map((f) => `${dir}/${f.replaceAll("\\", "/")}`),
+    );
+    expect(files.flatMap((f) => defaultExports(f, readFileSync(join(repoRoot, f), "utf8")))).toEqual([]);
+  });
+
+  it("PR-14: src/ and test/support/ are written in English — no Cyrillic letter in code or comments", () => {
     const support = readdirSync(join(repoRoot, "test/support")).map((f) => [`test/support/${f}`, readFileSync(join(repoRoot, "test/support", f), "utf8")] as const);
     const texts = [...[...repo.files].map(([path, file]) => [path, file.text] as const), ...support];
     expect(texts.filter(([, text]) => /[Ѐ-ӿ]/u.test(text)).map(([path]) => path)).toEqual([]);

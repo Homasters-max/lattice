@@ -30,7 +30,7 @@ const BODY: JsonValue = {
   },
 };
 
-/** A constant frozen through and through: records are frozen plain data (CONVENTIONS.md §1). */
+/** A constant frozen through and through: records are frozen plain data (CONVENTIONS.md §1.1). */
 function frozen<T>(value: T): T {
   if (typeof value === "object" && value !== null) for (const inner of Object.values(value)) frozen(inner);
   return Object.freeze(value);

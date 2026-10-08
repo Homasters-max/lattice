@@ -27,7 +27,7 @@ const withMetaType =
  * LG-16, phase 2: the record it is given, admitted against its type, or its rejections at the place the caller names
  * — where the record sits in its input; `rev` at `/rev`, the type at `/type`, the body under `/body`. `resolve` gives
  * the body of a type by pinned reference: the type of the record, its parents and the targets of `$ref`. The
- * rejections come sorted (CONVENTIONS.md §5).
+ * rejections come sorted (CONVENTIONS.md §5.2).
  */
 export function checkAgainstType<R extends Pick<Record, "type" | "rev" | "body">>(record: R, resolve: ResolveType, place: Place): Result<R> {
   const known = withMetaType(resolve);
