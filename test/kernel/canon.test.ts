@@ -74,6 +74,7 @@ describe("canon properties (KR-10)", () => {
         const parsed = parseJson(textOf(v));
         expect(parsed.ok && textOf(parsed.value)).toBe(textOf(v));
       }),
+      { numRuns: 100 },
     );
   });
 
@@ -84,6 +85,7 @@ describe("canon properties (KR-10)", () => {
         const reversed = deepFreeze(Object.fromEntries(Object.entries(o).reverse()));
         expect(textOf(reversed)).toBe(textOf(o));
       }),
+      { numRuns: 100 },
     );
   });
 });

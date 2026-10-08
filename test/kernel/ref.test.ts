@@ -85,6 +85,7 @@ describe("references (KR-23)", () => {
         expect(parsed.ok).toBe(true);
         if (parsed.ok) expect(formatRef(parsed.value)).toBe(s);
       }),
+      { numRuns: 100 },
     );
   });
 

@@ -8,7 +8,7 @@
 | [S0-02](tasks/S0-02-code-conventions.md) | Соглашения кода, отказов и фикстур правил | A | ✅ | [#3](https://github.com/Homasters-max/lattice/pull/3) | |
 | [S0-39](tasks/S0-39-proof-loop-design.md) | Контур проверки — правки дизайна | A | ✅ | [#33](https://github.com/Homasters-max/lattice/pull/33) | инструмент, разбор #30, G-29 |
 | [S0-40](tasks/S0-40-tools-tests.md) | Тесты dev-loop — отдельный project и быстрее | A | ⬜ | | инструмент |
-| [S0-41](tasks/S0-41-deterministic-tests.md) | Детерминизм тестов — seed и бюджет property-тестов | A | ⬜ | | инструмент |
+| [S0-41](tasks/S0-41-deterministic-tests.md) | Детерминизм тестов — seed и бюджет property-тестов | A | ✅ | [#35](https://github.com/Homasters-max/lattice/pull/35) | инструмент |
 | [S0-42](tasks/S0-42-verify-levels.md) | Уровни verify — affected и fitness, ratchet ST-18 | A | ⬜ | | инструмент |
 | [S0-43](tasks/S0-43-dl-gate.md) | dl gate — runner цикла и записи run'ов verify | A | ⬜ | | инструмент |
 | [S0-44](tasks/S0-44-mutate.md) | mutate — отчёт мутаций для ревью | A | ⬜ | | инструмент |
