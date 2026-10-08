@@ -1,0 +1,482 @@
+{
+  "abstract": true,
+  "kind": "entity",
+  "schema": {
+    "oneOf": [
+      {
+        "type": "object",
+        "properties": {
+          "status": {
+            "const": "selected"
+          },
+          "selected": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "ref",
+              "description": "a selected candidate, ref@n"
+            },
+            "description": "the selected candidates",
+            "minItems": 1
+          },
+          "evaluations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "candidate": {
+                  "type": "string",
+                  "format": "ref",
+                  "description": "the candidate, ref@n"
+                },
+                "value": {
+                  "type": "string",
+                  "description": "the answer of the judge for it (DP-10)"
+                },
+                "score": {
+                  "type": "number",
+                  "description": "its score (DP-10, DP-17)"
+                },
+                "score_semantics": {
+                  "enum": [
+                    "relevance",
+                    "confidence",
+                    "preference"
+                  ],
+                  "description": "what the score means (DP-17)"
+                }
+              },
+              "required": [
+                "candidate"
+              ]
+            },
+            "description": "one evaluation per candidate (DP-10)"
+          },
+          "inputs": {
+            "type": "object",
+            "properties": {
+              "point": {
+                "type": "string",
+                "format": "ref",
+                "ref": {
+                  "to": "std/decision-point@1",
+                  "pin": "pinned",
+                  "label": "uses"
+                },
+                "description": "the point revision"
+              },
+              "candidates": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "ref",
+                  "description": "a candidate, ref@n"
+                },
+                "description": "the candidate set given to the judge"
+              },
+              "input_fingerprint": {
+                "type": "string",
+                "minLength": 1,
+                "description": "the fingerprint of the input (RT-14)"
+              }
+            },
+            "required": [
+              "point",
+              "candidates",
+              "input_fingerprint"
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "selected",
+          "evaluations",
+          "inputs"
+        ]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "status": {
+            "const": "none"
+          },
+          "reason": {
+            "const": "threshold"
+          },
+          "selected": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "ref",
+              "description": "a selected candidate, ref@n"
+            },
+            "description": "the selected candidates"
+          },
+          "evaluations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "candidate": {
+                  "type": "string",
+                  "format": "ref",
+                  "description": "the candidate, ref@n"
+                },
+                "value": {
+                  "type": "string",
+                  "description": "the answer of the judge for it (DP-10)"
+                },
+                "score": {
+                  "type": "number",
+                  "description": "its score (DP-10, DP-17)"
+                },
+                "score_semantics": {
+                  "enum": [
+                    "relevance",
+                    "confidence",
+                    "preference"
+                  ],
+                  "description": "what the score means (DP-17)"
+                }
+              },
+              "required": [
+                "candidate"
+              ]
+            },
+            "description": "one evaluation per candidate (DP-10)"
+          },
+          "inputs": {
+            "type": "object",
+            "properties": {
+              "point": {
+                "type": "string",
+                "format": "ref",
+                "ref": {
+                  "to": "std/decision-point@1",
+                  "pin": "pinned",
+                  "label": "uses"
+                },
+                "description": "the point revision"
+              },
+              "candidates": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "ref",
+                  "description": "a candidate, ref@n"
+                },
+                "description": "the candidate set given to the judge"
+              },
+              "input_fingerprint": {
+                "type": "string",
+                "minLength": 1,
+                "description": "the fingerprint of the input (RT-14)"
+              }
+            },
+            "required": [
+              "point",
+              "candidates",
+              "input_fingerprint"
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "reason",
+          "evaluations",
+          "inputs"
+        ]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "status": {
+            "const": "ambiguous"
+          },
+          "reason": {
+            "const": "margin"
+          },
+          "selected": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "ref",
+              "description": "a selected candidate, ref@n"
+            },
+            "description": "the selected candidates"
+          },
+          "evaluations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "candidate": {
+                  "type": "string",
+                  "format": "ref",
+                  "description": "the candidate, ref@n"
+                },
+                "value": {
+                  "type": "string",
+                  "description": "the answer of the judge for it (DP-10)"
+                },
+                "score": {
+                  "type": "number",
+                  "description": "its score (DP-10, DP-17)"
+                },
+                "score_semantics": {
+                  "enum": [
+                    "relevance",
+                    "confidence",
+                    "preference"
+                  ],
+                  "description": "what the score means (DP-17)"
+                }
+              },
+              "required": [
+                "candidate"
+              ]
+            },
+            "description": "one evaluation per candidate (DP-10)"
+          },
+          "inputs": {
+            "type": "object",
+            "properties": {
+              "point": {
+                "type": "string",
+                "format": "ref",
+                "ref": {
+                  "to": "std/decision-point@1",
+                  "pin": "pinned",
+                  "label": "uses"
+                },
+                "description": "the point revision"
+              },
+              "candidates": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "ref",
+                  "description": "a candidate, ref@n"
+                },
+                "description": "the candidate set given to the judge"
+              },
+              "input_fingerprint": {
+                "type": "string",
+                "minLength": 1,
+                "description": "the fingerprint of the input (RT-14)"
+              }
+            },
+            "required": [
+              "point",
+              "candidates",
+              "input_fingerprint"
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "reason",
+          "evaluations",
+          "inputs"
+        ]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "status": {
+            "const": "insufficient"
+          },
+          "reason": {
+            "enum": [
+              "budget",
+              "no-candidates"
+            ]
+          },
+          "selected": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "ref",
+              "description": "a selected candidate, ref@n"
+            },
+            "description": "the selected candidates"
+          },
+          "evaluations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "candidate": {
+                  "type": "string",
+                  "format": "ref",
+                  "description": "the candidate, ref@n"
+                },
+                "value": {
+                  "type": "string",
+                  "description": "the answer of the judge for it (DP-10)"
+                },
+                "score": {
+                  "type": "number",
+                  "description": "its score (DP-10, DP-17)"
+                },
+                "score_semantics": {
+                  "enum": [
+                    "relevance",
+                    "confidence",
+                    "preference"
+                  ],
+                  "description": "what the score means (DP-17)"
+                }
+              },
+              "required": [
+                "candidate"
+              ]
+            },
+            "description": "one evaluation per candidate (DP-10)"
+          },
+          "inputs": {
+            "type": "object",
+            "properties": {
+              "point": {
+                "type": "string",
+                "format": "ref",
+                "ref": {
+                  "to": "std/decision-point@1",
+                  "pin": "pinned",
+                  "label": "uses"
+                },
+                "description": "the point revision"
+              },
+              "candidates": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "ref",
+                  "description": "a candidate, ref@n"
+                },
+                "description": "the candidate set given to the judge"
+              },
+              "input_fingerprint": {
+                "type": "string",
+                "minLength": 1,
+                "description": "the fingerprint of the input (RT-14)"
+              }
+            },
+            "required": [
+              "point",
+              "candidates",
+              "input_fingerprint"
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "reason",
+          "evaluations",
+          "inputs"
+        ]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "status": {
+            "const": "unavailable"
+          },
+          "reason": {
+            "enum": [
+              "timeout",
+              "network",
+              "schema",
+              "model",
+              "coverage"
+            ]
+          },
+          "selected": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "ref",
+              "description": "a selected candidate, ref@n"
+            },
+            "description": "the selected candidates"
+          },
+          "evaluations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "candidate": {
+                  "type": "string",
+                  "format": "ref",
+                  "description": "the candidate, ref@n"
+                },
+                "value": {
+                  "type": "string",
+                  "description": "the answer of the judge for it (DP-10)"
+                },
+                "score": {
+                  "type": "number",
+                  "description": "its score (DP-10, DP-17)"
+                },
+                "score_semantics": {
+                  "enum": [
+                    "relevance",
+                    "confidence",
+                    "preference"
+                  ],
+                  "description": "what the score means (DP-17)"
+                }
+              },
+              "required": [
+                "candidate"
+              ]
+            },
+            "description": "one evaluation per candidate (DP-10)"
+          },
+          "inputs": {
+            "type": "object",
+            "properties": {
+              "point": {
+                "type": "string",
+                "format": "ref",
+                "ref": {
+                  "to": "std/decision-point@1",
+                  "pin": "pinned",
+                  "label": "uses"
+                },
+                "description": "the point revision"
+              },
+              "candidates": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "ref",
+                  "description": "a candidate, ref@n"
+                },
+                "description": "the candidate set given to the judge"
+              },
+              "input_fingerprint": {
+                "type": "string",
+                "minLength": 1,
+                "description": "the fingerprint of the input (RT-14)"
+              }
+            },
+            "required": [
+              "point",
+              "candidates",
+              "input_fingerprint"
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "reason",
+          "evaluations",
+          "inputs"
+        ]
+      }
+    ],
+    "discriminator": "status",
+    "description": "the stage outcome of decide, kept only in its run record; reason from the closed set of its status (DP-08, DP-Z07)"
+  }
+}

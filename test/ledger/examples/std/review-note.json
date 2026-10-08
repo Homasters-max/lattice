@@ -1,0 +1,19 @@
+{
+  "valid": [
+    {
+      "about": "demo/order-intake@2",
+      "subject": "demo/order-intake.refund@1",
+      "note": "the scenario misses a refund"
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/subject",
+      "keyword": "required",
+      "body": {
+        "about": "demo/order-intake@2",
+        "note": "the scenario misses a refund"
+      }
+    }
+  ]
+}

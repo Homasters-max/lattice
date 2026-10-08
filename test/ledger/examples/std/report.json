@@ -1,0 +1,37 @@
+{
+  "valid": [
+    {
+      "of": {
+        "subject": "lattice/solve@3",
+        "set": "lattice/solve-set@1"
+      },
+      "split": "holdout",
+      "value": {
+        "runs": [
+          "01JB4M2Z8Q6N7R3T5V9W0X1Y2Z",
+          "01JB4M2Z8Q6N7R3T5V9W0X1Y3A"
+        ],
+        "tuple": "sha256:0f1e2d3c"
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/split",
+      "keyword": "enum",
+      "body": {
+        "of": {
+          "subject": "lattice/solve@3",
+          "set": "lattice/solve-set@1"
+        },
+        "split": "test",
+        "value": {
+          "runs": [
+            "01JB4M2Z8Q6N7R3T5V9W0X1Y2Z"
+          ],
+          "tuple": "sha256:0f1e2d3c"
+        }
+      }
+    }
+  ]
+}

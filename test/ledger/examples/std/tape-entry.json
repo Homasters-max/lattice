@@ -1,0 +1,54 @@
+{
+  "valid": [
+    {
+      "operation": "std/llm@1#operations/complete",
+      "request": "sha256:0f1e2d3c",
+      "occurrence": 1,
+      "answer": {},
+      "ms": 900,
+      "tokens": 1200,
+      "billing": "api",
+      "usd": "0.0125",
+      "mode": "service",
+      "model": {
+        "id": "claude-x-2026-09",
+        "check": "verified"
+      }
+    },
+    {
+      "operation": "std/llm@1#operations/complete",
+      "request": "sha256:0f1e2d3c",
+      "occurrence": 2,
+      "error": {
+        "adapter": "ai-sdk",
+        "code": "rate-limit",
+        "status": 429,
+        "retryable": true
+      },
+      "ms": 40,
+      "billing": "api",
+      "mode": "service"
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/mode",
+      "keyword": "enum",
+      "body": {
+        "operation": "std/llm@1#operations/complete",
+        "request": "sha256:0f1e2d3c",
+        "occurrence": 1,
+        "answer": {},
+        "ms": 900,
+        "tokens": 1200,
+        "billing": "api",
+        "usd": "0.0125",
+        "mode": "live",
+        "model": {
+          "id": "claude-x-2026-09",
+          "check": "verified"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "valid": [
+    {
+      "operation": "std/forge@1#operations/comment",
+      "key": "sha256:0f1e2d3c",
+      "payload": "sha256:0f1e2d3c",
+      "stage": "lattice/review@1",
+      "deadline": "2026-10-09T12:00:00.000000Z"
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/key",
+      "keyword": "required",
+      "body": {
+        "operation": "std/forge@1#operations/comment",
+        "payload": "sha256:0f1e2d3c",
+        "stage": "lattice/review@1"
+      }
+    }
+  ]
+}

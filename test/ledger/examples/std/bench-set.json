@@ -1,0 +1,20 @@
+{
+  "valid": [
+    {
+      "items": [
+        "demo/item-1@1",
+        "demo/item-2@3"
+      ],
+      "salt": "2026-10"
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/salt",
+      "keyword": "required",
+      "body": {
+        "items": []
+      }
+    }
+  ]
+}

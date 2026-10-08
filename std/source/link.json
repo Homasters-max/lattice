@@ -1,0 +1,69 @@
+{
+  "abstract": false,
+  "kind": "event",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "session": {
+        "type": "string",
+        "format": "ref",
+        "ref": {
+          "to": "core/session@1",
+          "pin": "any",
+          "label": "about"
+        },
+        "description": "the explore session that names its reason (TR-13)"
+      },
+      "for": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "const": "requirement"
+              },
+              "requirement": {
+                "type": "string",
+                "format": "ref",
+                "description": "the requirement the work is for"
+              }
+            },
+            "required": [
+              "reason",
+              "requirement"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "const": "finding"
+              },
+              "rule": {
+                "type": "string",
+                "minLength": 1,
+                "description": "the rule ID of the finding (TR-34)"
+              },
+              "subject": {
+                "type": "string",
+                "format": "ref",
+                "description": "the subject of the finding"
+              }
+            },
+            "required": [
+              "reason",
+              "rule",
+              "subject"
+            ]
+          }
+        ],
+        "discriminator": "reason",
+        "description": "the reason of the work: a requirement or a finding {rule, subject} (OB-01)"
+      }
+    },
+    "required": [
+      "session",
+      "for"
+    ]
+  }
+}

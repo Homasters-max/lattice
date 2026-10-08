@@ -1,0 +1,100 @@
+{
+  "valid": [
+    {
+      "candidates": {
+        "source": "acme/tools.allowed@2",
+        "required": []
+      },
+      "question": {
+        "kind": "choice",
+        "state": {
+          "task": {
+            "max": 4000
+          }
+        },
+        "criteria": "Which tool best advances the task?"
+      },
+      "judge": "acme/judge.jev@3",
+      "policy": {
+        "op": "margin",
+        "min": 0.2
+      },
+      "bench": "acme/pick-tool-set@4",
+      "targets": {
+        "precision": 0.9
+      }
+    },
+    {
+      "candidates": {
+        "source": "acme/tools.allowed@2",
+        "required": []
+      },
+      "question": {
+        "kind": "score",
+        "score_semantics": "preference",
+        "criteria": "How relevant is the block to the need?"
+      },
+      "judge": "acme/judge.jev@3",
+      "policy": {
+        "op": "top-k",
+        "k": 10
+      },
+      "bench": "acme/pick-tool-set@4",
+      "targets": {
+        "precision": 0.9
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/question/kind",
+      "keyword": "enum",
+      "body": {
+        "candidates": {
+          "source": "acme/tools.allowed@2",
+          "required": []
+        },
+        "question": {
+          "kind": "rank",
+          "criteria": "Which?"
+        },
+        "judge": "acme/judge.jev@3",
+        "policy": {
+          "op": "margin",
+          "min": 0.2
+        },
+        "bench": "acme/pick-tool-set@4",
+        "targets": {
+          "precision": 0.9
+        }
+      }
+    },
+    {
+      "path": "/judge",
+      "keyword": "required",
+      "body": {
+        "candidates": {
+          "source": "acme/tools.allowed@2",
+          "required": []
+        },
+        "question": {
+          "kind": "choice",
+          "state": {
+            "task": {
+              "max": 4000
+            }
+          },
+          "criteria": "Which tool best advances the task?"
+        },
+        "policy": {
+          "op": "margin",
+          "min": 0.2
+        },
+        "bench": "acme/pick-tool-set@4",
+        "targets": {
+          "precision": 0.9
+        }
+      }
+    }
+  ]
+}

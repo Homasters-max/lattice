@@ -1,5 +1,5 @@
 {
-  "abstract": true,
+  "abstract": false,
   "kind": "entity",
   "schema": {
     "type": "object",
@@ -16,8 +16,246 @@
           }
         },
         "description": "the pinned last revisions of the blocks this one replaces (TY-03, RF-12)"
+      },
+      "candidates": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "the allowed set: a pinned reference to a set, or scope, the scope of the need; a reference or a word, so no format (DP-05, LN-03, G-43)"
+          },
+          "required": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "ref",
+              "description": "a candidate always selected and never judged"
+            },
+            "description": "the candidates always selected and never judged (DP-04)"
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "description": "the allowed set and the candidates always selected (DP-04, DP-05)"
+      },
+      "question": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "choice",
+              "score",
+              "binary"
+            ],
+            "description": "the kind of the question (DP-02)"
+          },
+          "score_semantics": {
+            "enum": [
+              "relevance",
+              "confidence",
+              "preference"
+            ],
+            "description": "what a score means; ranking is score with preference (DP-02, DP-17)"
+          },
+          "state": {
+            "type": "object",
+            "values": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "format": "ref",
+                  "ref": {
+                    "to": "core/type@1",
+                    "pin": "pinned",
+                    "label": "uses"
+                  },
+                  "description": "the type of the field (DP-03)"
+                },
+                "max": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "its length limit (DP-03)"
+                }
+              },
+              "required": [
+                "max"
+              ]
+            },
+            "description": "the fields of state the point declares, each checked by its type and length limit (DP-03)"
+          },
+          "criteria": {
+            "type": "string",
+            "minLength": 1,
+            "description": "what the judge assesses, in the corpus language (DP-29)"
+          }
+        },
+        "required": [
+          "kind",
+          "criteria"
+        ],
+        "description": "the question to the judge (DP-01, DP-02)"
+      },
+      "judge": {
+        "type": "string",
+        "format": "ref",
+        "ref": {
+          "to": "std/judge-adapter@1",
+          "pin": "pinned",
+          "label": "uses"
+        },
+        "description": "the judge@n: its adapter code and exact model (DP-10, TY-12)"
+      },
+      "policy": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "op": {
+                "const": "threshold"
+              },
+              "min": {
+                "type": "number",
+                "description": "the least score selected; absolute, so it needs a calibration (DP-17)"
+              }
+            },
+            "required": [
+              "op",
+              "min"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "op": {
+                "const": "top-k"
+              },
+              "k": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "how many of the best are selected"
+              }
+            },
+            "required": [
+              "op",
+              "k"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "op": {
+                "const": "margin"
+              },
+              "min": {
+                "type": "number",
+                "minimum": 0,
+                "description": "the least lead of the first; below it the result is ambiguous (DP-08)"
+              }
+            },
+            "required": [
+              "op",
+              "min"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "op": {
+                "const": "budget"
+              }
+            },
+            "required": [
+              "op"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "op": {
+                "const": "any"
+              }
+            },
+            "required": [
+              "op"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "op": {
+                "const": "all"
+              }
+            },
+            "required": [
+              "op"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "op": {
+                "const": "table"
+              },
+              "table": {
+                "type": "object",
+                "values": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "the output value of each selected value (DP-13)"
+              }
+            },
+            "required": [
+              "op",
+              "table"
+            ]
+          }
+        ],
+        "discriminator": "op",
+        "description": "one operator of the closed set of measure (DP-13); their parameters and how two combine, as top-k with budget (DP-Z08), are G-43"
+      },
+      "bench": {
+        "type": "string",
+        "format": "ref",
+        "description": "the bench set it is measured on, set@n (DP-01, BN-02); no label of TY-16 says measured on (G-42)"
+      },
+      "targets": {
+        "type": "object",
+        "properties": {
+          "precision": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "the precision target (BN-12, DP-27)"
+          },
+          "consistency": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "the consistency target (BN-08, BN-12)"
+          },
+          "tolerance": {
+            "type": "number",
+            "minimum": 0,
+            "description": "the regression tolerance, no smaller than measured noise (BN-12)"
+          }
+        },
+        "required": [
+          "precision"
+        ],
+        "description": "the targets of the point (DP-01, BN-12)"
       }
     },
-    "required": []
+    "required": [
+      "candidates",
+      "question",
+      "judge",
+      "policy",
+      "bench",
+      "targets"
+    ]
   }
 }

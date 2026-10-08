@@ -1,0 +1,69 @@
+{
+  "abstract": false,
+  "kind": "event",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "sha": {
+        "type": "string",
+        "minLength": 1,
+        "key": true,
+        "description": "the git sha; a second write of it is a no-op (OB-08)"
+      },
+      "trailers": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Lattice-Session"
+          },
+          "step": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Lattice-Step"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Lattice-Reason"
+          }
+        },
+        "required": [
+          "session",
+          "step",
+          "reason"
+        ],
+        "description": "the trailers of the commit (OB-07, OB-08)"
+      },
+      "files": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "description": "the path of the file"
+            },
+            "hash": {
+              "type": "string",
+              "minLength": 1,
+              "description": "the hash of its content"
+            }
+          },
+          "required": [
+            "path",
+            "hash"
+          ]
+        },
+        "description": "the changed files with content hashes (OB-08)"
+      }
+    },
+    "required": [
+      "sha",
+      "trailers",
+      "files"
+    ]
+  }
+}

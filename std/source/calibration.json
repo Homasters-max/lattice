@@ -1,0 +1,76 @@
+{
+  "extends": "std/fact@1",
+  "abstract": false,
+  "kind": "event",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "of": {
+        "type": "object",
+        "properties": {
+          "point": {
+            "type": "string",
+            "format": "ref",
+            "ref": {
+              "to": "std/decision-point@1",
+              "pin": "floating",
+              "label": "about"
+            },
+            "description": "the id of the point (TR-29, DP-25)"
+          },
+          "judge": {
+            "type": "string",
+            "format": "ref",
+            "ref": {
+              "to": "std/judge-adapter@1",
+              "pin": "pinned",
+              "label": "about"
+            },
+            "description": "the judge@n the point pins (DP-25)"
+          },
+          "set": {
+            "type": "string",
+            "format": "ref",
+            "ref": {
+              "to": "std/bench-set@1",
+              "pin": "pinned",
+              "label": "about"
+            },
+            "description": "the set@n the point pins (DP-25)"
+          }
+        },
+        "required": [
+          "point",
+          "judge",
+          "set"
+        ],
+        "key": true,
+        "description": "what the fact is about, {role: ref}; the key of the fact (TY-14, TR-28)"
+      },
+      "question": {
+        "type": "string",
+        "minLength": 1,
+        "key": true,
+        "description": "the hash of the question of the point; not a reference, so beside of (TR-29, G-41)"
+      },
+      "value": {
+        "type": "string",
+        "format": "ref",
+        "ref": {
+          "to": "std/report@1",
+          "pin": "any",
+          "label": "derived-from"
+        },
+        "description": "the holdout report (BN-11, DP-25); an event, so pin says nothing (G-42)"
+      },
+      "revoked": {
+        "type": "boolean",
+        "description": "true cancels the fact in force for the same key (TR-28)"
+      }
+    },
+    "required": [
+      "of",
+      "question"
+    ]
+  }
+}

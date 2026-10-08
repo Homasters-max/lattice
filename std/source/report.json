@@ -1,0 +1,82 @@
+{
+  "extends": "std/fact@1",
+  "abstract": false,
+  "kind": "event",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "of": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string",
+            "format": "ref",
+            "description": "the subject ref@n: a pipeline or a point (BN-11, DP-31)"
+          },
+          "set": {
+            "type": "string",
+            "format": "ref",
+            "ref": {
+              "to": "std/bench-set@1",
+              "pin": "pinned",
+              "label": "about"
+            },
+            "description": "the set@n measured (BN-11)"
+          }
+        },
+        "required": [
+          "subject",
+          "set"
+        ],
+        "key": true,
+        "description": "what the fact is about, {role: ref}; the key of the fact (TY-14, TR-28)"
+      },
+      "split": {
+        "enum": [
+          "tune",
+          "holdout"
+        ],
+        "key": true,
+        "description": "the split measured; not a reference, so beside of (BN-04, BN-11, G-41)"
+      },
+      "value": {
+        "type": "object",
+        "properties": {
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "ref",
+              "ref": {
+                "to": "std/run@1",
+                "pin": "any",
+                "label": "measures"
+              },
+              "description": "a cited run; an event, so pin says nothing (G-42)"
+            },
+            "minItems": 1,
+            "description": "the cited runs, label measures (BN-11, TR-21)"
+          },
+          "tuple": {
+            "type": "string",
+            "minLength": 1,
+            "description": "the hash of their execution tuple (BN-11, BN-13)"
+          }
+        },
+        "required": [
+          "runs",
+          "tuple"
+        ],
+        "description": "the cited runs and the hash of their tuple; metrics are computed, never stored (BN-11)"
+      },
+      "revoked": {
+        "type": "boolean",
+        "description": "true cancels the fact in force for the same key (TR-28)"
+      }
+    },
+    "required": [
+      "of",
+      "split"
+    ]
+  }
+}

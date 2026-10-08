@@ -108,7 +108,8 @@ const body = (slug: string): JsonObject => {
 };
 
 const schemaOf = (slug: string) => object(body(slug).schema);
-const fieldsOf = (slug: string) => object(schemaOf(slug).properties);
+/** The fields of a type; a union (`oneOf`, as `decision-result`) has none at its root. */
+const fieldsOf = (slug: string) => (schemaOf(slug).oneOf === undefined ? object(schemaOf(slug).properties) : {});
 const field = (slug: string, name: string) => object(fieldsOf(slug)[name]);
 const required = (slug: string) => schemaOf(slug).required;
 
@@ -541,7 +542,7 @@ describe("examples of the types with records", () => {
   ];
 
   it("KR-16: a type without records has no example; every type with records has one", () => {
-    expect(owned.list("test/ledger/examples/std").sort()).toEqual(nonAbstract().map((slug) => `${slug}.json`));
+    expect(owned.list("test/ledger/examples/std").sort()).toEqual(nonAbstract().map((slug) => `${slug}.json`).sort());
   });
 
   it("KR-21: every valid example passes the check of its type, and the same example with a field more does not", () => {

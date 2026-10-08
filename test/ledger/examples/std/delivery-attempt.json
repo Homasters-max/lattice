@@ -1,0 +1,22 @@
+{
+  "valid": [
+    {
+      "intent": "01JB4M2Z8Q6N7R3T5V9W0X1Y2Z",
+      "status": "started"
+    },
+    {
+      "intent": "01JB4M2Z8Q6N7R3T5V9W0X1Y2Z",
+      "status": "done"
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/status",
+      "keyword": "enum",
+      "body": {
+        "intent": "01JB4M2Z8Q6N7R3T5V9W0X1Y2Z",
+        "status": "pending"
+      }
+    }
+  ]
+}

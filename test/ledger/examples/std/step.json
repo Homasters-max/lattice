@@ -1,0 +1,48 @@
+{
+  "valid": [
+    {
+      "session": "01JB4M2Z8Q6N7R3T5V9W0X1Y2Z",
+      "kind": "tool",
+      "name": "grep",
+      "status": "ok",
+      "ms": 12
+    },
+    {
+      "session": "01JB4M2Z8Q6N7R3T5V9W0X1Y2Z",
+      "parent": "01JB4M2Z8Q6N7R3T5V9W0X1Y3A",
+      "kind": "skill",
+      "name": "solve",
+      "input": "sha256:0f1e2d3c",
+      "output": "sha256:0f1e2d3c",
+      "status": "ok",
+      "ms": 812,
+      "tokens": 1500,
+      "billing": "subscription",
+      "reads": {
+        "blocks": [
+          "demo/order-intake@2"
+        ],
+        "files": [
+          {
+            "path": "src/a.ts",
+            "hash": "sha256:0f1e2d3c"
+          }
+        ]
+      },
+      "proposal": "sha256:0f1e2d3c"
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/kind",
+      "keyword": "enum",
+      "body": {
+        "session": "01JB4M2Z8Q6N7R3T5V9W0X1Y2Z",
+        "kind": "thought",
+        "name": "grep",
+        "status": "ok",
+        "ms": 12
+      }
+    }
+  ]
+}

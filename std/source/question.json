@@ -1,0 +1,39 @@
+{
+  "abstract": false,
+  "kind": "event",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "run": {
+        "type": "string",
+        "format": "ref",
+        "ref": {
+          "to": "std/run@1",
+          "pin": "any",
+          "label": "part-of"
+        },
+        "description": "the run it ends (RT-18)"
+      },
+      "stage": {
+        "type": "string",
+        "format": "ref",
+        "ref": {
+          "to": "std/stage@1",
+          "pin": "pinned",
+          "label": "uses"
+        },
+        "description": "the stage whose status escalated (RT-04)"
+      },
+      "status": {
+        "type": "string",
+        "minLength": 1,
+        "description": "the status that escalated (RT-04); the design names no other field (G-43)"
+      }
+    },
+    "required": [
+      "run",
+      "stage",
+      "status"
+    ]
+  }
+}
