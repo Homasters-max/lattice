@@ -159,7 +159,18 @@ function conventionsTodo(changed) {
   return out;
 }
 
-export function final(state, { scope, conventions = [], at } = {}) {
+// Контекст агентов (S0-48): что агенты прочитали сверх brief'а, и размер brief'ов в токенах по оценке — байт на 4,
+// как считает бюджет brief'а (context.mjs).
+function contextOf(context, steps) {
+  const out = ["", "### Контекст агентов", "", ...(context.length ? context.map((c) => `- ${c.agent}: ${c.text}`) : ["Сверх brief'ов агенты ничего не читали."])];
+  const sizes = new Map();
+  for (const s of steps) for (const [name, bytes] of Object.entries(s.briefs ?? {})) sizes.set(name, [...(sizes.get(name) ?? []), Math.ceil(bytes / 4)]);
+  if (sizes.size)
+    out.push("", "| Brief агента | Токенов, наибольший | Токенов, всего |", "|---|---|---|", ...[...sizes].map(([name, t]) => `| ${name} | ${Math.max(...t)} | ${t.reduce((a, b) => a + b, 0)} |`));
+  return out;
+}
+
+export function final(state, { scope, conventions = [], context = [], at } = {}) {
   const out = [header("final", state), title(state, "Итог цикла"), ""];
   out.push(`Head \`${short(state.head ?? scope?.head)}\` · \`npm run verify\` зелёный · кругов: ${state.waves.length} из ${state.budget}`);
   if (!state.waves.length && scope) out.push("", `Ревью не требовался: изменения вне кода (${scope.lines} строк).`);
@@ -181,6 +192,7 @@ export function final(state, { scope, conventions = [], at } = {}) {
   out.push("", "### Решить владельцу до merge", "", ...(todo.length ? todo : ["нечего"]));
   const ratchet = state.findings.filter((f) => f.ratchet).map((f) => f.id);
   out.push("", `Триггеры аудита ST-15: ${audit(state.triggers ?? scope?.triggers).join("; ") || "нет"}.`, `Кандидаты в ratchet (ST-16): ${ratchet.join(", ") || "нет"}.`);
+  out.push(...contextOf(context, state.steps ?? []));
   out.push(...measured(state.steps ?? [], at));
   return lines(out);
 }

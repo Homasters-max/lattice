@@ -110,6 +110,9 @@ function comments(l: Loop): string {
 
 beforeAll(() => {
   temp = mkdtempSync(join(tmpdir(), "dev-loop-flow-"));
+  // dl wave asks GitHub for the body of the PR for the brief of Spec (S0-48): a fake gh answers instead.
+  process.env.DEV_LOOP_GH = join(temp, "gh.mjs");
+  writeFileSync(process.env.DEV_LOOP_GH, 'console.log(JSON.stringify({ body: "PR body" }));\n');
 });
 
 afterAll(() => {

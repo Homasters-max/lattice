@@ -1,10 +1,10 @@
 # Протокол цикла разработки
 
-Единственный источник правил для `/dev-loop` и его агентов: что блокирует merge, как устроены круги, вход и выход каждой роли, самопроверка. Механику — круги, id, `late`, решения по кругу, комментарии — исполняет `plan/tools/dev-loop.mjs`; этот файл — её контракт.
+Протокол `/dev-loop` и его агентов: что блокирует merge, как устроены круги, контекст агента, поля brief и схема выхода каждой роли, самопроверка. Что делает роль, — в теле её агента `.claude/agents/<роль>.md`. Механику — круги, id, `late`, решения по кругу, комментарии — исполняет `plan/tools/dev-loop.mjs`; этот файл — её контракт.
 
 ## Обмен
 
-Агент получает одну строку `DEV-LOOP-IN <путь brief.in.json>`, первым читает этот файл и свой brief, работает только в `worktree` из brief и отвечает одной строкой `DEV-LOOP-OUT <путь out.json>`. Всё, что агент сообщает, — в `out.json` по схеме его роли; текст ответа вне этой строки никто не читает. Путь `out` назван в brief. Выход проверяет `dev-loop.mjs`. Ошибки приходят агенту строкой `DEV-LOOP-ERRORS <JSON-список>` — агент переписывает `out.json` и отвечает снова. Ответ владельца на вопрос агента приходит строкой `DEV-LOOP-OWNER <ответ>` или, если агент новый, полем `owner` в brief; агент продолжает с того места, где остановился.
+Агент получает одну строку `DEV-LOOP-IN <путь brief.in.json>`, работает по телу своего агента и brief, читает его первым, работает только в `worktree` из brief и отвечает одной строкой `DEV-LOOP-OUT <путь out.json>`. Всё, что агент сообщает, — в `out.json` по схеме его роли; текст ответа вне этой строки никто не читает. Путь `out` назван в brief. Выход проверяет `dev-loop.mjs`. Ошибки приходят агенту строкой `DEV-LOOP-ERRORS <JSON-список>` — агент переписывает `out.json` и отвечает снова. Ответ владельца на вопрос агента приходит строкой `DEV-LOOP-OWNER <ответ>` или, если агент новый, полем `owner` в brief; агент продолжает с того места, где остановился.
 
 Комментарии в PR, статус PR и метки ведёт только оркестратор; комментарии — по шаблонам `dev-loop.mjs` из `out.json`. Первая строка комментария — `<!-- dev-loop {"kind", "state"} -->` с состоянием цикла; из него цикл продолжается в новой сессии. Длина полей ограничена: `summary` — 800 знаков, `text` — 500, `quote` и `note` — 300, `question.text` — 500.
 
@@ -55,19 +55,37 @@ Push автора — `git push origin HEAD:refs/heads/<branch>` (worktree в de
 
 Статус находки: `closed` — нарушения нет; `open` — осталось (в `note` — что); `dispute-accepted` — довод автора верен; `dispute-kept` — правило говорит иное (в `note` — цитата правила). `dispute-*` — только для id из `disputed` в brief.
 
+## Контекст
+
+У каждого текста один дом; агент получает только нужное роли и в тот шаг, где оно нужно (S0-48).
+
+| Слой | Что | Дом |
+|---|---|---|
+| `tools` | инструменты роли | frontmatter агента |
+| `AGENTS.md` | общие нормы репо; грузится сам | `AGENTS.md` |
+| тело агента | неизменная инструкция роли: что делать, критерии, стоп-условия, точная схема `out.json` | `.claude/agents/<роль>.md` |
+| brief | данные задачи, не больше 15k токенов по оценке | `dl brief`, `dl wave` |
+| материал шага | раздел, нужный в одном шаге | `dl step <имя>` |
+
+- **Brief** несёт тексты дословно из их домов: правила — из `docs/design` по ID, пункты `CONVENTIONS.md` — по области путей, строки Q-NN и G-NN — из `PLAN.md` фазы; ревьюеру — hunk'и его оси и `diff` — путь `diff.patch` всего diff круга. Поле `context` — этот материал, `cut` — что не вошло в бюджет и где это взять, `tokens` — размер brief по оценке (байт UTF-8 на 4).
+- **`dl step <имя>`** — `node plan/tools/dev-loop.mjs step <имя>` в worktree, одна строка JSON: `selfcheck --task <ID>` — «Самопроверка» по diff ветки; `pr`, `deviation`, `where` — разделы `plan-task` «Шаблон описания PR», «Отступления от задачи», «Что и куда пишет исполнитель» как есть.
+- **`context_missing`** — поле выхода каждой роли: что агенту пришлось прочитать сверх brief и зачем, строкой до 300 знаков. `dl final` печатает эти строки и размеры brief'ов в токенах.
+
 ## Роли: вход и выход
 
-Общие поля brief: `role`, `pr`, `task`, `worktree` — всё делается в нём, `owner` — ответ владельца, если был, `out`. `question` в выходе — `{text, options: [2–4 строки], recommendation}`, так, чтобы владелец ответил одним выбором.
+Что делает роль, — в теле её агента; здесь — поля brief и схема выхода, которые проверяет `dev-loop.mjs`. У каждой роли выход — ровно поля её схемы, лишнее поле `dev-loop.mjs` отклоняет.
 
-**executor** — задача по `plan-task`, шаги 2–5 и описание PR. Шаги 1 и 6 механические, их делает `dl` (S0-51): `dl start` открывает ветку, коммит `S0-NN: start` и draft PR; `dl ready` по выходу executor сдаёт задачу.
-- Вход: общие поля и `branch` — ветка draft PR, который открыл `dl start`. Нет `pr` в brief — шаг 1 делает executor, как в `plan-task`.
-- Выход: `{status: "ready" | "needs_owner", pr, branch, head, done?: [пункт], question?, gaps?: ["G-NN"]}`; `head` закоммичен и запушен в `branch`.
+Общие поля brief: `role`, `pr`, `task`, `worktree` — всё делается в нём, `owner` — ответ владельца, если был, `out`, `context`, `cut`, `tokens`. `question` в выходе — `{text, options: [2–4 строки], recommendation}`, так, чтобы владелец ответил одним выбором.
+
+**executor** — `.claude/agents/executor.md`. Шаги 1 и 6 `plan-task` механические, их делает `dl` (S0-51): `dl start` открывает ветку, коммит `S0-NN: start` и draft PR; `dl ready` по выходу executor сдаёт задачу.
+- Вход: общие поля и `branch` — ветка draft PR, который открыл `dl start`; нет `pr` — шаг 1 делает executor. `context`: `task` — файл задачи, `rules` — тексты правил из `rules`, `questions` — строки Q-NN и G-NN задачи, `conventions` — пункты по модулям задачи.
+- Выход: `{status: "ready" | "needs_owner", pr, branch, head, done?: [пункт], question?, gaps?: ["G-NN"], context_missing?: [строка]}`; `head` закоммичен и запушен в `branch`.
   - `done` — выполненные пункты «Готово, когда» словами файла задачи; при `ready` обязателен, пункт, которого нет в файле, `dl check` не принимает.
   - По `done` `dl ready` отмечает пункты `[x]`, ставит ✅ и ссылку на PR на доске, переводит фазу в `plan/STATUS.md` в 🔄 или 🔍, гонит `plan-check`, коммитит последним коммитом ветки и переводит PR в ready. Пункт файла, которого нет в `done`, — не сдача, а вопрос владельцу (`plan-task`, «Отступления»).
 
-**reviewer** — `reviewer-spec`, `reviewer-standards`, `reviewer-architecture`, `verifier` (ось `verify`).
-- Вход: `axis`, `job`, `wave`, `base`, `head`, `reasons` (почему выбрана ось), `expectations` (Spec), `triggers` (Architecture), `files` и `range` (conflicts), `findings` — порученные находки, `disputed`, `answers` — ответ автора на них.
-- Выход: `{axis, head, summary, statuses: [{id, status, note?}], findings: [{kind, rule, where, quote, text, ratchet?}]}` — все пять полей, других нет; у каждой роли выход — ровно поля её схемы, лишнее поле `dev-loop.mjs` отклоняет.
+**reviewer** — `reviewer-spec`, `reviewer-standards`, `reviewer-architecture`, `verifier` (ось `verify`): `.claude/agents/<агент>.md`.
+- Вход: `axis`, `job`, `wave`, `base`, `head`, `reasons` (почему выбрана ось), `expectations` (Spec), `triggers` (Architecture), `files` и `range` (conflicts), `findings` — порученные находки, `disputed`, `answers` — ответ автора на них, `diff`. `context` по оси: Spec — `task`, `rules`, `questions`, `pr_body`, `hunks`; Standards — `conventions` по путям hunk'ов, `st` — строки ST классов путей, `hunks`; Architecture — `closure` — текст `plan/closure-check.md`, `rm` — RM-Z04 и RM-08, `hunks`; verifier — `hunks` дельты, кроме `conflicts`.
+- Выход: `{axis, head, summary, statuses: [{id, status, note?}], findings: [{kind, rule, where, quote, text, ratchet?}], context_missing?: [строка]}` — пять полей обязательны.
   - `summary` — что проверено, до 800 знаков; в `close` и `conflicts` — как сопоставлены hunk'и.
   - `statuses` и `findings` — списки, пустой, если нечего.
   - `where` — `файл:строка` в `head`.
@@ -75,9 +93,9 @@ Push автора — `git push origin HEAD:refs/heads/<branch>` (worktree в de
   - `ratchet: true` — нарушение мог бы ловить тест или lint (ST-16).
   - id находкам даёт инструмент.
 
-**fixer** — `job`: `answer` — ответ на круг, `tidy` — хвосты перед сдачей, `verify-red` — красный verify по `log`, `rebase` — пересборка на `origin/main`, `owner` — поручение владельца из `owner`.
-- Вход: `branch`, `base` — ревьюированный head, `since` — начало ветки (`tidy`), `findings` — открытые `block` (в `answer` все, в `tidy` — `late`), `advice` — советы (`tidy`), `decisions` — решения владельца `{id, action: fix|task|gap, note}`, `log` (verify-red).
-- Выход: `{status: "done" | "needs_owner", head, answers: [{id, action, commits?, where?, note?}], conflicts?: [файл], question?, gaps?}`.
+**fixer** — `.claude/agents/fixer.md`. `job`: `answer` — ответ на круг, `tidy` — хвосты перед сдачей, `verify-red` — красный verify по `log`, `rebase` — пересборка на `origin/main`, `owner` — поручение владельца из `owner`.
+- Вход: `branch`, `base` — ревьюированный head, `since` — начало ветки (`tidy`), `findings` — открытые `block` (в `answer` все, в `tidy` — `late`), `advice` — советы (`tidy`), `decisions` — решения владельца `{id, action: fix|task|gap, note}`, `log` (verify-red). `context`: `failed` — упавшие шаги verify из `log`, `hunks` — hunk ветки у каждой находки, `rules` — тексты правил находок, `conventions` — пункты, которые находки называют или чья область задевает их пути.
+- Выход: `{status: "done" | "needs_owner", head, answers: [{id, action, commits?, where?, note?}], conflicts?: [файл], question?, gaps?, context_missing?: [строка]}`.
   - На каждую находку из `findings` и `advice` и каждое решение `task` или `gap` — ровно один ответ.
   - `action`: в `answer` — `fixed` | `disputed`; в `tidy` ещё `deferred` | `declined`.
   - `fixed` — коммиты из `base..head`; в `tidy` — из `since..head`, всей ветки: хвост мог закрыть и более ранний коммит.
@@ -88,10 +106,10 @@ Push автора — `git push origin HEAD:refs/heads/<branch>` (worktree в de
 
 ## Самопроверка
 
-Executor перед выходом `ready`, fixer перед push — на своём diff или дельте:
+Executor перед выходом `ready`, fixer перед push — на своём diff или дельте. Список дел даёт `dl step selfcheck --task <ID>`: сработавшие триггеры Architecture и опись `plan/closure-check.md` по ним, пункты `CONVENTIONS.md` по путям diff, строки таблицы «Правила» PR; пустой `todo` — по списку делать нечего. Сверх списка:
 
-- **Standards**: `AGENTS.md`, `CONVENTIONS.md`, ST-01…ST-17 (`docs/design/13-structure.md`), имена по глоссарию (ST-03). Чаще всего ловят: адаптеры для тестов собирает только `test/support/assembly.ts` (CONVENTIONS §1.8), отказ называет rule ID (ST-17);
-- **Architecture**: опись `plan/closure-check.md` по добавленным и изменённым экспортам и тест-хелперам;
+- **Standards**: `AGENTS.md`, ST-01…ST-18 (`docs/design/13-structure.md`), имена по глоссарию (ST-03). Чаще всего ловят: адаптеры для тестов собирает только `test/support/assembly.ts` (CONVENTIONS §1.8), отказ называет rule ID (ST-17);
+- **Architecture**: у каждой строки описи из `architecture.inventory` — вердикт по `closure`;
 - **Spec**: таблица «Правила» в описании PR называет тесты, которые правило и показывают; ожидания не ослаблены (PR-11); отступления записаны в файле задачи и в PR;
 - исправление не повторяет класс нарушения в другом месте: соседей исправленного (тот же паттерн в других файлах ветки) исправь тем же коммитом.
 

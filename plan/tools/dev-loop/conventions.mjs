@@ -2,7 +2,7 @@
 // Пункт — заголовок `### §N.M Название` в разделе `## N. …`, следом строка `Область: `glob`, `glob``.
 // Номер растёт внутри раздела и не переиспользуется: убранный пункт оставляет пропуск, ссылки на него не оживают.
 // Читают: protocol — ссылки находок `CONVENTIONS §N.M`; plan-check — форму файла и ссылки из кода и процесса;
-// сборка brief — область путей (S0-48).
+// scope — текст пунктов из main; сборка brief и `dl step selfcheck` — пункты по области путей (context.mjs, S0-48).
 
 const SECTION = /^## (\d+)\. /;
 const ITEM = /^### §(\d+)\.(\d+) (\S.*)$/;
@@ -10,7 +10,8 @@ const AREA = /^Область: (.+)$/;
 // Ссылка на пункты: `CONVENTIONS §1.2`, `CONVENTIONS.md §3.1, §3.2`.
 const REFERENCE = /CONVENTIONS(?:\.md)?((?:,? §\d+(?:\.\d+)*)+)/g;
 
-/** Пункты файла и нарушения его формы: `{items: [{id: "§N.M", title, areas, line}], problems: [строка]}`. */
+/** Пункты файла и нарушения его формы: `{items: [{id: "§N.M", title, areas, line, text}], problems: [строка]}`;
+ * text — пункт как написан: от заголовка до следующего пункта или раздела. */
 export function conventionsOf(text) {
   const items = [];
   const problems = [];
@@ -38,7 +39,9 @@ export function conventionsOf(text) {
     const area = AREA.exec(lines[i + 1] ?? "");
     const areas = area ? [...area[1].matchAll(/`([^`]+)`/g)].map((a) => a[1]) : [];
     if (areas.length === 0) problems.push(`CONVENTIONS.md:${i + 1}: у §${n}.${k} нет строки «Область:» с путями в обратных кавычках`);
-    items.push({ id: `§${n}.${k}`, title: m[3], areas, line: i + 1 });
+    let end = i + 1;
+    while (end < lines.length && !/^###? /.test(lines[end])) end++;
+    items.push({ id: `§${n}.${k}`, title: m[3], areas, line: i + 1, text: lines.slice(i, end).join("\n").trim() });
   });
   return { items, problems };
 }

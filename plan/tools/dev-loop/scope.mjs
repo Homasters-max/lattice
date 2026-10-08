@@ -19,7 +19,8 @@ let cwd = process.cwd();
 const git = (...args) => execFileSync("git", args, { cwd, encoding: "utf8", maxBuffer: 1 << 26, stdio: ["ignore", "pipe", "pipe"] });
 const lines = (text) => text.split("\n").filter(Boolean);
 
-function classOf(path) {
+// Класс пути — от него зависят оси круга и материал агента; S0-42 переносит классы в классификатор `scripts/`.
+export function classOf(path) {
   if (path.startsWith("docs/design/")) return "design";
   if (/^(src|scripts|plan\/tools|discussion\/tools)\//.test(path)) return "code";
   if (/^(gen|store)\//.test(path)) return "generated";
@@ -29,6 +30,14 @@ function classOf(path) {
   if (/^plan\/phases\/[^/]+\/(tasks\/|PLAN\.md$)/.test(path)) return "task";
   return "text";
 }
+
+// Строки ST (docs/design/13-structure.md), которые задевает файл класса: их brief ревьюера Standards несёт текстом (S0-48).
+export const ST_BY_CLASS = {
+  code: ["ST-01", "ST-02", "ST-03", "ST-04", "ST-05", "ST-06", "ST-11", "ST-17"],
+  tests: ["ST-07", "ST-13", "ST-17", "ST-18"],
+  config: ["ST-09", "ST-12"],
+  generated: ["ST-08"],
+};
 
 // Файлы diff с переименованиями: {path, old, cls, status A|M|D|R|C|T, lines}.
 function changes(from, head) {
@@ -209,7 +218,7 @@ export function conventionsChanged({ main = "origin/main", head = "HEAD", dir = 
   return rows.filter((r) => r.startsWith("-") && !r.startsWith("---") && r.slice(1).trim() && !added.has(r.slice(1))).map((r) => ({ line: r.slice(1) }));
 }
 
-// Текст каждого пункта CONVENTIONS.md в ref: от его заголовка до следующего пункта или раздела.
+// Текст каждого пункта CONVENTIONS.md в ref (conventionsOf).
 function itemsAt(ref) {
   let text = "";
   try {
@@ -217,12 +226,5 @@ function itemsAt(ref) {
   } catch {
     return new Map();
   }
-  const rows = text.replace(/\r\n/g, "\n").split("\n");
-  const items = new Map();
-  for (const item of conventionsOf(text).items) {
-    let end = item.line;
-    while (end < rows.length && !/^###? /.test(rows[end])) end++;
-    items.set(item.id, { title: item.title, text: rows.slice(item.line - 1, end).join("\n").trim() });
-  }
-  return items;
+  return new Map(conventionsOf(text).items.map((item) => [item.id, { title: item.title, text: item.text }]));
 }
