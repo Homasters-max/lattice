@@ -11,14 +11,14 @@
     "lattice": "./dist/cli/main.js"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --incremental --tsBuildInfoFile .lattice/tsc/typecheck.tsbuildinfo",
     "test": "vitest run",
-    "lint": "eslint",
+    "lint": "eslint --cache --cache-location .lattice/eslint/ --cache-strategy content",
     "lint:ids": "node discussion/tools/lint-ids.mjs",
     "lint:eol": "node scripts/check-eol.mjs",
     "plan:check": "node plan/tools/plan-check.mjs",
     "build": "tsc -p tsconfig.build.json",
-    "verify": "npm run lint:ids && npm run plan:check && npm run lint:eol && npm run typecheck && npm run lint && npm run build && npm run test"
+    "verify": "node scripts/verify.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

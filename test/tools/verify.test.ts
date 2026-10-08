@@ -51,7 +51,8 @@ describe("verify, the steps in parallel", () => {
     expect(run.report.ok).toBe(true);
     expect(run.report.steps.map((s) => [s.step, s.exit])).toEqual(steps.map((s) => [s, 0]));
     expect(run.report.steps.every((s) => Number.isInteger(s.ms) && s.ms >= 0)).toBe(true);
-    const at = steps.map((s) => run.out.indexOf(`out ${s}`));
+    const lines = run.out.split(/\r?\n/);
+    const at = steps.map((s) => lines.indexOf(`out ${s}`));
     expect(at.every((p) => p >= 0)).toBe(true);
     expect([...at].sort((a, b) => a - b)).toEqual(at);
   });
@@ -62,8 +63,8 @@ describe("verify, the steps in parallel", () => {
     expect(run.report.ok).toBe(false);
     expect(run.report.steps.filter((s) => s.exit !== 0)).toEqual([{ step: "lint", ms: expect.any(Number) as number, exit: 3 }]);
     const log = readFileSync(run.report.log, "utf8");
-    expect(log).toContain("out lint");
-    expect(log).toContain("err lint 3");
-    for (const s of steps) expect(log).toContain(`out ${s}`);
+    const lines = log.split(/\r?\n/);
+    expect(lines).toContain("err lint 3");
+    expect(steps.filter((s) => !lines.includes(`out ${s}`))).toEqual([]);
   });
 });
