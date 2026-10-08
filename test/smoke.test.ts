@@ -14,7 +14,7 @@ describe("toolchain", () => {
 // ST-12: the fitness tests run on every change request. The run is split into projects of vitest (S0-40):
 // `tools` holds the tests of the development tools, `lattice` the rest; `npm test` runs every project,
 // and every test file of test/ belongs to exactly one of them, so the split drops no test.
-// vitest.config.ts refuses to load otherwise; these tests show that check on the projects vitest gets.
+// vitest.config.ts refuses to load otherwise (test/vitest-config.test.ts); these tests show that check on the projects vitest gets.
 const root = join(import.meta.dirname, "..");
 const projects: readonly Project[] = (config.test?.projects ?? []).map((p) => {
   if (typeof p !== "object" || p instanceof Promise || p.test === undefined) throw new Error("bug: a project of vitest.config.ts is not written inline");
