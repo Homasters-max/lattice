@@ -82,7 +82,7 @@
                 "pin": "pinned",
                 "label": "uses"
               },
-              "description": "the adapter implementation; absent for the judge port, whose points pin their judge (DP-10)"
+              "description": "the adapter implementation"
             },
             "mode": {
               "enum": [
@@ -106,10 +106,33 @@
           },
           "required": [
             "port",
-            "mode"
+            "adapter",
+            "mode",
+            "executor"
           ]
         },
-        "description": "for each port, its adapter, mode and memoization (RT-10)"
+        "description": "for each port but judge, its adapter with its executor, mode and memoization (RT-10, RT-31)"
+      },
+      "judge": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "enum": [
+              "service",
+              "recorded",
+              "fixture"
+            ],
+            "description": "the mode of the judge port"
+          },
+          "memo": {
+            "type": "boolean",
+            "description": "whether memoization is on; on when absent, off only to measure noise (BN-15)"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "description": "the judge port: only its mode and memoization, because each point pins its judge (RT-10, DP-10)"
       }
     },
     "required": [

@@ -212,9 +212,20 @@ describe("contracts and implementations", () => {
 });
 
 describe("behaviour", () => {
-  it("RT-10: setup is a behaviour type — stage bindings with executor, port bindings with adapter, mode and memoization; no bindings is a setup", () => {
-    const binding = (name: string) => Object.keys(object(object(field("setup", name).items).properties));
-    expect([parentsOf("setup"), binding("stages"), binding("ports")]).toEqual([["behaviour"], ["contract", "implementation", "executor"], ["port", "adapter", "mode", "memo", "executor"]]);
+  it("RT-10, RT-31: setup is a behaviour type — stage bindings with executor, port bindings with adapter, executor, mode and memoization, the judge port with mode and memoization only; no bindings is a setup", () => {
+    const binding = (name: string) => object(field("setup", name).items);
+    const judge = field("setup", "judge");
+    expect([parentsOf("setup"), required("setup"), list(binding("stages").required), list(binding("ports").required)]).toEqual([
+      ["behaviour"],
+      ["stages", "ports"],
+      ["contract", "implementation", "executor"],
+      ["port", "adapter", "mode", "executor"],
+    ]);
+    expect([Object.keys(object(binding("ports").properties)), Object.keys(object(judge.properties)), judge.required]).toEqual([
+      ["port", "adapter", "mode", "memo", "executor"],
+      ["mode", "memo"],
+      ["mode"],
+    ]);
     expect(check({ type: "std/setup@1", rev: 1, body: { stages: [], ports: [] } })).toEqual([]);
   });
 

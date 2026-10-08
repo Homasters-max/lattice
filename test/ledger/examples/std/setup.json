@@ -19,12 +19,11 @@
           "mode": "recorded",
           "memo": true,
           "executor": "inproc"
-        },
-        {
-          "port": "std/judge@1",
-          "mode": "service"
         }
-      ]
+      ],
+      "judge": {
+        "mode": "service"
+      }
     }
   ],
   "invalid": [
@@ -36,9 +35,51 @@
         "ports": [
           {
             "port": "std/llm@1",
-            "mode": "live"
+            "adapter": "std/llm-anthropic@1",
+            "mode": "live",
+            "executor": "inproc"
           }
         ]
+      }
+    },
+    {
+      "path": "/ports/0/adapter",
+      "keyword": "required",
+      "body": {
+        "stages": [],
+        "ports": [
+          {
+            "port": "std/llm@1",
+            "mode": "recorded",
+            "executor": "inproc"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/ports/0/executor",
+      "keyword": "required",
+      "body": {
+        "stages": [],
+        "ports": [
+          {
+            "port": "std/llm@1",
+            "adapter": "std/llm-anthropic@1",
+            "mode": "recorded"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/judge/adapter",
+      "keyword": "properties",
+      "body": {
+        "stages": [],
+        "ports": [],
+        "judge": {
+          "adapter": "std/judge-anthropic@1",
+          "mode": "service"
+        }
       }
     }
   ]
