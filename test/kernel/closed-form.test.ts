@@ -1,8 +1,8 @@
 // The closed form of an object (KR-04, KR-14, KR-19, LG-06, LG-09): the
 // fields of an object against the table of its members — every member of its
 // kind, no field outside the table — refused by the caller's rule at JSON
-// Pointers (G-13, CONVENTIONS.md §3) in the order of CONVENTIONS.md §5 — or
-// the value it read, of the type its table guards (CONVENTIONS.md §2). Every
+// Pointers (G-13, CONVENTIONS.md §3.1) in the order of CONVENTIONS.md §5.2 — or
+// the value it read, of the type its table guards (CONVENTIONS.md §2.2). Every
 // input crosses the module boundary frozen.
 import { describe, expect, it } from "vitest";
 import { closedForm, KR_04, KR_14, reject, rejectionsOf, sortRejections, type JsonObject, type MembersOf } from "../../src/kernel/index.js";
@@ -47,7 +47,7 @@ describe("the closed form of an object", () => {
     expect(check({ name: "a", "a/b~c": 1 })).toEqual([reject(KR_04, { ...AT, path: "/0/a~1b~0c", expected: "absent", got: 1 })]);
   });
 
-  it("LG-17: refuses in the order of CONVENTIONS.md §5, whatever the order of the fields", () => {
+  it("LG-17: refuses in the order of CONVENTIONS.md §5.2, whatever the order of the fields", () => {
     const got = check({ z: 1, count: "x", b: 2 });
     expect(got).toEqual(sortRejections(got));
     expect(got.map((r) => r.path)).toEqual(["/0/b", "/0/count", "/0/name", "/0/z"]);

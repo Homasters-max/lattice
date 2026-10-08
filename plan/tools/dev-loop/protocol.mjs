@@ -1,7 +1,9 @@
 // protocol: проверка выхода агента против его brief (plan/dev-loop.md, «Роли: вход и выход»).
 // check(brief, out, repo) → {errors, warnings, value}: errors — выход не принят, агент переделывает;
 // warnings — выход принят и нормализован (value).
-// repo — {head(), remote(branch), commits(from, to), changed(from, to)} в worktree агента.
+// repo — {head(), remote(branch), commits(from, to), changed(from, to), conventions()} в worktree агента;
+// conventions() — текст CONVENTIONS.md worktree, пустой, если файла нет.
+import { conventionsOf, unknownReferences } from "./conventions.mjs";
 
 export const AXES = ["spec", "standards", "architecture", "verify"];
 export const LETTER = { spec: "S", standards: "T", architecture: "A", verify: "V" };
@@ -24,6 +26,13 @@ const text = (v, max) => typeof v === "string" && v.trim().length > 0 && v.lengt
 
 function need(errors, ok, message) {
   if (!ok) errors.push(message);
+}
+
+// Ссылки на пункты CONVENTIONS.md в text: каждая называет пункт §N.M, который есть в файле worktree.
+function references(errors, text, repo, at) {
+  if (typeof text !== "string" || !text.includes("CONVENTIONS")) return;
+  const ids = new Set(conventionsOf(repo.conventions()).items.map((i) => i.id));
+  for (const ref of unknownReferences(text, ids)) errors.push(`${at}: ${ref} — нет такого пункта в CONVENTIONS.md; ссылка — CONVENTIONS §N.M`);
 }
 
 function list(errors, value, name) {
@@ -57,8 +66,9 @@ function executor(out, errors, repo) {
   return out;
 }
 
-function finding(errors, f, i, brief) {
+function finding(errors, f, i, brief, repo) {
   const at = `findings[${i}]`;
+  references(errors, f.rule, repo, `${at}.rule`);
   need(errors, KINDS.includes(f.kind), `${at}.kind: ${KINDS.join(" | ")}`);
   need(errors, WHERE.test(f.where ?? ""), `${at}.where: файл:строка`);
   need(errors, text(f.text, LIMITS.text), `${at}.text: что не так и что было бы верно, до ${LIMITS.text} знаков`);
@@ -77,7 +87,7 @@ function status(errors, s, assigned, disputed) {
   return disputed.has(s.id) && s.status === "closed" ? { ...s, status: "dispute-accepted" } : s;
 }
 
-function reviewer(brief, out, errors) {
+function reviewer(brief, out, errors, repo) {
   need(errors, REVIEW_JOBS.includes(brief.job), `brief.job: ${REVIEW_JOBS.join(" | ")}`);
   need(errors, out.axis === brief.axis, `axis: ${brief.axis}`);
   need(errors, sameSha(out.head, brief.head), `head: ${brief.head}`);
@@ -93,7 +103,7 @@ function reviewer(brief, out, errors) {
   return {
     ...out,
     statuses: statuses.map((s) => status(errors, s, assigned, disputed)),
-    findings: findings.map((f, i) => finding(errors, f, i, brief)),
+    findings: findings.map((f, i) => finding(errors, f, i, brief, repo)),
   };
 }
 
@@ -101,13 +111,16 @@ function reviewer(brief, out, errors) {
 const ACTIONS = { answer: ["fixed", "disputed"], tidy: ["fixed", "deferred", "declined", "disputed"] };
 
 function answer(errors, a, ctx) {
-  const { brief, from, range, changed, advice } = ctx;
+  const { brief, from, range, changed, advice, repo } = ctx;
   need(errors, ACTIONS[brief.job].includes(a.action), `answers.${a.id}: ${ACTIONS[brief.job].join(" | ")}`);
   need(errors, a.note === undefined || text(a.note, LIMITS.note), `answers.${a.id}.note: до ${LIMITS.note} знаков`);
   if (a.action === "fixed")
     need(errors, Array.isArray(a.commits) && a.commits.length > 0 && a.commits.every((c) => range.some((r) => sameSha(r, c))),
       `answers.${a.id}: commits — коммиты из ${from.slice(0, 7)}..head`);
-  if (a.action === "disputed") need(errors, !advice.has(a.id) && RULE.test(a.note ?? ""), `answers.${a.id}: спор — только о блокирующей находке и с правилом`);
+  if (a.action === "disputed") {
+    need(errors, !advice.has(a.id) && RULE.test(a.note ?? ""), `answers.${a.id}: спор — только о блокирующей находке и с правилом`);
+    references(errors, a.note, repo, `answers.${a.id}.note`);
+  }
   if (a.action === "deferred")
     need(errors, PLAN_RECORD.test(a.where ?? "") && changed.includes(a.where), `answers.${a.id}: where — файл задачи или PLAN.md фазы, изменённый в этом ответе`);
   if (a.action === "declined") need(errors, advice.has(a.id) && text(a.note, LIMITS.note), `answers.${a.id}: отклонить можно только совет, с причиной в note`);
@@ -126,7 +139,7 @@ function answers(brief, out, errors, repo) {
   const changed = isSha(out.head) ? repo.changed(brief.base, out.head) : [];
   for (const a of items) {
     need(errors, expected.includes(a.id), `answers: ${a.id} не поручен`);
-    answer(errors, a, { brief, from, range, changed, advice });
+    answer(errors, a, { brief, from, range, changed, advice, repo });
   }
 }
 
@@ -145,7 +158,7 @@ export function check(brief, out, repo) {
   if (!isObject(out)) return { errors: ["выход — не JSON-объект"], warnings, value: null };
   let value = out;
   if (brief.role === "executor") value = executor(out, errors, repo);
-  else if (brief.role === "reviewer") value = reviewer(brief, out, errors);
+  else if (brief.role === "reviewer") value = reviewer(brief, out, errors, repo);
   else if (brief.role === "fixer") value = fixer(brief, out, errors, repo);
   else errors.push(`role: неизвестна ${brief.role}`);
   return { errors, warnings, value };

@@ -70,6 +70,7 @@ const repoOf = (worktree) => ({
   remote: (branch) => (branch ? git(worktree, "ls-remote", "origin", `refs/heads/${branch}`).split("\t")[0] : ""),
   commits: (from, to) => git(worktree, "rev-list", `${from}..${to}`).split("\n").filter(Boolean),
   changed: (from, to) => git(worktree, "diff", "--name-only", from, to).split("\n").filter(Boolean),
+  conventions: () => (existsSync(join(worktree, "CONVENTIONS.md")) ? readFileSync(join(worktree, "CONVENTIONS.md"), "utf8") : ""),
 });
 const slim = ({ id, axis, kind, severity, rule, where, quote, text, late, history }) => ({ id, axis, kind, severity, rule, where, quote, text, late, history });
 

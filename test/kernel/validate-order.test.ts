@@ -1,4 +1,4 @@
-// validate (KR-21): violations in a deterministic order (CONVENTIONS.md §5)
+// validate (KR-21): violations in a deterministic order (CONVENTIONS.md §5.1)
 // whatever the order of the keys of the value and the schema; nothing read but
 // the caller's `resolve`. The hard check that refuses each violation of a body
 // with KR-21 is phase 2 of one record, against-type.test.ts. Every input

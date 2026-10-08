@@ -1,4 +1,4 @@
-// The rule registry of the kernel (CONVENTIONS.md §3): one constant per rule
+// The rule registry of the kernel (CONVENTIONS.md §3.5): one constant per rule
 // ID its hard checks enforce.
 import type { Rule } from "./rejection.js";
 

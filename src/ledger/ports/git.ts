@@ -1,13 +1,13 @@
 // The `git` port (LG-23): landing reaches git only through it. Adapters:
 // `repo` and `fixture`. An operation with several arguments takes one object
-// named by the arguments of LG-23 (CONVENTIONS.md §1). Path order is part of
+// named by the arguments of LG-23 (CONVENTIONS.md §1.9). Path order is part of
 // the contract, as key order is of `store` (Q-18): one comparator, `sortPaths`,
 // for the ledger and every adapter. Every worktree `prepare` returns is
 // released: `push` releases the one it pushes, `release` it on any other
 // outcome (D206). The exact types arrive with S0-20.
 import { compareText } from "../../kernel/index.js";
 
-/** Paths in the order of the port: by UTF-16 code units (CONVENTIONS.md §5). */
+/** Paths in the order of the port: by UTF-16 code units (CONVENTIONS.md §5.4). */
 export const sortPaths = (paths: Iterable<string>): string[] => [...paths].sort(compareText);
 
 /** A change request merged onto a commit of `main`, not yet pushed: a directory the store opens on, until it is released. */

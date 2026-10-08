@@ -210,7 +210,7 @@ function distinct(found: readonly Rejection[]): Rejection[] {
 
 /**
  * The model of a document in canonical md (RM-Z03, LG-42), or its refusals: bytes that are not UTF-8 by KR-10 at
- * `place`; every other under `place` and the number of its line, with the intent of `place` (CONVENTIONS.md §3).
+ * `place`; every other under `place` and the number of its line, with the intent of `place` (CONVENTIONS.md §3.2).
  */
 export function parse(bytes: Uint8Array, place: Place = ROOT): Result<Document> {
   const text = decodeUtf8(bytes, place);

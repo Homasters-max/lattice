@@ -146,7 +146,7 @@ function visit(task: Task, resolve: Resolve): Visit {
 
 const keyOf = (v: Violation): readonly string[] => [v.path, v.keyword, serialize(v.expected), serialize(v.got)];
 
-/** CONVENTIONS.md §5: by path, keyword, then canonical expected and got. */
+/** CONVENTIONS.md §5.1: by path, keyword, then canonical expected and got. */
 function compare(a: Violation, b: Violation): number {
   const [ka, kb] = [keyOf(a), keyOf(b)];
   const first = ka.findIndex((x, i) => x !== kb[i]);

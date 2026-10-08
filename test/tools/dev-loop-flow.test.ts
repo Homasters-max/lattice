@@ -40,6 +40,8 @@ async function commit(work: string, files: Files, message: string): Promise<stri
 const land = (n: number) => `export function land(): number {\n  return ${n};\n}\n`;
 
 const TASK: Files = { "src/ledger/land.ts": land(2) };
+// The items findings and disputes name (CONVENTIONS §N.M); a case may give main its own.
+const CONVENTIONS = "# C\n\n## 1. A\n\n### §1.1 One\nОбласть: `src/**`\n\n## 2. B\n\n### §2.1 Two\nОбласть: `src/**`\n";
 const NO_MAIN: Files = {};
 
 // A work tree with an origin whose main is the base and the main files, a branch with one change, and an initialised loop.
@@ -47,7 +49,7 @@ const NO_MAIN: Files = {};
 async function build(change: Files, main: Files): Promise<string> {
   const root = await mkdtemp(join(temp, "base-"));
   const work = join(root, "work");
-  for (const [path, text] of Object.entries({ "src/ledger/land.ts": land(1), ...main })) {
+  for (const [path, text] of Object.entries({ "src/ledger/land.ts": land(1), "CONVENTIONS.md": CONVENTIONS, ...main })) {
     await mkdir(dirname(join(work, path)), { recursive: true });
     await writeFile(join(work, path), text);
   }
@@ -89,7 +91,7 @@ const read = (file: string): Json => JSON.parse(readFileSync(file, "utf8")) as J
 const agents = (r: Json) => r.agents as { agent: string; brief: string }[];
 const out = (brief: string, value: Json) => writeFileSync(brief.replace(".in.json", ".out.json"), JSON.stringify(value));
 const head = (l: Loop) => sh(l.work, "git", ["rev-parse", "HEAD"]);
-const BLOCK = { kind: "rule", rule: "CONVENTIONS §1", where: "src/ledger/land.ts:2", quote: "return 2;", text: "magic number; use the constant" };
+const BLOCK = { kind: "rule", rule: "CONVENTIONS §1.1", where: "src/ledger/land.ts:2", quote: "return 2;", text: "magic number; use the constant" };
 const fixerBrief = async (l: Loop) => (await dl(l, "brief", "fixer", "--worktree", l.work, "--job", "answer")).brief as string;
 
 async function round(l: Loop, findings: Json[]): Promise<Json> {
@@ -119,7 +121,7 @@ describe.concurrent("dev-loop, a loop that converges", { timeout: 30_000 }, () =
     const l = await loop();
     const m1 = await round(l, [BLOCK]);
     expect(m1).toMatchObject({ ok: true, wave: 1, next: "fix", open: ["W1-T1"] });
-    expect(readFileSync(m1.comment as string, "utf8")).toMatch(/^<!-- dev-loop \{"kind":"review"[\s\S]*\*\*W1-T1\*\* · блокирует · CONVENTIONS §1/);
+    expect(readFileSync(m1.comment as string, "utf8")).toMatch(/^<!-- dev-loop \{"kind":"review"[\s\S]*\*\*W1-T1\*\* · блокирует · CONVENTIONS §1\.1/);
     const fb = await fixerBrief(l);
     const fix = await commit(l.work, { "src/ledger/land.ts": land(3) }, "S0-99: review — constant");
     out(fb, { status: "done", head: fix, answers: [{ id: "W1-T1", action: "fixed", commits: [fix], note: "constant" }] });
@@ -143,7 +145,7 @@ describe.concurrent("dev-loop, the owner decides", { timeout: 30_000 }, () => {
   it("escalates a kept dispute and closes the finding by the owner's decision", async () => {
     const l = await loop();
     await round(l, [BLOCK]);
-    out(await fixerBrief(l), { status: "done", head: await head(l), answers: [{ id: "W1-T1", action: "disputed", note: "CONVENTIONS §5 allows it" }] });
+    out(await fixerBrief(l), { status: "done", head: await head(l), answers: [{ id: "W1-T1", action: "disputed", note: "CONVENTIONS §2.1 allows it" }] });
     expect(await dl(l, "answer")).toMatchObject({ ok: true, disputed: ["W1-T1"] });
     const w2 = await dl(l, "wave", "--worktree", l.work);
     expect(agents(w2).map((a) => a.agent)).toEqual(["reviewer-standards"]);
@@ -205,18 +207,18 @@ describe.concurrent("dev-loop, outputs the protocol refuses", { timeout: 30_000 
     expect((await dl(l, "check", v.replace(".in.json", ".out.json"))).errors).toEqual(["statuses: нет статуса для W1-T1"]);
   });
 
-  it("refuses an answer twice to one finding, a commit outside the answer, a dispute without a rule and an unpushed head", async () => {
+  it("refuses an answer twice to one finding, a commit outside the answer, a dispute without a rule or with an item CONVENTIONS.md lacks, and an unpushed head", async () => {
     const l = await loop();
     await round(l, [BLOCK, { ...BLOCK, where: "src/ledger/land.ts:9", text: "other" }]);
     const fb = await fixerBrief(l);
     const base = (read(fb).base as string).slice(0, 7);
     const h = await head(l);
-    out(fb, { status: "done", head: h, answers: [{ id: "W1-T1", action: "fixed", commits: [h] }, { id: "W1-T1", action: "disputed", note: "CONVENTIONS §2" }, { id: "W1-T2", action: "disputed", note: "no" }] });
-    expect((await dl(l, "answer")).errors).toEqual(["answers: на находку — ровно один ответ", `answers.W1-T1: commits — коммиты из ${base}..head`, "answers.W1-T2: спор — только о блокирующей находке и с правилом"]);
+    out(fb, { status: "done", head: h, answers: [{ id: "W1-T1", action: "fixed", commits: [h] }, { id: "W1-T1", action: "disputed", note: "CONVENTIONS §2.1, §3.1" }, { id: "W1-T2", action: "disputed", note: "no" }] });
+    expect((await dl(l, "answer")).errors).toEqual(["answers: на находку — ровно один ответ", `answers.W1-T1: commits — коммиты из ${base}..head`, "answers.W1-T1.note: §3.1 — нет такого пункта в CONVENTIONS.md; ссылка — CONVENTIONS §N.M", "answers.W1-T2: спор — только о блокирующей находке и с правилом"]);
     writeFileSync(join(l.work, "x.txt"), "x");
     await sh(l.work, "git", ["add", "-A"]);
     await sh(l.work, "git", ["commit", "-q", "-m", "local"]);
-    out(fb, { status: "done", head: await head(l), answers: [{ id: "W1-T1", action: "disputed", note: "CONVENTIONS §2" }, { id: "W1-T2", action: "disputed", note: "LG-23" }] });
+    out(fb, { status: "done", head: await head(l), answers: [{ id: "W1-T1", action: "disputed", note: "CONVENTIONS §2.1" }, { id: "W1-T2", action: "disputed", note: "LG-23" }] });
     expect((await dl(l, "answer")).errors).toEqual([`head: не запушен в origin/${BRANCH}`]);
   });
 

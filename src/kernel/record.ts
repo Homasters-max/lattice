@@ -59,7 +59,7 @@ function grammar(value: JsonObject, place: Place, kind: Kind): Rejection[] {
 
 /**
  * KR-04…KR-08: the record a header holds, or its rejections field by field at the place the caller names — where
- * the record sits in its input; sorted (CONVENTIONS.md §5). Its `id` is read by the kind the header claims — entity
+ * the record sits in its input; sorted (CONVENTIONS.md §5.2). Its `id` is read by the kind the header claims — entity
  * with `rev`, event without; whether the type agrees is the question of `checkRev` (KR-05).
  */
 export function checkHeader(value: JsonValue, place: Place): Result<Record> {
