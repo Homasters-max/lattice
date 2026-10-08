@@ -129,6 +129,11 @@
       },
       "stages": [
         {
+          "stage": "lattice/retrieve@2",
+          "status": "unavailable",
+          "fallback": "lattice/retrieve-local@1"
+        },
+        {
           "stage": "std/decide@1",
           "status": "selected",
           "result": {
@@ -152,6 +157,10 @@
               "input_fingerprint": "sha256:0f1e2d3c"
             }
           }
+        },
+        {
+          "stage": "lattice/verify@1",
+          "status": "unsure"
         }
       ],
       "outcome": "escalated",
