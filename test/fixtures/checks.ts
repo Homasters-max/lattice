@@ -7,9 +7,6 @@
 // — a JSON text, a proposal value, apply, the lines of a store — run alone.
 // A row hands on the Result of its check as it is (CONVENTIONS.md §2.1); a
 // check placed by its caller is placed at the root of the input, `ROOT`.
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { fileOf } from "../../src/adapters/store-jsonl/index.js";
 import { LG_42, parse, RM_01, RM_02 } from "../../src/codec/index.js";
 import {
@@ -67,6 +64,7 @@ import {
 import { landingPortsForTests, type GitFixtureOptions } from "../support/assembly.js";
 // The land session of every fixture: apply takes the commit's `by` and `at` from it (LG-22).
 import { keyOfLand, LAND, landedChain } from "../support/chain.js";
+import { scratch } from "../support/files.js";
 import { testKey } from "../support/keys.js";
 import type { CheckOutcome, FixtureCheck } from "./run.js";
 
@@ -261,11 +259,11 @@ async function dryRun(dir: string, input: unknown): Promise<CheckOutcome> {
 const landCheck: FixtureCheck = {
   enforces: [LG_54.id, LG_23.id, KR_10.id, LG_09.id],
   run: async (input) => {
-    const dir = mkdtempSync(join(tmpdir(), "lattice-fixture-"));
+    const dir = scratch("lattice-fixture-");
     try {
-      return await dryRun(dir, input);
+      return await dryRun(dir.dir, input);
     } finally {
-      rmSync(dir, { recursive: true, force: true });
+      dir.remove();
     }
   },
 };

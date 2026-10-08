@@ -1,36 +1,34 @@
 // plan-check holds the board and the task files of the plan together; these cases run it on a copy of
 // this repository's plan, design and CONVENTIONS.md and show that a done task needs every item of «Готово, когда»
 // marked and that every item of CONVENTIONS.md has its number and area and every reference names one.
-import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { knowledge, owned, scratch, type Scratch } from "../support/files.js";
+import { program } from "../support/program.js";
 
-const root = join(import.meta.dirname, "../..");
-const tool = join(root, "plan/tools/plan-check.mjs");
+const tool = program("plan/tools/plan-check.mjs");
 const task = "plan/phases/S0-kernel-ledger/tasks/S0-34-worktree-release.md";
 const board = "plan/phases/S0-kernel-ledger/STATUS.md";
-const dirs: string[] = [];
+const dirs: Scratch[] = [];
 
-function copy(): string {
-  const dir = mkdtempSync(join(tmpdir(), "plan-check-"));
+function copy(): Scratch {
+  const dir = scratch("plan-check-");
   dirs.push(dir);
-  for (const part of ["docs/design", "plan", "CONVENTIONS.md"]) cpSync(join(root, part), join(dir, part), { recursive: true });
+  knowledge.copy("", dir.path("docs/design"));
+  for (const part of ["plan", "CONVENTIONS.md"]) owned.copy(part, dir.path(part));
   return dir;
 }
 
-function edit(dir: string, path: string, change: (text: string) => string): void {
-  writeFileSync(join(dir, path), change(readFileSync(join(dir, path), "utf8")));
+function edit(dir: Scratch, path: string, change: (text: string) => string): void {
+  dir.write(path, change(dir.text(path)));
 }
 
-function check(dir: string): { status: number | null; out: string } {
-  const run = spawnSync(process.execPath, [tool, "--root", dir], { encoding: "utf8" });
+function check(dir: Scratch): { status: number | null; out: string } {
+  const run = tool.run(["--root", dir.dir]);
   return { status: run.status, out: run.stdout };
 }
 
 afterEach(() => {
-  for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  for (const dir of dirs.splice(0)) dir.remove();
 });
 
 describe("plan-check, «Готово, когда» of a done task", () => {
@@ -84,8 +82,7 @@ describe("plan-check, the items of CONVENTIONS.md (S0-50)", () => {
 describe("plan-check, references to the items of CONVENTIONS.md (S0-50)", () => {
   it("refuses a reference to an item that is not there or to a whole section, and accepts one to an item", () => {
     const dir = copy();
-    mkdirSync(join(dir, "src/kernel"), { recursive: true });
-    writeFileSync(join(dir, "src/kernel/x.ts"), "// sorted (CONVENTIONS.md §5.2, §99.9)\n// and CONVENTIONS §3\n");
+    dir.write("src/kernel/x.ts", "// sorted (CONVENTIONS.md §5.2, §99.9)\n// and CONVENTIONS §3\n");
     const r = check(dir);
     expect(r.status).toBe(1);
     expect(r.out).toContain("✗ src/kernel/x.ts:1: CONVENTIONS §99.9 — нет такого пункта; ссылка называет пункт §N.M");
@@ -132,10 +129,8 @@ describe("plan-check, references to the items of CONVENTIONS.md (S0-50)", () => 
 });
 
 /** Appends a line to the file of the copy, made if it is not there; the number of the line written. */
-function append(dir: string, path: string, text: string): number {
-  const full = join(dir, path);
-  mkdirSync(dirname(full), { recursive: true });
-  const before = existsSync(full) ? readFileSync(full, "utf8").replace(/\n?$/, "\n") : "";
-  writeFileSync(full, `${before}${text}\n`);
+function append(dir: Scratch, path: string, text: string): number {
+  const before = dir.exists(path) ? dir.text(path).replace(/\n?$/, "\n") : "";
+  dir.write(path, `${before}${text}\n`);
   return before.split("\n").length;
 }

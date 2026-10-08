@@ -18,7 +18,8 @@
     "lint:eol": "node scripts/check-eol.mjs",
     "plan:check": "node plan/tools/plan-check.mjs",
     "build": "tsc -p tsconfig.build.json",
-    "verify": "node scripts/verify.mjs"
+    "verify": "node scripts/verify.mjs",
+    "prove": "node scripts/prove.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -1,15 +1,15 @@
 // dev-loop scope decides the mode and the axes of a review round (plan/dev-loop.md);
 // these cases build a throwaway repository and show each branch of the decision.
 // The repository of a base is built once and copied for each case; the cases run concurrently (S0-40).
-import { execFile } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
-import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { scratch, type Scratch } from "../support/files.js";
+import { program, type Program } from "../support/program.js";
 
-const tool = join(import.meta.dirname, "../../plan/tools/dev-loop.mjs");
-let temp = "";
+const tool = program("plan/tools/dev-loop.mjs");
+const git = program("git");
+let temp: Scratch;
+let folders = 0;
 
 type Files = { readonly [path: string]: string | null };
 type Scope = {
@@ -23,41 +23,38 @@ type Scope = {
 };
 type Repo = { dir: string; base: string };
 
-function run(dir: string, cmd: string, args: string[]): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile(cmd, args, { cwd: dir, encoding: "utf8" }, (error, stdout, stderr) => {
-      if (error) reject(new Error(`${cmd} ${args.join(" ")}: ${stderr}`));
-      else resolve(stdout.trim());
-    });
-  });
+async function run(dir: string, cmd: Program, args: string[]): Promise<string> {
+  const ran = await cmd.start(args, { cwd: dir });
+  if (ran.status !== 0) throw new Error(`${cmd === git ? "git" : "dl"} ${args.join(" ")}: ${ran.stderr}`);
+  return ran.stdout.trim();
 }
+
+/** A new folder of the run inside the scratch folder of this file. */
+const folder = (prefix: string) => temp.mkdir(`${prefix}${++folders}`);
 
 async function commit(dir: string, files: Files, message: string): Promise<void> {
   for (const [path, text] of Object.entries(files)) {
     const file = join(dir, path);
-    if (text === null) await rm(file);
-    else {
-      await mkdir(dirname(file), { recursive: true });
-      await writeFile(file, text);
-    }
+    if (text === null) temp.remove(file);
+    else temp.write(file, text);
   }
-  await run(dir, "git", ["add", "-A"]);
-  await run(dir, "git", ["commit", "-q", "-m", message]);
+  await run(dir, git, ["add", "-A"]);
+  await run(dir, git, ["commit", "-q", "-m", message]);
 }
 
 // Commits the files and names the commit; only the commits a case names ask git for their hash.
 async function named(dir: string, files: Files, message: string): Promise<string> {
   await commit(dir, files, message);
-  return run(dir, "git", ["rev-parse", "HEAD"]);
+  return run(dir, git, ["rev-parse", "HEAD"]);
 }
 
 async function build(base: Files): Promise<Repo> {
-  const dir = await mkdtemp(join(temp, "base-"));
+  const dir = folder("base-");
   // --template= leaves out the sample hooks: a repository without them copies several times faster.
-  await run(dir, "git", ["init", "-q", "--template="]);
-  await run(dir, "git", ["config", "user.email", "t@t"]);
-  await run(dir, "git", ["config", "user.name", "t"]);
-  await run(dir, "git", ["config", "core.autocrlf", "false"]);
+  await run(dir, git, ["init", "-q", "--template="]);
+  await run(dir, git, ["config", "user.email", "t@t"]);
+  await run(dir, git, ["config", "user.name", "t"]);
+  await run(dir, git, ["config", "core.autocrlf", "false"]);
   return { dir, base: await named(dir, base, "base") };
 }
 
@@ -71,14 +68,14 @@ async function repo(base: Files): Promise<Repo> {
     built.set(base, source);
   }
   const { dir: from, base: head } = await source;
-  const dir = await mkdtemp(join(temp, "case-"));
-  await cp(from, dir, { recursive: true });
+  const dir = folder("case-");
+  temp.copy(from, dir);
   return { dir, base: head };
 }
 
 function scope(dir: string, base: string, delta = false, main?: string): Promise<Scope> {
-  const args = [tool, "scope", base, "HEAD", ...(delta ? ["--delta"] : []), ...(main ? ["--main", main] : [])];
-  return run(dir, process.execPath, args).then((out) => JSON.parse(out) as Scope);
+  const args = ["scope", base, "HEAD", ...(delta ? ["--delta"] : []), ...(main ? ["--main", main] : [])];
+  return run(dir, tool, args).then((out) => JSON.parse(out) as Scope);
 }
 
 const land = (body: string) => `export function land(): number {\n${body}\n}\n`;
@@ -92,11 +89,11 @@ const LEDGER = {
 };
 
 beforeAll(() => {
-  temp = mkdtempSync(join(tmpdir(), "dev-loop-scope-"));
+  temp = scratch("dev-loop-scope-");
 });
 
 afterAll(() => {
-  rmSync(temp, { recursive: true, force: true });
+  temp.remove();
 });
 
 describe.concurrent("dev-loop scope, first round: mode and Spec", { timeout: 30_000 }, () => {
@@ -210,7 +207,7 @@ describe.concurrent("dev-loop scope, later rounds", { timeout: 30_000 }, () => {
   it("says the delta cannot be counted when the reviewed head is no longer an ancestor", async () => {
     const { dir, base } = await repo(LEDGER);
     const prev = await named(dir, { "src/ledger/land.ts": land("  return 2;") }, "round 1");
-    await run(dir, "git", ["reset", "-q", "--hard", base]);
+    await run(dir, git, ["reset", "-q", "--hard", base]);
     await commit(dir, { "src/ledger/land.ts": land("  return 4;") }, "rebased");
     expect((await scope(dir, prev, true)).rebased).toBe(true);
   });

@@ -1,19 +1,18 @@
 // The reference test of the codec (LG-42, RM-07, SL-Z02): every file of
 // docs/design parses into the model and prints back to the same bytes. The
 // round-trip through blocks is S0-26 and S0-27; this is its first half.
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { idOf, parse, print, type Block, type Document, type Section } from "../../src/codec/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
+import { knowledge } from "../support/files.js";
 
-const DESIGN = join(import.meta.dirname, "../../docs/design");
-const FILES = readdirSync(DESIGN)
+const FILES = knowledge
+  .list("")
   .filter((f) => f.endsWith(".md"))
   .sort();
 
 function parsed(file: string): Document {
-  const out = parse(readFileSync(join(DESIGN, file)), { intent: null, path: `/${file}` });
+  const out = parse(knowledge.bytes(file), { intent: null, path: `/${file}` });
   if (!out.ok) throw new Error(`${file}: ${out.rejections.map((r) => `${r.rule} ${r.path} ${JSON.stringify(r.got)}`).join("; ")}`);
   return out.value;
 }
@@ -31,7 +30,7 @@ describe("the reference: docs/design round-trips byte for byte (LG-42, RM-07)", 
   });
 
   it.each(FILES)("LG-42, RM-07: print(parse(%s)) is the same bytes", (file) => {
-    const bytes = new Uint8Array(readFileSync(join(DESIGN, file)));
+    const bytes = knowledge.bytes(file);
     const out = print(deepFreeze(parsed(file)));
     expect(new TextDecoder().decode(out)).toBe(new TextDecoder().decode(bytes));
     expect(out).toEqual(bytes);

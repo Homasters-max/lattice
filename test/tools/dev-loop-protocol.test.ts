@@ -1,16 +1,14 @@
 // A finding names the item of CONVENTIONS.md it rests on — `CONVENTIONS §N.M` (plan/dev-loop.md, S0-50):
 // the protocol reads the items of CONVENTIONS.md in the worktree of the agent and accepts a reference to
 // one of them, and refuses a reference to an item that is not there or to a whole section.
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { scratch, type Scratch } from "../support/files.js";
+import { program } from "../support/program.js";
 
-const tool = join(import.meta.dirname, "../../plan/tools/dev-loop.mjs");
-const dirs: string[] = [];
+const tool = program("plan/tools/dev-loop.mjs");
+const dirs: Scratch[] = [];
 afterAll(() => {
-  for (const d of dirs) rmSync(d, { recursive: true, force: true });
+  for (const d of dirs) d.remove();
 });
 
 const CONVENTIONS = ["# C", "", "## 1. Data", "", "### §1.1 One", "Область: `src/**`", "", "Text.", "", "### §1.3 Three", "Область: `test/**`", ""].join("\n");
@@ -18,13 +16,13 @@ const HEAD = "a".repeat(40);
 
 /** The errors of `dl check` for this output of a standards reviewer, in a worktree with this CONVENTIONS.md. */
 function checked(out: object, conventions: string | null = CONVENTIONS): string[] {
-  const dir = mkdtempSync(join(tmpdir(), "dl-protocol-"));
+  const dir = scratch("dl-protocol-");
   dirs.push(dir);
-  if (conventions !== null) writeFileSync(join(dir, "CONVENTIONS.md"), conventions);
-  const brief = { role: "reviewer", axis: "standards", job: "full", head: HEAD, worktree: dir, findings: [], disputed: [] };
-  writeFileSync(join(dir, "r.in.json"), JSON.stringify(brief));
-  writeFileSync(join(dir, "r.out.json"), JSON.stringify(out));
-  return (JSON.parse(execFileSync(process.execPath, [tool, "check", join(dir, "r.out.json")], { encoding: "utf8" })) as { errors: string[] }).errors;
+  if (conventions !== null) dir.write("CONVENTIONS.md", conventions);
+  const brief = { role: "reviewer", axis: "standards", job: "full", head: HEAD, worktree: dir.dir, findings: [], disputed: [] };
+  dir.write("r.in.json", JSON.stringify(brief));
+  const file = dir.write("r.out.json", JSON.stringify(out));
+  return (JSON.parse(tool.run(["check", file]).stdout) as { errors: string[] }).errors;
 }
 
 /** The errors of `dl check` for the output of a standards reviewer with these findings. */

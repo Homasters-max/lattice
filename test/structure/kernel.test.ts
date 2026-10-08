@@ -1,11 +1,9 @@
 // ST-05, KR-01: the files reachable from the kernel entry are listed, and
 // the kernel names no `std` type.
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { knowledge } from "../support/files.js";
 import { auditKernelFiles, auditStdNames, stdTypeNames } from "./audit-kernel.js";
 import { BASE_KERNEL, tree } from "./cases.js";
-import { repoRoot } from "./tree.js";
 
 const NAMES = new Set(["requirement", "namespace", "act"]);
 
@@ -73,7 +71,7 @@ describe("std type names in the kernel (KR-01)", () => {
   });
 
   it("KR-01: reads the std type names of TY-Z02…TY-Z05, not the core ones", () => {
-    const names = stdTypeNames(readFileSync(join(repoRoot, "docs/design/03-types.md"), "utf8"));
+    const names = stdTypeNames(knowledge.text("03-types.md"));
     for (const n of ["knowledge", "hint", "requirement", "review-note", "namespace", "test-set", "act", "retired", "source-listing", "code-commit"]) {
       expect(names).toContain(n);
     }

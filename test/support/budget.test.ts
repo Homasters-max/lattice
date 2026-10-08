@@ -3,15 +3,13 @@
 // without it — every property names its budget of cases and no seed of its
 // own, and no test takes the default timeout of vitest: time is a safeguard
 // set above the budget.
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import fc from "fast-check";
 import ts from "typescript";
 import { describe, expect, it, vi } from "vitest";
 import config from "../../vitest.config.js";
 import { DEFAULT_SEED, SAFEGUARD_MS, seedOf } from "./budget.js";
+import { owned } from "./files.js";
 import { setup } from "./global-setup.js";
-import { repoRoot } from "../structure/tree.js";
 
 /** A call `fc.assert(…)` or `fc.check(…)`: a run of a property. */
 const isRun = (node: ts.Node, file: ts.SourceFile): node is ts.CallExpression =>
@@ -93,10 +91,11 @@ describe("the budget of a property", () => {
   });
 
   it("ST-12: every property test of the repository names its numRuns and takes the seed of the run", () => {
-    const paths = readdirSync(join(repoRoot, "test"), { recursive: true, encoding: "utf8" })
-      .map((p) => `test/${p.replaceAll("\\", "/")}`)
+    const paths = owned
+      .list("test", { recursive: true })
+      .map((p) => `test/${p}`)
       .filter((p) => p.endsWith(".ts"))
       .sort();
-    expect(paths.flatMap((p) => unbudgeted(p, readFileSync(join(repoRoot, p), "utf8")))).toEqual([]);
+    expect(paths.flatMap((p) => unbudgeted(p, owned.text(p)))).toEqual([]);
   });
 });

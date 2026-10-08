@@ -1,11 +1,10 @@
 // RT-32, RT-Z03: the command table of S0 — `--help` lists the store commands
 // of the slice with the text of RT-Z03, a stub names the plan task where its
 // command arrives, and the commands of later slices do not exist.
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { COMMANDS } from "../../src/cli/commands.js";
 import { run } from "../../src/cli/run.js";
+import { knowledge } from "../support/files.js";
 
 const S0 = ["init", "draft", "land", "verify-store", "export", "migrate", "session"];
 const LATER = ["run", "replay", "sync", "import-md", "cite", "report", "act", "upgrade", "rebind", "trace"];
@@ -27,7 +26,7 @@ async function lattice(...argv: string[]) {
 
 /** RT-Z03: store command → what it does, backticks removed. */
 function storeCommands(): Map<string, string> {
-  const md = readFileSync(join(import.meta.dirname, "../../docs/design/07-runtime.md"), "utf8");
+  const md = knowledge.text("07-runtime.md");
   const table = md.slice(md.indexOf("RT-Z03.")).split("\n\n")[1] ?? "";
   return new Map(
     table

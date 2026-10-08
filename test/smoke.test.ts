@@ -1,8 +1,8 @@
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import config, { owners, projectsOf, strays, testFiles } from "../vitest.config.js";
+import { owned } from "./support/files.js";
 
 describe("toolchain", () => {
   it("runs a property with fast-check", () => {
@@ -21,7 +21,7 @@ const files = testFiles(root);
 
 describe("toolchain, projects of the test run", () => {
   it("ST-12: npm test runs every project", () => {
-    const scripts = (JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { scripts: { [name: string]: string } }).scripts;
+    const scripts = (JSON.parse(owned.text("package.json")) as { scripts: { [name: string]: string } }).scripts;
     expect(scripts.test).toBe("vitest run");
     expect(projects.map((p) => p.name).sort()).toEqual(["lattice", "tools"]);
   });

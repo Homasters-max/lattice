@@ -2,30 +2,29 @@
 // the build makes from `src/cli/main.ts`; built here into a temporary
 // directory, it shows the commands of S0 and refuses to land with exit code 2
 // until S0-23 gives it the working assembly from `store/lattice.json` (Q-13).
-import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { owned, repoRoot, scratch, type Scratch } from "../support/files.js";
+import { program, type Program } from "../support/program.js";
 
-const root = join(import.meta.dirname, "../..");
-let out = "";
+let out: Scratch;
+let bin: Program;
 
 beforeAll(() => {
-  out = mkdtempSync(join(tmpdir(), "lattice-bin-"));
-  const tsc = join(root, "node_modules/typescript/bin/tsc");
-  execFileSync(process.execPath, [tsc, "-p", "tsconfig.build.json", "--outDir", out, "--sourceMap", "false"], { cwd: root });
+  out = scratch("lattice-bin-");
+  const built = program("node_modules/typescript/bin/tsc").run(["-p", "tsconfig.build.json", "--outDir", out.dir, "--sourceMap", "false"], { cwd: repoRoot });
+  if (built.status !== 0) throw new Error(`bug: the build of src/ failed\n${built.stdout}${built.stderr}`);
   // The build of the package runs as ES modules: package.json says "type": "module".
-  writeFileSync(join(out, "package.json"), '{ "type": "module" }\n');
+  out.write("package.json", '{ "type": "module" }\n');
+  bin = program(out.path("cli/main.js"));
 }, 120_000);
-afterAll(() => rmSync(out, { recursive: true, force: true }));
+afterAll(() => out.remove());
 
-const lattice = (...args: string[]) => spawnSync(process.execPath, [join(out, "cli/main.js"), ...args], { encoding: "utf8" });
+const lattice = (...args: string[]) => bin.run(args);
 
 describe("the bin lattice (RT-32)", () => {
   it("RT-32: package.json names the build of src/cli/main.ts as the bin lattice", () => {
-    const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { bin: { lattice: string } };
-    const build = JSON.parse(readFileSync(join(root, "tsconfig.build.json"), "utf8")) as { compilerOptions: { rootDir: string; outDir: string } };
+    const pkg = JSON.parse(owned.text("package.json")) as { bin: { lattice: string } };
+    const build = JSON.parse(owned.text("tsconfig.build.json")) as { compilerOptions: { rootDir: string; outDir: string } };
     expect([pkg.bin.lattice, build.compilerOptions.rootDir, build.compilerOptions.outDir]).toEqual(["./dist/cli/main.js", "src", "dist"]);
   });
 

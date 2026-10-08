@@ -2,15 +2,15 @@
 // its start and end in the state of the loop; dl gate runs verify into a log and says where to go; dl final
 // prints the critical path, the rounds by their reason and the sizes of the briefs. Time comes through
 // DEV_LOOP_NOW, so the cases never wait. The repository is built once and copied for each case (S0-40).
-import { execFile } from "node:child_process";
-import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { cp, mkdir, mkdtemp, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { basename, dirname, join } from "node:path";
+import { basename, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { scratch, type Scratch } from "../support/files.js";
+import { program, type Program } from "../support/program.js";
 
-const tool = join(import.meta.dirname, "../../plan/tools/dev-loop.mjs");
-let temp = "";
+const tool = program("plan/tools/dev-loop.mjs");
+const git = program("git");
+let temp: Scratch;
+let folders = 0;
 // The fake gh of the tool: dl wave asks GitHub for the body of the PR for the brief of Spec (S0-48).
 let gh = "";
 const BRANCH = "s0-99-x";
@@ -24,24 +24,21 @@ type At = { at: string; red?: boolean };
 const t = (m: number): At => ({ at: new Date(Date.UTC(2026, 9, 8, 10, m)).toISOString() });
 const red = (m: number): At => ({ ...t(m), red: true });
 
-function sh(cwd: string, cmd: string, args: string[], env = process.env): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile(cmd, args, { cwd, encoding: "utf8", env }, (error, stdout, stderr) => {
-      if (error && cmd === "git") reject(new Error(`git ${args.join(" ")}: ${stderr}`));
-      else resolve(stdout.trim());
-    });
-  });
+async function sh(cwd: string, cmd: Program, args: string[], env = process.env): Promise<string> {
+  const ran = await cmd.start(args, { cwd, env });
+  if (ran.status !== 0 && cmd === git) throw new Error(`git ${args.join(" ")}: ${ran.stderr}`);
+  return ran.stdout.trim();
 }
 
+/** A new folder of the run inside the scratch folder of this file. */
+const folder = (prefix: string) => temp.mkdir(`${prefix}${++folders}`);
+
 async function commit(work: string, files: Files, message: string): Promise<string> {
-  for (const [path, text] of Object.entries(files)) {
-    await mkdir(dirname(join(work, path)), { recursive: true });
-    await writeFile(join(work, path), text);
-  }
-  await sh(work, "git", ["add", "-A"]);
-  await sh(work, "git", ["commit", "-q", "-m", message]);
-  await sh(work, "git", ["push", "-q", "origin", `HEAD:refs/heads/${BRANCH}`]);
-  return sh(work, "git", ["rev-parse", "HEAD"]);
+  for (const [path, text] of Object.entries(files)) temp.write(join(work, path), text);
+  await sh(work, git, ["add", "-A"]);
+  await sh(work, git, ["commit", "-q", "-m", message]);
+  await sh(work, git, ["push", "-q", "origin", `HEAD:refs/heads/${BRANCH}`]);
+  return sh(work, git, ["rev-parse", "HEAD"]);
 }
 
 const land = (n: number) => `export function land(): number {\n  return ${n};\n}\n`;
@@ -58,17 +55,14 @@ const MAIN: Files = {
 
 // A work tree with an origin whose main holds MAIN and a branch with one change; the loop is not started.
 async function build(): Promise<string> {
-  const root = await mkdtemp(join(temp, "base-"));
+  const root = folder("base-");
   const work = join(root, "work");
-  for (const [path, text] of Object.entries(MAIN)) {
-    await mkdir(dirname(join(work, path)), { recursive: true });
-    await writeFile(join(work, path), text);
-  }
-  await sh(root, "git", ["init", "-q", "--template=", "--bare", "origin.git"]);
-  for (const args of [["init", "-q", "--template="], ["config", "user.email", "t@t"], ["config", "user.name", "t"], ["config", "core.autocrlf", "false"], ["remote", "add", "origin", join(root, "origin.git")]]) await sh(work, "git", args);
-  await sh(work, "git", ["add", "-A"]);
-  await sh(work, "git", ["commit", "-q", "-m", "base"]);
-  await sh(work, "git", ["push", "-q", "origin", "HEAD:refs/heads/main", `HEAD:refs/heads/${BRANCH}`]);
+  for (const [path, text] of Object.entries(MAIN)) temp.write(join(work, path), text);
+  await sh(root, git, ["init", "-q", "--template=", "--bare", "origin.git"]);
+  for (const args of [["init", "-q", "--template="], ["config", "user.email", "t@t"], ["config", "user.name", "t"], ["config", "core.autocrlf", "false"], ["remote", "add", "origin", join(root, "origin.git")]]) await sh(work, git, args);
+  await sh(work, git, ["add", "-A"]);
+  await sh(work, git, ["commit", "-q", "-m", "base"]);
+  await sh(work, git, ["push", "-q", "origin", "HEAD:refs/heads/main", `HEAD:refs/heads/${BRANCH}`]);
   await commit(work, { "src/ledger/land.ts": land(2) }, "task");
   return root;
 }
@@ -77,10 +71,11 @@ let built: Promise<string> | undefined;
 
 async function loop(): Promise<Loop> {
   built ??= build();
-  const root = await mkdtemp(join(temp, "case-"));
-  await cp(await built, root, { recursive: true });
+  const from = await built;
+  const root = folder("case-");
+  temp.copy(from, root);
   const work = join(root, "work");
-  await sh(work, "git", ["remote", "set-url", "origin", join(root, "origin.git")]);
+  await sh(work, git, ["remote", "set-url", "origin", join(root, "origin.git")]);
   return { work, dir: join(root, "loop") };
 }
 
@@ -88,14 +83,14 @@ async function dl(l: Loop, when: At, ...args: string[]): Promise<Json> {
   const env: NodeJS.ProcessEnv = { ...process.env, DEV_LOOP_GH: gh, DEV_LOOP_NOW: when.at };
   if (when.red === true) env.RED = "1";
   else delete env.RED;
-  return JSON.parse(await sh(l.work, process.execPath, [tool, ...args, "--dir", l.dir], env)) as Json;
+  return JSON.parse(await sh(l.work, tool, [...args, "--dir", l.dir], env)) as Json;
 }
 
-const read = (file: string): Json => JSON.parse(readFileSync(file, "utf8")) as Json;
+const read = (file: string): Json => JSON.parse(temp.text(file)) as Json;
 const agents = (r: Json) => r.agents as { agent: string; brief: string }[];
 const outOf = (brief: string) => brief.replace(".in.json", ".out.json");
-const out = (brief: string, value: Json) => writeFileSync(outOf(brief), JSON.stringify(value));
-const head = (l: Loop) => sh(l.work, "git", ["rev-parse", "HEAD"]);
+const out = (brief: string, value: Json) => temp.write(outOf(brief), JSON.stringify(value));
+const head = (l: Loop) => sh(l.work, git, ["rev-parse", "HEAD"]);
 const steps = (l: Loop) => read(join(l.dir, "state.json")).steps as Step[];
 const BLOCK = { kind: "rule", rule: "CONVENTIONS §1.1", where: "src/ledger/land.ts:2", quote: "return 2;", text: "magic number; use the constant" };
 
@@ -147,18 +142,17 @@ async function wholeLoop(l: Loop): Promise<void> {
 function comments(l: Loop): string {
   const d = join(l.dir, "comments");
   const file = join(l.dir, "comments.json");
-  writeFileSync(file, JSON.stringify({ comments: readdirSync(d).filter((f) => f.endsWith(".md")).map((f) => ({ body: readFileSync(join(d, f), "utf8") })) }));
+  temp.write(file, JSON.stringify({ comments: temp.list(d).filter((f) => f.endsWith(".md")).map((f) => ({ body: temp.text(join(d, f)) })) }));
   return file;
 }
 
 beforeAll(() => {
-  temp = mkdtempSync(join(tmpdir(), "dev-loop-clock-"));
-  gh = join(temp, "gh.mjs");
-  writeFileSync(gh, 'console.log(JSON.stringify({ body: "PR body" }));\n');
+  temp = scratch("dev-loop-clock-");
+  gh = temp.write("gh.mjs", 'console.log(JSON.stringify({ body: "PR body" }));\n');
 });
 
 afterAll(() => {
-  rmSync(temp, { recursive: true, force: true });
+  temp.remove();
 });
 
 describe.concurrent("dev-loop, the time of every step", { timeout: 60_000 }, () => {
@@ -167,7 +161,7 @@ describe.concurrent("dev-loop, the time of every step", { timeout: 60_000 }, () 
     // task — the head the executor pushed; fix — the head the fixer pushed, the head of every later step.
     const task = await head(l);
     await wholeLoop(l);
-    const fix = await sh(l.work, "git", ["rev-parse", `origin/${BRANCH}`]);
+    const fix = await sh(l.work, git, ["rev-parse", `origin/${BRANCH}`]);
     expect(fix).not.toBe(task);
     const s = steps(l);
     expect(s.map((x) => [x.kind, x.role, x.job, x.wave, x.head, x.start, x.end])).toEqual([
@@ -187,7 +181,7 @@ describe.concurrent("dev-loop, the time of every step", { timeout: 60_000 }, () 
     expect(s.filter((x) => x.kind === "gate").map((x) => x.green)).toEqual([false, true, true, true]);
     expect(s.filter((x) => x.kind === "review").map((x) => x.reason)).toEqual(["first", "block", "owner"]);
     await dl(l, t(60), "final", "--worktree", l.work);
-    rmSync(join(l.dir, "state.json"));
+    temp.remove(join(l.dir, "state.json"));
     expect(await dl(l, t(61), "restore", "--comments", comments(l))).toMatchObject({ ok: true, entry: "final" });
     expect(steps(l)).toEqual(s);
   });
@@ -195,16 +189,16 @@ describe.concurrent("dev-loop, the time of every step", { timeout: 60_000 }, () 
   it("prints in the final report the critical path, the rounds by their reason and the sizes of the briefs", async () => {
     const l = await loop();
     await wholeLoop(l);
-    const report = readFileSync((await dl(l, t(60), "final", "--worktree", l.work)).comment as string, "utf8");
+    const report = temp.text((await dl(l, t(60), "final", "--worktree", l.work)).comment as string);
     expect(report).toContain("Критический путь, мин: executor 10.0 → ворота 0.0 → fixer verify-red 2.0 → ворота 0.0 → круг 1 7.0 → fixer answer 10.0 → ворота 0.0 → круг 2 2.0 → владелец 7.0 → ворота 0.0 → круг 3 1.0.");
     expect(report).toContain("Весь цикл 60.0 мин: в шагах 39.0, вне шагов 21.0.");
     for (const row of ["| executor | 1 | 10.0 |", "| ворота | 4, красных 1 | 0.0 |", "| круги: первый | 1 | 7.0 |", "| круги: блокирующие | 1 | 2.0 |", "| круги: tidy | 0 | 0.0 |", "| круги: владелец | 1 | 1.0 |", "| круги: rebase | 0 | 0.0 |", "| fixer | 2 | 12.0 |", "| владелец | 1 | 7.0 |"])
       expect(report).toContain(row);
     // Each brief of the loop is on disk once: the table holds, by its name, the count, the largest and the sum of their sizes.
     const sizes = new Map<string, number[]>();
-    for (const file of readdirSync(l.dir, { recursive: true, encoding: "utf8" }).filter((f) => f.endsWith(".in.json"))) {
+    for (const file of temp.list(l.dir, { recursive: true }).filter((f) => f.endsWith(".in.json"))) {
       const name = basename(file, ".in.json");
-      sizes.set(name, [...(sizes.get(name) ?? []), statSync(join(l.dir, file)).size]);
+      sizes.set(name, [...(sizes.get(name) ?? []), temp.bytes(join(l.dir, file)).length]);
     }
     expect([...sizes.keys()]).toEqual(expect.arrayContaining(["executor", "fixer-verify-red", "fixer-answer", "verifier", "reviewer-standards"]));
     const rows = [...sizes].map(([name, b]) => `| ${name} | ${b.length} | ${Math.max(...b)} | ${b.reduce((x, y) => x + y, 0)} |`);
@@ -247,7 +241,7 @@ describe.concurrent("dev-loop, the reason of each round", { timeout: 60_000 }, (
     out(agents(w3)[0]!.brief, { axis: "verify", head: await head(l), summary: "joined", statuses: [], findings: [] });
     expect(await dl(l, t(11), "merge")).toMatchObject({ ok: true, wave: 3 });
     expect(steps(l).filter((x) => x.kind === "review").map((x) => x.reason)).toEqual(["first", "tidy", "rebase"]);
-    const report = readFileSync((await dl(l, t(12), "final", "--worktree", l.work)).comment as string, "utf8");
+    const report = temp.text((await dl(l, t(12), "final", "--worktree", l.work)).comment as string);
     for (const row of ["| круги: tidy | 1 | 1.0 |", "| круги: rebase | 1 | 2.0 |", "| fixer | 2 | 2.0 |"]) expect(report).toContain(row);
   });
 });
@@ -258,10 +252,10 @@ describe.concurrent("dev-loop gate", { timeout: 60_000 }, () => {
     await dl(l, t(0), "init", "--pr", "9", "--task", "S0-99", "--branch", BRANCH);
     const log = join(l.dir, "verify.log");
     expect(await dl(l, red(1), "gate", "--worktree", l.work)).toMatchObject({ ok: true, green: false, log, next: "red" });
-    expect(readFileSync(log, "utf8")).toContain("verify: boom");
+    expect(temp.text(log)).toContain("verify: boom");
     expect(await dl(l, t(2), "gate", "--worktree", l.work)).toMatchObject({ ok: true, green: true, log, next: "wave" });
-    expect(readFileSync(log, "utf8")).toContain("verify: fine");
-    expect(readFileSync(log, "utf8")).not.toContain("verify: boom");
+    expect(temp.text(log)).toContain("verify: fine");
+    expect(temp.text(log)).not.toContain("verify: boom");
   });
 
   it("asks the owner on the third red in a row; a green gate starts the count again", async () => {
@@ -278,10 +272,10 @@ describe.concurrent("dev-loop gate", { timeout: 60_000 }, () => {
     const l = await loop();
     await dl(l, t(0), "init", "--pr", "9", "--task", "S0-99", "--branch", BRANCH);
     const pushed = await head(l);
-    writeFileSync(join(l.work, "local.txt"), "x");
+    temp.write(join(l.work, "local.txt"), "x");
     expect(await dl(l, t(1), "gate", "--worktree", l.work)).toMatchObject({ ok: false, error: "в worktree есть изменения: ворота проверяют запушенный head" });
-    await sh(l.work, "git", ["add", "-A"]);
-    await sh(l.work, "git", ["commit", "-q", "-m", "local"]);
+    await sh(l.work, git, ["add", "-A"]);
+    await sh(l.work, git, ["commit", "-q", "-m", "local"]);
     expect(await dl(l, t(2), "gate", "--worktree", l.work)).toMatchObject({ ok: true, head: pushed, green: true });
     expect(await head(l)).toBe(pushed);
   });

@@ -7,7 +7,8 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, posix } from "node:path";
 import { conventionsOf } from "./conventions.mjs";
-import { classOf, scope, ST_BY_CLASS } from "./scope.mjs";
+import { classOf, ST_BY_CLASS } from "../../../scripts/paths.mjs";
+import { scope } from "./scope.mjs";
 import { findTask } from "./task.mjs";
 
 const BUDGET = 15000;
