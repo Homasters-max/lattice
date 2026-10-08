@@ -2,15 +2,15 @@
 // the tool on a throwaway repository with an origin: a loop that converges and resumes from its comments,
 // a dispute the owner settles, a stop the owner answers, and outputs of agents the protocol refuses.
 // The repository and its loop are built once and copied for each case; the cases run concurrently (S0-40).
-import { execFile } from "node:child_process";
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { cp, mkdir, mkdtemp, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { scratch, type Scratch } from "../support/files.js";
+import { program, type Program } from "../support/program.js";
 
-const tool = join(import.meta.dirname, "../../plan/tools/dev-loop.mjs");
-let temp = "";
+const tool = program("plan/tools/dev-loop.mjs");
+const git = program("git");
+let temp: Scratch;
+let folders = 0;
 // The fake gh of the tool: dl wave asks GitHub for the body of the PR for the brief of Spec (S0-48).
 let gh = "";
 const BRANCH = "s0-99-x";
@@ -18,25 +18,22 @@ type Json = { [key: string]: unknown };
 type Loop = { work: string; dir: string };
 type Files = { readonly [path: string]: string };
 
-function sh(cwd: string, cmd: string, args: string[], env = process.env): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile(cmd, args, { cwd, encoding: "utf8", env }, (error, stdout, stderr) => {
-      if (error && cmd === "git") reject(new Error(`git ${args.join(" ")}: ${stderr}`));
-      else resolve(stdout.trim());
-    });
-  });
+async function sh(cwd: string, cmd: Program, args: string[], env = process.env): Promise<string> {
+  const ran = await cmd.start(args, { cwd, env });
+  if (ran.status !== 0 && cmd === git) throw new Error(`git ${args.join(" ")}: ${ran.stderr}`);
+  return ran.stdout.trim();
 }
+
+/** A new folder of the run inside the scratch folder of this file. */
+const folder = (prefix: string) => temp.mkdir(`${prefix}${++folders}`);
 
 // Commits the files and pushes the branch, as an agent does before it answers.
 async function commit(work: string, files: Files, message: string): Promise<string> {
-  for (const [path, text] of Object.entries(files)) {
-    await mkdir(dirname(join(work, path)), { recursive: true });
-    await writeFile(join(work, path), text);
-  }
-  await sh(work, "git", ["add", "-A"]);
-  await sh(work, "git", ["commit", "-q", "-m", message]);
-  await sh(work, "git", ["push", "-q", "origin", `HEAD:refs/heads/${BRANCH}`]);
-  return sh(work, "git", ["rev-parse", "HEAD"]);
+  for (const [path, text] of Object.entries(files)) temp.write(join(work, path), text);
+  await sh(work, git, ["add", "-A"]);
+  await sh(work, git, ["commit", "-q", "-m", message]);
+  await sh(work, git, ["push", "-q", "origin", `HEAD:refs/heads/${BRANCH}`]);
+  return sh(work, git, ["rev-parse", "HEAD"]);
 }
 
 const land = (n: number) => `export function land(): number {\n  return ${n};\n}\n`;
@@ -49,20 +46,17 @@ const NO_MAIN: Files = {};
 // A work tree with an origin whose main is the base and the main files, a branch with one change, and an initialised loop.
 // Steps that do not depend on each other run together: the build is on the path of every case.
 async function build(change: Files, main: Files): Promise<string> {
-  const root = await mkdtemp(join(temp, "base-"));
+  const root = folder("base-");
   const work = join(root, "work");
-  for (const [path, text] of Object.entries({ "src/ledger/land.ts": land(1), "CONVENTIONS.md": CONVENTIONS, ...main })) {
-    await mkdir(dirname(join(work, path)), { recursive: true });
-    await writeFile(join(work, path), text);
-  }
+  for (const [path, text] of Object.entries({ "src/ledger/land.ts": land(1), "CONVENTIONS.md": CONVENTIONS, ...main })) temp.write(join(work, path), text);
   // --template= leaves out the sample hooks: a repository without them copies several times faster.
-  const origin = sh(root, "git", ["init", "-q", "--template=", "--bare", "origin.git"]);
-  for (const args of [["init", "-q", "--template="], ["config", "user.email", "t@t"], ["config", "user.name", "t"], ["config", "core.autocrlf", "false"], ["remote", "add", "origin", join(root, "origin.git")]]) await sh(work, "git", args);
-  await sh(work, "git", ["add", "-A"]);
-  await sh(work, "git", ["commit", "-q", "-m", "base"]);
+  const origin = sh(root, git, ["init", "-q", "--template=", "--bare", "origin.git"]);
+  for (const args of [["init", "-q", "--template="], ["config", "user.email", "t@t"], ["config", "user.name", "t"], ["config", "core.autocrlf", "false"], ["remote", "add", "origin", join(root, "origin.git")]]) await sh(work, git, args);
+  await sh(work, git, ["add", "-A"]);
+  await sh(work, git, ["commit", "-q", "-m", "base"]);
   await origin;
   // The push also sets origin/main and origin/<branch> of the work tree, as a fetch would.
-  await sh(work, "git", ["push", "-q", "origin", "HEAD:refs/heads/main", `HEAD:refs/heads/${BRANCH}`]);
+  await sh(work, git, ["push", "-q", "origin", "HEAD:refs/heads/main", `HEAD:refs/heads/${BRANCH}`]);
   await Promise.all([commit(work, change, "task"), dl({ work, dir: join(root, "loop") }, "init", "--pr", "9", "--task", "S0-99", "--branch", BRANCH)]);
   return root;
 }
@@ -78,21 +72,21 @@ async function loop(change: Files = TASK, main: Files = NO_MAIN): Promise<Loop> 
     source = build(change, main);
     built.set(key, source);
   }
-  const root = await mkdtemp(join(temp, "case-"));
-  await cp(await source, root, { recursive: true });
+  const root = folder("case-");
+  temp.copy(await source, root);
   const work = join(root, "work");
-  await sh(work, "git", ["remote", "set-url", "origin", join(root, "origin.git")]);
+  await sh(work, git, ["remote", "set-url", "origin", join(root, "origin.git")]);
   return { work, dir: join(root, "loop") };
 }
 
 async function dl(l: Loop, ...args: string[]): Promise<Json> {
-  return JSON.parse(await sh(l.work, process.execPath, [tool, ...args, ...(args[0] === "check" ? [] : ["--dir", l.dir])], { ...process.env, DEV_LOOP_GH: gh })) as Json;
+  return JSON.parse(await sh(l.work, tool, [...args, ...(args[0] === "check" ? [] : ["--dir", l.dir])], { ...process.env, DEV_LOOP_GH: gh })) as Json;
 }
 
-const read = (file: string): Json => JSON.parse(readFileSync(file, "utf8")) as Json;
+const read = (file: string): Json => JSON.parse(temp.text(file)) as Json;
 const agents = (r: Json) => r.agents as { agent: string; brief: string }[];
-const out = (brief: string, value: Json) => writeFileSync(brief.replace(".in.json", ".out.json"), JSON.stringify(value));
-const head = (l: Loop) => sh(l.work, "git", ["rev-parse", "HEAD"]);
+const out = (brief: string, value: Json) => temp.write(brief.replace(".in.json", ".out.json"), JSON.stringify(value));
+const head = (l: Loop) => sh(l.work, git, ["rev-parse", "HEAD"]);
 const BLOCK = { kind: "rule", rule: "CONVENTIONS §1.1", where: "src/ledger/land.ts:2", quote: "return 2;", text: "magic number; use the constant" };
 const fixerBrief = async (l: Loop) => (await dl(l, "brief", "fixer", "--worktree", l.work, "--job", "answer")).brief as string;
 
@@ -106,18 +100,17 @@ async function round(l: Loop, findings: Json[]): Promise<Json> {
 function comments(l: Loop): string {
   const d = join(l.dir, "comments");
   const file = join(l.dir, "comments.json");
-  writeFileSync(file, JSON.stringify({ comments: readdirSync(d).filter((f) => f.endsWith(".md")).map((f) => ({ body: readFileSync(join(d, f), "utf8") })) }));
+  temp.write(file, JSON.stringify({ comments: temp.list(d).filter((f) => f.endsWith(".md")).map((f) => ({ body: temp.text(join(d, f)) })) }));
   return file;
 }
 
 beforeAll(() => {
-  temp = mkdtempSync(join(tmpdir(), "dev-loop-flow-"));
-  gh = join(temp, "gh.mjs");
-  writeFileSync(gh, 'console.log(JSON.stringify({ body: "PR body" }));\n');
+  temp = scratch("dev-loop-flow-");
+  gh = temp.write("gh.mjs", 'console.log(JSON.stringify({ body: "PR body" }));\n');
 });
 
 afterAll(() => {
-  rmSync(temp, { recursive: true, force: true });
+  temp.remove();
 });
 
 describe.concurrent("dev-loop, a loop that converges", { timeout: 30_000 }, () => {
@@ -125,7 +118,7 @@ describe.concurrent("dev-loop, a loop that converges", { timeout: 30_000 }, () =
     const l = await loop();
     const m1 = await round(l, [BLOCK]);
     expect(m1).toMatchObject({ ok: true, wave: 1, next: "fix", open: ["W1-T1"] });
-    expect(readFileSync(m1.comment as string, "utf8")).toMatch(/^<!-- dev-loop \{"kind":"review"[\s\S]*\*\*W1-T1\*\* · блокирует · CONVENTIONS §1\.1/);
+    expect(temp.text(m1.comment as string)).toMatch(/^<!-- dev-loop \{"kind":"review"[\s\S]*\*\*W1-T1\*\* · блокирует · CONVENTIONS §1\.1/);
     const fb = await fixerBrief(l);
     const fix = await commit(l.work, { "src/ledger/land.ts": land(3) }, "S0-99: review — constant");
     out(fb, { status: "done", head: fix, answers: [{ id: "W1-T1", action: "fixed", commits: [fix], note: "constant" }] });
@@ -140,7 +133,7 @@ describe.concurrent("dev-loop, a loop that converges", { timeout: 30_000 }, () =
     expect(await dl(l, "merge")).toMatchObject({ ok: false, error: "нет круга 3: сначала wave" });
 
     const fin = (await dl(l, "final", "--worktree", l.work)).comment as string;
-    expect(readFileSync(fin, "utf8")).toContain("| 2 | проверка закрытия | Проверка закрытия | — | W1-T1 |");
+    expect(temp.text(fin)).toContain("| 2 | проверка закрытия | Проверка закрытия | — | W1-T1 |");
     expect(await dl(l, "restore", "--comments", comments(l))).toMatchObject({ ok: true, entry: "final", wave: 2, next: "end" });
   });
 });
@@ -158,9 +151,9 @@ describe.concurrent("dev-loop, the owner decides", { timeout: 30_000 }, () => {
     const e = await dl(l, "escalate", "--why", "спор");
     expect((read(e.questions as string) as unknown as Json[])[0]).toMatchObject({ header: "W1-T1" });
     expect(await dl(l, "restore", "--comments", comments(l))).toMatchObject({ entry: "escalation", next: "ask" });
-    writeFileSync(join(l.dir, "a.json"), JSON.stringify({ "W1-T1": { action: "чинить" } }));
+    temp.write(join(l.dir, "a.json"), JSON.stringify({ "W1-T1": { action: "чинить" } }));
     expect((await dl(l, "owner", "--answers", join(l.dir, "a.json"))).errors).toEqual(["W1-T1.action: fix | drop | task | gap | stop"]);
-    writeFileSync(join(l.dir, "a.json"), JSON.stringify({ "W1-T1": { action: "drop", note: "§5 wins" } }));
+    temp.write(join(l.dir, "a.json"), JSON.stringify({ "W1-T1": { action: "drop", note: "§5 wins" } }));
     expect(await dl(l, "owner", "--answers", join(l.dir, "a.json"))).toMatchObject({ ok: true, next: "done" });
   });
 
@@ -219,9 +212,9 @@ describe.concurrent("dev-loop, outputs the protocol refuses", { timeout: 30_000 
     const h = await head(l);
     out(fb, { status: "done", head: h, answers: [{ id: "W1-T1", action: "fixed", commits: [h] }, { id: "W1-T1", action: "disputed", note: "CONVENTIONS §2.1, §3.1" }, { id: "W1-T2", action: "disputed", note: "no" }] });
     expect((await dl(l, "answer")).errors).toEqual(["answers: на находку — ровно один ответ", `answers.W1-T1: commits — коммиты из ${base}..head`, "answers.W1-T1.note: §3.1 — нет такого пункта в CONVENTIONS.md; ссылка — CONVENTIONS §N.M", "answers.W1-T2: спор — только о блокирующей находке и с правилом"]);
-    writeFileSync(join(l.work, "x.txt"), "x");
-    await sh(l.work, "git", ["add", "-A"]);
-    await sh(l.work, "git", ["commit", "-q", "-m", "local"]);
+    temp.write(join(l.work, "x.txt"), "x");
+    await sh(l.work, git, ["add", "-A"]);
+    await sh(l.work, git, ["commit", "-q", "-m", "local"]);
     out(fb, { status: "done", head: await head(l), answers: [{ id: "W1-T1", action: "disputed", note: "CONVENTIONS §2.1" }, { id: "W1-T2", action: "disputed", note: "LG-23" }] });
     expect((await dl(l, "answer")).errors).toEqual([`head: не запушен в origin/${BRANCH}`]);
   });
@@ -245,7 +238,7 @@ describe.concurrent("dev-loop, nothing is lost before the end", { timeout: 30_00
     const l = await loop();
     expect(await round(l, [{ ...BLOCK, kind: "advice", rule: "" }])).toMatchObject({ next: "tidy" });
     const tb = (await dl(l, "brief", "fixer", "--worktree", l.work, "--job", "tidy")).brief as string;
-    const task = await sh(l.work, "git", ["log", "-1", "--format=%H", "HEAD"]);
+    const task = await sh(l.work, git, ["log", "-1", "--format=%H", "HEAD"]);
     out(tb, { status: "done", head: await head(l), answers: [{ id: "W1-T1", action: "fixed", commits: [task] }] });
     expect(await dl(l, "answer", "--job", "tidy")).toMatchObject({ ok: true, status: "done" });
   });
@@ -253,7 +246,7 @@ describe.concurrent("dev-loop, nothing is lost before the end", { timeout: 30_00
   it("does not stop on a rule of main the branch rewrote and lists it for the owner in the final report", async () => {
     const l = await loop({ "CONVENTIONS.md": "# C\n\n- two rule\n- own rule\n- one rule, except configs\n" }, { "CONVENTIONS.md": "# C\n\n- one rule\n- two rule\n" });
     expect(await round(l, [])).toMatchObject({ ok: true, wave: 1, next: "done" });
-    const fin = readFileSync((await dl(l, "final", "--worktree", l.work)).comment as string, "utf8");
+    const fin = temp.text((await dl(l, "final", "--worktree", l.work)).comment as string);
     expect(fin.match(/^- строка CONVENTIONS\.md .*$/gm)).toEqual(["- строка CONVENTIONS.md из main изменена или убрана: «- one rule»"]);
   });
 
@@ -271,7 +264,7 @@ describe.concurrent("dev-loop, nothing is lost before the end", { timeout: 30_00
     const w2 = await dl(l, "wave", "--worktree", l.work);
     for (const a of agents(w2)) out(a.brief, { axis: read(a.brief).axis, head: rec, summary: "checked", statuses: [], findings: [] });
     expect(await dl(l, "merge")).toMatchObject({ ok: true, next: "done" });
-    expect(readFileSync((await dl(l, "final", "--worktree", l.work)).comment as string, "utf8")).toContain("→ `plan/phases/S0/tasks/S0-98-x.md`");
+    expect(temp.text((await dl(l, "final", "--worktree", l.work)).comment as string)).toContain("→ `plan/phases/S0/tasks/S0-98-x.md`");
   });
 });
 
@@ -284,7 +277,7 @@ describe.concurrent("dev-loop, CONVENTIONS.md of main in the final report", { ti
     const branch = ["# C", "", "## 1. Data", "", ...item("§1.1", "One", "Kept."), ...item("§1.2", "Two", "New.")].join("\n");
     const l = await loop({ "CONVENTIONS.md": branch }, { "CONVENTIONS.md": main });
     expect(await round(l, [])).toMatchObject({ ok: true, next: "done" });
-    const fin = readFileSync((await dl(l, "final", "--worktree", l.work)).comment as string, "utf8");
+    const fin = temp.text((await dl(l, "final", "--worktree", l.work)).comment as string);
     expect(fin.match(/^- пункт.? CONVENTIONS\.md .*$/gm)).toEqual([
       "- пункт CONVENTIONS.md §1.2 «Two» из main изменён",
       "- пункт CONVENTIONS.md §1.3 «Three» из main убран",
@@ -295,7 +288,7 @@ describe.concurrent("dev-loop, CONVENTIONS.md of main in the final report", { ti
     const many = (word: string) => ["# C", "", ...Array.from({ length: 12 }, (_, i) => `- ${word} rule ${i}`), ""].join("\n");
     const l = await loop({ "CONVENTIONS.md": many("new") }, { "CONVENTIONS.md": many("old") });
     expect(await round(l, [])).toMatchObject({ ok: true, next: "done" });
-    const fin = readFileSync((await dl(l, "final", "--worktree", l.work)).comment as string, "utf8");
+    const fin = temp.text((await dl(l, "final", "--worktree", l.work)).comment as string);
     expect(fin.match(/^- строк.? CONVENTIONS\.md .*$/gm)).toEqual([
       "- строк CONVENTIONS.md из main изменено или убрано: 12 — перестройка файла; список — `git diff origin/main...HEAD -- CONVENTIONS.md`",
     ]);

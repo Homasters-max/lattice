@@ -3,9 +3,6 @@
 // store at the tail of main (LG-14), the commit is appended to the store on the
 // worktree and pushed with it, chained to the tail; a change request never
 // writes the store itself (LG-23).
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { hashBytes } from "../../src/kernel/index.js";
 import {
@@ -21,6 +18,7 @@ import {
 import { AT, gitForTests, landingPortsForTests, type GitFixtureBranch, type GitFixtureOptions } from "../support/assembly.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 import { moveMain, onMain, proposal, refusals, storeTextOf, text } from "../support/landing.js";
+import { scratch, type Scratch } from "../support/files.js";
 
 const BRANCHES: GitFixtureOptions["branches"] = {
   main: { files: { "README.md": "one\n" } },
@@ -35,13 +33,15 @@ const BRANCHES: GitFixtureOptions["branches"] = {
 const LAND = deepFreeze({ dryRun: false });
 const DRY_RUN = deepFreeze({ dryRun: true });
 
+let own: Scratch;
 let dir = "";
 let opened: Store[] = [];
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), "lattice-landing-"));
+  own = scratch("lattice-landing-");
+  dir = own.dir;
   opened = [];
 });
-afterEach(() => rmSync(dir, { recursive: true, force: true }));
+afterEach(() => own.remove());
 
 /** The ports of landing, frozen by the test assembly; every store landing opens is kept in `opened`, in order. */
 function portsOf(over: Partial<LandingPorts> = {}, branches = BRANCHES): LandingPorts {

@@ -1,9 +1,9 @@
 // The source tree the structure test reads (D-07): the files of `src/` parsed
 // by the TypeScript compiler API, the declared dependencies, and a program for
 // the type checker. A virtual tree serves the trigger and pass cases.
-import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import ts from "typescript";
+import { owned } from "../support/files.js";
 
 /** What package-lock.json pins a package by: its version and the hash of its tarball. */
 export type Locked = { readonly version?: string; readonly integrity?: string };
@@ -73,16 +73,16 @@ function makeTree(root: string, texts: ReadonlyMap<string, string>, dependencies
   };
 }
 
-/** The tree of this repository. */
+/** The tree of this repository, read through owned (ST-18): the test set that calls it owns src/ and package.json. */
 export function repoTree(): Tree {
-  const src = join(repoRoot, "src");
-  const paths = readdirSync(src, { recursive: true, encoding: "utf8" })
-    .map((p) => `src/${slash(p)}`)
+  const paths = owned
+    .list("src", { recursive: true })
+    .map((p) => `src/${p}`)
     .filter((p) => p.endsWith(".ts"))
     .sort();
-  const texts = new Map(paths.map((p) => [p, readFileSync(join(repoRoot, p), "utf8")]));
-  const pkg = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8")) as { dependencies?: { readonly [name: string]: string } };
-  const lock = JSON.parse(readFileSync(join(repoRoot, "package-lock.json"), "utf8")) as { packages?: Packages };
+  const texts = new Map(paths.map((p) => [p, owned.text(p)]));
+  const pkg = JSON.parse(owned.text("package.json")) as { dependencies?: { readonly [name: string]: string } };
+  const lock = JSON.parse(owned.text("package-lock.json")) as { packages?: Packages };
   const dependencies = pkg.dependencies ?? {};
   const locked = Object.keys(dependencies).flatMap((name) => {
     const entry = lock.packages?.[`node_modules/${name}`];

@@ -2,24 +2,21 @@
 // These cases run it in a throwaway package whose scripts stand in for the steps: each prints a line and exits
 // with the code given, after a delay that makes the steps finish out of their order, or, to show that the steps
 // overlap, once every step has started.
-import { execFile } from "node:child_process";
-import { readFileSync, rmSync } from "node:fs";
-import { mkdtemp, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { SAFEGUARD_MS } from "../support/budget.js";
+import { scratch, type Scratch } from "../support/files.js";
+import { program } from "../support/program.js";
 
-const tool = join(import.meta.dirname, "../../scripts/verify.mjs");
+const tool = program("scripts/verify.mjs");
 const steps = ["lint:ids", "plan:check", "lint:eol", "typecheck", "lint", "build", "test"] as const;
-const dirs: string[] = [];
+const dirs: Scratch[] = [];
 
 // `delay: "meet"` — the step marks itself started and ends when every step has, printing how many it saw. Its window is
 // the safeguard of a test, not a budget (S0-41): starting seven processes under a loaded run took more than 2 s (S0-52).
 // Run one by one, the first step waits out the window, the case fails on its timeout, and the window ends the step.
 type Step = { readonly exit: number; readonly delay: number | "meet" };
 type Report = { ok: boolean; steps: { step: string; ms: number; exit: number }[]; log: string };
-type Run = { readonly code: number; readonly out: string; readonly report: Report };
+type Run = { readonly code: number; readonly out: string; readonly report: Report; readonly dir: Scratch };
 
 // A step prints its name, waits (a delay, or the meeting of the steps), prints its exit code to stderr, and exits with it.
 const stand = `import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
@@ -41,25 +38,22 @@ if (delay === "meet") {
 `;
 
 async function verify(of: { readonly [step: string]: Step }): Promise<Run> {
-  const dir = await mkdtemp(join(tmpdir(), "verify-"));
+  const dir = scratch("verify-");
   dirs.push(dir);
   const scripts = Object.fromEntries(steps.map((s, i) => [s, `node stand.mjs ${s} ${of[s]?.exit ?? 0} ${of[s]?.delay ?? 50 * (steps.length - i)} ${steps.length}`]));
-  await writeFile(join(dir, "package.json"), JSON.stringify({ name: "stand", private: true, scripts }));
-  await writeFile(join(dir, "stand.mjs"), stand);
-  return new Promise((resolve, reject) => {
-    execFile(process.execPath, [tool], { cwd: dir, encoding: "utf8" }, (error, stdout, stderr) => {
-      const last = stdout.trimEnd().split("\n").at(-1) ?? "";
-      try {
-        resolve({ code: typeof error?.code === "number" ? error.code : 0, out: stdout, report: JSON.parse(last) as Report });
-      } catch {
-        reject(new Error(`verify: the last line of its output is not JSON: ${last}\n${stderr}`));
-      }
-    });
-  });
+  dir.write("package.json", JSON.stringify({ name: "stand", private: true, scripts }));
+  dir.write("stand.mjs", stand);
+  const ran = await tool.start([], { cwd: dir.dir });
+  const last = ran.stdout.trimEnd().split("\n").at(-1) ?? "";
+  try {
+    return { code: ran.status, out: ran.stdout, report: JSON.parse(last) as Report, dir };
+  } catch {
+    throw new Error(`verify: the last line of its output is not JSON: ${last}\n${ran.stderr}`);
+  }
 }
 
 afterAll(() => {
-  for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  for (const dir of dirs.splice(0)) dir.remove();
 });
 
 describe("verify, the steps in parallel", () => {
@@ -87,7 +81,7 @@ describe("verify, the steps in parallel", () => {
     expect(run.code).not.toBe(0);
     expect(run.report.ok).toBe(false);
     expect(run.report.steps.filter((s) => s.exit !== 0)).toEqual([{ step: "lint", ms: expect.any(Number) as number, exit: 3 }]);
-    const log = readFileSync(run.report.log, "utf8");
+    const log = run.dir.text(run.report.log);
     const lines = log.split(/\r?\n/);
     expect(lines).toContain("err lint 3");
     expect(steps.filter((s) => !lines.includes(`out ${s}`))).toEqual([]);

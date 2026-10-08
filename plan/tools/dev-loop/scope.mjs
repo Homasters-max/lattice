@@ -7,6 +7,7 @@
 //   triggers — триггеры аудита ST-15; expectations — тест-файлы, где ожидания изменены или отключены (PR-11);
 //   rebased — base не предок head: дельту посчитать нельзя, нужен круг без delta.
 import { execFileSync } from "node:child_process";
+import { classOf } from "../../../scripts/paths.mjs";
 import { conventionsOf } from "./conventions.mjs";
 
 const VERIFY_MAX_LINES = 40;
@@ -19,25 +20,7 @@ let cwd = process.cwd();
 const git = (...args) => execFileSync("git", args, { cwd, encoding: "utf8", maxBuffer: 1 << 26, stdio: ["ignore", "pipe", "pipe"] });
 const lines = (text) => text.split("\n").filter(Boolean);
 
-// Класс пути — от него зависят оси круга и материал агента; S0-42 переносит классы в классификатор `scripts/`.
-export function classOf(path) {
-  if (path.startsWith("docs/design/")) return "design";
-  if (/^(src|scripts|plan\/tools|discussion\/tools)\//.test(path)) return "code";
-  if (/^(gen|store)\//.test(path)) return "generated";
-  if (path.startsWith("test/")) return "tests";
-  if (/^(package(-lock)?\.json|tsconfig[^/]*\.json|eslint\.config\.js|vitest\.config\.ts|\.gitattributes)$|^\.github\//.test(path)) return "config";
-  if (path === "CONVENTIONS.md") return "conventions";
-  if (/^plan\/phases\/[^/]+\/(tasks\/|PLAN\.md$)/.test(path)) return "task";
-  return "text";
-}
-
-// Строки ST (docs/design/13-structure.md), которые задевает файл класса: их brief ревьюера Standards несёт текстом (S0-48).
-export const ST_BY_CLASS = {
-  code: ["ST-01", "ST-02", "ST-03", "ST-04", "ST-05", "ST-06", "ST-11", "ST-17"],
-  tests: ["ST-07", "ST-13", "ST-17", "ST-18"],
-  config: ["ST-09", "ST-12"],
-  generated: ["ST-08"],
-};
+// Класс пути — от него зависят оси круга и материал агента — даёт классификатор scripts/paths.mjs (S0-42).
 
 // Файлы diff с переименованиями: {path, old, cls, status A|M|D|R|C|T, lines}.
 function changes(from, head) {

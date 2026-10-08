@@ -3,26 +3,28 @@
 // and says where to go next. It also brings the owner's checkout to a fresh main
 // when that loses nothing. GitHub is a fake gh that answers from a file.
 // The checkout and its origin are built once and copied for each case; the cases run concurrently (S0-40).
-import { execFile } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { cp, mkdir, mkdtemp, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { scratch, type Scratch } from "../support/files.js";
+import { program, type Program } from "../support/program.js";
 
-const tool = join(import.meta.dirname, "../../plan/tools/dev-loop.mjs");
-let temp = "";
+const tool = program("plan/tools/dev-loop.mjs");
+const git = program("git");
+let temp: Scratch;
+let folders = 0;
 type Json = { [key: string]: unknown };
 type Repo = { root: string; work: string; github: string };
 
-function exec(cwd: string, cmd: string, args: string[], env = process.env): Promise<{ ok: boolean; stdout: string; stderr: string }> {
-  return new Promise((resolve) => {
-    execFile(cmd, args, { cwd, encoding: "utf8", env }, (error, stdout, stderr) => resolve({ ok: error === null, stdout, stderr }));
-  });
+async function exec(cwd: string, cmd: Program, args: string[], env = process.env): Promise<{ ok: boolean; stdout: string; stderr: string }> {
+  const ran = await cmd.start(args, { cwd, env });
+  return { ok: ran.status === 0, stdout: ran.stdout, stderr: ran.stderr };
 }
 
+/** A new folder of the run inside the scratch folder of this file. */
+const folder = (prefix: string) => temp.mkdir(`${prefix}${++folders}`);
+
 async function sh(cwd: string, args: string[]): Promise<string> {
-  const r = await exec(cwd, "git", args);
+  const r = await exec(cwd, git, args);
   if (!r.ok) throw new Error(`git ${args.join(" ")}: ${r.stderr}`);
   return r.stdout.trim();
 }
@@ -32,10 +34,7 @@ async function advance(root: string, files: { [path: string]: string } = { "b.tx
   const other = join(root, "other");
   await sh(root, ["clone", "-q", "--template=", "-b", "main", join(root, "origin.git"), other]);
   for (const args of [["config", "user.email", "t@t"], ["config", "user.name", "t"]]) await sh(other, args);
-  for (const [path, text] of Object.entries(files)) {
-    await mkdir(dirname(join(other, path)), { recursive: true });
-    await writeFile(join(other, path), text);
-  }
+  for (const [path, text] of Object.entries(files)) temp.write(join(other, path), text);
   await sh(other, ["add", "-A"]);
   await sh(other, ["commit", "-q", "-m", "merged"]);
   await sh(other, ["push", "-q", "origin", "main"]);
@@ -45,19 +44,18 @@ async function advance(root: string, files: { [path: string]: string } = { "b.tx
 // with ahead, main on origin is one commit ahead of the checkout, as after a merge of a PR. The fake gh keeps
 // a PR it creates in its file, so that a later list finds it.
 async function build(ahead: boolean): Promise<string> {
-  const root = await mkdtemp(join(temp, "base-"));
+  const root = folder("base-");
   const work = join(root, "checkout");
-  await mkdir(work);
+  temp.mkdir(work);
   // --template= leaves out the sample hooks: a repository without them copies several times faster.
   await sh(root, ["init", "-q", "--template=", "--bare", "origin.git"]);
   for (const args of [["init", "-q", "--template=", "-b", "main"], ["config", "user.email", "t@t"], ["config", "user.name", "t"], ["remote", "add", "origin", join(root, "origin.git")]]) await sh(work, args);
-  await writeFile(join(work, "a.txt"), "a\n");
-  await mkdir(join(work, "plan/phases/S0-x/tasks"), { recursive: true });
-  await writeFile(join(work, "plan/phases/S0-x/tasks/S0-98-new-thing.md"), "---\nid: S0-98\ntitle: New thing\nphase: S0\n---\n");
+  temp.write(join(work, "a.txt"), "a\n");
+  temp.write(join(work, "plan/phases/S0-x/tasks/S0-98-new-thing.md"), "---\nid: S0-98\ntitle: New thing\nphase: S0\n---\n");
   await sh(work, ["add", "-A"]);
   await sh(work, ["commit", "-q", "-m", "base"]);
   await sh(work, ["push", "-q", "origin", "HEAD:refs/heads/main", "HEAD:refs/heads/s0-99-x"]);
-  await writeFile(join(root, "gh.mjs"), [
+  temp.write(join(root, "gh.mjs"), [
     'import { readFileSync, writeFileSync } from "node:fs";',
     "const data = JSON.parse(readFileSync(process.env.FAKE_GITHUB, \"utf8\"));",
     "const args = process.argv.slice(2);",
@@ -86,28 +84,28 @@ async function repo({ ahead = false } = {}): Promise<Repo> {
     source = build(ahead);
     built.set(ahead, source);
   }
-  const root = await mkdtemp(join(temp, "case-"));
-  await cp(await source, root, { recursive: true });
+  const root = folder("case-");
+  temp.copy(await source, root);
   const work = join(root, "checkout");
   await sh(work, ["remote", "set-url", "origin", join(root, "origin.git")]);
   return { root, work, github: join(root, "github.json") };
 }
 
 async function start(r: Repo, github: Json, ...args: string[]): Promise<Json> {
-  writeFileSync(r.github, JSON.stringify(github));
+  temp.write(r.github, JSON.stringify(github));
   const env = { ...process.env, DEV_LOOP_GH: join(r.root, "gh.mjs"), FAKE_GITHUB: r.github };
-  const run = await exec(r.work, process.execPath, [tool, "start", ...args, "--root", join(r.root, "loops")], env);
+  const run = await exec(r.work, tool, ["start", ...args, "--root", join(r.root, "loops")], env);
   return JSON.parse(run.stdout) as Json;
 }
 
 const PR = { number: 12, title: "S0-99 · Something", headRefName: "s0-99-x", isDraft: false };
 
 beforeAll(() => {
-  temp = mkdtempSync(join(tmpdir(), "dev-loop-start-"));
+  temp = scratch("dev-loop-start-");
 });
 
 afterAll(() => {
-  rmSync(temp, { recursive: true, force: true });
+  temp.remove();
 });
 
 describe.concurrent("dev-loop start", { timeout: 30_000 }, () => {
@@ -115,17 +113,17 @@ describe.concurrent("dev-loop start", { timeout: 30_000 }, () => {
     const r = await repo();
     const s = await start(r, { list: [], comments: [] }, "--task", "S0-98");
     expect(s).toMatchObject({ ok: true, task: "S0-98", pr: 77, branch: "s0-98-new-thing", created: true, interrupted: false, opened: true, entry: "none", next: "executor" });
-    const github = JSON.parse(readFileSync(r.github, "utf8")) as { list: Json[] };
+    const github = JSON.parse(temp.text(r.github)) as { list: Json[] };
     expect(github.list).toEqual([expect.objectContaining({ title: "S0-98 · New thing", headRefName: "s0-98-new-thing", isDraft: true })]);
     const work = s.work as string;
     expect((await sh(work, ["ls-remote", "origin", "refs/heads/s0-98-new-thing"])).split("\t")[0]).toBe(await sh(work, ["rev-parse", "HEAD"]));
     expect(await sh(work, ["log", "-1", "--format=%s"])).toBe("S0-98: start");
     expect(await sh(work, ["rev-parse", "HEAD^"])).toBe(await sh(work, ["rev-parse", "origin/main"]));
-    const brief = await exec(r.work, process.execPath, [tool, "brief", "executor", "--task", "S0-98", "--worktree", work, "--dir", s.dir as string]);
+    const brief = await exec(r.work, tool, ["brief", "executor", "--task", "S0-98", "--worktree", work, "--dir", s.dir as string]);
     const briefPath = (JSON.parse(brief.stdout) as Json).brief as string;
-    expect(JSON.parse(readFileSync(briefPath, "utf8"))).toMatchObject({ pr: 77, branch: "s0-98-new-thing" });
+    expect(JSON.parse(temp.text(briefPath))).toMatchObject({ pr: 77, branch: "s0-98-new-thing" });
     expect(await start(r, github, "--task", "S0-98")).toMatchObject({ pr: 77, created: false, interrupted: false, opened: false, next: "executor", brief: null });
-    writeFileSync(join(work, "half.txt"), "x");
+    temp.write(join(work, "half.txt"), "x");
     expect(await start(r, github, "--task", "S0-98")).toMatchObject({ created: false, interrupted: true, opened: false, brief: briefPath });
   });
 
@@ -133,10 +131,10 @@ describe.concurrent("dev-loop start", { timeout: 30_000 }, () => {
     const r = await repo();
     const s = await start(r, { list: [], comments: [] }, "--task", "S0-98");
     const out = join(s.dir as string, "executor.out.json");
-    writeFileSync(out, JSON.stringify({ status: "ready", pr: 77, branch: "s0-98-new-thing", gaps: ["G-99"] }));
-    const init = await exec(r.work, process.execPath, [tool, "init", "--task", "S0-98", "--from", out, "--dir", s.dir as string]);
+    temp.write(out, JSON.stringify({ status: "ready", pr: 77, branch: "s0-98-new-thing", gaps: ["G-99"] }));
+    const init = await exec(r.work, tool, ["init", "--task", "S0-98", "--from", out, "--dir", s.dir as string]);
     expect(JSON.parse(init.stdout)).toMatchObject({ ok: true, existed: true });
-    expect(JSON.parse(readFileSync(join(s.dir as string, "state.json"), "utf8"))).toMatchObject({ pr: 77, branch: "s0-98-new-thing", gaps: ["G-99"] });
+    expect(JSON.parse(temp.text(join(s.dir as string, "state.json")))).toMatchObject({ pr: 77, branch: "s0-98-new-thing", gaps: ["G-99"] });
   });
 
   it("resumes a ready PR without comments of the loop at the gate, with its state", async () => {
@@ -198,7 +196,7 @@ describe.concurrent("dev-loop start, the owner's checkout left as it is", { time
   it("leaves a branch with commits outside origin/main, even if its PR is merged", async () => {
     const r = await repo({ ahead: true });
     await sh(r.work, ["checkout", "-q", "-b", "s0-99-x"]);
-    writeFileSync(join(r.work, "c.txt"), "c\n");
+    temp.write(join(r.work, "c.txt"), "c\n");
     await sh(r.work, ["add", "-A"]);
     await sh(r.work, ["commit", "-q", "-m", "after merge"]);
     expect(await start(r, { ...none, merged: [{ number: 12 }] }, "--task", "S0-98")).toMatchObject({ copy: { branch: "s0-99-x", synced: false } });
@@ -207,7 +205,7 @@ describe.concurrent("dev-loop start, the owner's checkout left as it is", { time
 
   it("leaves a checkout with changes untouched", async () => {
     const r = await repo({ ahead: true });
-    writeFileSync(join(r.work, "a.txt"), "changed\n");
+    temp.write(join(r.work, "a.txt"), "changed\n");
     const s = await start(r, none, "--task", "S0-98");
     expect(s).toMatchObject({ ok: true, copy: { branch: "main", synced: false, behind: 1 } });
     expect((s.copy as Json).why).toEqual(expect.any(String));
@@ -218,9 +216,9 @@ describe.concurrent("dev-loop start, the owner's checkout left as it is", { time
     const r = await repo({ ahead: true });
     const linked = join(r.root, "linked");
     await sh(r.work, ["worktree", "add", "-q", "--detach", linked, "main"]);
-    writeFileSync(r.github, JSON.stringify(none));
+    temp.write(r.github, JSON.stringify(none));
     const env = { ...process.env, DEV_LOOP_GH: join(r.root, "gh.mjs"), FAKE_GITHUB: r.github };
-    const run = await exec(linked, process.execPath, [tool, "start", "--task", "S0-98", "--root", join(r.root, "loops")], env);
+    const run = await exec(linked, tool, ["start", "--task", "S0-98", "--root", join(r.root, "loops")], env);
     expect(JSON.parse(run.stdout)).toMatchObject({ copy: { synced: false } });
     expect(await sh(r.work, ["rev-list", "--count", "HEAD..origin/main"])).toBe("1");
   });

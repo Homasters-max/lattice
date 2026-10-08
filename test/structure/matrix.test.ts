@@ -1,15 +1,14 @@
 // ST-01: the matrix of modules is the table of the design, and every pair
 // importer → target is allowed exactly when the matrix grants it.
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { knowledge } from "../support/files.js";
 import { auditImports } from "./audit-imports.js";
 import { MATRIX, MODULES, type Module } from "./modules.js";
-import { repoRoot, virtualTree } from "./tree.js";
+import { virtualTree } from "./tree.js";
 
 /** The rows of the module table of ST-01: module → the modules its «May import» cell names. */
 function designMatrix(): Map<string, string[] | "port"> {
-  const md = readFileSync(join(repoRoot, "docs/design/13-structure.md"), "utf8");
+  const md = knowledge.text("13-structure.md");
   const table = md.slice(md.indexOf("| Module | Holds | May import |")).split("\n\n")[0] ?? "";
   const rows = new Map<string, string[] | "port">();
   for (const row of table.split("\n").slice(2)) {

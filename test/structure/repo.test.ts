@@ -1,19 +1,19 @@
 // The structure test over this repository (ST-04…ST-06, ST-05, KR-01,
 // SL-05, LG-23): every audit is empty, the module folders are those of the
 // slice, the ledger has the ports of S0, and the lists are well-formed.
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
 import ts from "typescript";
 import { beforeAll, describe, expect, it } from "vitest";
+import { knowledge, owned } from "../support/files.js";
 import { auditForm, defaultExports, modelCasts } from "./audit-form.js";
 import { auditImports, portEntries } from "./audit-imports.js";
 import { auditKernelFiles, auditStdNames, stdTypeNames } from "./audit-kernel.js";
 import { auditPurity } from "./audit-purity.js";
 import { SLICE_MODULES } from "./modules.js";
-import { repoRoot, repoTree, type Tree } from "./tree.js";
+import { repoTree, type Tree } from "./tree.js";
 
 const lines = (file: string) =>
-  readFileSync(join(repoRoot, file), "utf8")
+  owned
+    .text(file)
     .split("\n")
     .filter((l) => l !== "" && !l.startsWith("#"));
 
@@ -68,15 +68,16 @@ describe("structure of this repository", () => {
 
   it("ST-16: test/ and scripts/ export by name too", () => {
     const files = ["test", "scripts"].flatMap((dir) =>
-      readdirSync(join(repoRoot, dir), { recursive: true, encoding: "utf8" })
+      owned
+        .list(dir, { recursive: true })
         .filter((f) => /\.(ts|mjs|js)$/.test(f))
-        .map((f) => `${dir}/${f.replaceAll("\\", "/")}`),
+        .map((f) => `${dir}/${f}`),
     );
-    expect(files.flatMap((f) => defaultExports(f, readFileSync(join(repoRoot, f), "utf8")))).toEqual([]);
+    expect(files.flatMap((f) => defaultExports(f, owned.text(f)))).toEqual([]);
   });
 
   it("PR-14: src/ and test/support/ are written in English — no Cyrillic letter in code or comments", () => {
-    const support = readdirSync(join(repoRoot, "test/support")).map((f) => [`test/support/${f}`, readFileSync(join(repoRoot, "test/support", f), "utf8")] as const);
+    const support = owned.list("test/support").map((f) => [`test/support/${f}`, owned.text(`test/support/${f}`)] as const);
     const texts = [...[...repo.files].map(([path, file]) => [path, file.text] as const), ...support];
     expect(texts.filter(([, text]) => /[Ѐ-ӿ]/u.test(text)).map(([path]) => path)).toEqual([]);
   });
@@ -86,12 +87,12 @@ describe("structure of this repository", () => {
   });
 
   it("KR-01: the kernel names no std type", () => {
-    const names = new Set(stdTypeNames(readFileSync(join(repoRoot, "docs/design/03-types.md"), "utf8")));
+    const names = new Set(stdTypeNames(knowledge.text("03-types.md")));
     expect(auditStdNames(repo, names)).toEqual([]);
   });
 
   it("SL-05: src/ has exactly the module folders of the slice", () => {
-    const dirs = readdirSync(join(repoRoot, "src")).filter((d) => statSync(join(repoRoot, "src", d)).isDirectory());
+    const dirs = owned.list("src").filter((d) => owned.isDirectory(`src/${d}`));
     expect(dirs.sort()).toEqual([...SLICE_MODULES].sort());
   });
 
@@ -112,13 +113,13 @@ describe("lists of the structure test", () => {
     it(`${file} is sorted, without duplicates, and every file in it exists`, () => {
       const list = lines(file);
       expect(list).toEqual([...new Set(list)].sort());
-      expect(list.filter((f) => !existsSync(join(repoRoot, f)))).toEqual([]);
+      expect(list.filter((f) => !owned.exists(f))).toEqual([]);
     });
   }
 
   /** R9 of the plan: the port interfaces, the command table, the bin, the kernel version and the structure test — what SL-05 makes the skeleton create. Files every task fills by the plan are aside: kernel-files.txt (ST-05), the entries of the modules and the stubs of the command table. */
   function skeletonFiles(): string[] {
-    const under = (dir: string) => readdirSync(join(repoRoot, dir)).map((f) => `${dir}/${f}`);
+    const under = (dir: string) => owned.list(dir).map((f) => `${dir}/${f}`);
     return [
       ...under("src/ledger/ports"),
       "src/cli/commands.ts",

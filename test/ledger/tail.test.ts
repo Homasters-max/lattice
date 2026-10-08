@@ -2,13 +2,11 @@
 // adapters `git-fixture` and `store-jsonl`: a worktree of the tail commit
 // alone, what it holds at `store/knowledge.jsonl`, and the read view folded
 // from genesis.
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { commitHash, land, openTail, type LandingPorts } from "../../src/ledger/index.js";
 import { landingPortsForTests, type GitFixtureOptions } from "../support/assembly.js";
 import { proposal, storeTextOf, text } from "../support/landing.js";
+import { scratch, type Scratch } from "../support/files.js";
 
 const BRANCHES: GitFixtureOptions["branches"] = {
   main: { files: { "README.md": "one\n" } },
@@ -16,11 +14,13 @@ const BRANCHES: GitFixtureOptions["branches"] = {
   "cr/b": { from: "main", files: { "store/proposals/cr-b.json": proposal("demo/b") } },
 };
 
+let own: Scratch;
 let dir = "";
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), "lattice-tail-"));
+  own = scratch("lattice-tail-");
+  dir = own.dir;
 });
-afterEach(() => rmSync(dir, { recursive: true, force: true }));
+afterEach(() => own.remove());
 
 const portsOf = (branches = BRANCHES): LandingPorts => landingPortsForTests({ dir, branches });
 

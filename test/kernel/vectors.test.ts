@@ -3,16 +3,15 @@
 // never change between kernel versions, so each file is pinned by its hash: a
 // change of a vector fails here before anything else.
 import { createHash } from "node:crypto";
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { canon, isFormat, parseJson, type Format, type JsonValue } from "../../src/kernel/index.js";
 import { serialize } from "../../src/kernel/json.js";
 import { deepFreeze } from "../support/deep-freeze.js";
+import { owned } from "../support/files.js";
 
-const dir = join(import.meta.dirname, "..", "vectors");
-const bytes = (file: string) => readFileSync(join(dir, file));
-const vector = <T>(file: string): T => JSON.parse(bytes(file).toString("utf8")) as T;
+const dir = "test/vectors";
+const bytes = (file: string) => owned.bytes(`${dir}/${file}`);
+const vector = <T>(file: string): T => JSON.parse(owned.text(`${dir}/${file}`)) as T;
 
 const PINNED: { readonly [file: string]: string } = {
   "rfc8785-numbers.json": "714da647d458c6251dfb0ca015eaeaea7d14edfc8e6b45d06102619339b6971e",
@@ -32,7 +31,7 @@ describe("the vector files (KR-13)", () => {
   it("KR-13: every vector file is pinned by its hash, and nothing else lies beside them", () => {
     const actual = Object.fromEntries(Object.keys(PINNED).map((f) => [f, createHash("sha256").update(bytes(f)).digest("hex")]));
     expect(actual).toEqual(PINNED);
-    expect(readdirSync(dir).sort()).toEqual(Object.keys(PINNED).sort());
+    expect(owned.list(dir)).toEqual(Object.keys(PINNED).sort());
   });
 });
 

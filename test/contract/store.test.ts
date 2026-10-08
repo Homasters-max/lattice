@@ -2,25 +2,23 @@
 // `knowledge`, run against every adapter. The store keeps the lines the ledger
 // hands it and the rows of each delta; it never parses a line, and it gives
 // the bytes of every line back as it keeps them.
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { createStoreJsonl } from "../../src/adapters/store-jsonl/index.js";
 import { createStoreMemory } from "../../src/adapters/store-memory/index.js";
 import type { Row, Store } from "../../src/ledger/index.js";
+import { scratch, type Scratch } from "../support/files.js";
 
-const dirs: string[] = [];
+const dirs: Scratch[] = [];
 const fresh = () => {
-  const dir = mkdtempSync(join(tmpdir(), "lattice-store-"));
+  const dir = scratch("lattice-store-");
   dirs.push(dir);
   return dir;
 };
-afterAll(() => dirs.forEach((d) => rmSync(d, { recursive: true, force: true })));
+afterAll(() => dirs.forEach((d) => d.remove()));
 
 const ADAPTERS: readonly { readonly name: string; readonly make: () => Store }[] = [
   { name: "store-memory", make: () => createStoreMemory() },
-  { name: "store-jsonl", make: () => createStoreJsonl({ dir: fresh() }) },
+  { name: "store-jsonl", make: () => createStoreJsonl({ dir: fresh().dir }) },
 ];
 
 const row = (key: string, from: number, to: number | null = null): Row => ({ key, from, to, value: { key, from } });
@@ -76,13 +74,12 @@ describe.each(ADAPTERS)("store port: $name", ({ make }) => {
 describe("store-jsonl", () => {
   const fileIn = (bytes: Uint8Array) => {
     const dir = fresh();
-    mkdirSync(join(dir, "store"));
-    writeFileSync(join(dir, "store/knowledge.jsonl"), bytes);
-    return dir;
+    dir.write("store/knowledge.jsonl", bytes);
+    return dir.dir;
   };
 
   it("LG-23: writes one line per commit to store/knowledge.jsonl, read again from the start on opening", async () => {
-    const dir = fresh();
+    const { dir } = fresh();
     await createStoreJsonl({ dir }).append({ commit: '{"seq":1}', delta: [], evidence: [] });
     expect(await all(createStoreJsonl({ dir }).commits(1))).toEqual([utf8('{"seq":1}')]);
   });

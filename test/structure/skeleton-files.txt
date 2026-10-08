@@ -17,6 +17,7 @@ test/structure/audit-form.ts
 test/structure/audit-imports.ts
 test/structure/audit-kernel.ts
 test/structure/audit-purity.ts
+test/structure/audit-reads.ts
 test/structure/boundaries.test.ts
 test/structure/cases.ts
 test/structure/form.test.ts
@@ -26,6 +27,7 @@ test/structure/kernel.test.ts
 test/structure/matrix.test.ts
 test/structure/modules.ts
 test/structure/purity.test.ts
+test/structure/reads.test.ts
 test/structure/repo.test.ts
 test/structure/skeleton-files.txt
 test/structure/tree.ts

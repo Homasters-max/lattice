@@ -1,25 +1,27 @@
 // Reads rule registries, fixture folders and the design from disk for the
 // fitness tests of ST-17; the checks themselves are in coverage.ts and run.ts.
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+// The files are read through the helpers of ST-18: the fixtures set owns the repository.
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { knowledge, owned, repoRoot } from "../support/files.js";
 import type { DesignDocument, FixtureCase, FixtureFolder } from "./coverage.js";
 
-const root = join(import.meta.dirname, "../..");
-export const fixturesDir = join(root, "test/fixtures");
+const fixturesDir = "test/fixtures";
 
+/** The paths from the root of the files named `name` under the folder `dir`. */
 function filesNamed(dir: string, name: string): string[] {
-  if (!existsSync(dir)) return [];
-  return readdirSync(dir, { recursive: true, encoding: "utf8" })
-    .filter((p) => p.split(/[\\/]/).at(-1) === name)
-    .map((p) => join(dir, p));
+  if (!owned.exists(dir)) return [];
+  return owned
+    .list(dir, { recursive: true })
+    .filter((p) => p.split("/").at(-1) === name)
+    .map((p) => `${dir}/${p}`);
 }
 
 /** Rule IDs listed by `RULES` of every registry `src/**\/rules.ts`. */
 export async function loadRegistered(): Promise<Set<string>> {
   const ids = new Set<string>();
-  for (const file of filesNamed(join(root, "src"), "rules.ts")) {
-    const mod = (await import(pathToFileURL(file).href)) as { RULES?: unknown };
+  for (const file of filesNamed("src", "rules.ts")) {
+    const mod = (await import(pathToFileURL(join(repoRoot, file)).href)) as { RULES?: unknown };
     const rules: unknown[] = Array.isArray(mod.RULES) ? mod.RULES : [];
     if (rules.length === 0) throw new Error(`${file}: a registry exports a non-empty RULES`);
     for (const rule of rules) {
@@ -32,10 +34,8 @@ export async function loadRegistered(): Promise<Set<string>> {
 }
 
 function readCases(dir: string): FixtureCase[] | null {
-  if (!existsSync(dir)) return null;
-  return readdirSync(dir)
-    .sort()
-    .map((name) => ({ name, data: name.endsWith(".json") ? parse(readFileSync(join(dir, name), "utf8")) : null }));
+  if (!owned.exists(dir)) return null;
+  return owned.list(dir).map((name) => ({ name, data: name.endsWith(".json") ? parse(owned.text(`${dir}/${name}`)) : null }));
 }
 
 function parse(text: string): unknown {
@@ -48,21 +48,20 @@ function parse(text: string): unknown {
 
 /** Every folder directly under `test/fixtures/`. */
 export function loadFolders(): FixtureFolder[] {
-  return readdirSync(fixturesDir)
-    .filter((name) => statSync(join(fixturesDir, name)).isDirectory())
-    .sort()
+  return owned
+    .list(fixturesDir)
+    .filter((name) => owned.isDirectory(`${fixturesDir}/${name}`))
     .map((name) => ({
       name,
-      trigger: readCases(join(fixturesDir, name, "trigger")),
-      pass: readCases(join(fixturesDir, name, "pass")),
+      trigger: readCases(`${fixturesDir}/${name}/trigger`),
+      pass: readCases(`${fixturesDir}/${name}/pass`),
     }));
 }
 
 /** Every document of `docs/design`, by file name, as bytes — the codec reads them. */
 export function loadDesign(): DesignDocument[] {
-  const dir = join(root, "docs/design");
-  return readdirSync(dir)
+  return knowledge
+    .list("")
     .filter((f) => f.endsWith(".md"))
-    .sort()
-    .map((name) => ({ name, bytes: new Uint8Array(readFileSync(join(dir, name))) }));
+    .map((name) => ({ name, bytes: knowledge.bytes(name) }));
 }

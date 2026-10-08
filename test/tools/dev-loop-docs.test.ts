@@ -1,18 +1,16 @@
 // The documents of /dev-loop and its tool name the same agents, commands, jobs, statuses and files;
 // these cases catch a contradiction between them before an agent meets it.
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { knowledge, owned } from "../support/files.js";
 
-const root = join(import.meta.dirname, "../..");
-const text = (path: string) => readFileSync(join(root, path), "utf8");
+const text = (path: string) => owned.text(path);
 const tool = text("plan/tools/dev-loop.mjs");
 const protocolCode = text("plan/tools/dev-loop/protocol.mjs");
 const stateCode = text("plan/tools/dev-loop/state.mjs");
 const protocol = text("plan/dev-loop.md");
 const skill = text(".claude/skills/dev-loop/SKILL.md");
 const agentDir = ".claude/agents";
-const agentFiles = readdirSync(join(root, agentDir)).filter((f) => f.endsWith(".md"));
+const agentFiles = owned.list(agentDir).filter((f) => f.endsWith(".md"));
 const listOf = (code: string, name: string) => [...new RegExp(`export const ${name} = \\[([^\\]]*)\\]`).exec(code)![1]!.matchAll(/"([^"]+)"/g)].map((m) => m[1]!);
 
 describe("dev-loop documents, agents", () => {
@@ -101,6 +99,7 @@ describe("dev-loop documents, paths", () => {
     const docs = [protocol, skill, text(".claude/skills/plan-task/SKILL.md"), text("AGENTS.md"), ...agentFiles.map((f) => text(`${agentDir}/${f}`))];
     const paths = docs.flatMap((d) => [...d.matchAll(/`((?:plan|docs|test|\.claude)\/[^`\s<>*]+\.(?:md|mjs|ts|txt))`/g)].map((m) => m[1]!));
     expect(paths.length).toBeGreaterThan(5);
-    expect(paths.filter((p) => !existsSync(join(root, p)))).toEqual([]);
+    const exists = (p: string) => (p.startsWith("docs/design/") ? knowledge.exists(p.slice("docs/design/".length)) : owned.exists(p));
+    expect(paths.filter((p) => !exists(p))).toEqual([]);
   });
 });

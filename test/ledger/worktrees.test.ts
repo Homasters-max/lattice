@@ -2,14 +2,12 @@
 // released — `push` releases the one it pushes, `release` it on any other
 // outcome — so no outcome of landing or of opening the store at the tail of
 // main leaves a directory in the one `git-fixture` writes its worktrees to.
-import { mkdtempSync, readdirSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { land, openTail, type Git, type LandingPorts, type Push } from "../../src/ledger/index.js";
 import { landingPortsForTests, type GitFixtureOptions } from "../support/assembly.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 import { moveMain, proposal, refusals } from "../support/landing.js";
+import { scratch, type Scratch } from "../support/files.js";
 
 const KNOWLEDGE = "store/knowledge.jsonl";
 const empty = JSON.stringify({ session: { id: "01JB2X00000000000000000SES" }, intents: [], sig: null });
@@ -29,11 +27,13 @@ const BRANCHES: GitFixtureOptions["branches"] = {
 const LAND = deepFreeze({ dryRun: false });
 const DRY_RUN = deepFreeze({ dryRun: true });
 
+let own: Scratch;
 let dir = "";
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), "lattice-worktrees-"));
+  own = scratch("lattice-worktrees-");
+  dir = own.dir;
 });
-afterEach(() => rmSync(dir, { recursive: true, force: true }));
+afterEach(() => own.remove());
 
 /** The ports of landing on the git fixture of `branches`, its worktrees under `dir`. */
 const portsOf = (over: Partial<LandingPorts> = {}, branches = BRANCHES): LandingPorts => landingPortsForTests({ dir, branches }, over);
@@ -89,6 +89,6 @@ const OUTCOMES: readonly (readonly [string, () => Promise<unknown>, unknown])[] 
 describe("the worktrees landing prepares (LG-23, D206)", () => {
   it.each(OUTCOMES)("LG-23: no worktree is left in the directory of git-fixture after %s", async (_, run, ends) => {
     expect(await run()).toEqual(ends);
-    expect(readdirSync(dir)).toEqual([]);
+    expect(own.list("")).toEqual([]);
   });
 });

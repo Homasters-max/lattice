@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import config, { checked, testFiles } from "../vitest.config.js";
+import { owned } from "./support/files.js";
 
 // ST-12: vitest.config.ts does not load while a test file of test/ is outside every project or in two of them.
 // This test is a file of its own, not a case of test/smoke.test.ts: an exclude that drops the smoke test
@@ -11,8 +12,9 @@ const load = async (extra: readonly string[]): Promise<unknown> => {
   vi.resetModules();
   vi.doMock("node:fs", async (original) => {
     const fs = await original<typeof import("node:fs")>();
-    // the one call of the config: readdirSync(join(root, "test"), { recursive: true, encoding: "utf8" })
-    const readdirSync = (path: string, options: { recursive: true; encoding: "utf8" }): string[] => [...fs.readdirSync(path, options), ...extra];
+    // the one call of the config: readdirSync(join(root, "test"), { recursive: true, encoding: "utf8" }); the files of
+    // test/ come through owned (ST-18)
+    const readdirSync = (): string[] => [...owned.list("test", { recursive: true }), ...extra];
     return { ...fs, readdirSync };
   });
   try {

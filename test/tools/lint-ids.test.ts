@@ -1,19 +1,17 @@
 // lint-ids holds RM-01 and RM-02 for docs/design in CI; these cases show it
 // refuses a breach of each rule and passes a clean design.
-import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { scratch, type Scratch } from "../support/files.js";
+import { program } from "../support/program.js";
 
-const tool = join(import.meta.dirname, "../../discussion/tools/lint-ids.mjs");
-const dirs: string[] = [];
+const tool = program("discussion/tools/lint-ids.mjs");
+const dirs: Scratch[] = [];
 
 function lint(files: { readonly [name: string]: string }): { status: number | null; out: string } {
-  const dir = mkdtempSync(join(tmpdir(), "lint-ids-"));
+  const dir = scratch("lint-ids-");
   dirs.push(dir);
-  for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, name), text);
-  const run = spawnSync(process.execPath, [tool, dir], { encoding: "utf8" });
+  for (const [name, text] of Object.entries(files)) dir.write(name, text);
+  const run = tool.run([dir.dir]);
   return { status: run.status, out: run.stdout };
 }
 
@@ -21,7 +19,7 @@ const doc = (rows: string, prose = "KR-Z01. Prose.\n") =>
   `# Doc\n\n${prose}\n| ID | Rule |\n|---|---|\n${rows}`;
 
 afterEach(() => {
-  for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  for (const dir of dirs.splice(0)) dir.remove();
 });
 
 describe("lint-ids", () => {

@@ -1,9 +1,6 @@
 // SL-05: the walking skeleton — one thin change unit through every seam:
 // command → `land --dry-run` with a rejection carrying its rule ID and fixture
 // → `land` → `append` with its delta → a question to the read view.
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Assembly, View } from "../../src/assembly/index.js";
 import { run } from "../../src/cli/run.js";
@@ -11,9 +8,9 @@ import type { JsonValue } from "../../src/kernel/index.js";
 import { NO_FACTS, proposalHash, readProposal } from "../../src/ledger/index.js";
 import { assembleForTests, type FixtureConfig } from "../support/assembly.js";
 import { hashOf } from "../support/hash-of.js";
+import { owned, scratch, type Scratch } from "../support/files.js";
 
-const fixtures = join(import.meta.dirname, "../fixtures/KR-06");
-const proposalOf = (file: string) => (JSON.parse(readFileSync(join(fixtures, file), "utf8")) as { input: { proposal: JsonValue } }).input.proposal;
+const proposalOf = (file: string) => (JSON.parse(owned.text(`test/fixtures/KR-06/${file}`)) as { input: { proposal: JsonValue } }).input.proposal;
 const bad = proposalOf("trigger/entity-id-uppercase.json");
 const good = proposalOf("pass/entity-id.json");
 const AT = "2026-10-06T12:30:00.000000Z";
@@ -51,11 +48,13 @@ async function viewOf(assembled: Assembly): Promise<View> {
   return view.value;
 }
 
+let own: Scratch;
 let dir = "";
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), "lattice-e2e-"));
+  own = scratch("lattice-e2e-");
+  dir = own.dir;
 });
-afterEach(() => rmSync(dir, { recursive: true, force: true }));
+afterEach(() => own.remove());
 
 describe("walking skeleton (SL-05)", () => {
   it("SL-05: dry run refuses with KR-06, the fixed proposal lands in git, and the read view answers", async () => {

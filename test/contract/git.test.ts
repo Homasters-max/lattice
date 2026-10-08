@@ -3,15 +3,15 @@
 // a compare-and-swap; `tail` of a ref that does not exist is `null`; paths come
 // in the order of `sortPaths`, the one comparator of the port (Q-18); every
 // worktree `prepare` returns is released — by `push`, or by `release` (D206).
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { createGitFixture, type GitFixtureOptions } from "../../src/adapters/git-fixture/index.js";
 import { sortPaths, type Git, type Worktree } from "../../src/ledger/index.js";
+import { scratch, type Scratch } from "../support/files.js";
 
-const dirs: string[] = [];
-afterAll(() => dirs.forEach((d) => rmSync(d, { recursive: true, force: true })));
+const dirs: Scratch[] = [];
+afterAll(() => dirs.forEach((d) => d.remove()));
+/** Whether a path is there, in a scratch folder of this run. */
+const exists = (path: string) => dirs[0]?.exists(path) ?? false;
 
 const BRANCHES: GitFixtureOptions["branches"] = {
   main: { files: { "README.md": "one\n", "src/a.ts": "a\n" } },
@@ -27,9 +27,9 @@ const ADAPTERS: readonly { readonly name: string; readonly make: () => Git }[] =
   {
     name: "git-fixture",
     make: () => {
-      const dir = mkdtempSync(join(tmpdir(), "lattice-git-"));
+      const dir = scratch("lattice-git-");
       dirs.push(dir);
-      return createGitFixture({ dir, branches: BRANCHES });
+      return createGitFixture({ dir: dir.dir, branches: BRANCHES });
     },
   },
 ];
@@ -95,11 +95,11 @@ describe.each(ADAPTERS)("git port: $name — releasing a worktree (LG-23, D206)"
   it("ST-07, LG-23: release removes the directory of the worktree, and a second release does nothing", async () => {
     const git = make();
     const w = await worktree(git, "cr/add", await tailOf(git, "main"));
-    expect(existsSync(w.dir)).toBe(true);
+    expect(exists(w.dir)).toBe(true);
     await w.release();
-    expect(existsSync(w.dir)).toBe(false);
+    expect(exists(w.dir)).toBe(false);
     await w.release();
-    expect(existsSync(w.dir)).toBe(false);
+    expect(exists(w.dir)).toBe(false);
   });
 
   it("ST-07, LG-23: push releases the worktree it pushes, and a release after it does nothing", async () => {
@@ -107,10 +107,10 @@ describe.each(ADAPTERS)("git port: $name — releasing a worktree (LG-23, D206)"
     const onto = await tailOf(git, "main");
     const w = await worktree(git, "cr/add", onto);
     expect(await push(git, w, onto)).toBe("pushed");
-    expect(existsSync(w.dir)).toBe(false);
+    expect(exists(w.dir)).toBe(false);
     await w.release();
     const after = await worktree(git, "main", await tailOf(git, "main"));
-    expect([existsSync(w.dir), await after.list("src/")]).toEqual([false, ["src/a.ts", "src/b.ts"]]);
+    expect([exists(w.dir), await after.list("src/")]).toEqual([false, ["src/a.ts", "src/b.ts"]]);
   });
 
   it("ST-07, LG-23: a worktree whose push ended moved is released by release", async () => {
@@ -119,7 +119,7 @@ describe.each(ADAPTERS)("git port: $name — releasing a worktree (LG-23, D206)"
     const [first, second] = [await worktree(git, "cr/add", onto), await worktree(git, "cr/edit", onto)];
     expect([await push(git, first, onto), await push(git, second, onto)]).toEqual(["pushed", "moved"]);
     await second.release();
-    expect(existsSync(second.dir)).toBe(false);
+    expect(exists(second.dir)).toBe(false);
   });
 
   it("ST-07, LG-23: release of one worktree leaves another of the same commit as it was", async () => {
