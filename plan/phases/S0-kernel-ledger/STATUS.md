@@ -9,9 +9,14 @@
 | [S0-39](tasks/S0-39-proof-loop-design.md) | Контур проверки — правки дизайна | A | ✅ | [#33](https://github.com/Homasters-max/lattice/pull/33) | инструмент, разбор #30, G-29 |
 | [S0-40](tasks/S0-40-tools-tests.md) | Тесты dev-loop — отдельный project и быстрее | A | ✅ | [#34](https://github.com/Homasters-max/lattice/pull/34) | инструмент |
 | [S0-41](tasks/S0-41-deterministic-tests.md) | Детерминизм тестов — seed и бюджет property-тестов | A | ✅ | [#35](https://github.com/Homasters-max/lattice/pull/35) | инструмент |
-| [S0-42](tasks/S0-42-verify-levels.md) | Уровни verify — affected и fitness, ratchet ST-18 | A | ⬜ | | инструмент |
-| [S0-43](tasks/S0-43-dl-gate.md) | dl gate — runner цикла и записи run'ов verify | A | ⬜ | | инструмент |
-| [S0-44](tasks/S0-44-mutate.md) | mutate — отчёт мутаций для ревью | A | ⬜ | | инструмент |
+| [S0-46](tasks/S0-46-loop-timing.md) | Замер цикла в dl — время шагов и тонкий dl gate | A | ⬜ | | инструмент, разбор циклов |
+| [S0-47](tasks/S0-47-parallel-verify.md) | Параллельный verify — scripts/verify.mjs и кэши | A | ⬜ | | инструмент, разбор циклов |
+| [S0-48](tasks/S0-48-minimal-brief.md) | Минимальный контекст — brief несёт всё нужное роли | A | ⬜ | | инструмент, разбор циклов |
+| [S0-42](tasks/S0-42-verify-levels.md) | prove — доказательство затронутого, ratchet ST-18 | A | ⬜ | | инструмент |
+| [S0-44](tasks/S0-44-mutate.md) | Мутации в prove --ready — выживших решает executor | A | ⬜ | | инструмент |
+| [S0-45](tasks/S0-45-review-evidence.md) | Ревью по hunk'ам — вердикт оси как evidence | A | ⬜ | | инструмент, разбор циклов |
+| [S0-43](tasks/S0-43-dl-gate.md) | Записи run'ов — ворота по ключам и shadow | A | ⬜ | | инструмент |
+| [S0-49](tasks/S0-49-fixture-pairs.md) | Фикстуры каждой пары «строка проверки × rule ID» | A | ⬜ | | разбор циклов, в лимите SL-06 |
 | [S0-03](tasks/S0-03-walking-skeleton.md) | Walking skeleton | B | ✅ | [#5](https://github.com/Homasters-max/lattice/pull/5) | G-14…G-18, Q-09…Q-27 |
 | [S0-32](tasks/S0-32-open-tail.md) | Открытие store на tail main | B | ✅ | [#8](https://github.com/Homasters-max/lattice/pull/8) | разбор S0-03 |
 | [S0-33](tasks/S0-33-landing-checks.md) | Проверки landing до apply | B | ✅ | [#10](https://github.com/Homasters-max/lattice/pull/10) | разбор S0-03, Q-28, Q-29 |
