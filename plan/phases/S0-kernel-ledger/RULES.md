@@ -223,7 +223,7 @@
 | ST-13 | полностью | [S0-30](tasks/S0-30-architecture-audit.md), [S0-44](tasks/S0-44-mutate.md) |
 | ST-14 | полностью | [S0-30](tasks/S0-30-architecture-audit.md) |
 | ST-15 | полностью | [S0-30](tasks/S0-30-architecture-audit.md) |
-| ST-16 | полностью | [S0-30](tasks/S0-30-architecture-audit.md) |
+| ST-16 | полностью | [S0-30](tasks/S0-30-architecture-audit.md), [S0-50](tasks/S0-50-conventions-one-home.md) |
 
 ## 14-slices.md
 
