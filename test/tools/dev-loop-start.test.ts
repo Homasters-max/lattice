@@ -139,6 +139,21 @@ describe.concurrent("dev-loop start", { timeout: 30_000 }, () => {
     expect(JSON.parse(readFileSync(join(s.dir as string, "state.json"), "utf8"))).toMatchObject({ pr: 77, branch: "s0-98-new-thing", gaps: ["G-99"] });
   });
 
+  it("resumes a ready PR without comments of the loop at the gate, with its state", async () => {
+    const r = await repo();
+    const s = await start(r, { list: [PR], comments: [{ body: "looks good" }] }, "--task", "S0-99");
+    expect(s).toMatchObject({ pr: 12, branch: "s0-99-x", entry: "none", next: "gate" });
+  });
+
+  it("resumes a PR from the header of its last comment of the loop", async () => {
+    const r = await repo();
+    const state = { pr: 12, task: "S0-99", branch: "s0-99-x", budget: 3, wave: 1, head: null, base: null, waves: [], findings: [], answers: null, decisions: [], gaps: [], triggers: null, pending: null, owner: null, tidied: false, stopped: false };
+    const body = `<!-- dev-loop ${JSON.stringify({ kind: "review", state })} -->\n## Ревью`;
+    expect(await start(r, { list: [PR], comments: [{ body }] }, "--pr", "12")).toMatchObject({ task: "S0-99", entry: "review", next: "done" });
+  });
+});
+
+describe.concurrent("dev-loop start, a task whose file is not on main", { timeout: 30_000 }, () => {
   it("refuses to open a task without its file on main", async () => {
     const r = await repo();
     expect(await start(r, { list: [], comments: [] }, "--task", "S0-97")).toMatchObject({ ok: false, error: "нет файла задачи S0-97 в plan/phases/*/tasks на origin/main" });
@@ -151,19 +166,6 @@ describe.concurrent("dev-loop start", { timeout: 30_000 }, () => {
     const s = await start(r, { list: [], comments: [] }, "--task", "S0-97");
     expect(s).toMatchObject({ ok: true, pr: 77, branch: "s0-97-later", created: false, interrupted: false, opened: true });
     expect(await sh(s.work as string, ["rev-parse", "HEAD^"])).toBe(await sh(s.work as string, ["rev-parse", "origin/main"]));
-  });
-
-  it("resumes a ready PR without comments of the loop at the gate, with its state", async () => {
-    const r = await repo();
-    const s = await start(r, { list: [PR], comments: [{ body: "looks good" }] }, "--task", "S0-99");
-    expect(s).toMatchObject({ pr: 12, branch: "s0-99-x", entry: "none", next: "gate" });
-  });
-
-  it("resumes a PR from the header of its last comment of the loop", async () => {
-    const r = await repo();
-    const state = { pr: 12, task: "S0-99", branch: "s0-99-x", budget: 3, wave: 1, head: null, base: null, waves: [], findings: [], answers: null, decisions: [], gaps: [], triggers: null, pending: null, owner: null, tidied: false, stopped: false };
-    const body = `<!-- dev-loop ${JSON.stringify({ kind: "review", state })} -->\n## Ревью`;
-    expect(await start(r, { list: [PR], comments: [{ body }] }, "--pr", "12")).toMatchObject({ task: "S0-99", entry: "review", next: "done" });
   });
 });
 
