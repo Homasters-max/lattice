@@ -169,23 +169,23 @@ describe.concurrent("dev-loop, the owner decides", { timeout: 30_000 }, () => {
     expect(await dl(l, "owner", "--text", "x")).toMatchObject({ ok: false, errors: ["владельца ни о чём не спрашивали"] });
   });
 
-  it("resumes a stopped loop by the owner's answer: on to the gate, or an instruction to the fixer", () => {
-    const l = loop();
-    round(l, [BLOCK]);
-    const fb = fixerBrief(l);
-    const fix = commit(l.work, { "src/ledger/land.ts": land(3) }, "S0-99: review — constant");
+  it("resumes a stopped loop by the owner's answer: on to the gate, or an instruction to the fixer", async () => {
+    const l = await loop();
+    await round(l, [BLOCK]);
+    const fb = await fixerBrief(l);
+    const fix = await commit(l.work, { "src/ledger/land.ts": land(3) }, "S0-99: review — constant");
     out(fb, { status: "done", head: fix, answers: [{ id: "W1-T1", action: "fixed", commits: [fix] }] });
-    expect(dl(l, "answer")).toMatchObject({ ok: true, status: "done" });
-    dl(l, "escalate", "--why", "проверить");
-    expect(dl(l, "owner", "--text", "стоп")).toMatchObject({ ok: true, next: "stop" });
-    expect(dl(l, "restore", "--comments", comments(l))).toMatchObject({ entry: "decision", next: "stop" });
-    expect(dl(l, "owner", "--text", "продолжить")).toMatchObject({ ok: true, next: "gate" });
-    expect(dl(l, "restore", "--comments", comments(l))).toMatchObject({ entry: "decision", next: "gate" });
+    expect(await dl(l, "answer")).toMatchObject({ ok: true, status: "done" });
+    await dl(l, "escalate", "--why", "проверить");
+    expect(await dl(l, "owner", "--text", "стоп")).toMatchObject({ ok: true, next: "stop" });
+    expect(await dl(l, "restore", "--comments", comments(l))).toMatchObject({ entry: "decision", next: "stop" });
+    expect(await dl(l, "owner", "--text", "продолжить")).toMatchObject({ ok: true, next: "gate" });
+    expect(await dl(l, "restore", "--comments", comments(l))).toMatchObject({ entry: "decision", next: "gate" });
 
-    dl(l, "escalate", "--why", "проверить");
-    expect(dl(l, "owner", "--text", "стоп")).toMatchObject({ next: "stop" });
-    expect(dl(l, "owner", "--text", "верни константу")).toMatchObject({ ok: true, next: "instruct" });
-    expect(dl(l, "owner", "--text", "x")).toMatchObject({ ok: false, errors: ["владельца ни о чём не спрашивали"] });
+    await dl(l, "escalate", "--why", "проверить");
+    expect(await dl(l, "owner", "--text", "стоп")).toMatchObject({ next: "stop" });
+    expect(await dl(l, "owner", "--text", "верни константу")).toMatchObject({ ok: true, next: "instruct" });
+    expect(await dl(l, "owner", "--text", "x")).toMatchObject({ ok: false, errors: ["владельца ни о чём не спрашивали"] });
   });
 });
 
