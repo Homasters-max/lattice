@@ -1,4 +1,6 @@
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import config, { checked, testFiles } from "../vitest.config.js";
 
 // ST-12: vitest.config.ts does not load while a test file of test/ is outside every project or in two of them.
 // This test is a file of its own, not a case of test/smoke.test.ts: an exclude that drops the smoke test
@@ -27,5 +29,15 @@ describe("toolchain, vitest.config.ts", () => {
 
   it("ST-12: does not load while a test file of test/ belongs to no project", async () => {
     await expect(load(["node_modules/stray.test.ts"])).rejects.toThrow(/^ST-12: .*: test\/node_modules\/stray\.test\.ts$/);
+  });
+
+  // The config is built through checked(), so the check reads the object vitest gets: `extends: true` puts the include
+  // and the exclude of the root `test` into every project, and one line there drops a file or puts it in two projects.
+  it("ST-12: refuses an include or an exclude of the root test, which every project inherits", () => {
+    const files = testFiles(join(import.meta.dirname, ".."));
+    const root = (globs: { include?: string[]; exclude?: string[] }): typeof config => ({ ...config, test: { ...config.test, ...globs } });
+    expect(checked(config, files)).toBe(config);
+    expect(() => checked(root({ exclude: ["test/smoke.test.ts"] }), files)).toThrow(/^ST-12: .*: test\/smoke\.test\.ts$/);
+    expect(() => checked(root({ include: ["test/smoke.test.ts"] }), files)).toThrow(/^ST-12: .*: test\/smoke\.test\.ts$/);
   });
 });

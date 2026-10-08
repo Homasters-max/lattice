@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
-import config, { owners, type Project, strays, testFiles } from "../vitest.config.js";
+import config, { owners, projectsOf, strays, testFiles } from "../vitest.config.js";
 
 describe("toolchain", () => {
   it("runs a property with fast-check", () => {
@@ -16,11 +16,7 @@ describe("toolchain", () => {
 // and every test file of test/ belongs to exactly one of them, so the split drops no test.
 // vitest.config.ts refuses to load otherwise (test/vitest-config.test.ts); these tests show that check on the projects vitest gets.
 const root = join(import.meta.dirname, "..");
-const projects: readonly Project[] = (config.test?.projects ?? []).map((p) => {
-  if (typeof p !== "object" || p instanceof Promise || p.test === undefined) throw new Error("bug: a project of vitest.config.ts is not written inline");
-  const { name, include = [], exclude = [] } = p.test;
-  return { name: typeof name === "string" ? name : "", include, exclude };
-});
+const projects = projectsOf(config);
 const files = testFiles(root);
 
 describe("toolchain, projects of the test run", () => {
