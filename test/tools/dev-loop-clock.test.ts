@@ -50,6 +50,8 @@ const MAIN: Files = {
   "CONVENTIONS.md": "# C\n\n## 1. A\n\n### §1.1 One\nОбласть: `src/**`\n",
   "package.json": JSON.stringify({ name: "t", private: true, scripts: { verify: "node verify.mjs" } }) + "\n",
   "verify.mjs": 'if (process.env.RED) {\n  console.log("verify: boom");\n  process.exit(1);\n}\nconsole.log("verify: fine");\n',
+  // The task the executor hands in: dl check reads the items it names done (S0-51).
+  "plan/phases/S0-x/tasks/S0-99-x.md": "---\nid: S0-99\ntitle: X\nphase: S0\n---\n\n## Готово, когда\n\n- [ ] land works\n",
 };
 
 // A work tree with an origin whose main holds MAIN and a branch with one change; the loop is not started.
@@ -106,7 +108,7 @@ async function round(l: Loop, from: At, to: At, findings: Json[] = []): Promise<
 // The executor from dl brief to dl check, and dl init from its output.
 async function executor(l: Loop, from: At, to: At): Promise<void> {
   const brief = (await dl(l, from, "brief", "executor", "--task", "S0-99", "--worktree", l.work)).brief as string;
-  out(brief, { status: "ready", pr: 9, branch: BRANCH, head: await head(l) });
+  out(brief, { status: "ready", pr: 9, branch: BRANCH, head: await head(l), done: ["land works"] });
   expect(await dl(l, to, "check", outOf(brief))).toMatchObject({ ok: true, status: "ready" });
   expect(await dl(l, to, "init", "--task", "S0-99", "--from", outOf(brief))).toMatchObject({ ok: true, existed: false });
 }

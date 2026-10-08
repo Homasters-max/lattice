@@ -59,9 +59,11 @@ Push автора — `git push origin HEAD:refs/heads/<branch>` (worktree в de
 
 Общие поля brief: `role`, `pr`, `task`, `worktree` — всё делается в нём, `owner` — ответ владельца, если был, `out`. `question` в выходе — `{text, options: [2–4 строки], recommendation}`, так, чтобы владелец ответил одним выбором.
 
-**executor** — задача по `plan-task`, шаги 1–6.
-- Вход: общие поля.
-- Выход: `{status: "ready" | "needs_owner", pr, branch, head, question?, gaps?: ["G-NN"]}`; `head` закоммичен и запушен в `branch`.
+**executor** — задача по `plan-task`, шаги 2–5 и описание PR. Шаги 1 и 6 механические, их делает `dl` (S0-51): `dl start` открывает ветку, коммит `S0-NN: start` и draft PR; `dl ready` по выходу executor сдаёт задачу.
+- Вход: общие поля и `branch` — ветка draft PR, который открыл `dl start`. Нет `pr` в brief — шаг 1 делает executor, как в `plan-task`.
+- Выход: `{status: "ready" | "needs_owner", pr, branch, head, done?: [пункт], question?, gaps?: ["G-NN"]}`; `head` закоммичен и запушен в `branch`.
+  - `done` — выполненные пункты «Готово, когда» словами файла задачи; при `ready` обязателен, пункт, которого нет в файле, `dl check` не принимает.
+  - По `done` `dl ready` отмечает пункты `[x]`, ставит ✅ и ссылку на PR на доске, переводит фазу в `plan/STATUS.md` в 🔄 или 🔍, гонит `plan-check`, коммитит последним коммитом ветки и переводит PR в ready. Пункт файла, которого нет в `done`, — не сдача, а вопрос владельцу (`plan-task`, «Отступления»).
 
 **reviewer** — `reviewer-spec`, `reviewer-standards`, `reviewer-architecture`, `verifier` (ось `verify`).
 - Вход: `axis`, `job`, `wave`, `base`, `head`, `reasons` (почему выбрана ось), `expectations` (Spec), `triggers` (Architecture), `files` и `range` (conflicts), `findings` — порученные находки, `disputed`, `answers` — ответ автора на них.
@@ -86,7 +88,7 @@ Push автора — `git push origin HEAD:refs/heads/<branch>` (worktree в de
 
 ## Самопроверка
 
-Executor перед шагом 6 `plan-task`, fixer перед push — на своём diff или дельте:
+Executor перед выходом `ready`, fixer перед push — на своём diff или дельте:
 
 - **Standards**: `AGENTS.md`, `CONVENTIONS.md`, ST-01…ST-17 (`docs/design/13-structure.md`), имена по глоссарию (ST-03). Чаще всего ловят: адаптеры для тестов собирает только `test/support/assembly.ts` (CONVENTIONS §1.8), отказ называет rule ID (ST-17);
 - **Architecture**: опись `plan/closure-check.md` по добавленным и изменённым экспортам и тест-хелперам;
