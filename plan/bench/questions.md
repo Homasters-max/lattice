@@ -50,3 +50,5 @@
 | 42 | Is a new type revision that adds a required field narrower? | lattice/kr-22 | normal | S0-07 | 2026-10-07 |
 | 43 | Which edge label does the extends field of a type carry? | — | blank | S0-07, G-26 (в словаре TY-16 метки `extends` нет) | 2026-10-07 |
 | 44 | Which rule refuses a record whose type the ledger does not know, before references are checked? | — | blank | S0-36, G-28 (LG-16 читает тело против `type@n`, RF-03 — фаза 4; решено: KR-15 на `/type`) | 2026-10-07 |
+| 45 | Does the code hash of a test set include the code under test that its tests import? | — | blank | S0-39, G-29 (RT-12 называет файлы test set и их транзитивные импорты; RT-21 даёт код под тестом отдельно) | 2026-10-07 |
+| 46 | May a test read a file outside its test set at run time? | lattice/st-18 | normal | S0-39 | 2026-10-07 |

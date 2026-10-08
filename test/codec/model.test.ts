@@ -147,6 +147,8 @@ describe("a document whose sections print does not write back is not built (LG-4
 });
 
 describe("a value of the model is made by its builders only (LG-42, CONVENTIONS §1)", () => {
+  // The program and its checker over the whole repository take longer than the
+  // timeout of a test under the load of the whole run.
   it("LG-42: no file of src/ but src/codec/build.ts casts to a type of the model with `as`", () => {
     const tree = repoTree();
     const checker = tree.program().getTypeChecker();
@@ -166,5 +168,5 @@ describe("a value of the model is made by its builders only (LG-42, CONVENTIONS 
     expect(casts.get("src/codec/build.ts")?.length).toBeGreaterThan(0);
     casts.delete("src/codec/build.ts");
     expect(Object.fromEntries(casts)).toEqual({});
-  });
+  }, 30_000);
 });

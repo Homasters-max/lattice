@@ -20,18 +20,20 @@ rules: [ST-12]
 ## Объём
 
 Входит — правки `docs/design` по решениям владельца 2026-10-07 и строки D207 и далее в `discussion/decisions.md`:
-- **ST-18** (новое, `13-structure`, раздел «Modules», срез S0): *"A test reads at run time only the files its test set owns (ST-10), knowledge, and the programs of the project it runs as code under test; it runs no other program except the tools its environment names. A structure test checks it."* — формулировку уточняет исполнитель;
-- **RT-12**: code hash test-set — файлы, которыми он владеет, и их транзитивные импорты (ST-18);
+- **ST-18** (новое, `13-structure`, раздел «Modules», срез S0): *"At run time a test reads only the files its test set owns (ST-10), `knowledge` (LG-01) and what it has written itself in that run; the only programs it starts are programs of its project, run as the code under test, and the tools its environment names. A structure test checks it on every change request (ST-12)."* Исполнитель уточнил набросок: тест читает и то, что сам записал в этом run (контракт-тесты `store`, `git` и e2e пишут во временную папку и читают её), — поэтому у ratchet S0-42 четвёртый хелпер `scratch`; «on every change request (ST-12)» делает проверку fitness-тестом без правки ST-12;
+- **RT-12**: code hash test-set — файлы, которыми он владеет, и их транзитивные импорты (ST-18); входит ли в них код под тестом — G-29;
 - **RT-21**: run `std/verify` детерминирован — случайность берёт seed из input fingerprint; бюджет run (RT-19) в счётных единицах, превышение страховки по времени кончает run `budget-exceeded`, не `failed`;
 - **LT-31**: мутационное измерение силы test-set; триггер — первая delegation по evidence (S3);
 - **LT-32**: окружения, в которых policy требует `ok` verify; триггер — первый проект, чьи runner'ы идут в нескольких окружениях;
 - **RM-Z04**: ST-18 в строке «structure and fitness tests»;
 - `rules` задачи S0-42 пополняется `ST-18`; `RULES.md` — `plan-check --rules`.
 
-Не входит: код и тесты — S0-40…S0-44.
+Не входит: код и тесты — S0-40…S0-44. Исключение по решению владельца 2026-10-08: явный таймаут 30 с у теста `test/codec/model.test.ts` «LG-42: no file of src/ but src/codec/build.ts casts…» — в составе `npm run verify` он шёл 5.2–6.4 с при таймауте vitest по умолчанию 5 с и валил `verify` и на `main`; ожидание теста не меняется. Остальные тесты на таймауте по умолчанию — S0-41.
+
+Попутно: G-29 в `PLAN.md`, вопросы 45 и 46 в `plan/bench/questions.md`, хелпер `scratch` в ratchet S0-42 и в разделе 8 `PLAN.md`.
 
 ## Готово, когда
 
-- [ ] ST-18, RT-12, RT-21, LT-31, LT-32, RM-Z04 правлены; D207 и далее записаны
-- [ ] `node discussion/tools/lint-ids.mjs` и `plan-check` без ошибок; файлы `docs/design` — LF
-- [ ] `npm run verify` зелёный
+- [x] ST-18, RT-12, RT-21, LT-31, LT-32, RM-Z04 правлены; D207 и далее записаны
+- [x] `node discussion/tools/lint-ids.mjs` и `plan-check` без ошибок; файлы `docs/design` — LF
+- [x] `npm run verify` зелёный
