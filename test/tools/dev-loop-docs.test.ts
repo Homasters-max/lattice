@@ -49,6 +49,10 @@ describe("dev-loop documents, commands and contract", () => {
       expect(protocol).toMatch(new RegExp(`[\`"]${word}[\`"]`));
   });
 
+  it("opens the gate of the skill with dl gate: the gate is the program, not a step of the model", () => {
+    expect(skill.slice(skill.indexOf("## Ворота"))).toMatch(/^## Ворота\n\n`dl gate --worktree <work>`/);
+  });
+
   it("routes in the skill every next step the tool can print", () => {
     const steps = new Set([...(tool + stateCode).matchAll(/next: "(\w+)"/g)].map((m) => m[1]!));
     expect(steps.size).toBeGreaterThan(8);

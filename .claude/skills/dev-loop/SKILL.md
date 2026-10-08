@@ -13,6 +13,7 @@ argument-hint: "[S0-NN | PR <n>]"
 - **`dl <команда>`** — `node <work>/plan/tools/dev-loop.mjs <команда> --dir <папка>`. Печатает одну строку JSON.
 - **Агент** — `Agent` с `subagent_type` из вывода `dl` и промптом ровно `DEV-LOOP-IN <brief>`. Отвечает строкой `DEV-LOOP-OUT <out>`. На `errors` от `dl` — `SendMessage` тому же агенту `DEV-LOOP-ERRORS <errors JSON>` и та же команда `dl` снова.
 - **Пост** — `gh pr comment <n> --body-file <comment>` для каждого `comment` из вывода `dl`, сразу.
+- **Замер** — время каждого шага — агента, ворот, круга, владельца — `dl` пишет в состояние сам; итог `dl final` печатает критический путь, круги по причинам и размеры brief'ов.
 - **Контекст оркестратора** — только строки `dl`, `DEV-LOOP-OUT`, коды выхода и файл `questions`. Diff, код, brief, out, отчёты и лог verify не читай.
 
 ## Переходы
@@ -26,6 +27,8 @@ argument-hint: "[S0-NN | PR <n>]"
 | `fix` | `dl brief fixer --worktree <work> --job answer` → новый агент `fixer` → `dl answer` → пост → «Ворота». `status: needs_owner` — эскалация с `--why "вопрос исправляющего" --from <out>` |
 | `tidy` | `dl brief fixer --worktree <work> --job tidy` → новый агент `fixer` → `dl answer --job tidy` → пост → «Ворота» |
 | `gate` | «Ворота» |
+| `wave` | `dl wave --worktree <work>`, дальше по `next` |
+| `red` | `dl brief fixer --worktree <work> --job verify-red --log <log>` (`log` из вывода `dl gate`) → новый агент `fixer` → `dl check <out>` → «Ворота». Круг на это не тратится |
 | `instruct` | `dl brief fixer --worktree <work> --job owner` → новый агент `fixer` → `dl check <out>` → «Ворота» |
 | `resume` | ответ владельца агенту `agent`: живому — `SendMessage` `DEV-LOOP-OWNER <ответ>`; если его нет — новый по `dl brief executor --task <ID> --worktree <work>` или `dl brief fixer --worktree <work> --job <job>` (ответ brief берёт из состояния) |
 | `done`, `final` | «Сдать» |
@@ -57,16 +60,13 @@ argument-hint: "[S0-NN | PR <n>]"
 
 ## Ворота
 
-В `<work>`: `git fetch origin`, `git checkout --detach origin/<ветка>`; HEAD равен `headRefOid` PR. `npm run verify > <папка>/verify.log 2>&1`.
-
-- Зелёный — `dl wave --worktree <work>`, дальше по `next`.
-- Красный — `dl brief fixer --worktree <work> --job verify-red --log <папка>/verify.log` → агент `fixer` → `dl check <out>` → «Ворота». Круг на это не тратится; третий красный подряд — «Эскалация» с `--why "verify красный трижды"`.
+`dl gate --worktree <work>`, дальше по `next`. Ворота — программа: `dl` ставит `<work>` на head, запушенный в ветку PR, гонит `npm run verify` в `<папка>/verify.log` и пишет время ворот в состояние. `next`: `wave` — verify зелёный; `red` — красный; `escalate` — красный третий раз подряд, `why` — «verify красный трижды». `ok: false` — в `<work>` остались изменения: агент не закоммитил работу — повтори его поручение.
 
 Ветка, от которой ушёл `main`, до «Сдать» не пересобирается: ревью считает diff от merge-base, а пересборка посреди цикла делает следующий круг полным. Исключение — текстовый конфликт с `main` (`gh pr view <n> --json mergeStateStatus` — `DIRTY`): `dl brief fixer --worktree <work> --job rebase` → агент `fixer` → `dl check <out>` → «Ворота».
 
 ## Сдать
 
-- `git merge-base --is-ancestor origin/main HEAD` ложно — `dl brief fixer --worktree <work> --job rebase` → агент `fixer` → `dl check <out>` → verify. `conflicts` задевают `src/` или `test/` — `dl wave --worktree <work> --conflicts <файлы через запятую>`, дальше по `next`. Иначе — к следующему пункту.
+- `git merge-base --is-ancestor origin/main HEAD` ложно — `dl brief fixer --worktree <work> --job rebase` → агент `fixer` → `dl check <out>` → `dl gate --worktree <work>`: `red` и `escalate` — по «Переходам», зелёный — дальше здесь. `conflicts` задевают `src/` или `test/` — `dl wave --worktree <work> --conflicts <файлы через запятую>`, дальше по `next`. Иначе — к следующему пункту.
 - `dl final --worktree <work>` → пост. `gh pr ready <n>`; метка `blocked` на PR есть (`gh pr view <n> --json labels`) — `gh pr edit <n> --remove-label blocked`.
 - Владельцу: задача, число кругов, ссылка на PR; что отложено в план и куда, что отклонено, что решить до merge — по разделам итога, без пересказа. Merge делает владелец. Защита ветки `main` пускает merge, только когда PR стоит на tail `main` и CI зелёный; ушёл `main` после «Сдать» — «Update branch» с rebase в PR, а при конфликте — `/dev-loop PR <n>`.
 

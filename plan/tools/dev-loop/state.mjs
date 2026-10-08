@@ -1,7 +1,7 @@
 // state: состояние цикла и его переходы (plan/dev-loop.md, «Круги»). Чистые функции.
 // Состояние: {pr, task, branch, budget, wave, head, base, waves[], findings[], answers, decisions[], gaps[], triggers,
 //   pending — вопрос владельцу {why, question?, agent?, job?, findings?}, owner — ответ владельца агенту {text, agent, job?},
-//   tidied — круг tidy пройден, stopped}.
+//   tidied — круг tidy пройден, stopped, steps — шаги цикла и их время (clock.mjs)}.
 // Статусы находки: open, dispute-kept, closed, dispute-accepted, advice, applied, deferred (+ deferredTo), declined, owner-closed.
 // Находка: {id, axis, severity, rule, where, quote, text, ratchet, late, wave, status, history[{wave, status, note}]}.
 import { LETTER } from "./protocol.mjs";
@@ -11,7 +11,7 @@ export const OWNER_ACTIONS = ["fix", "drop", "task", "gap", "stop"];
 const DUPLICATE_LINES = 3;
 
 export function initial({ pr, task, branch, gaps = [] }) {
-  return { pr, task, branch, budget: BUDGET, wave: 0, head: null, base: null, waves: [], findings: [], answers: null, decisions: [], gaps, triggers: null, pending: null, owner: null, tidied: false, stopped: false };
+  return { pr, task, branch, budget: BUDGET, wave: 0, head: null, base: null, waves: [], findings: [], answers: null, decisions: [], gaps, triggers: null, pending: null, owner: null, tidied: false, stopped: false, steps: [] };
 }
 
 const isOpen = (f) => f.severity === "block" && (f.status === "open" || f.status === "dispute-kept");
