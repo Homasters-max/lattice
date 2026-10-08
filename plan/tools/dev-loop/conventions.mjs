@@ -32,7 +32,8 @@ export function conventionsOf(text) {
     const m = ITEM.exec(line);
     if (!m) return problems.push(`CONVENTIONS.md:${i + 1}: пункт без номера — «### §N.M Название»`);
     const [n, k] = [Number(m[1]), Number(m[2])];
-    if (n !== section || k <= last) problems.push(`CONVENTIONS.md:${i + 1}: §${n}.${k} — в разделе ${section} номер после §${section}.${last}`);
+    if (n !== section) problems.push(`CONVENTIONS.md:${i + 1}: §${n}.${k} в разделе ${section} — номер пункта начинается с номера раздела`);
+    else if (k <= last) problems.push(`CONVENTIONS.md:${i + 1}: §${n}.${k} после §${n}.${last} — номер растёт внутри раздела`);
     last = Math.max(last, k);
     const area = AREA.exec(lines[i + 1] ?? "");
     const areas = area ? [...area[1].matchAll(/`([^`]+)`/g)].map((a) => a[1]) : [];
