@@ -8,12 +8,15 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { SAFEGUARD_MS } from "../support/budget.js";
 
 const tool = join(import.meta.dirname, "../../scripts/verify.mjs");
 const steps = ["lint:ids", "plan:check", "lint:eol", "typecheck", "lint", "build", "test"] as const;
 const dirs: string[] = [];
 
-// `delay: "meet"` — the step marks itself started and ends when every step has (or after 2 s), printing how many it saw.
+// `delay: "meet"` — the step marks itself started and ends when every step has, printing how many it saw. Its window is
+// the safeguard of a test, not a budget (S0-41): starting seven processes under a loaded run took more than 2 s (S0-52).
+// Run one by one, the first step waits out the window, the case fails on its timeout, and the window ends the step.
 type Step = { readonly exit: number; readonly delay: number | "meet" };
 type Report = { ok: boolean; steps: { step: string; ms: number; exit: number }[]; log: string };
 type Run = { readonly code: number; readonly out: string; readonly report: Report };
@@ -26,7 +29,7 @@ const end = () => { console.error("err " + step + " " + exit); process.exit(Numb
 if (delay === "meet") {
   mkdirSync("started", { recursive: true });
   writeFileSync("started/" + step.replace(":", "-"), "");
-  const until = Date.now() + 2000;
+  const until = Date.now() + ${SAFEGUARD_MS};
   const wait = () => {
     const seen = readdirSync("started").length;
     if (seen < Number(total) && Date.now() < until) return void setTimeout(wait, 10);
