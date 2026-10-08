@@ -50,8 +50,9 @@ async function commit(work: string, files: Files, message: string): Promise<stri
   return sh(work, git, ["rev-parse", "HEAD"]);
 }
 
-// A work tree whose origin's main holds MAIN, the branch with LAND committed and pushed, and an initialised loop.
-async function loop(): Promise<Loop> {
+// A work tree whose origin's main holds MAIN, the branch with LAND committed and pushed, and a loop — initialised unless
+// `init` is false.
+async function loop(init = true): Promise<Loop> {
   const base = temp.mkdir(`case-${++folders}`);
   const work = join(base, "work");
   put(work, MAIN);
@@ -62,7 +63,7 @@ async function loop(): Promise<Loop> {
   await sh(work, git, ["push", "-q", "origin", "HEAD:refs/heads/main", `HEAD:refs/heads/${BRANCH}`]);
   await commit(work, { "src/ledger/land.ts": LAND }, "task");
   const l = { work, dir: join(base, "loop") };
-  await dl(l, "init", "--pr", "9", "--task", "S0-99", "--branch", BRANCH);
+  if (init) await dl(l, "init", "--pr", "9", "--task", "S0-99", "--branch", BRANCH);
   return l;
 }
 
@@ -70,10 +71,13 @@ const dl = async (l: Loop, ...args: string[]): Promise<Json> => JSON.parse(await
 const head = (l: Loop) => sh(l.work, git, ["rev-parse", "HEAD"]);
 const read = (file: string): Json => JSON.parse(temp.text(file)) as Json;
 
-/** The mutants of the branch by operator, as dl computes them, and the report of prove --ready with these outcomes at the head. */
+/**
+ * The mutants of the branch by operator, as dl computes them, and the report of prove --ready with these outcomes at the
+ * head; a mutant whose operator has no outcome is not in the report.
+ */
 async function report(l: Loop, outcomes: { readonly [operator: string]: string }, extra: Json = {}): Promise<{ [operator: string]: string }> {
   const { mutants } = changedMutants({ dir: l.work, base: "origin/main" });
-  const entries = mutants.map((m) => ({ ...m, tests: ["ledger"], outcome: outcomes[m.operator], killer: outcomes[m.operator] === "killed" ? "test/ledger/land.test.ts > lands" : null, cached: false }));
+  const entries = mutants.filter((m) => m.operator in outcomes).map((m) => ({ ...m, tests: ["ledger"], outcome: outcomes[m.operator], killer: outcomes[m.operator] === "killed" ? "test/ledger/land.test.ts > lands" : null, cached: false }));
   put(l.work, { ".lattice/mutants.json": JSON.stringify({ head: await head(l), dirty: false, base: "x", mutants: entries, ...extra }) });
   return Object.fromEntries(mutants.map((m) => [m.operator, m.id]));
 }
@@ -83,6 +87,14 @@ async function executor(l: Loop, out: Json = {}): Promise<string[]> {
   const brief = (await dl(l, "brief", "executor", "--task", "S0-99", "--worktree", l.work)).brief as string;
   const file = brief.replace(".in.json", ".out.json");
   temp.write(file, JSON.stringify({ status: "ready", pr: 9, branch: BRANCH, head: await head(l), done: ["land works"], ...out }));
+  return (await dl(l, "check", file)).errors as string[];
+}
+
+/** The errors of dl check for an output `done` of the fixer beside its brief. */
+async function fixer(l: Loop, out: Json = {}): Promise<string[]> {
+  const brief = (await dl(l, "brief", "fixer", "--worktree", l.work, "--job", "verify-red")).brief as string;
+  const file = brief.replace(".in.json", ".out.json");
+  temp.write(file, JSON.stringify({ status: "done", head: await head(l), answers: [], ...out }));
   return (await dl(l, "check", file)).errors as string[];
 }
 
@@ -105,7 +117,31 @@ describe.concurrent("dev-loop check, the survivors of prove --ready", { timeout:
     expect(await executor(l, { mutants: [{ id: ids.boundary, decision: "equivalent", reason: "no input below zero" }] })).toEqual([
       expect.stringMatching(/^mutants: отчёт снят с незакоммиченными правками — /),
     ]);
+    const before = await sh(l.work, git, ["rev-parse", "HEAD~1"]);
+    await report(l, { boundary: "killed", refusal: "killed" }, { head: before });
+    expect(await executor(l)).toEqual([expect.stringMatching(new RegExp(`^mutants: отчёт на ${before.slice(0, 7)} — нужен .* на head \\w{7} `))]);
+    await report(l, { boundary: "killed" });
+    expect(await executor(l)).toEqual([`mutants: отчёт на head не называет мутантов: ${ids.refusal} src/ledger/land.ts:2 — нужен новый \`npm run prove --ready\``]);
   });
+
+  it("ST-13: refuses an output done of the fixer with a survivor it did not decide and dl does not remember", async () => {
+    const l = await loop();
+    const ids = await report(l, { boundary: "survived", refusal: "killed" });
+    expect(await fixer(l)).toEqual([`mutants: выживший ${ids.boundary} не решён — src/ledger/land.ts:2 boundary: < → <=; нужно killed, equivalent или deferred`]);
+    expect(await fixer(l, { mutants: [{ id: ids.boundary, decision: "deferred", reason: "G-01 of the plan" }] })).toEqual([]);
+  });
+
+  // init without a state makes one, and with the state of start keeps it: either way the decisions of the executor,
+  // checked before there was a state, go into it.
+  for (const started of [false, true])
+    it(`ST-13: init ${started ? "into the state of start" : "of a new state"} carries the decisions of the executor: the fixer is not asked for them again`, async () => {
+      const l = await loop(false);
+      const ids = await report(l, { boundary: "survived", refusal: "killed" });
+      expect(await executor(l, { mutants: [{ id: ids.boundary, decision: "equivalent", reason: "no input below zero" }] })).toEqual([]);
+      if (started) await dl(l, "init", "--pr", "9", "--task", "S0-99", "--branch", BRANCH);
+      expect(await dl(l, "init", "--task", "S0-99", "--from", join(l.dir, "executor.out.json"))).toMatchObject({ ok: true, existed: started });
+      expect(await fixer(l)).toEqual([]);
+    });
 
   it("ST-13: accepts a survivor decided equivalent or deferred with a reason, and killed only when the report at the head shows it killed", async () => {
     const l = await loop();
@@ -125,9 +161,7 @@ describe.concurrent("dev-loop check, the survivors of prove --ready", { timeout:
     const l = await loop();
     const ids = await report(l, { boundary: "survived", refusal: "killed" });
     expect(await executor(l, { mutants: [{ id: ids.boundary, decision: "equivalent", reason: "no input below zero" }] })).toEqual([]);
-    const fixer = (await dl(l, "brief", "fixer", "--worktree", l.work, "--job", "verify-red")).brief as string;
-    temp.write(fixer.replace(".in.json", ".out.json"), JSON.stringify({ status: "done", head: await head(l), answers: [] }));
-    expect((await dl(l, "check", fixer.replace(".in.json", ".out.json"))).errors).toEqual([]);
+    expect(await fixer(l)).toEqual([]);
 
     const w = await dl(l, "wave", "--worktree", l.work);
     const spec = read((w.agents as { agent: string; brief: string }[]).find((a) => a.agent === "reviewer-spec")!.brief) as { context: Json };
