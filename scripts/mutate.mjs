@@ -30,7 +30,6 @@ const BUDGET_FACTOR = 3;
 const BUDGET_MIN_MS = 10_000;
 const OUTPUT_KEPT = 4000;
 const SURVIVORS_LISTED = 20;
-export const OUTCOMES = ["killed", "survived", "budget-exceeded"];
 
 const sha256 = (text) => createHash("sha256").update(text).digest("hex");
 const slash = (p) => p.replaceAll("\\", "/");
@@ -188,12 +187,13 @@ export async function runMutants({ dir, chosen, mutants }) {
 
 /**
  * The step --ready of prove: the mutants of the changed hunks of src/ against `base`, run, the report written to
- * .lattice/mutants.json; → the summary for the last line of prove, or `{error}`.
+ * .lattice/mutants.json; → the summary for the last line of prove, or `{error, output}` — output, the end of what the
+ * red run printed, for the log.
  */
 export async function mutation({ dir, base, chosen }) {
   const { mutants } = changedMutants({ dir, base });
   const result = await runMutants({ dir, chosen, mutants });
-  if (result.error) return { error: result.error };
+  if (result.error) return { error: result.error, output: result.output };
   const report = join(dir, ".lattice", "mutants.json");
   const head = git(dir, "rev-parse", "HEAD").trim();
   const dirty = git(dir, "status", "--porcelain").trim() !== "";

@@ -189,11 +189,13 @@ if (isMain(import.meta.url)) {
   const skipped = chosen.sets.filter((s) => !s.run).map((s) => s.set);
   const outcome = { base: chosen.base, sets, skipped, steps: results.slice(0, steps.length), log };
   // --ready (S0-44): the mutants of the changed hunks of src/, once the tests are green — a mutant of a red run proves nothing.
+  let red = "";
   if (readyOf(args)) {
     const { mutation } = await import("./mutate.mjs");
-    const mutants = ok ? await mutation({ dir: process.cwd(), base: chosen.base, chosen }) : { error: "the tests are red: no mutants run" };
+    const { output = "", ...mutants } = ok ? await mutation({ dir: process.cwd(), base: chosen.base, chosen }) : { error: "the tests are red: no mutants run" };
     if (mutants.error) ok = false;
+    if (output !== "") red = `# mutants: a test set group without a mutant\n${output}\n`;
     outcome.mutants = mutants;
   }
-  finish(log, text, { outcome: ok ? "passed" : "failed", ...outcome }, ok);
+  finish(log, `${text}${red}`, { outcome: ok ? "passed" : "failed", ...outcome }, ok);
 }
