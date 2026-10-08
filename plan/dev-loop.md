@@ -97,8 +97,8 @@ Push автора — `git push origin HEAD:refs/heads/<branch>` (worktree в de
   - `ratchet: true` — нарушение мог бы ловить тест или lint (ST-16).
   - id находкам даёт инструмент.
 
-**fixer** — `.claude/agents/fixer.md`. `job`: `answer` — ответ на круг, `tidy` — хвосты перед сдачей, `verify-red` — красный verify по `log`, `rebase` — пересборка на `origin/main`, `owner` — поручение владельца из `owner`.
-- Вход: `branch`, `base` — ревьюированный head, `since` — начало ветки (`tidy`), `findings` — открытые `block` (в `answer` все, в `tidy` — `late`), `advice` — советы (в `answer` — советы круга, в `tidy` — оставшиеся), `decisions` — решения владельца `{id, action: fix|task|gap, note}`, `log` (verify-red). `context`: `failed` — упавшие шаги verify из `log`, `hunks` — hunk ветки у каждой находки, `rules` — тексты правил находок, `conventions` — пункты, которые находки называют или чья область задевает их пути.
+**fixer** — `.claude/agents/fixer.md`. `job`: `answer` — ответ на круг, `tidy` — хвосты перед сдачей, `verify-red` — красные ворота по `log` и записям run'ов, `rebase` — пересборка на `origin/main`, `owner` — поручение владельца из `owner`.
+- Вход: `branch`, `base` — ревьюированный head, `since` — начало ветки (`tidy`), `findings` — открытые `block` (в `answer` все, в `tidy` — `late`), `advice` — советы (в `answer` — советы круга, в `tidy` — оставшиеся), `decisions` — решения владельца `{id, action: fix|task|gap, note}`, `log` (verify-red). `context`: `runs` — записи run'ов красных test-sets ворот `{test_set, seed, outcome, failed, …}` (S0-43), `failed` — упавшие шаги и прогоны test-sets из `log`, `hunks` — hunk ветки у каждой находки, `rules` — тексты правил находок, `conventions` — пункты, которые находки называют или чья область задевает их пути.
 - Выход: `{status: "done" | "needs_owner", head, answers: [{id, action, commits?, where?, note?}], mutants?: [{id, decision, commit?, reason?}], conflicts?: [файл], question?, gaps?, context_missing?: [строка]}`.
   - На каждую находку из `findings` и `advice` и каждое решение `task` или `gap` — ровно один ответ.
   - `action`: `fixed` | `disputed` | `deferred` | `declined` — и в `answer`, и в `tidy`.
@@ -127,4 +127,4 @@ Executor перед выходом `ready`, fixer перед push — на св�
 - **Spec**: таблица «Правила» в описании PR называет тесты, которые правило и показывают; ожидания не ослаблены (PR-11); отступления записаны в файле задачи и в PR;
 - исправление не повторяет класс нарушения в другом месте: соседей исправленного (тот же паттерн в других файлах ветки) исправь тем же коммитом.
 
-Готово, когда каждый пункт сверен с diff, `npm run prove --ready` по закоммиченному зелёный: `outcome: "passed"` в JSON последней строки, код выхода 0, — и выжившие мутанты решены; вывод не режется `| tail`. `prove` гоняет затронутые test-sets и весь fitness (`scripts/prove.mjs`), `--ready` — ещё мутантов изменённых hunk'ов `src/`; полный `npm run verify` — для CI и ворот.
+Готово, когда каждый пункт сверен с diff, `npm run prove --ready` по закоммиченному зелёный: `outcome: "passed"` в JSON последней строки, код выхода 0, — и выжившие мутанты решены; вывод не режется `| tail`. `prove` гоняет затронутые test-sets и весь fitness (`scripts/prove.mjs`), `--ready` — ещё мутантов изменённых hunk'ов `src/`; полный `npm run verify` — для CI; ворота — `prove --gate` по записям run'ов (S0-43).
