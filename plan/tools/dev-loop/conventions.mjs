@@ -43,7 +43,7 @@ export function conventionsOf(text) {
 }
 
 /** Ссылки текста на пункты CONVENTIONS.md — как написаны: `§1.2`, `§3`. */
-export function referencesOf(text) {
+function referencesOf(text) {
   return [...text.matchAll(REFERENCE)].flatMap((m) => m[1].match(/§\d+(?:\.\d+)*/g));
 }
 
