@@ -33,7 +33,12 @@ rules: []
 
 ## Готово, когда
 
-- [ ] `npm run verify` идёт параллельно и печатает итог одной JSON-строкой
-- [ ] кэши eslint и tsc в `.lattice/`
-- [ ] замер до и после — в описании PR
-- [ ] `npm run verify` зелёный
+- [x] `npm run verify` идёт параллельно и печатает итог одной JSON-строкой
+- [x] кэши eslint и tsc в `.lattice/`
+- [x] замер до и после — в описании PR
+- [x] `npm run verify` зелёный
+
+## Отступления
+
+- **Шаг — npm-скрипт.** `scripts/verify.mjs` запускает каждый шаг как `npm run --silent <шаг>` в текущей папке: шаг определён один раз — в `package.json`, и CI зовёт те же скрипты. Тест `test/tools/verify.test.ts` гоняет `verify.mjs` в пакете-заглушке, где скрипты шагов печатают строку и выходят с заданным кодом. Лог — `.lattice/verify.log`, в JSON — его абсолютный путь.
+- **Кэши — в скриптах `package.json`.** `lint` — `eslint --cache` с `--cache-strategy content` (время файла меняется при checkout), `typecheck` — `tsc --incremental` с `tsBuildInfoFile` в `.lattice/tsc/`. CI их тоже зовёт, но на чистом checkout кэша нет — там прогон полный. `build` без `--incremental`: обычный `tsc --incremental` не проверяет, что вывод в `dist/` на месте, и не пересобрал бы удалённый `dist/`; шаг и так 2 с.

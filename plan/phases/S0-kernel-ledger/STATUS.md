@@ -10,7 +10,7 @@
 | [S0-40](tasks/S0-40-tools-tests.md) | Тесты dev-loop — отдельный project и быстрее | A | ✅ | [#34](https://github.com/Homasters-max/lattice/pull/34) | инструмент |
 | [S0-41](tasks/S0-41-deterministic-tests.md) | Детерминизм тестов — seed и бюджет property-тестов | A | ✅ | [#35](https://github.com/Homasters-max/lattice/pull/35) | инструмент |
 | [S0-46](tasks/S0-46-loop-timing.md) | Замер цикла в dl — время шагов и тонкий dl gate | A | ✅ | [#39](https://github.com/Homasters-max/lattice/pull/39) | инструмент, разбор циклов |
-| [S0-47](tasks/S0-47-parallel-verify.md) | Параллельный verify — scripts/verify.mjs и кэши | A | ⬜ | | инструмент, разбор циклов |
+| [S0-47](tasks/S0-47-parallel-verify.md) | Параллельный verify — scripts/verify.mjs и кэши | A | ✅ | [#41](https://github.com/Homasters-max/lattice/pull/41) | инструмент, разбор циклов |
 | [S0-50](tasks/S0-50-conventions-one-home.md) | CONVENTIONS — один дом каждой нормы | A | ⬜ | | инструмент, разбор циклов |
 | [S0-48](tasks/S0-48-minimal-brief.md) | Минимальный контекст — brief несёт всё нужное роли | A | ⬜ | | инструмент, разбор циклов |
 | [S0-42](tasks/S0-42-verify-levels.md) | prove — доказательство затронутого, ratchet ST-18 | A | ⬜ | | инструмент |
