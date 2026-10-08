@@ -32,6 +32,6 @@ ST-17 требует фикстуры trigger и pass у каждого rule ID 
 
 ## Готово, когда
 
-- [ ] покрытие проверяется по парам «строка × rule ID»
-- [ ] фикстуры `apply`/KR-10, `header`/KR-11, `store`/KR-10, `md`/KR-10 есть
-- [ ] `npm run verify` зелёный
+- [x] покрытие проверяется по парам «строка × rule ID»
+- [x] фикстуры `apply`/KR-10, `header`/KR-11, `store`/KR-10, `md`/KR-10 есть
+- [x] `npm run verify` зелёный
