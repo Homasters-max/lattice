@@ -138,6 +138,13 @@ describe.concurrent("dev-loop briefs of the reviewers", { timeout: 30_000 }, () 
     expect(readFileSync(b.diff as string, "utf8")).toContain("+  return 2;");
   });
 
+  it("gives Standards over a diff only in test/ the ST rows of the class tests", async () => {
+    const l = await loop({ "test/ledger/land.test.ts": "it(\"lands\", () => {});\n" });
+    const b = read((await wave(l))["reviewer-standards"]!);
+    expect(ids(b.context.st)).toEqual(["ST-07", "ST-13", "ST-17", "ST-18"]);
+    expect(ids(b.context.conventions)).toEqual(["§1.3"]);
+  });
+
   it("gives Spec the task, its rules and the body of the PR, and Architecture the closure check and RM-Z04", async () => {
     const l = await loop({ "src/ledger/land.ts": `${land(2)}export const LAND = 2;\n` });
     const briefs = await wave(l);
@@ -209,6 +216,19 @@ describe.concurrent("dev-loop briefs of the fixer", { timeout: 30_000 }, () => {
     expect(b.context.rules).toEqual([{ id: "LG-23", text: "| LG-23 | Landing pushes through the git port. |" }]);
     expect(ids(b.context.conventions)).toEqual(["§1.1", "§1.4"]);
     expect(b.cut).toEqual([]);
+  });
+
+  it("answer: a finding outside the diff of the branch comes with the lines of its file around it", async () => {
+    const l = await loop({ "src/ledger/land.ts": land(2) });
+    const head = await sh(l.work, "git", ["rev-parse", "HEAD"]);
+    for (const [agent, brief] of Object.entries(await wave(l))) {
+      const finding = { kind: "rule", rule: "LG-23", where: "plan/closure-check.md:5", quote: "1. Inventory.", text: "the inventory misses the port" };
+      writeFileSync(brief.replace(".in.json", ".out.json"), JSON.stringify({ axis: read(brief).axis, head, summary: "checked", statuses: [], findings: agent === "reviewer-standards" ? [finding] : [] }));
+    }
+    expect(await dl(l, "merge")).toMatchObject({ ok: true, next: "fix" });
+    const b = read((await dl(l, "brief", "fixer", "--worktree", l.work, "--job", "answer")).brief as string);
+    const closure = MAIN["plan/closure-check.md"]!.split("\n");
+    expect(b.context.hunks).toEqual([{ id: "W1-T1", where: "plan/closure-check.md:5", lines: "1-10", text: closure.slice(0, 10).join("\n") }]);
   });
 
   it("verify-red: the failed steps of the run from the JSON line of its log, each with its own output", async () => {
