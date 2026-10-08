@@ -20,7 +20,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join, posix, resolve } from "node:path";
 import ts from "typescript";
-import { FITNESS, ownedRoots, testSetOf } from "./paths.mjs";
+import { FITNESS, owns, testSetOf } from "./paths.mjs";
 import { finish, isMain, runSteps, STEPS } from "./verify.mjs";
 
 /** The config of every run of the tests: an input of every test set. */
@@ -82,15 +82,13 @@ function linksOf(tree, path) {
   return [...imports.map((s) => [resolveImport(tree, path, s), "import"]), ...programs.map((p) => [posix.normalize(p), "program"])];
 }
 
-const ownedBy = (roots) => (path) => roots.some((root) => root === "" || (root.endsWith("/") ? path.startsWith(root) : path === root));
-
 /**
  * The input of test set `set`: path → how it came in (owned, import, program, knowledge, config). What the files of
  * the set and the config import and start counts; a file it owns only as data counts by itself.
  */
 function inputOf(tree, set) {
-  const owns = ownedBy(ownedRoots(set));
-  const input = new Map([...new Set([...tree.files, ...tree.base.keys()])].filter(owns).map((p) => [p, "owned"]));
+  // What the set owns is the classifier's (ST-18): the same decision test/support/files.ts refuses a read by.
+  const input = new Map([...new Set([...tree.files, ...tree.base.keys()])].filter((p) => owns(set, p)).map((p) => [p, "owned"]));
   for (const p of CONFIG) if (!input.has(p)) input.set(p, "config");
   const fitness = FITNESS.includes(set);
   const queue = [...input.keys()].filter((p) => fitness || CONFIG.includes(p) || testSetOf(p) === set);
