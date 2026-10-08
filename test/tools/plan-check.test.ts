@@ -112,8 +112,14 @@ describe("plan-check, references to the items of CONVENTIONS.md (S0-50)", () => 
     expect(r.out).toContain(`✗ ${path}:${line}: CONVENTIONS §99.9 — нет такого пункта`);
   });
 
-  // Task files and PLAN.md of the phases are history; test/tools holds the data of the tools' tests.
-  it.each(["plan/phases/S0-kernel-ledger/tasks/S0-34-worktree-release.md", "plan/phases/S0-kernel-ledger/PLAN.md", "test/tools/x.test.ts"])(
+  // Task files and PLAN.md of the phases are history; test/tools holds the data of the tools' tests;
+  // .claude/worktrees holds the working copies of other sessions, not this repository.
+  it.each([
+    "plan/phases/S0-kernel-ledger/tasks/S0-34-worktree-release.md",
+    "plan/phases/S0-kernel-ledger/PLAN.md",
+    "test/tools/x.test.ts",
+    ".claude/worktrees/w/src/kernel/x.ts",
+  ])(
     "does not read references from %s",
     (path) => {
       const dir = copy();

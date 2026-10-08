@@ -4,7 +4,7 @@ import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist/", "coverage/", "gen/", "node_modules/", "discussion/", "plan/", "docs/"] },
+  { ignores: ["dist/", "coverage/", "gen/", "node_modules/", "discussion/", "plan/", "docs/", ".claude/worktrees/"] },
   js.configs.recommended,
   {
     files: ["**/*.ts"],
