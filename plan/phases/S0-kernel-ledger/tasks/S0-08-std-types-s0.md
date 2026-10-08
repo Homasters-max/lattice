@@ -31,6 +31,13 @@ rules: [TY-01, TY-02, TY-03, TY-05, TY-06, TY-07, TY-11, TY-12, TY-13, TY-14, TY
 
 Где лежат исходники — `std/source/` (раздел 6 плана): одно тело типа на файл, имя файла — slug `id`.
 
+Как сделано:
+- тип `core/session` — константа `SESSION_TYPE` ledger-кода в `src/ledger/session-type.ts`, как мета-тип в ядре: genesis (S0-23) пишет его, не видя `std`;
+- тело записи namespace `std` с метками TY-16 — `std/namespace.json`: не тип, поэтому вне `std/source/`; её id совпадает с id типа `std/namespace` — Q-37;
+- примеры — `test/ledger/examples/std/<slug>.json` и `test/ledger/examples/core/session.json`: `valid` — тела записей, `invalid` — тело с путём и ключевым словом нарушения; тест — `test/ledger/std-types.test.ts`, test set `ledger` владеет `std/` (`scripts/paths.mjs`);
+- имя формы `code` (TY-11) — слово, которое ядро писало в `parse.ts` как имя кодовой единицы: переменная переименована в `unit`, а аудит KR-01 не считает имена, которые объявляет платформа (`charCodeAt`, `fromCharCode`);
+- пробелы — G-31…G-34.
+
 ## Шаги
 
 1. Набросать типы в порядке зависимостей: формы → базовые → подтипы.
