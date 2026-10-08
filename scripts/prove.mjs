@@ -16,14 +16,24 @@
 // --ready (S0-44) adds the mutants of the changed hunks of src/ (scripts/mutate.mjs): the line gets
 //   "mutants": {"report": "<path>", "total", "killed", "survived", "budget-exceeded", "ran", "survivors": […]};
 //   a survivor does not fail the outcome — the executor or the fixer decides it (plan/dev-loop.md).
-//   npm run prove [--ready] [-- --base <ref>]
+// Every run writes a record of each test set it ran (scripts/runs.mjs, S0-43) under the key of its inputs: the hashes of
+// its code, of its knowledge and of the config of a run, split from its input, and the environment. A set of the line
+// names its key, its outcome — ok, failed or budget-exceeded, when every failure is the safeguard of time (S0-41) — and
+// what failed: its tests by the JSON report of vitest, and for a fitness set the failed steps too — the type check and the
+// quality profile are fitness tests (ST-12), and a fitness set owns their input, the whole repository.
+// --gate (dl gate, S0-43) proves the head by the records of its keys: every test set whose key has no record ok runs, the
+// steps with a fitness set alone; --shadow runs every set and compares each outcome with the record of its key. The line
+// gets "gate": {"shadow", "recorded": [set with a record ok], "taken": [set taken from its record], "ran": [set],
+//   "mismatches": [{"set", "key", "recorded", "outcome"}]}.
+//   npm run prove [--ready] [-- --base <ref>] [-- --gate [--shadow]]
 import { Buffer } from "node:buffer";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
-import { join, posix, resolve } from "node:path";
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { join, posix, relative, resolve } from "node:path";
 import ts from "typescript";
 import { filtersOf, FITNESS, owns, seedOf, testSetOf } from "./paths.mjs";
+import { environment as environmentOfRun, keyOf, readRun, runsDir, writeRun } from "./runs.mjs";
 import { finish, flagOf, isMain, runSteps, STEPS } from "./verify.mjs";
 
 export { seedOf };
@@ -140,10 +150,22 @@ function reasonsOf(input, changed) {
 }
 
 /**
- * Each test set of the repository at `dir` against the merge base of `base` and HEAD: `{set, run, reasons, hash, seed,
- * reach}`; `run` — fitness, or the hash of its input differs from the base; `reach` — what its tests run as code.
+ * The parts of the key of a record (S0-43): the hashes of the code, of the knowledge and of the config of a run in the
+ * input `paths` — the paths there are in the tree, so that the key is of the tree and not of the base.
  */
-export function select({ dir = process.cwd(), base = "origin/main" } = {}) {
+function partsOf(paths, tree) {
+  const present = paths.filter((p) => tree.has(p));
+  const part = (keep) => hashOf(present.filter(keep), tree.blob);
+  const knowledge = (p) => p.startsWith("docs/design/");
+  return { code: part((p) => !knowledge(p) && !CONFIG.includes(p)), knowledge: part(knowledge), tools: part((p) => CONFIG.includes(p)) };
+}
+
+/**
+ * Each test set of the repository at `dir` against the merge base of `base` and HEAD: `{set, run, reasons, hash, seed,
+ * reach, code, knowledge, tools, key}`; `run` — fitness, or the hash of its input differs from the base; `reach` — what
+ * its tests run as code; `key` — the key of its record on `environment` (scripts/runs.mjs).
+ */
+export function select({ dir = process.cwd(), base = "origin/main", environment = environmentOfRun() } = {}) {
   const from = git(dir, "merge-base", base, "HEAD").trim();
   const tree = treeOf(dir, from);
   const sets = setsOf(tree).map((set) => {
@@ -152,42 +174,119 @@ export function select({ dir = process.cwd(), base = "origin/main" } = {}) {
     const hash = hashOf(paths, tree.blob);
     const changed = hash === hashOf(paths, (p) => tree.base.get(p) ?? "-") ? [] : paths.filter((p) => tree.blob(p) !== (tree.base.get(p) ?? "-"));
     const fitness = FITNESS.includes(set);
-    return { set, run: fitness || changed.length > 0, reasons: fitness ? [FITNESS_REASON] : reasonsOf(input, changed), hash, seed: seedOf(hash), reach: reachOf(tree, set) };
+    const parts = partsOf(paths, tree);
+    const key = keyOf({ test_set: set, ...parts, environment });
+    return { set, run: fitness || changed.length > 0, reasons: fitness ? [FITNESS_REASON] : reasonsOf(input, changed), hash, seed: seedOf(hash), reach: reachOf(tree, set), ...parts, key };
   });
-  return { base: from, sets, files: tree.files };
+  return { base: from, sets, files: tree.files, environment };
+}
+
+const TIMEOUT = /\b(Test|Hook) timed out in \d+ms/;
+const firstLine = (text) => String(text ?? "").split("\n")[0];
+
+/** The JSON report of vitest at `path`, or null. */
+function reportAt(path) {
+  try {
+    return JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+/** The failures of test set `set` in the JSON report of vitest: `{test, timeout}` — `<file> > <name>`, or the file that failed to run. */
+function failuresOf(report, set) {
+  const out = [];
+  for (const file of report?.testResults ?? []) {
+    const at = relative(process.cwd(), file.name ?? "").replaceAll("\\", "/");
+    if (testSetOf(at) !== set) continue;
+    const failed = (file.assertionResults ?? []).filter((a) => a.status === "failed");
+    for (const a of failed) out.push({ test: `${at} > ${a.fullName}`, timeout: TIMEOUT.test((a.failureMessages ?? []).join("\n")) });
+    if (failed.length === 0 && file.status === "failed") out.push({ test: `${at}: ${firstLine(file.message)}`, timeout: TIMEOUT.test(file.message ?? "") });
+  }
+  return out;
+}
+
+/**
+ * The outcome of a test set by the exit of its run and its failures: ok, budget-exceeded when every failure is the
+ * safeguard of time, failed otherwise — a run that failed without a failure of the set fails it too: what failed the run
+ * is not known to be another set's.
+ */
+function outcomeOf(exit, failures) {
+  if (exit === 0 && failures.length === 0) return "ok";
+  return failures.length > 0 && failures.every((f) => f.timeout) ? "budget-exceeded" : "failed";
 }
 
 // `npm run prove --ready` gives npm the flag, and npm gives it to the script as npm_config_ready; `-- --ready` gives it as is.
 const readyOf = (args) => args.includes("--ready") || process.env.npm_config_ready === "true";
 
+/**
+ * What --gate runs (S0-43): every test set whose key has no record ok in `runs`, or every one with `shadow`; each with
+ * its reason and the record of its key → `{running, recorded, gate}`.
+ */
+function gateOf(sets, runs, shadow) {
+  const recorded = new Map(sets.map((s) => [s.set, readRun(runs, s.key)]));
+  const proven = sets.filter((s) => recorded.get(s.set)?.outcome === "ok").map((s) => s.set);
+  const reasonOf = (s) => `gate: ${recorded.get(s.set) ? `the record of its key is ${recorded.get(s.set).outcome}` : "no record of its key"}${shadow ? "; shadow runs every set" : ""}`;
+  const running = sets.filter((s) => shadow || !proven.includes(s.set)).map((s) => ({ ...s, reasons: [reasonOf(s)] }));
+  return { running, recorded, gate: { shadow, recorded: proven, taken: shadow ? [] : proven, ran: running.map((s) => s.set), mismatches: [] } };
+}
+
 if (isMain(import.meta.url)) {
   const log = resolve(".lattice", "prove.log");
   const args = process.argv.slice(2);
   let chosen;
+  let runs;
   try {
     chosen = select({ base: flagOf(args, "base", "origin/main") });
+    runs = runsDir(process.cwd());
   } catch (error) {
     finish(log, "", { outcome: "failed", error: String(error instanceof Error ? error.message : error).trim(), log }, false);
     process.exit();
   }
-  const running = chosen.sets.filter((s) => s.run);
+  const gating = args.includes("--gate") ? gateOf(chosen.sets, runs, args.includes("--shadow")) : null;
+  const running = gating ? gating.running : chosen.sets.filter((s) => s.run);
   // Test sets of one hash — the fitness sets own the whole repository — share a seed and one run of vitest. The runs
-  // go one after another, beside the other steps: vitest runs the files of a run in parallel itself.
-  const runs = Map.groupBy(running, (s) => s.hash);
-  const stepOf = (hash) => `test ${runs.get(hash).map((s) => s.set).join(" ")}`;
-  const tests = [...runs].map(([hash, group]) => ({
-    step: stepOf(hash),
-    command: `npm run --silent test -- ${group.flatMap((s) => filtersOf(s.set, chosen.files)).join(" ")}`,
-    env: { LATTICE_SEED: String(group[0].seed) },
-    queue: "test",
-  }));
-  const steps = STEPS.filter((step) => step !== "test").map((step) => ({ step, command: `npm run --silent ${step}` }));
+  // go one after another, beside the other steps: vitest runs the files of a run in parallel itself; each writes the
+  // JSON report its records read.
+  const groups = Map.groupBy(running, (s) => s.hash);
+  const stepOf = (hash) => `test ${groups.get(hash).map((s) => s.set).join(" ")}`;
+  const reports = resolve(".lattice", "prove");
+  mkdirSync(reports, { recursive: true });
+  const reportOf = (hash) => join(reports, `${hash.slice("sha256:".length, "sha256:".length + 16)}.json`);
+  const tests = [...groups].map(([hash, group]) => {
+    rmSync(reportOf(hash), { force: true });
+    return {
+      step: stepOf(hash),
+      command: `npm run --silent test -- --reporter=default --reporter=json "--outputFile.json=${reportOf(hash)}" ${group.flatMap((s) => filtersOf(s.set, chosen.files)).join(" ")}`,
+      env: { LATTICE_SEED: String(group[0].seed) },
+      queue: "test",
+    };
+  });
+  // The steps go with a fitness set; --gate leaves them out when no fitness set runs: the record of each proves them.
+  const withSteps = !gating || running.some((s) => FITNESS.includes(s.set));
+  const steps = withSteps ? STEPS.filter((step) => step !== "test").map((step) => ({ step, command: `npm run --silent ${step}` })) : [];
   const { results, text } = await runSteps([...steps, ...tests]);
   const resultOf = new Map(results.map((r) => [r.step, r]));
-  const sets = running.map(({ set, reasons, hash, seed }) => ({ set, reasons, hash, seed, exit: resultOf.get(stepOf(hash)).exit, ms: resultOf.get(stepOf(hash)).ms }));
+  const stepFailures = results.slice(0, steps.length).filter((r) => r.exit !== 0).map((r) => ({ test: `step: ${r.step}`, timeout: false }));
+  const head = git(process.cwd(), "rev-parse", "HEAD").trim();
+  const at = new Date().toISOString();
+  const sets = running.map((s) => {
+    const { exit, ms } = resultOf.get(stepOf(s.hash));
+    const failures = [...failuresOf(reportAt(reportOf(s.hash)), s.set), ...(FITNESS.includes(s.set) ? stepFailures : [])];
+    const outcome = outcomeOf(exit, failures);
+    const failed = outcome !== "ok" && failures.length === 0 ? [`${stepOf(s.hash)}: exit ${exit}`] : failures.map((f) => f.test);
+    writeRun(runs, { test_set: s.set, code: s.code, knowledge: s.knowledge, tools: s.tools, environment: chosen.environment, seed: s.seed, outcome, failed, ms, head, at });
+    return { set: s.set, reasons: s.reasons, hash: s.hash, key: s.key, seed: s.seed, exit, ms, outcome, failed };
+  });
   let ok = results.every((r) => r.exit === 0);
-  const skipped = chosen.sets.filter((s) => !s.run).map((s) => s.set);
+  const ran = new Set(running.map((s) => s.set));
+  const skipped = chosen.sets.filter((s) => !ran.has(s.set)).map((s) => s.set);
   const outcome = { base: chosen.base, sets, skipped, steps: results.slice(0, steps.length), log };
+  if (gating) {
+    const differs = (s) => gating.recorded.get(s.set) && gating.recorded.get(s.set).outcome !== s.outcome;
+    gating.gate.mismatches = sets.filter(differs).map((s) => ({ set: s.set, key: s.key, recorded: gating.recorded.get(s.set).outcome, outcome: s.outcome }));
+    outcome.gate = gating.gate;
+  }
   // --ready (S0-44): the mutants of the changed hunks of src/, once the tests are green — a mutant of a red run proves nothing.
   let red = "";
   if (readyOf(args)) {

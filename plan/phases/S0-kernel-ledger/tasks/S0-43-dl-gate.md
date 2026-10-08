@@ -20,13 +20,13 @@ rules: [ST-12]
 ## Объём
 
 Входит:
-- **записи**: `npm run prove` (S0-42), кто бы его ни вызвал — executor, fixer или `dl gate`, — пишет `.lattice/verify-runs/<hash ключа>.json` в рабочей копии владельца (из worktree — через `git rev-parse --git-common-dir`): `{test_set, code, knowledge, tools, environment: {os, node, git}, seed, outcome: ok|failed|budget-exceeded, failed, ms, head, at}`;
-- **ворота по ключам**: `dl gate` (S0-46) ищет записи для ключей head и гоняет `prove` только для ключей без записи `ok`; печатает, что взято из записей, а что прогнано;
-- **shadow**: сначала gate гонит всё и сравнивает исход с записью того же ключа; расхождение — в выводе gate и в итоге цикла. Пропуск включается решением владельца после двух задач без расхождений;
+- **записи**: `npm run prove` (S0-42), кто бы его ни вызвал — executor, fixer или `dl gate`, — пишет `.lattice/verify-runs/<hash ключа>.json` в рабочей копии владельца (из worktree — через `git rev-parse --git-common-dir`): `{test_set, code, knowledge, tools, environment: {os, node, git}, seed, outcome: ok|failed|budget-exceeded, failed, ms, head, at}`. Сделано: модуль записей — `scripts/runs.mjs` (каталог, окружение, ключ, чтение, запись через rename, уборка); `code`, `knowledge`, `tools` — hash кода, `docs/design` и конфига прогона с lockfile во входе test-set, только путей, которые есть в дереве, — ключ не зависит от базы; `failed` — тесты из JSON-отчёта vitest (`--reporter=json`), `budget-exceeded` — когда каждый отказ — страховка по времени (S0-41). Шаги `verify` (type check, quality profile) — fitness по ST-12, и вход fitness-set — весь репозиторий: упавший шаг валит запись каждого fitness-set, а `--gate` гонит шаги только вместе с fitness-set;
+- **ворота по ключам**: `dl gate` (S0-46) ищет записи для ключей head и гоняет `prove` только для ключей без записи `ok`; печатает, что взято из записей, а что прогнано. Сделано: ключи и записи читает сам `prove --gate` — `dl gate` гонит `npm run prove -- --gate [--shadow]` и берёт из последней строки `taken`, `ran`, `mismatches` и ключи красных test-sets;
+- **shadow**: сначала gate гонит всё и сравнивает исход с записью того же ключа; расхождение — в выводе gate и в итоге цикла. Пропуск включается решением владельца после двух задач без расхождений. Сделано: переключатель — константа `GATE_SHADOW` в `plan/tools/dev-loop.mjs`; итог цикла — раздел «Ворота» `dl final`;
 - красный gate — brief `verify-red` получает из записей список test-sets, тестов, seed и исход;
 - ответ владельца «продолжить» на head, у которого ворота зелёные, ведёт сразу к `wave`, без ворот;
 - `dl start` удаляет записи старше 30 дней;
-- **контракт**: `.claude/skills/dev-loop/SKILL.md` «Ворота» — что gate берёт из записей, «Переходы», строка `stop` — «продолжить» на зелёном head ведёт к `wave`; `.claude/agents/fixer.md`, `verify-red` — список из записей.
+- **контракт**: `.claude/skills/dev-loop/SKILL.md` «Ворота» — что gate берёт из записей, «Переходы», строка `stop` — «продолжить» на зелёном head ведёт к `wave`; `.claude/agents/fixer.md`, `verify-red` — список из записей. Сделано: ещё `plan/dev-loop.md` — вход fixer (`context.runs`) и строка «полный `npm run verify` — для CI»; строка `red` «Переходов» — записи brief берёт сам.
 
 Не входит: переиспользование записей в CI — CI остаётся полным прогоном и независимым runner, до LG-51 (5) в S3 (решение владельца 2026-10-08); мутации — S0-44.
 
@@ -35,10 +35,12 @@ rules: [ST-12]
 - Ключ: правка файла test-set, знания, lockfile или смена окружения даёт новый ключ; правка вне входов — тот же.
 - Gate: при записи `ok` для всех ключей head ничего не гоняет; при недостающем ключе гоняет только его; в shadow — гоняет всё и печатает расхождение, если исход не совпал с записью.
 
+Сделано: ключ, записи и `--gate` — `test/tools/prove.test.ts`; `dl gate` с shadow и расхождением, brief `verify-red` из записей, «продолжить» на сменившемся head и после красных ворот — `test/tools/dev-loop-gate.test.ts`; «продолжить» на зелёном head — `test/tools/dev-loop-clock.test.ts`; уборка записей — `test/tools/dev-loop-start.test.ts`; упавшие прогоны test-sets из лога `prove` — `test/tools/dev-loop-context.test.ts`.
+
 ## Готово, когда
 
-- [ ] записи пишет только `prove`, ключ — по входам test-set и окружению
-- [ ] gate гонит только ключи без записи; shadow-сравнение в выводе gate
-- [ ] `verify-red` получает список из записей
-- [ ] «продолжить» на зелёном head ведёт к `wave`
-- [ ] `npm run verify` зелёный
+- [x] записи пишет только `prove`, ключ — по входам test-set и окружению
+- [x] gate гонит только ключи без записи; shadow-сравнение в выводе gate
+- [x] `verify-red` получает список из записей
+- [x] «продолжить» на зелёном head ведёт к `wave`
+- [x] `npm run verify` зелёный
