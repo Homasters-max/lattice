@@ -54,7 +54,7 @@ describe("the drafts of S0-09: behaviour, decision points and the bench", () => 
 });
 
 describe("any value in the drafts of S0-09 (KR-18, G-38)", () => {
-  it("G-38: the params of a stage, the input and output of a run, the answer of a tape entry and the values of a bench item are any value (KR-18)", () => {
+  it("KR-18, G-38: the params of a stage, the input and output of a run, the answer of a tape entry and the values of a bench item are any value", () => {
     const anyAt = (slug: string) => anyValues(schemaOf(slug), "");
     const answers = [0, 1, 2].map((i) => `/oneOf/${i}/properties/answer`);
     expect(Object.fromEntries(STD_TYPES.flatMap((slug) => (anyAt(slug).length > 0 ? [[slug, anyAt(slug)]] : [])))).toEqual({
