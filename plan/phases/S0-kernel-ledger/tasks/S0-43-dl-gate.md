@@ -35,7 +35,7 @@ rules: [ST-12]
 - Ключ: правка файла test-set, знания, lockfile или смена окружения даёт новый ключ; правка вне входов — тот же.
 - Gate: при записи `ok` для всех ключей head ничего не гоняет; при недостающем ключе гоняет только его; в shadow — гоняет всё и печатает расхождение, если исход не совпал с записью.
 
-Сделано: ключ, записи и `--gate` — `test/tools/prove.test.ts`; `dl gate` с shadow и расхождением, brief `verify-red` из записей, «продолжить» на зелёном и сменившемся head — `test/tools/dev-loop-clock.test.ts`; уборка записей — `test/tools/dev-loop-start.test.ts`; упавшие прогоны test-sets из лога `prove` — `test/tools/dev-loop-context.test.ts`.
+Сделано: ключ, записи и `--gate` — `test/tools/prove.test.ts`; `dl gate` с shadow и расхождением, brief `verify-red` из записей, «продолжить» на сменившемся head и после красных ворот — `test/tools/dev-loop-gate.test.ts`; «продолжить» на зелёном head — `test/tools/dev-loop-clock.test.ts`; уборка записей — `test/tools/dev-loop-start.test.ts`; упавшие прогоны test-sets из лога `prove` — `test/tools/dev-loop-context.test.ts`.
 
 ## Готово, когда
 
