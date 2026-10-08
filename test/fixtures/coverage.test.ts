@@ -1,19 +1,21 @@
 // ST-17: the coverage audit refuses a registered rule ID without both fixture
-// folders and a fixture folder that is not a registered rule ID of the design;
-// the last case runs the audit over this repository.
+// folders, a fixture folder that is not a registered rule ID of the design and
+// a row of checks.ts with a rule ID it enforces but no trigger or pass case run
+// through that row; the last case runs the audit over this repository.
 import { describe, expect, it } from "vitest";
+import { CHECKS } from "./checks.js";
 import { auditCoverage, designRuleIds, type FixtureFolder } from "./coverage.js";
 import { loadDesign, loadFolders, loadRegistered } from "./load.js";
 
-const ok = (name: string) => ({ name, data: { check: "c", input: {} } });
+const ok = (name: string, check = "c") => ({ name, data: { check, input: {} } });
 const folder = (name: string, over: Partial<FixtureFolder> = {}): FixtureFolder => ({
   name,
   trigger: [ok("bad-id.json")],
   pass: [ok("good-id.json")],
   ...over,
 });
-const audit = (registered: string[], folders: FixtureFolder[], design = ["KR-06", "KR-10"]) =>
-  auditCoverage({ registered: new Set(registered), folders, design: new Set(design) });
+const audit = (registered: string[], folders: FixtureFolder[], design = ["KR-06", "KR-10"], checks: { [check: string]: string[] } = {}) =>
+  auditCoverage({ registered: new Set(registered), folders, design: new Set(design), checks });
 
 describe("rule fixture coverage", () => {
   it("ST-17: passes when every registered rule has trigger and pass cases", () => {
@@ -69,6 +71,30 @@ describe("rule fixture coverage", () => {
     const design = designRuleIds(loadDesign());
     expect(design.has("ST-17")).toBe(true);
     const registered = await loadRegistered();
-    expect(auditCoverage({ registered, folders: loadFolders(), design })).toEqual([]);
+    const checks = Object.fromEntries(Object.entries(CHECKS).map(([name, check]) => [name, check.enforces]));
+    expect(auditCoverage({ registered, folders: loadFolders(), design, checks })).toEqual([]);
+  });
+});
+
+describe("rule fixture coverage, by row of checks.ts", () => {
+  it("ST-17: passes when every rule ID of every row of checks.ts has a trigger and a pass case through that row", () => {
+    const folders = [folder("KR-06", { trigger: [ok("bad-c.json"), ok("bad-d.json", "d")], pass: [ok("good-c.json"), ok("good-d.json", "d")] }), folder("KR-10")];
+    expect(audit(["KR-06", "KR-10"], folders, undefined, { c: ["KR-06", "KR-10"], d: ["KR-06"] })).toEqual([]);
+  });
+
+  it("ST-17: refuses a row of checks.ts with a rule ID no trigger or pass case runs through it, naming the pair", () => {
+    const folders = [folder("KR-06", { trigger: [ok("bad-c.json"), ok("bad-d.json", "d")] }), folder("KR-10", { pass: [ok("good-d.json", "d")] })];
+    expect(audit(["KR-06", "KR-10"], folders, undefined, { c: ["KR-06", "KR-10"], d: ["KR-06", "KR-10"] })).toEqual([
+      'KR-06 × check "d": no pass/ case runs through it',
+      'KR-10 × check "c": no pass/ case runs through it',
+      'KR-10 × check "d": no trigger/ case runs through it',
+    ]);
+  });
+
+  it("ST-17: refuses a row of checks.ts with a rule ID that has no fixture folder, naming the pair", () => {
+    expect(audit(["KR-06"], [folder("KR-06")], undefined, { c: ["KR-06", "KR-10"] })).toEqual([
+      'KR-10 × check "c": no pass/ case runs through it',
+      'KR-10 × check "c": no trigger/ case runs through it',
+    ]);
   });
 });

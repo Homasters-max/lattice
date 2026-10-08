@@ -1,7 +1,9 @@
 // Fitness test of ST-17: every rule ID a hard check enforces has a fixture
 // that triggers it and one that passes it — a folder test/fixtures/<RULE-ID>/
 // with trigger/ and pass/, each with a parsable <case>.json; every folder is a
-// rule ID the design defines and a registry declares. Format: run.ts.
+// rule ID the design defines and a registry declares. Each row of checks.ts is
+// its own hard check: every rule ID it enforces has a trigger and a pass case
+// that run through that row. Format: run.ts.
 // The rule IDs of the design are read by the codec, as LATTICE reads it.
 import { idOf, parse, type Section } from "../../src/codec/index.js";
 import { ROOT } from "../../src/kernel/index.js";
@@ -25,6 +27,8 @@ export type CoverageInput = {
   readonly folders: readonly FixtureFolder[];
   /** Rule IDs defined in `docs/design`. */
   readonly design: ReadonlySet<string>;
+  /** The rows of `test/fixtures/checks.ts`: the name a case gives in `check` → the rule IDs that row enforces. */
+  readonly checks: { readonly [check: string]: readonly string[] };
 };
 
 const undefinedId = (id: string) => `${id}: not a rule ID defined in docs/design`;
@@ -55,9 +59,24 @@ function auditFolder(folder: FixtureFolder, { registered, design }: CoverageInpu
   ];
 }
 
+const runsThrough = (check: string) => (c: FixtureCase) =>
+  typeof c.data === "object" && c.data !== null && (c.data as { readonly check?: unknown }).check === check;
+
+/** Each pair «row of checks.ts × rule ID it enforces» without a trigger or a pass case run through that row. */
+function auditPairs({ checks, folders }: CoverageInput): string[] {
+  return Object.entries(checks).flatMap(([check, ids]) =>
+    ids.flatMap((id) => {
+      const folder = folders.find((f) => f.name === id);
+      return (["trigger", "pass"] as const)
+        .filter((kind) => !(folder?.[kind] ?? []).some(runsThrough(check)))
+        .map((kind) => `${id} × check "${check}": no ${kind}/ case runs through it`);
+    }),
+  );
+}
+
 /** Problems of rule fixture coverage, sorted; empty when coverage holds. */
 export function auditCoverage(input: CoverageInput): string[] {
-  const problems = [...auditRegistered(input), ...input.folders.flatMap((f) => auditFolder(f, input))];
+  const problems = [...auditRegistered(input), ...input.folders.flatMap((f) => auditFolder(f, input)), ...auditPairs(input)];
   return [...new Set(problems)].sort();
 }
 
