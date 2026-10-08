@@ -6,3 +6,5 @@ export declare const FITNESS: readonly string[];
 export declare function isTool(path: string): boolean;
 export declare function testSetOf(path: string): string | null;
 export declare function owns(set: string, path: string): boolean;
+export declare function filtersOf(set: string, files: readonly string[]): string[];
+export declare function seedOf(hash: string): number;

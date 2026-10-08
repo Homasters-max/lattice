@@ -1,9 +1,11 @@
 // protocol: проверка выхода агента против его brief (plan/dev-loop.md, «Роли: вход и выход»).
 // check(brief, out, repo) → {errors, warnings, value}: errors — выход не принят, агент переделывает;
 // warnings — выход принят и нормализован (value).
-// repo — {head(), remote(branch), commits(from, to), changed(from, to), conventions(), items()} в worktree агента;
-// conventions() — текст CONVENTIONS.md worktree, пустой, если файла нет; items() — пункты «Готово, когда»
-// файла задачи brief.task, null, если файла нет.
+// repo — {head(), remote(branch), commits(from, to), changed(from, to), conventions(), items(), since(), mutants(),
+// report(), decided()} в worktree агента; conventions() — текст CONVENTIONS.md worktree, пустой, если файла нет;
+// items() — пункты «Готово, когда» файла задачи brief.task, null, если файла нет; since() — начало ветки;
+// mutants() — мутанты изменённых hunk'ов src/ (scripts/mutants.mjs), report() — отчёт `prove --ready` или null,
+// decided() — решения о мутантах, которые dl помнит: {id: решение}.
 import { conventionsOf, unknownReferences } from "./conventions.mjs";
 
 export const AXES = ["spec", "standards", "architecture", "verify"];
@@ -13,6 +15,8 @@ export const REVIEW_JOBS = ["full", "delta", "close", "status", "conflicts"];
 export const FIXER_JOBS = ["answer", "tidy", "verify-red", "rebase", "owner"];
 // Критерий находки; тяжесть выводится из него: advice — совет, остальные блокируют.
 export const KINDS = ["rule", "scope", "untested", "expectation", "mechanism", "advice"];
+// Решение автора о выжившем мутанте (S0-44).
+export const DECISIONS = ["killed", "equivalent", "deferred"];
 const PLAN_RECORD = /^plan\/phases\/[^/]+\/(PLAN\.md|tasks\/[^/]+\.md)$/;
 export const LIMITS = { summary: 800, text: 500, quote: 300, note: 300, question: 500 };
 const RULE = /\b[A-Z]{2}-\d{2}\b|CONVENTIONS §\d+|AGENTS\.md|\bS\d-\d{2}:\d+/;
@@ -40,9 +44,9 @@ const shown = (v) => {
 // Поля выхода по схеме роли (plan/dev-loop.md, «Роли: вход и выход»); других полей в out.json нет.
 // context_missing — у всех ролей: что агенту пришлось прочитать сверх brief и зачем (S0-48); итог цикла его печатает.
 export const FIELDS = {
-  executor: ["status", "pr", "branch", "head", "done", "question", "gaps", "context_missing"],
+  executor: ["status", "pr", "branch", "head", "done", "mutants", "question", "gaps", "context_missing"],
   reviewer: ["axis", "head", "summary", "statuses", "findings", "context_missing"],
-  fixer: ["status", "head", "answers", "conflicts", "question", "gaps", "context_missing"],
+  fixer: ["status", "head", "answers", "mutants", "conflicts", "question", "gaps", "context_missing"],
 };
 
 function fields(errors, out, role) {
@@ -91,6 +95,45 @@ function done(errors, out, repo) {
   if (items !== null) out.done.forEach((d, i) => need(errors, items.includes(d.trim()), `done[${i}]: «${shown(d)}» — нет такого пункта «Готово, когда» в файле задачи`));
 }
 
+// Решение о мутанте из отчёта `npm run prove --ready` (S0-44): killed — тест, который его убивает, в коммите ветки,
+// и отчёт на head это показывает; equivalent и deferred — с причиной.
+function decision(errors, d, { known, outcome, commits }) {
+  const at = `mutants.${shown(d.id)}`;
+  if (!known.has(d.id)) return errors.push(`${at}: нет такого мутанта в изменённых hunk'ах src/ на head`);
+  need(errors, DECISIONS.includes(d.decision), `${at}.decision: ${shown(d.decision)} — нужно ${DECISIONS.join(" | ")}`);
+  if (d.decision === "killed") {
+    need(errors, outcome.get(d.id)?.outcome === "killed", `${at}: killed — но в отчёте на head мутант ${outcome.get(d.id)?.outcome ?? "не назван"}: тест, который его убивает, не в head`);
+    need(errors, isSha(d.commit) && commits.some((c) => sameSha(c, d.commit)), `${at}.commit: ${shown(d.commit)} — коммит ветки с тестом, который убивает мутанта`);
+  } else if (DECISIONS.includes(d.decision))
+    need(errors, text(d.reason, LIMITS.note), `${at}.reason: ${shown(d.reason)} — почему ${d.decision === "equivalent" ? "мутант не меняет поведения" : "мутант отложен и где это записано"}, до ${LIMITS.note} знаков`);
+}
+
+const short = (sha) => (typeof sha === "string" ? sha.slice(0, 7) : shown(sha));
+
+// Выжившие мутанты изменённых hunk'ов src/ (S0-44): каждого решает автор — executor до ready, fixer до push;
+// решение, которое dl уже помнит, снова не выносится.
+function mutants(errors, out, repo) {
+  const given = out.mutants === undefined ? [] : list(errors, out.mutants, "mutants");
+  const at = repo.mutants();
+  if (at.length === 0 && given.length === 0) return;
+  const report = repo.report();
+  if (report === null || !sameSha(report.head, out.head) || report.dirty !== false) {
+    const why = report === null ? "нет отчёта" : report.dirty !== false ? "отчёт снят с незакоммиченными правками" : `отчёт на ${short(report.head)}`;
+    return errors.push(`mutants: ${why} — нужен .lattice/mutants.json \`npm run prove --ready\` на head ${short(out.head)} без незакоммиченных правок: мутантов в изменённых hunk'ах src/ — ${at.length}`);
+  }
+  const outcome = new Map((Array.isArray(report.mutants) ? report.mutants : []).map((m) => [m.id, m]));
+  const uncovered = at.filter((m) => !outcome.has(m.id));
+  need(errors, uncovered.length === 0, `mutants: отчёт на head не называет мутантов: ${uncovered.slice(0, 5).map((m) => `${m.id} ${m.file}:${m.line}`).join(", ")} — нужен новый \`npm run prove --ready\``);
+  const ids = given.map((d) => d.id);
+  need(errors, new Set(ids).size === ids.length, "mutants: id повторяется");
+  const decided = repo.decided();
+  for (const m of at)
+    if (outcome.get(m.id)?.outcome === "survived" && !(m.id in decided) && !ids.includes(m.id))
+      errors.push(`mutants: выживший ${m.id} не решён — ${m.file}:${m.line} ${m.operator}: ${m.before} → ${m.after}; нужно killed, equivalent или deferred`);
+  const commits = given.some((d) => d.decision === "killed") ? repo.commits(repo.since(), out.head) : [];
+  for (const d of given) decision(errors, d, { known: new Map(at.map((m) => [m.id, m])), outcome, commits });
+}
+
 function executor(out, errors, repo) {
   fields(errors, out, "executor");
   need(errors, ["ready", "needs_owner"].includes(out.status), `status: ${shown(out.status)} — нужно ready | needs_owner`);
@@ -100,6 +143,7 @@ function executor(out, errors, repo) {
   }
   done(errors, out, repo);
   author(out, errors, repo, out.branch);
+  if (out.status === "ready" && isSha(out.head)) mutants(errors, out, repo);
   return out;
 }
 
@@ -188,6 +232,7 @@ function fixer(brief, out, errors, repo) {
   author(out, errors, repo, brief.branch);
   need(errors, out.conflicts === undefined || (Array.isArray(out.conflicts) && out.conflicts.every((c) => text(c, 300))), "conflicts: список файлов");
   if (brief.job in ACTIONS && out.status === "done") answers(brief, out, errors, repo);
+  if (out.status === "done" && isSha(out.head)) mutants(errors, out, repo);
   return out;
 }
 

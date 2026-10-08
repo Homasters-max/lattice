@@ -29,7 +29,7 @@ import { contextMissing, diffOf, executorBrief as executorContext, fixerBrief as
 import { check, FIXER_JOBS } from "./dev-loop/protocol.mjs";
 import { answer, decision, escalation, final, parseHeader, questions, review } from "./dev-loop/render.mjs";
 import { changedLines, conventionsChanged, scope } from "./dev-loop/scope.mjs";
-import { answerFindings, answerText, ask, entryOf, initial, looseFindings, mergeWave, openFindings, planWave, recordAnswer } from "./dev-loop/state.mjs";
+import { answerFindings, answerText, ask, entryOf, initial, looseFindings, mergeWave, openFindings, planWave, recordAnswer, rememberMutants } from "./dev-loop/state.mjs";
 import { advancePhase, closeOnBoard, findTask, itemsOf, markItems } from "./dev-loop/task.mjs";
 
 const COMMENT_MAX = 65000;
@@ -71,7 +71,18 @@ function stamp(change) {
   write(stepsPath(), change(existsSync(stepsPath()) ? read(stepsPath()) : []));
 }
 const git = (worktree, ...args) => execFileSync("git", args, { cwd: worktree, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
-const repoOf = (worktree, task) => ({
+// Мутанты изменённых hunk'ов src/ (S0-44) — для выхода автора: scripts/mutants.mjs грузит typescript, и другим командам он не нужен.
+const mutantsAt = async (worktree) => (await import("../../scripts/mutants.mjs")).changedMutants({ dir: worktree, base: "origin/main" }).mutants;
+const reportOf = (worktree) => {
+  const file = join(worktree, ".lattice", "mutants.json");
+  return existsSync(file) ? read(file) : null;
+};
+// mutation — {mutants, decided}: мутанты на head и решения, которые dl помнит; без них — ни мутантов, ни решений.
+const repoOf = (worktree, task, mutation = { mutants: [], decided: {} }) => ({
+  since: () => git(worktree, "merge-base", "origin/main", "HEAD"),
+  mutants: () => mutation.mutants,
+  report: () => reportOf(worktree),
+  decided: () => mutation.decided,
   head: () => git(worktree, "rev-parse", "HEAD"),
   remote: (branch) => (branch ? git(worktree, "ls-remote", "origin", `refs/heads/${branch}`).split("\t")[0] : ""),
   commits: (from, to) => git(worktree, "rev-list", `${from}..${to}`).split("\n").filter(Boolean),
@@ -94,11 +105,16 @@ function comment(kind, body) {
   return file;
 }
 
-function checked(outFile) {
+// Решения о мутантах, которые dl помнит (S0-44): в состоянии цикла, если оно есть.
+const decidedMutants = () => (flags.dir !== undefined && existsSync(statePath()) ? (read(statePath()).mutants ?? {}) : {});
+
+async function checked(outFile) {
   const brief = read(outFile.replace(/\.out\.json$/, ".in.json"));
   if (!existsSync(outFile)) return { brief, errors: [`нет выхода ${outFile}`], warnings: [], value: null };
   try {
-    return { brief, ...check(brief, read(outFile), repoOf(brief.worktree, brief.task)) };
+    const author = ["executor", "fixer"].includes(brief.role);
+    const mutation = author ? { mutants: await mutantsAt(brief.worktree), decided: decidedMutants() } : undefined;
+    return { brief, ...check(brief, read(outFile), repoOf(brief.worktree, brief.task, mutation)) };
   } catch (e) {
     return { brief, errors: [`выход не проверить: ${e.message.split("\n")[0]}`], warnings: [], value: null };
   }
@@ -114,7 +130,9 @@ function reviewerBrief(state, s, plan, a, { worktree, out, diff, patch, body }) 
     files: a.files, range: a.range, findings: a.findings.map(slim), disputed: plan.disputed.filter((id) => ids.has(id)),
     answers: (state.answers?.items ?? []).filter((x) => ids.has(x.id)), diff: diff ? patch : undefined, out,
   };
-  return reviewerContext(base, { diff, body: a.axis === "spec" ? body() : null });
+  // Spec получает отчёт мутаций `prove --ready` и решения авторов о выживших (S0-44).
+  const mutation = a.axis === "spec" ? { report: reportOf(worktree), decisions: state.mutants ?? {} } : null;
+  return reviewerContext(base, { diff, body: a.axis === "spec" ? body() : null, mutation });
 }
 
 // Тело PR для brief Spec: ревьюеру gh не нужен. gh не ответил — тела нет, и brief называет это в cut.
@@ -171,14 +189,14 @@ function wave() {
   print({ ok: true, wave: n, mode: s.mode, axes: s.axes, rebased: s.rebased === true, agents, next: agents.length ? "review" : "merge" });
 }
 
-function merge() {
+async function merge() {
   const state = load();
   const n = state.wave + 1;
   const scopeFile = join(dir(), "waves", String(n), "scope.json");
   if (!existsSync(scopeFile)) fail(`нет круга ${n}: сначала wave`);
   const wd = waveDir(n);
   const s = read(scopeFile);
-  const results = readdirSync(wd).filter((f) => f.endsWith(".in.json")).map((f) => checked(join(wd, f.replace(".in.json", ".out.json"))));
+  const results = await Promise.all(readdirSync(wd).filter((f) => f.endsWith(".in.json")).map((f) => checked(join(wd, f.replace(".in.json", ".out.json")))));
   const errors = Object.fromEntries(results.filter((r) => r.errors.length).map((r) => [r.brief.agent, r.errors]));
   if (Object.keys(errors).length) return print({ ok: false, errors });
   const outputs = results.map((r) => r.value);
@@ -220,10 +238,10 @@ function brief() {
   print({ ok: true, brief: file });
 }
 
-function answerCmd() {
+async function answerCmd() {
   const state = load();
   const job = flags.job ?? "answer";
-  const r = checked(join(waveDir(state.wave), `fixer-${job}.out.json`));
+  const r = await checked(join(waveDir(state.wave), `fixer-${job}.out.json`));
   if (r.errors.length) return print({ ok: false, errors: r.errors });
   const steps = finish(stepsOf(state), { kind: "agent", role: "fixer", job }, now(), { head: r.value.head ?? null });
   if (r.value.status === "needs_owner") {
@@ -270,12 +288,12 @@ function init() {
   const from = flags.from ? read(flags.from) : {};
   if (existed) {
     // Состояние могло прийти от start; пробелы executor не теряются.
-    const state = load();
+    const state = rememberMutants(load(), from, "executor");
     save({ ...state, gaps: [...new Set([...(state.gaps ?? []), ...(from.gaps ?? [])])], steps: [...stepsOf(state), ...early] });
   } else {
     const pr = from.pr ?? Number(need("pr"));
     const branch = from.branch ?? need("branch");
-    save({ ...initial({ pr, task: flags.task ?? null, branch, gaps: from.gaps ?? [] }), steps: early });
+    save({ ...rememberMutants(initial({ pr, task: flags.task ?? null, branch, gaps: from.gaps ?? [] }), from, "executor"), steps: early });
   }
   rmSync(stepsPath(), { force: true });
   print({ ok: true, state: statePath(), existed });
@@ -485,11 +503,14 @@ const commands = {
   init,
   gate,
   wave,
-  check: () => {
-    const r = checked(positional[0] ?? fail("нужен файл .out.json"));
+  check: async () => {
+    const r = await checked(positional[0] ?? fail("нужен файл .out.json"));
     const { status, pr, head, conflicts, question } = r.value ?? {};
-    if (r.errors.length === 0 && ["executor", "fixer"].includes(r.brief.role))
+    if (r.errors.length === 0 && ["executor", "fixer"].includes(r.brief.role)) {
       stamp((steps) => finish(steps, { kind: "agent", role: r.brief.role, job: r.brief.job ?? null }, now(), { head: head ?? null }));
+      // Решения о мутантах dl помнит по id и снова их не выносит (S0-44); до состояния их переносит init.
+      if (flags.dir !== undefined && existsSync(statePath())) save(rememberMutants(load(), r.value, r.brief.role));
+    }
     print({ ok: r.errors.length === 0, errors: r.errors, warnings: r.warnings, status, pr, head, conflicts, question: status === "needs_owner" ? question : undefined });
   },
   merge,

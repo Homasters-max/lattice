@@ -256,9 +256,22 @@ export function fixerBrief(base) {
   ]);
 }
 
+const ORDER = { survived: 0, "budget-exceeded": 1, killed: 2 };
+
+/** Отчёт мутаций для Spec (S0-44): сводка отчёта `prove --ready` и его мутанты с решениями авторов, выжившие первыми. */
+function mutationParts({ report, decisions }) {
+  const where = "`.lattice/mutants.json` в worktree";
+  if (report === null) return [{ name: "mutation", value: { report: null, why: "в worktree нет отчёта `npm run prove --ready`" }, where }];
+  const entries = (report.mutants ?? []).map((m) => ({ ...m, decision: decisions[m.id] ?? null }));
+  const count = (o) => entries.filter((m) => m.outcome === o).length;
+  const summary = { report: ".lattice/mutants.json", head: report.head, dirty: report.dirty, total: entries.length, killed: count("killed"), survived: count("survived"), "budget-exceeded": count("budget-exceeded") };
+  const sorted = [...entries].sort((a, b) => (ORDER[a.outcome] ?? 3) - (ORDER[b.outcome] ?? 3));
+  return [{ name: "mutation", value: summary, where }, { name: "mutants", items: sorted.map((m) => ({ label: m.id, value: m })), where }];
+}
+
 /** Brief ревьюера оси: материал оси, hunk'и оси и путь `diff.patch` всего diff круга. diff — {patch, files} или null;
- * body — тело PR (Spec) или null. */
-export function reviewerBrief(base, { diff, body }) {
+ * body — тело PR (Spec) или null; mutation — {report, decisions} для Spec: отчёт `prove --ready` или null и решения. */
+export function reviewerBrief(base, { diff, body, mutation = null }) {
   const root = base.worktree;
   const files = (diff?.files ?? []).filter((f) => AXIS_FILES[base.axis](f.file));
   const hunks = { name: "hunks", items: hunkItems(files), where: `\`${base.diff}\`` };
@@ -266,6 +279,7 @@ export function reviewerBrief(base, { diff, body }) {
   if (base.axis === "spec") {
     const task = taskOf(root, base.task);
     parts.push(...withTask(root, task), { name: "pr_body", value: body, where: `\`gh pr view ${base.pr}\`` });
+    if (mutation) parts.push(...mutationParts(mutation));
   }
   if (base.axis === "standards") {
     const paths = files.map((f) => f.file);

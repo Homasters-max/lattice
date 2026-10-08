@@ -4,7 +4,8 @@
 // The full output goes to .lattice/verify.log; the last line of stdout is the outcome as JSON:
 //   {"ok": true, "steps": [{"step": "lint:ids", "ms": 640, "exit": 0}, …], "log": "<path of the log>"}
 // The exit code is 1 when any step fails. CI runs the steps one by one (.github/workflows/ci.yml).
-// scripts/prove.mjs runs its jobs through runSteps and ends through finish (S0-42).
+// scripts/prove.mjs runs its jobs through runSteps and ends through finish (S0-42); it and scripts/mutate.mjs read
+// their flags through flagOf.
 //   node scripts/verify.mjs
 import { Buffer } from "node:buffer";
 import { spawn } from "node:child_process";
@@ -61,6 +62,12 @@ export function finish(log, text, outcome, ok) {
   writeFileSync(log, `${text}${line}\n`);
   process.stdout.write(`${line}\n`);
   process.exitCode = ok ? 0 : 1;
+}
+
+/** The value of the flag `--name` in `args`, or `fallback`. */
+export function flagOf(args, name, fallback) {
+  const at = args.indexOf(`--${name}`);
+  return at === -1 ? fallback : args[at + 1];
 }
 
 /** Whether the module at `url` is the script node runs. */
