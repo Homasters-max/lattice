@@ -96,3 +96,30 @@ export function stdTypeNames(files: readonly string[]): string[] {
     .map((f) => f.slice(0, -".json".length))
     .sort();
 }
+
+/**
+ * KR-01: the `std` type names of TY-Z02…TY-Z05 in docs/design/03-types.md — the
+ * first column of TY-Z02…TY-Z04, and the types of TY-Z05 except the `core` ones.
+ * std/source/ holds only the types of S0 (S0-08); the rest of `std` — `pipeline`,
+ * `review-note`, `live`, `report`, `step`, `run`… — has no source until S0-09
+ * writes it, and the kernel must not name those either.
+ */
+export function designTypeNames(md: string): string[] {
+  const names = ["TY-Z02", "TY-Z03", "TY-Z04", "TY-Z05"].flatMap((block) =>
+    blockRows(md, block).flatMap((row) => [...typeCell(block, row).matchAll(/`([a-z][a-z0-9-]*)`/g)].map((m) => m[1] ?? "")),
+  );
+  return [...new Set(names.filter((n) => n !== "core"))].sort();
+}
+
+function blockRows(md: string, block: string): string[] {
+  const start = md.indexOf(`\n${block}.`);
+  if (start < 0) throw new Error(`03-types.md has no block ${block}`);
+  return md.slice(start).split("\n\n")[1]?.split("\n").slice(2) ?? [];
+}
+
+/** The cell that names types: the first, or in TY-Z05 the second without its `core` types. */
+function typeCell(block: string, row: string): string {
+  const cells = row.split(" | ");
+  if (block !== "TY-Z05") return cells[0] ?? "";
+  return (cells[1] ?? "").replace(/`[a-z-]+` \(`core`[^)]*\)/g, "");
+}

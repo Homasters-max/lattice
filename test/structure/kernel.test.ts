@@ -1,7 +1,8 @@
 // ST-05, KR-01: the files reachable from the kernel entry are listed, and
 // the kernel names no `std` type.
 import { describe, expect, it } from "vitest";
-import { auditKernelFiles, auditStdNames, stdTypeNames } from "./audit-kernel.js";
+import { knowledge } from "../support/files.js";
+import { auditKernelFiles, auditStdNames, designTypeNames, stdTypeNames } from "./audit-kernel.js";
 import { BASE_KERNEL, tree } from "./cases.js";
 
 const NAMES = new Set(["requirement", "namespace", "act"]);
@@ -76,5 +77,14 @@ describe("std type names in the kernel (KR-01)", () => {
 
   it("KR-01: reads the std type names from the sources of std, one per file named by its slug", () => {
     expect(stdTypeNames(["requirement.json", "act.json", "test-set.json", "README.md"])).toEqual(["act", "requirement", "test-set"]);
+  });
+
+  it("KR-01: reads the std type names of TY-Z02…TY-Z05, those without a source yet included, not the core ones", () => {
+    const names = designTypeNames(knowledge.text("03-types.md"));
+    for (const n of ["knowledge", "requirement", "review-note", "namespace-policy", "pipeline", "live", "verdict", "report", "source-listing", "step", "run", "question", "code-commit"]) {
+      expect(names).toContain(n);
+    }
+    expect(names).not.toContain("session");
+    expect(names).not.toContain("core");
   });
 });

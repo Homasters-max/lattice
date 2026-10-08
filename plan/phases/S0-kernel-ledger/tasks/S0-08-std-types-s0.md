@@ -36,6 +36,7 @@ rules: [TY-01, TY-02, TY-03, TY-05, TY-06, TY-07, TY-11, TY-12, TY-13, TY-14, TY
 - тип namespace — `std/namespace-policy` (`std/source/namespace-policy.json`; Q-37, D211): запись namespace `std` — `std/namespace`, и тип с тем же id был бы второй сущностью; тело этой записи с метками TY-16 — `std/namespace.json`: не тип, поэтому вне `std/source/`;
 - примеры — `test/ledger/examples/std/<slug>.json` и `test/ledger/examples/core/session.json`: `valid` — тела записей, `invalid` — тело с путём и ключевым словом нарушения; тест — `test/ledger/std-types.test.ts`, test set `ledger` владеет `std/` (`scripts/paths.mjs`);
 - имя формы `code` (TY-11) — слово, которое ядро писало в `parse.ts` как имя кодовой единицы: переменная переименована в `unit`, а аудит KR-01 не считает имена, которые объявляет платформа (`charCodeAt`, `fromCharCode`);
+- тест KR-01 берёт имена `std` из `std/source/` и, пока у типов S0-09 нет исходников, ещё из TY-Z02…TY-Z05 (`designTypeNames`): правило не сужается до типов S0;
 - пробелы — G-31…G-34.
 
 ## Шаги
