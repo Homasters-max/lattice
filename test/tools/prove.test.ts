@@ -253,10 +253,15 @@ describe("prove, the key of a record: the test set, its inputs and the environme
     expect(Object.keys(after).filter((set) => after[set] === before[set])).toEqual([]);
   });
 
-  it("ST-12: another environment gives every set a new key", () => {
+  it("ST-12: another environment gives every set a new key — each of os, node and git alone", () => {
     const here = keys();
-    const there = keys({}, { environment: { os: "plan9", node: 1, git: 1 } });
-    expect(Object.keys(here).filter((set) => here[set] === there[set])).toEqual([]);
+    const environment = select({ dir: stand.dir, base: "main" }).environment;
+    expect(keys({}, { environment })).toEqual(here);
+    const changes: readonly Partial<Environment>[] = [{ os: "plan9" }, { node: environment.node + 1 }, { git: environment.git + 1 }];
+    for (const change of changes) {
+      const there = keys({}, { environment: { ...environment, ...change } });
+      expect([change, Object.keys(here).filter((set) => here[set] === there[set])]).toEqual([change, []]);
+    }
   });
 
   it("ST-12: the key is of the tree, not of the base it is compared with", () => {
