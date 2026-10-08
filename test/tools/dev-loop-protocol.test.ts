@@ -16,16 +16,20 @@ afterAll(() => {
 const CONVENTIONS = ["# C", "", "## 1. Data", "", "### §1.1 One", "Область: `src/**`", "", "Text.", "", "### §1.3 Three", "Область: `test/**`", ""].join("\n");
 const HEAD = "a".repeat(40);
 
-/** The errors of `dl check` for the output of a standards reviewer with these findings, in a worktree with this CONVENTIONS.md. */
-function errors(findings: readonly object[], conventions: string | null = CONVENTIONS): string[] {
+/** The errors of `dl check` for this output of a standards reviewer, in a worktree with this CONVENTIONS.md. */
+function checked(out: object, conventions: string | null = CONVENTIONS): string[] {
   const dir = mkdtempSync(join(tmpdir(), "dl-protocol-"));
   dirs.push(dir);
   if (conventions !== null) writeFileSync(join(dir, "CONVENTIONS.md"), conventions);
   const brief = { role: "reviewer", axis: "standards", job: "full", head: HEAD, worktree: dir, findings: [], disputed: [] };
   writeFileSync(join(dir, "r.in.json"), JSON.stringify(brief));
-  writeFileSync(join(dir, "r.out.json"), JSON.stringify({ axis: "standards", head: HEAD, summary: "checked", statuses: [], findings }));
+  writeFileSync(join(dir, "r.out.json"), JSON.stringify(out));
   return (JSON.parse(execFileSync(process.execPath, [tool, "check", join(dir, "r.out.json")], { encoding: "utf8" })) as { errors: string[] }).errors;
 }
+
+/** The errors of `dl check` for the output of a standards reviewer with these findings. */
+const errors = (findings: readonly object[], conventions: string | null = CONVENTIONS): string[] =>
+  checked({ axis: "standards", head: HEAD, summary: "checked", statuses: [], findings }, conventions);
 
 const finding = (rule: string) => ({ kind: "rule", rule, where: "src/x.ts:1", quote: "x", text: "y" });
 
@@ -46,5 +50,23 @@ describe("dev-loop protocol, a reference to CONVENTIONS.md", () => {
 
   it("passes an advice that names no item", () => {
     expect(errors([{ ...finding(""), kind: "advice" }])).toEqual([]);
+  });
+});
+
+// An error of the protocol says what came beside what is needed, and names the fields outside the schema of the role:
+// an agent that reads only the expected value takes it for a statement and does not rewrite out.json.
+describe("dev-loop protocol, an output outside the schema of its role", () => {
+  it("names the fields the schema of the reviewer lacks and what came instead of the fields it needs", () => {
+    expect(checked({ head: "", hunks: [], new: [], statuses: [] })).toEqual([
+      "лишние поля: hunks, new — схема reviewer в plan/dev-loop.md, «Роли: вход и выход»: axis, head, summary, statuses, findings",
+      "axis: нет — нужно standards",
+      `head: пусто — нужно ${HEAD}`,
+      "summary: нет — нужно что проверено, до 800 знаков",
+      "findings: нет — нужен список объектов, пустой, если нечего",
+    ]);
+  });
+
+  it("accepts the five fields of the schema and nothing else", () => {
+    expect(checked({ axis: "standards", head: HEAD, summary: "checked", statuses: [], findings: [] })).toEqual([]);
   });
 });

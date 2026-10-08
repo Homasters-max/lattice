@@ -138,6 +138,27 @@ function measured(steps, at) {
 }
 
 // at — время итога: конец цикла для замера.
+// Изменённые пункты и строки CONVENTIONS.md из main (scope.mjs, conventionsChanged). До CONVENTIONS_LISTED — по одному
+// в строке; больше — номера пунктов одной строкой и число строк: перестройку файла владелец решает целиком.
+const CONVENTIONS_LISTED = 10;
+
+function conventionsTodo(changed) {
+  const items = changed.filter((c) => c.id !== undefined);
+  const rows = changed.filter((c) => c.line !== undefined).map((c) => c.line);
+  const out = [];
+  if (items.length <= CONVENTIONS_LISTED)
+    out.push(...items.map((i) => `- пункт CONVENTIONS.md ${i.id} «${i.title}» из main ${i.gone ? "убран" : "изменён"}`));
+  else
+    for (const [gone, what] of [[false, "изменены"], [true, "убраны"]]) {
+      const ids = items.filter((i) => i.gone === gone).map((i) => i.id);
+      if (ids.length) out.push(`- пункты CONVENTIONS.md из main ${what} (${ids.length}): ${ids.join(", ")}`);
+    }
+  if (rows.length <= CONVENTIONS_LISTED)
+    out.push(...rows.map((l) => `- строка CONVENTIONS.md из main изменена или убрана: «${l.length > 200 ? `${l.slice(0, 200)}…` : l}»`));
+  else out.push(`- строк CONVENTIONS.md из main изменено или убрано: ${rows.length} — перестройка файла; список — \`git diff origin/main...HEAD -- CONVENTIONS.md\``);
+  return out;
+}
+
 export function final(state, { scope, conventions = [], at } = {}) {
   const out = [header("final", state), title(state, "Итог цикла"), ""];
   out.push(`Head \`${short(state.head ?? scope?.head)}\` · \`npm run verify\` зелёный · кругов: ${state.waves.length} из ${state.budget}`);
@@ -155,7 +176,7 @@ export function final(state, { scope, conventions = [], at } = {}) {
     ...openFindings(state).filter((f) => f.late).map((f) => `- находка вне дельты ${f.id} · ${f.rule} · \`${f.where}\`: ${f.text}`),
     ...of("advice").map((f) => `- совет ${f.id} · \`${f.where}\`: ${f.text}`),
     ...state.gaps.map((g) => `- пробел ${g} в PLAN.md: решение до merge`),
-    ...conventions.map((l) => `- строка CONVENTIONS.md из main изменена или убрана: «${l.length > 200 ? `${l.slice(0, 200)}…` : l}»`),
+    ...conventionsTodo(conventions),
   ];
   out.push("", "### Решить владельцу до merge", "", ...(todo.length ? todo : ["нечего"]));
   const ratchet = state.findings.filter((f) => f.ratchet).map((f) => f.id);

@@ -302,9 +302,10 @@ function rulesMarkdown(phase, rules, owners) {
 // ---------- CONVENTIONS.md (S0-50)
 
 // Где ссылаются на пункты CONVENTIONS.md: код, тесты, скрипты и процесс. Задачи и PLAN.md фаз — история, их ссылки
-// не правятся; test/tools — данные тестов инструментов.
+// не правятся; test/tools — данные тестов инструментов; .claude/worktrees — рабочие копии других сессий, не репо.
 const REFERRERS = ["AGENTS.md", "CONVENTIONS.md", "plan/dev-loop.md", "plan/closure-check.md", ".claude", "src", "test", "scripts"];
 const READ_FOR_REFERENCES = /\.(md|ts|mjs|js)$/;
+const NOT_REFERRERS = /^(test\/tools|\.claude\/worktrees)\//;
 
 function filesUnder(path) {
   const full = join(ROOT, path);
@@ -312,7 +313,7 @@ function filesUnder(path) {
   if (!statSync(full).isDirectory()) return [path];
   return readdirSync(full, { recursive: true, encoding: "utf8" })
     .map((f) => `${path}/${f.replaceAll("\\", "/")}`)
-    .filter((f) => READ_FOR_REFERENCES.test(f) && !f.startsWith("test/tools/") && statSync(join(ROOT, f)).isFile());
+    .filter((f) => READ_FOR_REFERENCES.test(f) && !NOT_REFERRERS.test(f) && statSync(join(ROOT, f)).isFile());
 }
 
 function checkConventions() {
