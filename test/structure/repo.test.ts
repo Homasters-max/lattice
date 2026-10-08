@@ -86,15 +86,10 @@ describe("structure of this repository", () => {
     expect(auditKernelFiles(repo, lines("test/structure/kernel-files.txt"))).toEqual([]);
   });
 
-  it("KR-01: the kernel names no std type of the sources of std", () => {
+  it("KR-01: the kernel names no std type of the sources of std, and std/source holds a source for every std type TY-Z02…TY-Z05 name (S0-09)", () => {
     const sources = stdTypeNames(owned.list("std/source"));
-    expect(sources.length).toBeGreaterThan(0);
+    expect(designTypeNames(knowledge.text("03-types.md")).filter((name) => !sources.includes(name))).toEqual([]);
     expect(auditStdNames(repo, new Set(sources))).toEqual([]);
-  });
-
-  it("KR-01, S0-09: std/source holds a source for every std type TY-Z02…TY-Z05 name, so the names of KR-01 are those of the sources", () => {
-    const sources = new Set(stdTypeNames(owned.list("std/source")));
-    expect(designTypeNames(knowledge.text("03-types.md")).filter((name) => !sources.has(name))).toEqual([]);
   });
 
   it("SL-05: src/ has exactly the module folders of the slice", () => {
