@@ -53,6 +53,8 @@ async function build(ahead: boolean): Promise<string> {
   await sh(root, ["init", "-q", "--template=", "--bare", "origin.git"]);
   for (const args of [["init", "-q", "--template=", "-b", "main"], ["config", "user.email", "t@t"], ["config", "user.name", "t"], ["remote", "add", "origin", join(root, "origin.git")]]) await sh(work, args);
   temp.write(join(work, "a.txt"), "a\n");
+  // The records of runs (S0-43) are in .lattice/, which git ignores: a checkout with them is clean.
+  temp.write(join(work, ".gitignore"), ".lattice/\n");
   temp.write(join(work, "plan/phases/S0-x/tasks/S0-98-new-thing.md"), "---\nid: S0-98\ntitle: New thing\nphase: S0\n---\n");
   await sh(work, ["add", "-A"]);
   await sh(work, ["commit", "-q", "-m", "base"]);
@@ -93,9 +95,11 @@ async function repo({ ahead = false } = {}): Promise<Repo> {
   return { root, work, github: join(root, "github.json") };
 }
 
+const NOW = "2026-10-08T10:00:00.000Z";
+
 async function start(r: Repo, github: Json, ...args: string[]): Promise<Json> {
   temp.write(r.github, JSON.stringify(github));
-  const env = { ...process.env, DEV_LOOP_GH: join(r.root, "gh.mjs"), FAKE_GITHUB: r.github };
+  const env = { ...process.env, DEV_LOOP_GH: join(r.root, "gh.mjs"), FAKE_GITHUB: r.github, DEV_LOOP_NOW: NOW };
   const run = await exec(r.work, tool, ["start", ...args, "--root", join(r.root, "loops")], env);
   return JSON.parse(run.stdout) as Json;
 }
@@ -143,6 +147,15 @@ describe.concurrent("dev-loop start", { timeout: 60_000 }, () => {
     const r = await repo();
     const s = await start(r, { list: [PR], comments: [{ body: "looks good" }] }, "--task", "S0-99");
     expect(s).toMatchObject({ pr: 12, branch: "s0-99-x", entry: "none", next: "gate" });
+  });
+
+  it("removes the records of runs older than 30 days from the owner's checkout", async () => {
+    const r = await repo();
+    const runs = join(r.work, ".lattice", "verify-runs");
+    const daysAgo = (n: number) => new Date(Date.parse(NOW) - n * 86_400_000).toISOString();
+    for (const [name, at] of [["old", daysAgo(31)], ["fresh", daysAgo(29)]]) temp.write(join(runs, `${name}.json`), JSON.stringify({ test_set: "kernel", at }));
+    expect(await start(r, { list: [PR], comments: [] }, "--task", "S0-99")).toMatchObject({ ok: true, pruned: 1 });
+    expect(temp.list(runs)).toEqual(["fresh.json"]);
   });
 
   it("resumes a PR from the header of its last comment of the loop", async () => {

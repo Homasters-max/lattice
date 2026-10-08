@@ -138,6 +138,15 @@ function measured(steps, at) {
   return out;
 }
 
+// Ворота в shadow (S0-43): сколько прогонов сравнены с записями и каждое расхождение — head ворот, test-set, исход
+// записи и прогона. По двум задачам без расхождений владелец решает о пропуске по записям.
+function shadowOf(steps) {
+  const gates = steps.filter((s) => s.kind === "gate" && s.shadow === true);
+  if (!gates.length) return [];
+  const rows = gates.flatMap((g) => (g.mismatches ?? []).map((m) => `- \`${short(g.head)}\` · ${m.set}: запись ${m.recorded}, прогон ${m.outcome}`));
+  return ["", "### Ворота", "", `Ворота в shadow: прогонов ${gates.length}, расхождений с записями ${rows.length}.`, ...rows];
+}
+
 // at — время итога: конец цикла для замера.
 // Изменённые пункты и строки CONVENTIONS.md из main (scope.mjs, conventionsChanged). До CONVENTIONS_LISTED — по одному
 // в строке; больше — номера пунктов одной строкой и число строк: перестройку файла владелец решает целиком.
@@ -194,6 +203,7 @@ export function final(state, { scope, conventions = [], context = [], at } = {})
   const ratchet = state.findings.filter((f) => f.ratchet).map((f) => f.id);
   out.push("", `Триггеры аудита ST-15: ${audit(state.triggers ?? scope?.triggers).join("; ") || "нет"}.`, `Кандидаты в ratchet (ST-16): ${ratchet.join(", ") || "нет"}.`);
   out.push(...contextOf(context, state.steps ?? []));
+  out.push(...shadowOf(state.steps ?? []));
   out.push(...measured(state.steps ?? [], at));
   return lines(out);
 }

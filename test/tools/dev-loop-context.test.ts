@@ -242,6 +242,15 @@ describe.concurrent("dev-loop briefs of the fixer", { timeout: 60_000 }, () => {
       { step: "build", exit: 2, output: "# build: exit 2, 3 ms\nbroken" },
     ]);
   });
+
+  it("verify-red: the failed runs of test sets from a log of prove, whose line names them under sets, not steps (S0-43)", async () => {
+    const l = await loop({ "src/ledger/land.ts": land(2) });
+    const log = join(l.dir, "verify.log");
+    const outcome = { outcome: "failed", sets: [{ set: "ledger", exit: 1 }], steps: [{ step: "lint", ms: 5, exit: 0 }], log: "x" };
+    temp.write(log, `# lint: exit 0, 5 ms\nok\n# test ledger: exit 1, 9 ms\n FAIL test/ledger/x.test.ts\n${JSON.stringify(outcome)}\n`);
+    const b = read((await dl(l, "brief", "fixer", "--worktree", l.work, "--job", "verify-red", "--log", log)).brief as string);
+    expect(b.context.failed).toEqual([{ step: "test ledger", exit: 1, output: "# test ledger: exit 1, 9 ms\n FAIL test/ledger/x.test.ts" }]);
+  });
 });
 
 describe.concurrent("dev-loop step", { timeout: 60_000 }, () => {

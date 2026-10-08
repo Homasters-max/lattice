@@ -201,7 +201,13 @@ export function executorBrief(base) {
 const RULE_IDS = /\b[A-Z]{2}-Z?\d{2}\b/g;
 const CONVENTION_IDS = /§\d+\.\d+/g;
 
-/** Строки упавших шагов из лога verify: последняя строка — JSON итога `{steps: [{step, exit}]}` (scripts/verify.mjs). */
+const SECTION = /^# (.+): exit (\d+), \d+ ms$/gm;
+
+/**
+ * Строки упавших шагов из лога verify или prove: последняя строка — JSON итога со `steps` (scripts/verify.mjs,
+ * scripts/prove.mjs); упавший шаг — раздел `# <шаг>: exit <код>, <мс> ms` с кодом не 0: у prove так идут и прогоны
+ * test-sets — `# test <test-sets>: …`, — которых нет в его `steps` (S0-43).
+ */
 function failedSteps(log) {
   if (!log || !existsSync(log)) return [];
   const text = lf(readFileSync(log, "utf8"));
@@ -213,16 +219,21 @@ function failedSteps(log) {
     outcome = null;
   }
   if (!Array.isArray(outcome?.steps)) return [{ label: "лог", value: { step: null, output: rows.slice(-200).join("\n") } }];
-  return outcome.steps.filter((s) => s.exit !== 0).map((s) => {
-    const start = text.indexOf(`# ${s.step}: exit `);
-    const next = start < 0 ? -1 : text.slice(start + 1).search(/\n# \S+: exit \d+, \d+ ms\n/);
-    const output = start < 0 ? "" : text.slice(start, next < 0 ? text.lastIndexOf("\n{") : start + 1 + next);
-    return { label: s.step, value: { step: s.step, exit: s.exit, output } };
+  const end = text.lastIndexOf("\n{");
+  const sections = [...text.matchAll(SECTION)];
+  return sections.flatMap((m, i) => {
+    const exit = Number(m[2]);
+    if (exit === 0) return [];
+    const output = text.slice(m.index, i + 1 < sections.length ? sections[i + 1].index - 1 : end);
+    return [{ label: m[1], value: { step: m[1], exit, output } }];
   });
 }
 
-/** Brief fixer: находки с hunk'ами ветки и текстами их правил, пункты CONVENTIONS.md по путям находок; verify-red — упавшие шаги. */
-export function fixerBrief(base) {
+/**
+ * Brief fixer: находки с hunk'ами ветки и текстами их правил, пункты CONVENTIONS.md по путям находок; verify-red —
+ * записи run'ов красных test-sets ворот (S0-43: test-set, упавшие тесты, seed, исход) и упавшие шаги из лога.
+ */
+export function fixerBrief(base, { runs = [] } = {}) {
   const root = base.worktree;
   const all = [...base.findings, ...(base.advice ?? [])];
   const from = git(root, "merge-base", "origin/main", "HEAD").trim();
@@ -243,6 +254,7 @@ export function fixerBrief(base) {
     .filter((i) => named.has(i.id) || i.areas.some((a) => paths.some((p) => matchesGlob(a, p))))
     .map(item);
   return fit(base, [
+    { name: "runs", items: runs.map((r) => ({ label: r.test_set, value: r })), where: "`.lattice/verify-runs/` рабочей копии владельца" },
     { name: "failed", items: failedSteps(base.log), where: `лог \`${base.log}\`` },
     { name: "hunks", items: hunks, where: "`git diff origin/main...HEAD`" },
     { name: "rules", items: rulesOf(root, ids).map((r) => ({ label: r.id, value: r })), where: "docs/design" },

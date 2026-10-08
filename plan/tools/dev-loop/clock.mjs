@@ -1,7 +1,8 @@
 // clock: шаги цикла и их время (S0-46; PLAN.md фазы S0, раздел 8, «замер»). Чистые функции: время приходит параметром.
 // Шаг: {kind, role, job, wave, head, start, end, briefs?, green?, reason?}; end null — шаг идёт.
 //   agent  — executor или fixer: от dl brief до dl check или dl answer; briefs — {имя brief: байт};
-//   gate   — dl gate: прогон verify; green — его исход;
+//   gate   — dl gate: prove --gate (S0-43); green — его исход; shadow, taken и ran — режим, test-sets из записей и
+//            прогнанные; mismatches — расхождения shadow с записями; red — {set, key} красных test-sets;
 //   review — круг: от dl wave до dl merge; role reviewer; reason — почему круг; briefs — brief'ы ревьюеров;
 //   owner  — от dl escalate до dl owner.
 // Время — ISO-строки UTC: их порядок — порядок строк.
@@ -32,6 +33,14 @@ export function reasonOf(state, { rebased }) {
   if (state.answers?.job === "tidy") return "tidy";
   if (state.answers?.job === "answer") return "block";
   return "owner";
+}
+
+// Head, на котором последние ворота зелёные, если с тех пор ни один шаг не назвал другой head (S0-43); иначе null.
+export function greenHead(steps) {
+  const i = steps.findLastIndex((s) => s.kind === "gate");
+  if (i < 0 || !steps[i].green) return null;
+  const { head } = steps[i];
+  return steps.slice(i + 1).every((s) => s.head === null || s.head === undefined || s.head === head) ? head : null;
 }
 
 // Красных ворот подряд в конце цикла.

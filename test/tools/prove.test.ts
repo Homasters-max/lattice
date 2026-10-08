@@ -5,6 +5,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { classOf, FITNESS, isTool, owns, ST_BY_CLASS, testSetOf } from "../../scripts/paths.mjs";
 import { seedOf, select } from "../../scripts/prove.mjs";
+import { keyOf, type Environment, type Run } from "../../scripts/runs.mjs";
 import { scratch, type Scratch } from "../support/files.js";
 import { program } from "../support/program.js";
 
@@ -13,12 +14,24 @@ const prove = program("scripts/prove.mjs");
 const stands: Scratch[] = [];
 afterAll(() => stands.forEach((s) => s.remove()));
 
-// A step prints its name; `test` prints its filters and the seed it got, and fails when a filter names the set in `red`.
-const STAND = `import { existsSync, readFileSync } from "node:fs";
-const [step, ...filters] = process.argv.slice(2);
+// A step prints its name; `test` prints its filters and the seed it got. Each line of the file `red` makes a run fail:
+// `<set>` — the test set fails, `<set> timeout` — it goes over its budget, `step:<name>` — the step fails. A failed test
+// set goes into the JSON report vitest would write to --outputFile.json.
+const STAND = `import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+const [step, ...args] = process.argv.slice(2);
+const filters = args.filter((a) => !a.startsWith("--"));
+const json = args.find((a) => a.startsWith("--outputFile.json="))?.slice("--outputFile.json=".length);
 console.log(step + " " + filters.join(" ") + " seed=" + process.env.LATTICE_SEED);
-const red = existsSync("red") ? readFileSync("red", "utf8").trim() : null;
-process.exit(red !== null && filters.some((f) => f.startsWith("test/" + red + "/")) ? 1 : 0);
+const red = existsSync("red") ? readFileSync("red", "utf8").trim().split("\\n").map((l) => l.split(" ")) : [];
+if (red.some(([what]) => what === "step:" + step)) process.exit(1);
+const hit = red.filter(([set]) => filters.some((f) => f.startsWith("test/" + set + "/")));
+const result = ([set, how]) => ({
+  name: join(process.cwd(), "test", set, "x.test.ts").replaceAll("\\\\", "/"), status: "failed", message: "",
+  assertionResults: [{ status: "failed", fullName: "x " + (how ?? "fails"), failureMessages: [how === "timeout" ? "Error: Test timed out in 30000ms." : "AssertionError: boom"] }],
+});
+if (json) writeFileSync(json, JSON.stringify({ success: hit.length === 0, testResults: hit.map(result) }));
+process.exit(hit.length ? 1 : 0);
 `;
 
 const STEPS = ["lint:ids", "plan:check", "lint:eol", "typecheck", "lint", "build", "test"];
@@ -170,14 +183,15 @@ describe("prove, the input beyond the files of a test set: programs, the config 
 
 type Report = {
   outcome: string;
-  sets: { set: string; reasons: string[]; hash: string; seed: number; exit: number }[];
+  sets: { set: string; reasons: string[]; hash: string; key: string; seed: number; exit: number; outcome: string; failed: string[] }[];
   skipped: string[];
   steps: { step: string; exit: number }[];
   log: string;
+  gate?: { shadow: boolean; recorded: string[]; taken: string[]; ran: string[]; mismatches: { set: string; key: string; recorded: string; outcome: string }[] };
 };
 
-async function proveRun(): Promise<{ status: number; report: Report }> {
-  const ran = await prove.start(["--base", "main"], { cwd: stand.dir });
+async function proveRun(args: readonly string[] = [], cwd = stand.dir): Promise<{ status: number; report: Report }> {
+  const ran = await prove.start(["--base", "main", ...args], { cwd });
   const last = ran.stdout.trimEnd().split("\n").at(-1) ?? "";
   return { status: ran.status, report: JSON.parse(last) as Report };
 }
@@ -203,5 +217,132 @@ describe("prove, the run", () => {
   it("ST-12: outcome passed and exit 0 when every set and step is green", async () => {
     const run = await proveRun();
     expect([run.status, run.report.outcome, run.report.sets.map((s) => s.set)]).toEqual([0, "passed", ["structure"]]);
+  });
+});
+
+/** The key of each test set of the stand after the edits, on `environment` or on that of the run. */
+function keys(edits: { readonly [path: string]: string } = {}, options: { base?: string; environment?: Environment } = {}) {
+  for (const [path, text] of Object.entries(edits)) stand.write(path, text);
+  return Object.fromEntries(select({ dir: stand.dir, base: options.base ?? "main", environment: options.environment }).sets.map((s) => [s.set, s.key]));
+}
+
+const head = (cwd = stand.dir) => git.run(["rev-parse", "HEAD"], { cwd }).stdout.trim();
+const record = (key: string, dir = stand) => JSON.parse(dir.text(`.lattice/verify-runs/${key}.json`)) as Run;
+const RECORD_FIELDS = ["test_set", "code", "knowledge", "tools", "environment", "seed", "outcome", "failed", "ms", "head", "at"];
+
+describe("prove, the key of a record: the test set, its inputs and the environment (S0-43)", () => {
+  it("ST-12: an edit of a file of a test set gives that set a new key; an edit outside its input keeps the key", () => {
+    const before = keys();
+    const after = keys({ "test/ledger/b.test.ts": 'import { b } from "../../src/ledger/b.js";\nexport const t = b + 1;\n' });
+    expect(after.ledger).not.toBe(before.ledger);
+    expect([after.kernel, after.trust, after.tools]).toEqual([before.kernel, before.trust, before.tools]);
+    // A fitness set owns the whole repository: every edit is in its input.
+    expect(after.structure).not.toBe(before.structure);
+  });
+
+  it("ST-12: an edit of docs/design gives a new key to the sets that read knowledge, and to them alone", () => {
+    const before = keys();
+    const after = keys({ "docs/design/01-a.md": "# A\n\nmore\n" });
+    expect([after.trust !== before.trust, after.structure !== before.structure]).toEqual([true, true]);
+    expect([after.kernel, after.ledger, after.tools]).toEqual([before.kernel, before.ledger, before.tools]);
+  });
+
+  it("ST-12: an edit of the lockfile gives every set a new key", () => {
+    const before = keys();
+    const after = keys({ "package-lock.json": '{"lockfileVersion": 3}\n' });
+    expect(Object.keys(after).filter((set) => after[set] === before[set])).toEqual([]);
+  });
+
+  it("ST-12: another environment gives every set a new key", () => {
+    const here = keys();
+    const there = keys({}, { environment: { os: "plan9", node: 1, git: 1 } });
+    expect(Object.keys(here).filter((set) => here[set] === there[set])).toEqual([]);
+  });
+
+  it("ST-12: the key is of the tree, not of the base it is compared with", () => {
+    stand.write("src/trust/c.ts", "export const c = 4;\n");
+    inStand([...COMMIT, "next"]);
+    expect(keys({}, { base: "HEAD~1" })).toEqual(keys({}, { base: "HEAD" }));
+  });
+});
+
+describe("prove, the records of its runs (S0-43)", () => {
+  it("ST-12: writes a record of each test set it ran, under the key of its inputs", async () => {
+    const run = await proveRun();
+    expect(run.report.sets.map((s) => [s.set, s.outcome, s.failed])).toEqual([["structure", "ok", []]]);
+    const [structure] = run.report.sets;
+    const r = record(structure!.key);
+    expect(Object.keys(r).sort()).toEqual([...RECORD_FIELDS].sort());
+    expect(r).toMatchObject({ test_set: "structure", seed: structure!.seed, outcome: "ok", failed: [], head: head() });
+    expect(keyOf(r)).toBe(structure!.key);
+  });
+
+  it("ST-12: run from a worktree, writes the records in the working copy of its common git dir", async () => {
+    const other = scratch("prove-worktree-");
+    stands.push(other);
+    const linked = other.path("linked");
+    inStand(["worktree", "add", "-q", "--detach", linked, "HEAD"]);
+    const run = await proveRun([], linked);
+    const key = run.report.sets[0]!.key;
+    expect([stand.exists(`.lattice/verify-runs/${key}.json`), other.exists(`linked/.lattice/verify-runs/${key}.json`)]).toEqual([true, false]);
+  });
+
+  it("ST-12: a red test set gets outcome failed and its failed tests; one over its budget gets budget-exceeded", async () => {
+    stand.write("src/ledger/b.ts", 'import { a } from "../kernel/a.js";\nexport const b = a + 2;\n');
+    stand.write("red", "ledger\n");
+    const red = (await proveRun()).report.sets.find((s) => s.set === "ledger")!;
+    expect(record(red.key)).toMatchObject({ outcome: "failed", failed: ["test/ledger/x.test.ts > x fails"] });
+    stand.write("red", "ledger timeout\n");
+    const slow = (await proveRun()).report.sets.find((s) => s.set === "ledger")!;
+    expect([slow.key, record(slow.key).outcome, record(slow.key).failed]).toEqual([red.key, "budget-exceeded", ["test/ledger/x.test.ts > x timeout"]]);
+  });
+
+  it("ST-12: a red step fails the record of each fitness set: the steps are fitness tests over the same repository", async () => {
+    stand.write("red", "step:lint\n");
+    const run = await proveRun();
+    expect(run.status).not.toBe(0);
+    expect(record(run.report.sets[0]!.key)).toMatchObject({ test_set: "structure", outcome: "failed", failed: ["step: lint"] });
+  });
+});
+
+describe("prove --gate: the head by the records of its keys (S0-43)", () => {
+  const ALL = ["kernel", "ledger", "structure", "tools", "trust"];
+
+  it("ST-12: runs nothing — no test set, no step — when every key of the head has a record ok", async () => {
+    const first = await proveRun(["--gate", "--shadow"]);
+    expect([first.status, first.report.gate?.ran]).toEqual([0, ALL]);
+    const gate = await proveRun(["--gate"]);
+    expect([gate.status, gate.report.outcome, gate.report.sets, gate.report.steps]).toEqual([0, "passed", [], []]);
+    expect(gate.report.gate).toEqual({ shadow: false, recorded: ALL, taken: ALL, ran: [], mismatches: [] });
+  });
+
+  it("ST-12: runs only the test sets whose key has no record ok, the steps with fitness alone", async () => {
+    const first = await proveRun(["--gate", "--shadow"]);
+    stand.remove(`.lattice/verify-runs/${first.report.sets.find((s) => s.set === "trust")!.key}.json`);
+    const missing = await proveRun(["--gate"]);
+    expect([missing.report.gate?.ran, missing.report.steps]).toEqual([["trust"], []]);
+    // An edit is in the input of every fitness set: they run again, and the steps with them.
+    stand.write("src/kernel/a.ts", "export const a = 2;\n");
+    const edited = await proveRun(["--gate"]);
+    expect(edited.report.gate?.ran).toEqual(["kernel", "ledger", "structure"]);
+    expect(edited.report.steps.map((s) => s.step)).toEqual(STEPS.filter((s) => s !== "test"));
+  });
+
+  it("ST-12: a set whose record is not ok runs again", async () => {
+    stand.write("red", "trust\n");
+    await proveRun(["--gate", "--shadow"]);
+    stand.remove("red");
+    const gate = await proveRun(["--gate"]);
+    expect([gate.status, gate.report.gate?.ran, gate.report.sets.map((s) => s.outcome)]).toEqual([0, ["trust"], ["ok"]]);
+  });
+
+  it("ST-12: in shadow runs every set though its record is ok, and names each set whose outcome differs from its record", async () => {
+    const first = await proveRun(["--gate", "--shadow"]);
+    const ledger = first.report.sets.find((s) => s.set === "ledger")!.key;
+    stand.write("red", "ledger\n");
+    const shadow = await proveRun(["--gate", "--shadow"]);
+    expect(shadow.status).not.toBe(0);
+    expect(shadow.report.gate).toEqual({ shadow: true, recorded: ALL, taken: [], ran: ALL, mismatches: [{ set: "ledger", key: ledger, recorded: "ok", outcome: "failed" }] });
+    expect(record(ledger).outcome).toBe("failed");
   });
 });

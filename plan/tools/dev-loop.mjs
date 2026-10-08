@@ -2,13 +2,15 @@
 // dev-loop: инструмент оркестратора /dev-loop (plan/dev-loop.md). Каждая команда печатает одну строку JSON.
 //   scope <base> [<head>] [--since <ref>]                   hunk'и ветки и оси, чьи триггеры они задевают
 //   start (--task T | --pr N) [--root R]                      старт или продолжение: копия на main, worktree, npm ci, PR задачи —
-//                                                             у новой задачи ветка, коммит «T: start» и draft PR (S0-51), следующий шаг
+//                                                             у новой задачи ветка, коммит «T: start» и draft PR (S0-51), следующий шаг;
+//                                                             записи run'ов старше 30 дней удаляются (S0-43)
 //   brief executor --dir D --task T --worktree W [--owner текст]   brief в бюджете: данные задачи (context.mjs, S0-48)
 //   step selfcheck|pr|deviation|where [--worktree W] [--task T]       материал шага агента: самопроверка по diff ветки
 //                                                             или раздел plan-task как есть
 //   init --dir D --task T (--from executor.out.json | --pr N --branch B)
 //   ready --dir D --worktree W --from executor.out.json       сдача (шаг 6 plan-task): пункты done → [x], доска, фаза, plan-check, push, PR ready
-//   gate --dir D --worktree W                                 ворота: verify на запушенном head в D/verify.log, следующий шаг
+//   gate --dir D --worktree W                                 ворота: prove --gate на запушенном head в D/verify.log — по записям
+//                                                             run'ов, в shadow всё (S0-43), следующий шаг
 //   wave --dir D --worktree W [--early | --conflicts a,b]     следующий круг: briefs агентов; --early — оси, которые стартуют
 //                                                             вместе с воротами; без него — остальные агенты того же круга
 //   check <файл.out.json> [--dir D]                           выход агента против его brief; с --dir — конец шага агента
@@ -21,6 +23,7 @@
 //   restore --dir D --comments файл.json                      состояние из `gh pr view --json comments` (отладка; start делает сам)
 // Файлы цикла в D: state.json, waves/<n>/<агент>.in.json и .out.json, waves/<n>/scope.json, waves/<n>/diff.patch, comments/<NN>-<вид>.md,
 //   verify.log — лог последних ворот, steps.json — шаги до init (init переносит их в состояние).
+// Записи run'ов — .lattice/verify-runs/ рабочей копии владельца (scripts/runs.mjs): пишет их только prove.
 // Время шагов (clock.mjs) — сейчас или DEV_LOOP_NOW (ISO), если задано: так тесты не ждут.
 import { execFileSync, spawnSync } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -32,6 +35,7 @@ import { answer, decision, escalation, final, parseHeader, questions, review } f
 import { changedLines, conventionsChanged, scope } from "./dev-loop/scope.mjs";
 import { answerFindings, answerText, ask, entryOf, initial, looseFindings, mergeWave, openFindings, planWave, recordAnswer, rememberMutants } from "./dev-loop/state.mjs";
 import { advancePhase, closeOnBoard, findTask, itemsOf, markItems } from "./dev-loop/task.mjs";
+import { pruneRuns, readRun, runsDir } from "../../scripts/runs.mjs";
 
 const COMMENT_MAX = 65000;
 const [command, ...rest] = process.argv.slice(2);
@@ -238,6 +242,15 @@ function executorBrief() {
   print({ ok: true, brief: file });
 }
 
+// Записи run'ов красных test-sets последних ворот (S0-43): по ключам из шага ворот, в рабочей копии владельца.
+// Записи ключа нет — строка называет test-set и ключ.
+function redRuns(state, worktree) {
+  const last = stepsOf(state).findLast((s) => s.kind === "gate");
+  if (!last?.red?.length) return [];
+  const runs = runsDir(worktree);
+  return last.red.map(({ set, key }) => readRun(runs, key) ?? { test_set: set, key, record: null });
+}
+
 function brief() {
   if (positional[0] === "executor") return executorBrief();
   if (positional[0] !== "fixer") fail("brief executor | fixer");
@@ -248,13 +261,14 @@ function brief() {
   // answer решает и советы своего круга (S0-45); tidy — советы и находки вне дельты после круга без блокирующих.
   const loose = job === "tidy" ? looseFindings(state) : [];
   const advice = job === "answer" ? state.findings.filter((f) => f.status === "advice") : loose.filter((f) => f.severity === "advice");
+  const runs = job === "verify-red" ? redRuns(state, need("worktree")) : [];
   write(file, fixerContext({
     role: "fixer", job, pr: state.pr, task: state.task, branch: state.branch, worktree: need("worktree"), base: state.head ?? undefined,
     since: job === "tidy" ? git(need("worktree"), "merge-base", "origin/main", "HEAD") : undefined,
     findings: job === "answer" ? openFindings(state).map(slim) : loose.filter((f) => f.severity === "block").map(slim),
     advice: advice.map(slim),
     decisions: job === "answer" ? state.decisions : [], log: flags.log, owner: flags.owner ?? state.owner?.text, out: file.replace(".in.json", ".out.json"),
-  }));
+  }, { runs }));
   const step = { kind: "agent", role: "fixer", job, wave: state.wave, briefs: { [`fixer-${job}`]: statSync(file).size } };
   save({ ...state, owner: null, steps: begin(stepsOf(state), step, now()) });
   print({ ok: true, brief: file });
@@ -321,7 +335,22 @@ function init() {
   print({ ok: true, state: statePath(), existed });
 }
 
-// Ворота: verify на head, запушенном в ветку цикла, лог — в D/verify.log. Красные трижды подряд — к владельцу.
+// Ворота в shadow (S0-43): prove гонит все test-sets head и сравнивает исход с записью того же ключа. Пропуск по записям
+// включает решение владельца после двух задач без расхождений — тогда здесь false.
+const GATE_SHADOW = true;
+
+// Последняя строка лога — JSON итога prove; нет её — null.
+function proveLine(log) {
+  try {
+    return JSON.parse(readFileSync(log, "utf8").trimEnd().split("\n").at(-1));
+  } catch {
+    return null;
+  }
+}
+
+// Ворота: `prove --gate` на head, запушенном в ветку цикла, лог — в D/verify.log (S0-43): test-sets, у ключей которых
+// нет записи ok, а в shadow — все. В шаг ворот идут взятое из записей, прогнанное, расхождения shadow и ключи красных
+// test-sets — по ним brief verify-red берёт записи. Красные трижды подряд — к владельцу.
 function gate() {
   const state = load();
   const worktree = need("worktree");
@@ -331,16 +360,19 @@ function gate() {
   git(worktree, "checkout", "-q", "--detach", `origin/${state.branch}`);
   const log = join(dir(), "verify.log");
   const fd = openSync(log, "w");
-  const run = spawnSync("npm run verify", { cwd: worktree, shell: true, stdio: ["ignore", fd, fd] });
+  const run = spawnSync(`npm run --silent prove -- --gate${GATE_SHADOW ? " --shadow" : ""}`, { cwd: worktree, shell: true, stdio: ["ignore", fd, fd] });
   closeSync(fd);
   const green = run.status === 0;
   const head = git(worktree, "rev-parse", "HEAD");
+  const line = proveLine(log);
+  const { shadow = GATE_SHADOW, taken = [], ran = [], mismatches = [] } = line?.gate ?? {};
+  const red = (line?.sets ?? []).filter((s) => s.outcome !== "ok").map(({ set, key }) => ({ set, key }));
   // Ревью стартует вместе с воротами (S0-45): за прогон `dl wave --early` мог записать состояние — оно читается заново.
   const latest = load();
-  const steps = [...stepsOf(latest), { kind: "gate", role: null, job: null, wave: latest.wave, head, start, end: now(), green }];
+  const steps = [...stepsOf(latest), { kind: "gate", role: null, job: null, wave: latest.wave, head, start, end: now(), green, shadow, taken, ran, mismatches, red }];
   save({ ...latest, steps });
   const route = green ? { next: "wave" } : redsInRow(steps) >= 3 ? { next: "escalate", why: "verify красный трижды" } : { next: "red" };
-  print({ ok: true, head, green, log, ...route });
+  print({ ok: true, head, green, log, shadow, taken, ran, mismatches, ...route });
 }
 
 // Состояние из комментариев PR → {entry, next, …}; entry none — заголовков цикла нет.
@@ -435,6 +467,8 @@ function openPr(work, task) {
 function start() {
   const repo = git(".", "rev-parse", "--show-toplevel");
   git(repo, "fetch", "-q", "origin");
+  // Записи run'ов старше 30 дней (S0-43) — в рабочей копии владельца, откуда бы ни запустили start.
+  const pruned = pruneRuns(runsDir(repo), now());
   const copy = syncCopy(repo);
   let pr = findPr();
   const task = flags.task ?? /^(S\d-\d{2})\b/.exec(pr?.title ?? "")?.[1] ?? null;
@@ -461,7 +495,7 @@ function start() {
       route = { entry: "none", next: pr.isDraft ? "executor" : "gate" };
     }
   }
-  print({ ok: true, task, pr: pr?.number ?? null, branch: pr?.headRefName ?? null, dir: loop, work, created, interrupted, opened, brief: interrupted ? lastBrief(loop) : null, copy, ...route });
+  print({ ok: true, task, pr: pr?.number ?? null, branch: pr?.headRefName ?? null, dir: loop, work, created, interrupted, opened, brief: interrupted ? lastBrief(loop) : null, copy, pruned, ...route });
 }
 
 // Изменения сдачи в worktree: пункты done → [x], задача ✅ со ссылкой на PR на доске, фаза → 🔄 или 🔍.

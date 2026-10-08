@@ -7,6 +7,7 @@
 //   без вердикта нужной оси, steps — шаги цикла и их время (clock.mjs)}.
 // Статусы находки: open, dispute-kept, closed, dispute-accepted, advice, applied, deferred (+ deferredTo), declined, owner-closed.
 // Находка: {id, axis, severity, rule, where, quote, text, ratchet, late, wave, status, history[{wave, status, note}]}.
+import { greenHead } from "./clock.mjs";
 import { LETTER } from "./protocol.mjs";
 import { HUNK_AXES } from "./scope.mjs";
 
@@ -223,7 +224,8 @@ export function answerFindings(state, answers) {
 }
 
 // Ответ владельца текстом: стоп, ответ агенту, который спрашивал, или поручение исправляющему.
-// Остановленный цикл ответ владельца возобновляет: «продолжить» — к воротам и следующему кругу, иной текст — поручение.
+// Остановленный цикл ответ владельца возобновляет: «продолжить» — к воротам и следующему кругу, а если ворота на head
+// уже зелёные, — сразу к кругу (S0-43); иной текст — поручение.
 export function answerText(state, text) {
   if (!state.pending && !state.stopped) return { errors: ["владельца ни о чём не спрашивали"] };
   const next = structuredClone(state);
@@ -234,7 +236,10 @@ export function answerText(state, text) {
     return { errors: [], state: next, next: "stop", why: "владелец остановил цикл" };
   }
   next.stopped = false;
-  if (state.stopped && /^\s*продолжить\s*$/i.test(text)) return { errors: [], state: next, next: "gate", why: "владелец возобновил цикл" };
+  if (state.stopped && /^\s*продолжить\s*$/i.test(text)) {
+    const green = greenHead(state.steps ?? []);
+    return { errors: [], state: next, next: green ? "wave" : "gate", why: green ? `владелец возобновил цикл; ворота на head ${green.slice(0, 7)} зелёные` : "владелец возобновил цикл" };
+  }
   next.owner = agent ? { text, agent, job: state.pending.job } : { text, agent: "fixer", job: "owner" };
   return { errors: [], state: next, ...resumeOf(next) };
 }

@@ -1,7 +1,7 @@
 // dev-loop measures its own loop (S0-46): every step — an agent, the gate, a review round, the owner — keeps
-// its start and end in the state of the loop; dl gate runs verify into a log and says where to go; dl final
-// prints the critical path, the rounds by their reason and the sizes of the briefs. Time comes through
-// DEV_LOOP_NOW, so the cases never wait. The repository is built once and copied for each case (S0-40).
+// its start and end in the state of the loop; dl final prints the critical path, the rounds by their reason and the
+// sizes of the briefs. The gate itself is the cases of dev-loop-gate.test.ts. Time comes through DEV_LOOP_NOW, so the
+// cases never wait. The repository is built once and copied for each case (S0-40).
 import { basename, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { scratch, type Scratch } from "../support/files.js";
@@ -18,8 +18,8 @@ type Json = { [key: string]: unknown };
 type Loop = { work: string; dir: string };
 type Files = { readonly [path: string]: string };
 type Step = { kind: string; role: string | null; job: string | null; wave: number; head: string | null; start: string; end: string | null; green?: boolean; reason?: string };
-// The moment of a command: minute m of one morning; red — verify fails; hold — verify waits for this file.
-type At = { at: string; red?: boolean; hold?: string };
+// The moment of a command: minute m of one morning; red — the prove the gate runs fails.
+type At = { at: string; red?: boolean };
 
 const t = (m: number): At => ({ at: new Date(Date.UTC(2026, 9, 8, 10, m)).toISOString() });
 const red = (m: number): At => ({ ...t(m), red: true });
@@ -42,28 +42,13 @@ async function commit(work: string, files: Files, message: string): Promise<stri
 }
 
 const land = (n: number) => `export function land(): number {\n  return ${n};\n}\n`;
-// verify of the repository: red while RED is set, its output goes to the log of the gate; while HOLD is set it says
-// it started and waits for the file HOLD, so a case runs another command of dl during the gate. CONVENTIONS.md holds
-// the item findings name (CONVENTIONS §N.M).
+// prove of the repository, which dl gate runs (S0-43): red while RED is set, its output goes to the log of the gate.
+// CONVENTIONS.md holds the item findings name (CONVENTIONS §N.M).
 const MAIN: Files = {
   "src/ledger/land.ts": land(1),
   "CONVENTIONS.md": "# C\n\n## 1. A\n\n### §1.1 One\nОбласть: `src/**`\n",
-  "package.json": JSON.stringify({ name: "t", private: true, scripts: { verify: "node verify.mjs" } }) + "\n",
-  "verify.mjs": [
-    'import { existsSync, writeFileSync } from "node:fs";',
-    "const hold = process.env.HOLD;",
-    "if (hold) {",
-    '  writeFileSync(`${hold}.started`, "");',
-    "  const sleep = new Int32Array(new SharedArrayBuffer(4));",
-    "  for (const end = Date.now() + 30000; !existsSync(hold) && Date.now() < end; ) Atomics.wait(sleep, 0, 0, 20);",
-    "}",
-    "if (process.env.RED) {",
-    '  console.log("verify: boom");',
-    "  process.exit(1);",
-    "}",
-    'console.log("verify: fine");',
-    "",
-  ].join("\n"),
+  "package.json": JSON.stringify({ name: "t", private: true, scripts: { prove: "node prove.mjs" } }) + "\n",
+  "prove.mjs": ["const red = Boolean(process.env.RED);", 'console.log(red ? "prove: boom" : "prove: fine");', "process.exit(red ? 1 : 0);", ""].join("\n"),
   // The task the executor hands in: dl check reads the items it names done (S0-51).
   "plan/phases/S0-x/tasks/S0-99-x.md": "---\nid: S0-99\ntitle: X\nphase: S0\n---\n\n## Готово, когда\n\n- [ ] land works\n",
 };
@@ -98,8 +83,6 @@ async function dl(l: Loop, when: At, ...args: string[]): Promise<Json> {
   const env: NodeJS.ProcessEnv = { ...process.env, DEV_LOOP_GH: gh, DEV_LOOP_NOW: when.at };
   if (when.red === true) env.RED = "1";
   else delete env.RED;
-  if (when.hold !== undefined) env.HOLD = when.hold;
-  else delete env.HOLD;
   return JSON.parse(await sh(l.work, tool, [...args, "--dir", l.dir], env)) as Json;
 }
 
@@ -152,8 +135,8 @@ async function wholeLoop(l: Loop): Promise<void> {
   expect(await dl(l, t(42), "merge")).toMatchObject({ ok: true, next: "done" });
   await dl(l, t(43), "escalate", "--why", "проверить");
   expect(await dl(l, t(50), "owner", "--text", "стоп")).toMatchObject({ next: "stop" });
-  expect(await dl(l, t(52), "owner", "--text", "продолжить")).toMatchObject({ next: "gate" });
-  await dl(l, t(53), "gate", "--worktree", l.work);
+  // The gate at minute 39 is green on the head, and nothing pushed since: «продолжить» goes to the round, not the gate (S0-43).
+  expect(await dl(l, t(52), "owner", "--text", "продолжить")).toMatchObject({ next: "wave" });
   expect(await round(l, t(54), t(55))).toMatchObject({ ok: true, wave: 3, next: "done" });
 }
 
@@ -192,11 +175,10 @@ describe.concurrent("dev-loop, the time of every step", { timeout: 60_000 }, () 
       ["gate", null, null, 1, fix, t(39).at, t(39).at],
       ["review", "reviewer", null, 2, fix, t(40).at, t(42).at],
       ["owner", null, null, 2, fix, t(43).at, t(50).at],
-      ["gate", null, null, 2, fix, t(53).at, t(53).at],
       ["review", "reviewer", null, 3, fix, t(54).at, t(55).at],
     ]);
     expect(s.every((x) => x.end !== null && x.start <= x.end)).toBe(true);
-    expect(s.filter((x) => x.kind === "gate").map((x) => x.green)).toEqual([false, true, true, true]);
+    expect(s.filter((x) => x.kind === "gate").map((x) => x.green)).toEqual([false, true, true]);
     expect(s.filter((x) => x.kind === "review").map((x) => x.reason)).toEqual(["first", "block", "owner"]);
     await dl(l, t(60), "final", "--worktree", l.work);
     temp.remove(join(l.dir, "state.json"));
@@ -208,9 +190,9 @@ describe.concurrent("dev-loop, the time of every step", { timeout: 60_000 }, () 
     const l = await loop();
     await wholeLoop(l);
     const report = temp.text((await dl(l, t(60), "final", "--worktree", l.work)).comment as string);
-    expect(report).toContain("Критический путь, мин: executor 10.0 → ворота 0.0 → fixer verify-red 2.0 → ворота 0.0 → круг 1 7.0 → fixer answer 10.0 → ворота 0.0 → круг 2 2.0 → владелец 7.0 → ворота 0.0 → круг 3 1.0.");
+    expect(report).toContain("Критический путь, мин: executor 10.0 → ворота 0.0 → fixer verify-red 2.0 → ворота 0.0 → круг 1 7.0 → fixer answer 10.0 → ворота 0.0 → круг 2 2.0 → владелец 7.0 → круг 3 1.0.");
     expect(report).toContain("Весь цикл 60.0 мин: в шагах 39.0, вне шагов 21.0.");
-    for (const row of ["| executor | 1 | 10.0 |", "| ворота | 4, красных 1 | 0.0 |", "| круги: первый | 1 | 7.0 |", "| круги: блокирующие | 1 | 2.0 |", "| круги: tidy | 0 | 0.0 |", "| круги: владелец | 1 | 1.0 |", "| круги: rebase | 0 | 0.0 |", "| fixer | 2 | 12.0 |", "| владелец | 1 | 7.0 |"])
+    for (const row of ["| executor | 1 | 10.0 |", "| ворота | 3, красных 1 | 0.0 |", "| круги: первый | 1 | 7.0 |", "| круги: блокирующие | 1 | 2.0 |", "| круги: tidy | 0 | 0.0 |", "| круги: владелец | 1 | 1.0 |", "| круги: rebase | 0 | 0.0 |", "| fixer | 2 | 12.0 |", "| владелец | 1 | 7.0 |"])
       expect(report).toContain(row);
     // Each brief of the loop is on disk once: the table holds, by its name, the count, the largest and the sum of their sizes.
     const sizes = new Map<string, number[]>();
@@ -261,55 +243,5 @@ describe.concurrent("dev-loop, the reason of each round", { timeout: 60_000 }, (
     expect(steps(l).filter((x) => x.kind === "review").map((x) => x.reason)).toEqual(["first", "tidy", "rebase"]);
     const report = temp.text((await dl(l, t(12), "final", "--worktree", l.work)).comment as string);
     for (const row of ["| круги: tidy | 1 | 1.0 |", "| круги: rebase | 1 | 2.0 |", "| fixer | 2 | 2.0 |"]) expect(report).toContain(row);
-  });
-});
-
-describe.concurrent("dev-loop gate", { timeout: 60_000 }, () => {
-  it("runs verify into the log and goes to the round when it is green, to the fixer when it is red", async () => {
-    const l = await loop();
-    await dl(l, t(0), "init", "--pr", "9", "--task", "S0-99", "--branch", BRANCH);
-    const log = join(l.dir, "verify.log");
-    expect(await dl(l, red(1), "gate", "--worktree", l.work)).toMatchObject({ ok: true, green: false, log, next: "red" });
-    expect(temp.text(log)).toContain("verify: boom");
-    expect(await dl(l, t(2), "gate", "--worktree", l.work)).toMatchObject({ ok: true, green: true, log, next: "wave" });
-    expect(temp.text(log)).toContain("verify: fine");
-    expect(temp.text(log)).not.toContain("verify: boom");
-  });
-
-  it("asks the owner on the third red in a row; a green gate starts the count again", async () => {
-    const l = await loop();
-    await dl(l, t(0), "init", "--pr", "9", "--task", "S0-99", "--branch", BRANCH);
-    expect(await dl(l, red(1), "gate", "--worktree", l.work)).toMatchObject({ next: "red" });
-    expect(await dl(l, red(2), "gate", "--worktree", l.work)).toMatchObject({ next: "red" });
-    expect(await dl(l, red(3), "gate", "--worktree", l.work)).toMatchObject({ green: false, next: "escalate", why: "verify красный трижды" });
-    expect(await dl(l, t(4), "gate", "--worktree", l.work)).toMatchObject({ green: true, next: "wave" });
-    expect(await dl(l, red(5), "gate", "--worktree", l.work)).toMatchObject({ next: "red" });
-  });
-
-  it("keeps what dl wave --early wrote to the state while verify ran: the gate reads the state again before it writes", async () => {
-    const l = await loop();
-    await dl(l, t(0), "init", "--pr", "9", "--task", "S0-99", "--branch", BRANCH);
-    const hold = join(l.dir, "hold");
-    const gate = dl(l, { ...t(1), hold }, "gate", "--worktree", l.work);
-    for (let i = 0; i < 1500 && !temp.exists(`${hold}.started`); i++) await new Promise((done) => setTimeout(done, 20));
-    expect(await dl(l, t(2), "wave", "--worktree", l.work, "--early")).toMatchObject({ ok: true, wave: 1, next: "gate" });
-    temp.write(hold, "");
-    expect(await gate).toMatchObject({ ok: true, green: true, next: "wave" });
-    expect(steps(l).map((x) => [x.kind, x.wave, x.start, x.end])).toEqual([
-      ["review", 1, t(2).at, null],
-      ["gate", 0, t(1).at, t(1).at],
-    ]);
-  });
-
-  it("verifies the head pushed to the branch, and refuses a worktree with changes", async () => {
-    const l = await loop();
-    await dl(l, t(0), "init", "--pr", "9", "--task", "S0-99", "--branch", BRANCH);
-    const pushed = await head(l);
-    temp.write(join(l.work, "local.txt"), "x");
-    expect(await dl(l, t(1), "gate", "--worktree", l.work)).toMatchObject({ ok: false, error: "в worktree есть изменения: ворота проверяют запушенный head" });
-    await sh(l.work, git, ["add", "-A"]);
-    await sh(l.work, git, ["commit", "-q", "-m", "local"]);
-    expect(await dl(l, t(2), "gate", "--worktree", l.work)).toMatchObject({ ok: true, head: pushed, green: true });
-    expect(await head(l)).toBe(pushed);
   });
 });
