@@ -55,7 +55,7 @@ describe("the sources of the types of std (S0-08, S0-09)", () => {
 
 describe("the base types and what extends them", () => {
   it("TY-03, G-02, G-39: each base type is a root entity type with an optional supersedes of pinned references, label supersedes; all but decision-point are abstract", () => {
-    const own: Record<string, readonly string[]> = { implementation: ["contract", "code"], "decision-point": ["candidates", "question", "judge", "policy", "bench", "targets"] };
+    const own: { readonly [base: string]: readonly string[] } = { implementation: ["contract", "code"], "decision-point": ["candidates", "question", "judge", "policy", "bench", "targets"] };
     for (const base of BASES) {
       expect([base, body(base).extends, body(base).abstract, body(base).kind, required(base)]).toEqual([base, undefined, base !== "decision-point", "entity", own[base] ?? []]);
       expect([base, field(base, "supersedes")]).toEqual([
