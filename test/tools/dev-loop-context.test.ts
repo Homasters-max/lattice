@@ -164,6 +164,37 @@ describe.concurrent("dev-loop briefs of the reviewers", { timeout: 30_000 }, () 
   });
 });
 
+describe.concurrent("dev-loop hunks of each axis", { timeout: 30_000 }, () => {
+  it("gives Spec in the full wave the hunks of every changed file but the generated ones", async () => {
+    const l = await loop({ "src/ledger/land.ts": land(2), "plan/notes.md": "notes\n", "gen/rules.json": "{}\n" });
+    const spec = read((await wave(l))["reviewer-spec"]!);
+    expect(spec.job).toBe("full");
+    expect((spec.context.hunks as { file: string }[]).map((h) => h.file)).toEqual(["plan/notes.md", "src/ledger/land.ts"]);
+    expect((spec.context.hunks as { diff: string }[])[1]!.diff).toContain("+  return 2;");
+  });
+
+  it("gives the verifier closing a wave the hunks of every file of the delta and only of the delta", async () => {
+    const l = await loop({ "src/ledger/land.ts": land(2) });
+    const head = await sh(l.work, "git", ["rev-parse", "HEAD"]);
+    const finding = { kind: "rule", rule: "LG-23", where: "src/ledger/land.ts:2", quote: "return 2;", text: "use the port" };
+    for (const [agent, brief] of Object.entries(await wave(l)))
+      writeFileSync(brief.replace(".in.json", ".out.json"), JSON.stringify({ axis: read(brief).axis, head, summary: "checked", statuses: [], findings: agent === "reviewer-standards" ? [finding] : [] }));
+    expect(await dl(l, "merge")).toMatchObject({ ok: true, next: "fix" });
+    const fb = (await dl(l, "brief", "fixer", "--worktree", l.work, "--job", "answer")).brief as string;
+    await put(l.work, { "src/ledger/land.ts": land(3), "plan/phases/S0-x/tasks/S0-99-x.md": `${TASK}- [ ] the port\n` });
+    await sh(l.work, "git", ["commit", "-q", "-am", "S0-99: review — the port"]);
+    await sh(l.work, "git", ["push", "-q", "origin", `HEAD:refs/heads/${BRANCH}`]);
+    const fix = await sh(l.work, "git", ["rev-parse", "HEAD"]);
+    writeFileSync(fb.replace(".in.json", ".out.json"), JSON.stringify({ status: "done", head: fix, answers: [{ id: "W1-T1", action: "fixed", commits: [fix] }] }));
+    expect(await dl(l, "answer")).toMatchObject({ ok: true, status: "done" });
+    const v = read((await wave(l))["verifier"]!);
+    expect(v.job).toBe("close");
+    const hunks = v.context.hunks as { file: string; diff: string }[];
+    expect(hunks.map((h) => h.file)).toEqual(["plan/phases/S0-x/tasks/S0-99-x.md", "src/ledger/land.ts"]);
+    expect(hunks[1]!.diff).toContain("-  return 2;\n+  return 3;");
+  });
+});
+
 describe.concurrent("dev-loop briefs of the fixer", { timeout: 30_000 }, () => {
   it("answer: each finding with its hunk, the texts of its rules and the items of CONVENTIONS.md it names or its path falls under", async () => {
     const l = await loop({ "src/ledger/land.ts": land(2) });
