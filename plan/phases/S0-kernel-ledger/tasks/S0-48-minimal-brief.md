@@ -40,7 +40,7 @@ rules: []
   | fixer | находки с hunk'ами и текстами их правил, пункты `CONVENTIONS.md` по путям находок, решения владельца; `verify-red` — упавшие test-sets из JSON прогона |
   | reviewer-spec | файл задачи, тексты правил, тело PR, `expectations`, hunk'и оси, `diff.patch`, находки на статус |
   | reviewer-standards | пункты `CONVENTIONS.md` по области hunk'ов, строки ST по классам путей, hunk'и, `diff.patch` |
-  | reviewer-architecture | текст `plan/closure-check.md`, строки RM-Z04, сработавшие триггеры, hunk'и, `diff.patch` |
+  | reviewer-architecture | текст `plan/closure-check.md`, строки RM-Z04 и правило RM-08 (на него ссылаются `closure-check.md` и находки оси), сработавшие триггеры, hunk'и, `diff.patch` |
   | verifier | находки, ответы, hunk'и дельты; `range` и `files` для `conflicts` |
 
   Карта «класс путей → строки ST» — рядом с классами `scope.mjs` (в S0-42 переезжает в классификатор). Глоссарий — Grep по имени, не чтение целиком. Что не вошло в бюджет — `dl` пишет в brief, что отрезал;
