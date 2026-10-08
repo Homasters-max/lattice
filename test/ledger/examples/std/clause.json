@@ -1,0 +1,51 @@
+{
+  "valid": [
+    {
+      "cells": [
+        {
+          "column": "id",
+          "text": "KR-01"
+        },
+        {
+          "column": "rule",
+          "text": "The kernel knows only Record."
+        }
+      ],
+      "refs": [
+        "lattice/02-kernel.kr-14"
+      ]
+    },
+    {
+      "cells": [
+        {
+          "column": "id",
+          "text": "TY-07"
+        }
+      ],
+      "table": {
+        "header": [
+          "Type",
+          "Body"
+        ],
+        "rows": [
+          [
+            "stage",
+            "input"
+          ]
+        ]
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/cells",
+      "keyword": "minItems",
+      "body": {
+        "cells": [],
+        "refs": [
+          "lattice/02-kernel.kr-14"
+        ]
+      }
+    }
+  ]
+}

@@ -18,7 +18,7 @@ rules: [TY-01, TY-02, LG-44, LG-48]
 ## Объём
 
 Входит:
-- **сборка** `scripts/build-std`: исходники `std/source/` (S0-08) → init ledger `std` (Q-03) → proposal с типами → landing с act владельца; детерминированно: `clock-fixed`, `ids-counter`, dev-ключ ядра `0` (Q-04);
+- **сборка** `scripts/build-std`: исходники `std/source/` и тело записи namespace `std` с метками TY-16 — `std/namespace.json` (S0-08; запись `std/namespace` типа `std/namespace-policy@1`, Q-37) → init ledger `std` (Q-03) → proposal с типами → landing с act владельца; детерминированно: `clock-fixed`, `ids-counter`, dev-ключ ядра `0` (Q-04);
 - **артефакт** `std/knowledge.jsonl` в пакете и константа его hash в коде;
 - **CI**: сборка повторяется и побайтно совпадает с закоммиченным файлом; константа совпадает (LG-48);
 - **проект**: `lattice init` пинит `std` текущей версии LATTICE; read view проекта видит типы `std` (S0-22);
@@ -29,7 +29,7 @@ rules: [TY-01, TY-02, LG-44, LG-48]
 ## Готово, когда
 
 - [ ] `scripts/build-std` воспроизводим, CI сверяет байты и hash
-- [ ] `lattice init` проекта видит `std/namespace`, `std/setup`, `std/clause` и остальные типы S0
+- [ ] `lattice init` проекта видит `std/namespace-policy`, `std/setup`, `std/clause` и остальные типы S0
 - [ ] фикстура LG-48: подменённый `std/knowledge.jsonl` отклоняется при загрузке
 
 ## Риски и заметки

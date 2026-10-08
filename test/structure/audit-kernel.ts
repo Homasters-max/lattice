@@ -33,12 +33,20 @@ export function auditKernelFiles(tree: Tree, listed: readonly string[]): string[
 
 type Text = { readonly text: string; readonly line: number; readonly identifier: boolean };
 
-/** The string literals and identifiers of a file — names, types, properties; comments are not code. */
-function texts(sf: ts.SourceFile): Text[] {
+/**
+ * The string literals and identifiers of a file — names, types, properties; comments are not code. A name the platform
+ * declares — `charCodeAt`, `fromCharCode` — is the platform's, not one the kernel gives: the checker says whose it is.
+ */
+function texts(sf: ts.SourceFile, program: ts.Program): Text[] {
+  const checker = program.getTypeChecker();
+  const platform = (node: ts.Identifier) => {
+    const declarations = checker.getSymbolAtLocation(node)?.declarations ?? [];
+    return declarations.length > 0 && declarations.every((d) => program.isSourceFileDefaultLibrary(d.getSourceFile()));
+  };
   const out: Text[] = [];
   const visit = (node: ts.Node) => {
     const literal = ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateLiteralToken(node);
-    if (literal || ts.isIdentifier(node)) {
+    if (literal || (ts.isIdentifier(node) && !platform(node))) {
       out.push({ text: node.text, line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1, identifier: !literal });
     }
     ts.forEachChild(node, visit);
@@ -65,11 +73,12 @@ function namesIn({ text, identifier }: Text, names: ReadonlySet<string>): string
 
 /** KR-01: string literals that name `std` or one of its types, and identifiers named after a `std` type, in kernel code. */
 export function auditStdNames(tree: Tree, names: ReadonlySet<string>): string[] {
+  const program = tree.program();
   return kernelReach(tree)
     .flatMap((path) => {
-      const sf = tree.files.get(path);
+      const sf = program.getSourceFile(tree.files.get(path)?.fileName ?? "");
       if (sf === undefined) return [];
-      return texts(sf).flatMap((t) => {
+      return texts(sf, program).flatMap((t) => {
         const hit = namesIn(t, names);
         return hit === null ? [] : [`KR-01: ${path}:${t.line} names the std type ${JSON.stringify(hit)}; the kernel knows no std type`];
       });
@@ -78,11 +87,24 @@ export function auditStdNames(tree: Tree, names: ReadonlySet<string>): string[] 
 }
 
 /**
- * The `std` type names of TY-Z02…TY-Z05 in docs/design/03-types.md — the
- * source until S0-08 writes `std` itself: the first column of TY-Z02…TY-Z04,
- * and the types of TY-Z05 except the `core` ones.
+ * KR-01, S0-08: the `std` type names, read from the sources of `std` — the files
+ * of std/source/, one type body per file named by the slug of its `id`.
  */
-export function stdTypeNames(md: string): string[] {
+export function stdTypeNames(files: readonly string[]): string[] {
+  return files
+    .filter((f) => f.endsWith(".json"))
+    .map((f) => f.slice(0, -".json".length))
+    .sort();
+}
+
+/**
+ * KR-01: the `std` type names of TY-Z02…TY-Z05 in docs/design/03-types.md — the
+ * first column of TY-Z02…TY-Z04, and the types of TY-Z05 except the `core` ones.
+ * std/source/ holds only the types of S0 (S0-08); the rest of `std` — `pipeline`,
+ * `review-note`, `live`, `report`, `step`, `run`… — has no source until S0-09
+ * writes it, and the kernel must not name those either.
+ */
+export function designTypeNames(md: string): string[] {
   const names = ["TY-Z02", "TY-Z03", "TY-Z04", "TY-Z05"].flatMap((block) =>
     blockRows(md, block).flatMap((row) => [...typeCell(block, row).matchAll(/`([a-z][a-z0-9-]*)`/g)].map((m) => m[1] ?? "")),
   );

@@ -1,0 +1,154 @@
+{
+  "valid": [
+    {
+      "owner": "dev",
+      "writers": [
+        {
+          "participant": "dev",
+          "kind": "human",
+          "identities": [
+            "github:dev"
+          ],
+          "keys": [
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA dev"
+          ],
+          "roles": [
+            "owner"
+          ],
+          "grants": [
+            "agent"
+          ]
+        }
+      ],
+      "roles": {
+        "agent": {
+          "types": [
+            "std/requirement@1"
+          ],
+          "paths": [
+            "src/"
+          ]
+        }
+      },
+      "pins": {
+        "lattice": "0.1.0",
+        "libraries": [
+          {
+            "name": "demo-lib",
+            "version": "1.0.0",
+            "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ]
+      },
+      "acts": [
+        {
+          "match": [
+            "std/requirement@1"
+          ],
+          "from": [
+            "owner"
+          ],
+          "count": 1
+        }
+      ],
+      "recovery": {
+        "participants": [
+          "alice",
+          "bob"
+        ],
+        "count": 2
+      },
+      "delegation": [
+        "std/test-set@1"
+      ],
+      "labels": {
+        "blocks-on": "a block waits for its target"
+      },
+      "budget": {
+        "ms": 60000,
+        "tokens": 100000,
+        "usd": "2.5",
+        "calls": 40
+      },
+      "quality": "demo/quality@1"
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/labels/Blocks On",
+      "keyword": "values",
+      "body": {
+        "owner": "dev",
+        "writers": [
+          {
+            "participant": "dev",
+            "kind": "human",
+            "identities": [
+              "github:dev"
+            ],
+            "keys": [
+              "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA dev"
+            ],
+            "roles": [
+              "owner"
+            ],
+            "grants": [
+              "agent"
+            ]
+          }
+        ],
+        "roles": {
+          "agent": {
+            "types": [
+              "std/requirement@1"
+            ],
+            "paths": [
+              "src/"
+            ]
+          }
+        },
+        "pins": {
+          "lattice": "0.1.0",
+          "libraries": [
+            {
+              "name": "demo-lib",
+              "version": "1.0.0",
+              "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+            }
+          ]
+        },
+        "acts": [
+          {
+            "match": [
+              "std/requirement@1"
+            ],
+            "from": [
+              "owner"
+            ],
+            "count": 1
+          }
+        ],
+        "recovery": {
+          "participants": [
+            "alice",
+            "bob"
+          ],
+          "count": 2
+        },
+        "delegation": [
+          "std/test-set@1"
+        ],
+        "labels": {
+          "Blocks On": "a block waits for its target"
+        },
+        "budget": {
+          "ms": 60000,
+          "tokens": 100000,
+          "usd": "2.5",
+          "calls": 40
+        },
+        "quality": "demo/quality@1"
+      }
+    }
+  ]
+}

@@ -6,7 +6,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { knowledge, owned } from "../support/files.js";
 import { auditForm, defaultExports, modelCasts } from "./audit-form.js";
 import { auditImports, portEntries } from "./audit-imports.js";
-import { auditKernelFiles, auditStdNames, stdTypeNames } from "./audit-kernel.js";
+import { auditKernelFiles, auditStdNames, designTypeNames, stdTypeNames } from "./audit-kernel.js";
 import { auditPurity } from "./audit-purity.js";
 import { SLICE_MODULES } from "./modules.js";
 import { repoTree, type Tree } from "./tree.js";
@@ -86,8 +86,10 @@ describe("structure of this repository", () => {
     expect(auditKernelFiles(repo, lines("test/structure/kernel-files.txt"))).toEqual([]);
   });
 
-  it("KR-01: the kernel names no std type", () => {
-    const names = new Set(stdTypeNames(knowledge.text("03-types.md")));
+  it("KR-01: the kernel names no std type — of the sources of std, nor of TY-Z02…TY-Z05 without a source yet", () => {
+    const sources = stdTypeNames(owned.list("std/source"));
+    expect(sources.length).toBeGreaterThan(0);
+    const names = new Set([...sources, ...designTypeNames(knowledge.text("03-types.md"))]);
     expect(auditStdNames(repo, names)).toEqual([]);
   });
 

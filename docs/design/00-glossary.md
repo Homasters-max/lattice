@@ -25,7 +25,7 @@ GL-Z02. Terms defined by rules:
 | contract, stage, port | TY-06, TY-07 |
 | implementation, capability, adapter | TY-11 |
 | `memo` of an operation | TY-10 |
-| `judge` block | TY-12, DP-10 |
+| `judge` block, `judge-adapter` | TY-12, DP-10 |
 | `test-set` | TY-13 |
 | requirement, scenario, decision, invariant, term, clause, prose, example | TY-Z03 |
 | `review-note` | TY-04 |

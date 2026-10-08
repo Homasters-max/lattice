@@ -1,0 +1,52 @@
+{
+  "valid": [
+    {
+      "heading": "Kernel",
+      "level": 1,
+      "items": [
+        {
+          "item": "block",
+          "ref": "lattice/02-kernel.boundary"
+        },
+        {
+          "item": "table",
+          "header": [
+            "ID",
+            "Rule"
+          ]
+        },
+        {
+          "item": "block",
+          "ref": "lattice/02-kernel.kr-01"
+        }
+      ]
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/level",
+      "keyword": "maximum",
+      "body": {
+        "heading": "Kernel",
+        "level": 7,
+        "items": [
+          {
+            "item": "block",
+            "ref": "lattice/02-kernel.boundary"
+          },
+          {
+            "item": "table",
+            "header": [
+              "ID",
+              "Rule"
+            ]
+          },
+          {
+            "item": "block",
+            "ref": "lattice/02-kernel.kr-01"
+          }
+        ]
+      }
+    }
+  ]
+}

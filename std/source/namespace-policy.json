@@ -1,0 +1,276 @@
+{
+  "extends": "std/behaviour@1",
+  "abstract": false,
+  "kind": "entity",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "supersedes": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/behaviour@1",
+            "pin": "pinned",
+            "label": "supersedes"
+          }
+        },
+        "description": "the pinned last revisions of the blocks this one replaces (TY-03, RF-12)"
+      },
+      "owner": {
+        "type": "string",
+        "minLength": 1,
+        "description": "the participant that owns the namespace (TR-01, TR-05)"
+      },
+      "writers": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "participant": {
+              "type": "string",
+              "minLength": 1,
+              "description": "the participant"
+            },
+            "kind": {
+              "enum": [
+                "human",
+                "agent",
+                "machine"
+              ],
+              "description": "its kind (TR-07)"
+            },
+            "identities": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "description": "github:<login>, gitlab:<user> or ssh:<key fingerprint>"
+              },
+              "description": "its identities (TR-09)"
+            },
+            "keys": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "description": "an Ed25519 public key in OpenSSH format"
+              },
+              "description": "its public keys (TR-10)"
+            },
+            "roles": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "description": "a role"
+              },
+              "description": "the roles its keys may take"
+            },
+            "grants": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "description": "a role"
+              },
+              "description": "the roles its keys may grant (TR-10)"
+            }
+          },
+          "required": [
+            "participant",
+            "kind"
+          ]
+        },
+        "description": "the writers of the namespace (TR-09, TR-10)"
+      },
+      "roles": {
+        "type": "object",
+        "values": {
+          "type": "object",
+          "properties": {
+            "types": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "ref"
+              },
+              "description": "the types the role may write, their subtypes included (TR-08)"
+            },
+            "paths": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "description": "a path of the repository"
+              },
+              "description": "the repository paths the role may change (AG-08)"
+            }
+          },
+          "required": []
+        },
+        "description": "for each role, what it may write (TR-08)"
+      },
+      "pins": {
+        "type": "object",
+        "properties": {
+          "lattice": {
+            "type": "string",
+            "minLength": 1,
+            "description": "the LATTICE version, which fixes std (LG-44)"
+          },
+          "libraries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "the library"
+                },
+                "version": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "its version"
+                },
+                "hash": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "the hash of its ledger (LG-48)"
+                }
+              },
+              "required": [
+                "name",
+                "version",
+                "hash"
+              ]
+            },
+            "description": "the libraries the namespace uses (LG-44)"
+          }
+        },
+        "required": [
+          "lattice"
+        ]
+      },
+      "acts": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "match": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "description": "a type, a status fact type, policy, upgrade, namespace or <port>#operations/<op>"
+              },
+              "minItems": 1,
+              "description": "what the requirement matches (TR-42)"
+            },
+            "from": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "description": "owner, a role or a participant"
+              },
+              "minItems": 1,
+              "description": "whose acts count (TR-42)"
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "how many distinct participants must act; 1 when absent (TR-42)"
+            }
+          },
+          "required": [
+            "match",
+            "from"
+          ]
+        },
+        "description": "act requirements beyond the floor (TR-42)"
+      },
+      "recovery": {
+        "type": "object",
+        "properties": {
+          "participants": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "a participant"
+            },
+            "description": "participants by name"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "how many of them replace the owner"
+          }
+        },
+        "required": [
+          "participants",
+          "count"
+        ]
+      },
+      "delegation": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref"
+        },
+        "description": "the types whose intents count as acted on a deterministic check (TR-18)"
+      },
+      "labels": {
+        "type": "object",
+        "values": {
+          "type": "string",
+          "minLength": 1,
+          "description": "the one-line meaning of the label"
+        },
+        "description": "edge labels beyond std, each with its meaning (TR-03)"
+      },
+      "budget": {
+        "type": "object",
+        "properties": {
+          "ms": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "milliseconds"
+          },
+          "tokens": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "tokens"
+          },
+          "usd": {
+            "type": "string",
+            "format": "decimal",
+            "description": "dollars"
+          },
+          "calls": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "calls"
+          }
+        },
+        "required": []
+      },
+      "quality": {
+        "type": "string",
+        "format": "ref",
+        "ref": {
+          "to": "std/quality-profile@1",
+          "pin": "pinned",
+          "label": "uses"
+        },
+        "description": "the quality profile of the namespace (ST-09)"
+      }
+    },
+    "required": [
+      "owner"
+    ]
+  }
+}

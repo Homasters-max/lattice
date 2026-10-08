@@ -67,7 +67,7 @@ TY-Z03. Knowledge types in `std`; `card` shows the default card fields:
 | TY-09 | An operation of a port is addressed by fragment: `std/llm@1#operations/complete` (KR-23). |
 | TY-10 | `memo` is a list of paths in the syntax of a fragment (KR-23); apply rejects a port revision whose `memo` names a path that does not exist in the operation's `input` type. An operation without `memo` is never memoized. `std/llm` declares `[model, prompt, schema, input, params]` for `complete`; `std/judge` declares `[question, judge, candidates, state]` for `evaluate` (DP-20). |
 | TY-11 | The abstract shape `code` is `{module, hash}`; its hash is defined by RT-12. `implementation` holds `contract` — a pinned reference to one `stage` or `port` revision, label `implements` — and `code`. An implementation of a `stage` is a **capability**; an implementation of a `port` is an **adapter**. |
-| TY-12 | `judge` extends `implementation` for the `judge` port and adds `model`: the exact model id it pins (DP-10). |
+| TY-12 | `judge-adapter` extends `implementation` for the `judge` port and adds `model`: the exact model id it pins (DP-10). A block of this type is a `judge` block, pinned as `judge@n`. The type is not named `judge`: the port is `std/judge` (TY-10), and one `id` has one type (KR-07). |
 | TY-13 | `test-set` extends `behaviour`: `contract` — the pinned contract revision under test, label `verifies` — `code`, and `covers` — references to the scenarios it checks, label `verifies`. A test set is never an implementation: `setup` never binds it, and a right to write implementations never covers it. It runs as input of the pipeline `std/verify` (RT-21). |
 
 ## Behaviour types
@@ -78,7 +78,7 @@ TY-Z04. Behaviour types in `std`, each defined where it is used:
 |---|---|
 | `pipeline` | RT-01 |
 | `setup` | RT-10 |
-| `namespace` | TR-01 |
+| `namespace-policy` | TR-01, TR-02 |
 | `quality-profile` | ST-09 |
 | `test-set` | TY-13 |
 

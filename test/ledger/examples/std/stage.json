@@ -1,0 +1,35 @@
+{
+  "valid": [
+    {
+      "input": "demo/order@1",
+      "output": "demo/verdict@1",
+      "params": "demo/intake-params@1",
+      "statuses": [
+        "ok",
+        "unavailable",
+        "duplicate"
+      ],
+      "uses": [
+        "std/llm@1"
+      ]
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/output",
+      "keyword": "required",
+      "body": {
+        "input": "demo/order@1",
+        "params": "demo/intake-params@1",
+        "statuses": [
+          "ok",
+          "unavailable",
+          "duplicate"
+        ],
+        "uses": [
+          "std/llm@1"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "extends": "std/fact@1",
+  "abstract": false,
+  "kind": "event",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "of": {
+        "type": "object",
+        "properties": {
+          "entity": {
+            "type": "string",
+            "format": "ref",
+            "description": "the entity id, label about (G-31)"
+          }
+        },
+        "required": [
+          "entity"
+        ],
+        "key": true,
+        "description": "what the fact is about, {role: ref}; the key of the fact (TY-14, TR-28)"
+      },
+      "revoked": {
+        "type": "boolean",
+        "description": "true cancels the fact in force for the same key (TR-28)"
+      }
+    },
+    "required": [
+      "of"
+    ]
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "valid": [
+    {
+      "of": {
+        "entity": "demo/order-intake"
+      }
+    },
+    {
+      "of": {
+        "entity": "demo/order-intake"
+      },
+      "revoked": true
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/of/entity",
+      "keyword": "required",
+      "body": {
+        "of": {}
+      }
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "extends": "std/knowledge@1",
+  "abstract": false,
+  "kind": "entity",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "supersedes": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/knowledge@1",
+            "pin": "pinned",
+            "label": "supersedes"
+          }
+        },
+        "description": "the pinned last revisions of the blocks this one replaces (TY-03, RF-12)"
+      },
+      "refs": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/knowledge@1",
+            "pin": "floating",
+            "label": "about"
+          }
+        },
+        "description": "the IDs its text mentions, as floating references (LG-42, G-01)"
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1,
+        "card_order": 1,
+        "description": "the title"
+      },
+      "statement": {
+        "type": "string",
+        "minLength": 1,
+        "card_order": 2,
+        "description": "what always holds"
+      },
+      "checked_by": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref"
+        },
+        "description": "the test-set or clause blocks that check it, label verifies; targets of two types, so no annotation ref (G-31)"
+      }
+    },
+    "required": [
+      "title",
+      "statement"
+    ]
+  }
+}

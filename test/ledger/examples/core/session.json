@@ -1,0 +1,58 @@
+{
+  "valid": [
+    {
+      "participant": "dev",
+      "kind": "human",
+      "role": "owner",
+      "purpose": "work",
+      "for": {
+        "reason": "requirement",
+        "requirement": "demo/order-intake@2"
+      },
+      "software": "lattice",
+      "version": "0.1.0",
+      "certificate": {
+        "key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA dev",
+        "expires": "2026-10-06T12:00:00.000000Z",
+        "sig": "ed25519:AAAA"
+      }
+    },
+    {
+      "participant": "lattice",
+      "kind": "machine",
+      "role": "init",
+      "purpose": "init",
+      "parent": "01JB2000000000000000000000",
+      "software": "lattice",
+      "version": "0.1.0",
+      "certificate": {
+        "key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA init",
+        "expires": "2026-10-06T12:00:00.000000Z",
+        "sig": "ed25519:AAAA"
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/purpose",
+      "keyword": "enum",
+      "body": {
+        "participant": "dev",
+        "kind": "human",
+        "role": "owner",
+        "purpose": "play",
+        "for": {
+          "reason": "requirement",
+          "requirement": "demo/order-intake@2"
+        },
+        "software": "lattice",
+        "version": "0.1.0",
+        "certificate": {
+          "key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA dev",
+          "expires": "2026-10-06T12:00:00.000000Z",
+          "sig": "ed25519:AAAA"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "valid": [
+    {
+      "complexity": 10,
+      "function_lines": 50,
+      "nesting": 3,
+      "parameters": 4,
+      "file_lines": 300,
+      "purity": [
+        "no-io-outside-adapters"
+      ]
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/nesting",
+      "keyword": "minimum",
+      "body": {
+        "complexity": 10,
+        "function_lines": 50,
+        "nesting": -1,
+        "parameters": 4,
+        "file_lines": 300,
+        "purity": [
+          "no-io-outside-adapters"
+        ]
+      }
+    }
+  ]
+}

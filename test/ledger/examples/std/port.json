@@ -1,0 +1,33 @@
+{
+  "valid": [
+    {
+      "operations": {
+        "complete": {
+          "input": "std/llm-request@1",
+          "output": "std/llm-answer@1",
+          "class": "llm",
+          "idempotent": false,
+          "memo": [
+            "model",
+            "prompt"
+          ]
+        }
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/operations/complete/class",
+      "keyword": "enum",
+      "body": {
+        "operations": {
+          "complete": {
+            "input": "std/llm-request@1",
+            "output": "std/llm-answer@1",
+            "class": "network"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "abstract": true,
+  "kind": "entity",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "module": {
+        "type": "string",
+        "minLength": 1,
+        "description": "the module of the code, a path in the repository"
+      },
+      "hash": {
+        "type": "string",
+        "minLength": 1,
+        "description": "the code hash of the module and every file it imports (RT-12)"
+      }
+    },
+    "required": [
+      "module",
+      "hash"
+    ]
+  }
+}

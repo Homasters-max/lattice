@@ -1,0 +1,143 @@
+{
+  "extends": "std/behaviour@1",
+  "abstract": false,
+  "kind": "entity",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "supersedes": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/behaviour@1",
+            "pin": "pinned",
+            "label": "supersedes"
+          }
+        },
+        "description": "the pinned last revisions of the blocks this one replaces (TY-03, RF-12)"
+      },
+      "stages": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "contract": {
+              "type": "string",
+              "format": "ref",
+              "ref": {
+                "to": "std/stage@1",
+                "pin": "pinned",
+                "label": "uses"
+              },
+              "description": "a stage contract revision a pipeline uses"
+            },
+            "implementation": {
+              "type": "string",
+              "format": "ref",
+              "ref": {
+                "to": "std/implementation@1",
+                "pin": "pinned",
+                "label": "uses"
+              },
+              "description": "the implementation whose contract is exactly that revision"
+            },
+            "executor": {
+              "enum": [
+                "inproc",
+                "subprocess"
+              ],
+              "description": "the executor of the implementation (RT-31)"
+            }
+          },
+          "required": [
+            "contract",
+            "implementation",
+            "executor"
+          ]
+        },
+        "description": "for each stage contract revision, its implementation (RT-10)"
+      },
+      "ports": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "port": {
+              "type": "string",
+              "format": "ref",
+              "ref": {
+                "to": "std/port@1",
+                "pin": "pinned",
+                "label": "uses"
+              },
+              "description": "the port"
+            },
+            "adapter": {
+              "type": "string",
+              "format": "ref",
+              "ref": {
+                "to": "std/implementation@1",
+                "pin": "pinned",
+                "label": "uses"
+              },
+              "description": "the adapter implementation"
+            },
+            "mode": {
+              "enum": [
+                "service",
+                "recorded",
+                "fixture"
+              ],
+              "description": "the mode of the port"
+            },
+            "memo": {
+              "type": "boolean",
+              "description": "whether memoization is on; on when absent, off only to measure noise (BN-15)"
+            },
+            "executor": {
+              "enum": [
+                "inproc",
+                "subprocess"
+              ],
+              "description": "the executor of the adapter (RT-31)"
+            }
+          },
+          "required": [
+            "port",
+            "adapter",
+            "mode",
+            "executor"
+          ]
+        },
+        "description": "for each port but judge, its adapter with its executor, mode and memoization (RT-10, RT-31)"
+      },
+      "judge": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "enum": [
+              "service",
+              "recorded",
+              "fixture"
+            ],
+            "description": "the mode of the judge port"
+          },
+          "memo": {
+            "type": "boolean",
+            "description": "whether memoization is on; on when absent, off only to measure noise (BN-15)"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "description": "the judge port: only its mode and memoization, because each point pins its judge (RT-10, DP-10)"
+      }
+    },
+    "required": [
+      "stages",
+      "ports"
+    ]
+  }
+}

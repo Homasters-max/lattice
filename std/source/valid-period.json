@@ -1,0 +1,27 @@
+{
+  "abstract": true,
+  "kind": "entity",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "valid_from": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "inclusive; a date-time or a date of KR-11, narrowed by the type that uses it (G-33); null means open"
+      },
+      "valid_to": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "exclusive; a date-time or a date of KR-11, narrowed by the type that uses it (G-33); null means open"
+      }
+    },
+    "required": [
+      "valid_from",
+      "valid_to"
+    ]
+  }
+}

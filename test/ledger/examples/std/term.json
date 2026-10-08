@@ -1,0 +1,17 @@
+{
+  "valid": [
+    {
+      "term": "order",
+      "definition": "a request to buy"
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/definition",
+      "keyword": "required",
+      "body": {
+        "term": "order"
+      }
+    }
+  ]
+}

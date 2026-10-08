@@ -54,14 +54,14 @@ function readString(c: Cursor): string | undefined {
   const parts: string[] = [];
   c.at++;
   for (let start = c.at; ; ) {
-    const code = c.text.charCodeAt(c.at);
-    if (Number.isNaN(code) || code < 0x20) return undefined;
-    if (code !== 0x22 && code !== 0x5c) {
+    const unit = c.text.charCodeAt(c.at);
+    if (Number.isNaN(unit) || unit < 0x20) return undefined;
+    if (unit !== 0x22 && unit !== 0x5c) {
       c.at++;
       continue;
     }
     parts.push(c.text.slice(start, c.at));
-    if (code === 0x22) {
+    if (unit === 0x22) {
       c.at++;
       return parts.join("");
     }

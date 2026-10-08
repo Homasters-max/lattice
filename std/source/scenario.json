@@ -1,0 +1,75 @@
+{
+  "extends": "std/knowledge@1",
+  "abstract": false,
+  "kind": "entity",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "supersedes": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/knowledge@1",
+            "pin": "pinned",
+            "label": "supersedes"
+          }
+        },
+        "description": "the pinned last revisions of the blocks this one replaces (TY-03, RF-12)"
+      },
+      "refs": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/knowledge@1",
+            "pin": "floating",
+            "label": "about"
+          }
+        },
+        "description": "the IDs its text mentions, as floating references (LG-42, G-01)"
+      },
+      "requirement": {
+        "type": "string",
+        "format": "ref",
+        "ref": {
+          "to": "std/requirement@1",
+          "pin": "pinned",
+          "label": "part-of"
+        },
+        "description": "the requirement the scenario belongs to"
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1,
+        "card_order": 1,
+        "description": "the title"
+      },
+      "given": {
+        "type": "string",
+        "minLength": 1,
+        "description": "the state before"
+      },
+      "when": {
+        "type": "string",
+        "minLength": 1,
+        "card_order": 2,
+        "description": "what happens"
+      },
+      "then": {
+        "type": "string",
+        "minLength": 1,
+        "card_order": 3,
+        "description": "what follows"
+      }
+    },
+    "required": [
+      "requirement",
+      "title",
+      "when",
+      "then"
+    ]
+  }
+}

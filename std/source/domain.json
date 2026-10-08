@@ -1,0 +1,34 @@
+{
+  "extends": "std/composition@1",
+  "abstract": false,
+  "kind": "entity",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "supersedes": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/composition@1",
+            "pin": "pinned",
+            "label": "supersedes"
+          }
+        },
+        "description": "the pinned last revisions of the blocks this one replaces (TY-03, RF-12)"
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref"
+        },
+        "description": "the blocks it groups, label about; it owns nothing; targets of any type (G-31)"
+      }
+    },
+    "required": [
+      "items"
+    ]
+  }
+}

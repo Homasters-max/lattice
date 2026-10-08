@@ -1,0 +1,79 @@
+{
+  "extends": "std/contract@1",
+  "abstract": false,
+  "kind": "entity",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "supersedes": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/contract@1",
+            "pin": "pinned",
+            "label": "supersedes"
+          }
+        },
+        "description": "the pinned last revisions of the blocks this one replaces (TY-03, RF-12)"
+      },
+      "input": {
+        "type": "string",
+        "format": "ref",
+        "ref": {
+          "to": "core/type@1",
+          "pin": "pinned",
+          "label": "uses"
+        },
+        "description": "the abstract type of its input"
+      },
+      "output": {
+        "type": "string",
+        "format": "ref",
+        "ref": {
+          "to": "core/type@1",
+          "pin": "pinned",
+          "label": "uses"
+        },
+        "description": "the abstract type of its output"
+      },
+      "params": {
+        "type": "string",
+        "format": "ref",
+        "ref": {
+          "to": "core/type@1",
+          "pin": "pinned",
+          "label": "uses"
+        },
+        "description": "the abstract type of its static params"
+      },
+      "statuses": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minItems": 1,
+        "description": "a closed list of statuses; ok and unavailable when absent"
+      },
+      "uses": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/port@1",
+            "pin": "pinned",
+            "label": "uses"
+          }
+        },
+        "description": "the port revisions it reaches"
+      }
+    },
+    "required": [
+      "input",
+      "output"
+    ]
+  }
+}

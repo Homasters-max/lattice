@@ -1,0 +1,21 @@
+{
+  "valid": [
+    {
+      "items": [
+        "demo/order-intake",
+        "demo/order-tests"
+      ]
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/items/0",
+      "keyword": "format",
+      "body": {
+        "items": [
+          "?"
+        ]
+      }
+    }
+  ]
+}

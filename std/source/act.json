@@ -1,0 +1,54 @@
+{
+  "abstract": false,
+  "kind": "event",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "verb": {
+        "enum": [
+          "approve",
+          "answer",
+          "acknowledge"
+        ],
+        "description": "the verb of the act (TR-14)"
+      },
+      "target": {
+        "type": "string",
+        "minLength": 1,
+        "description": "what it confirms: a proposal hash, or what it answers or acknowledges (TR-15)"
+      },
+      "identity": {
+        "type": "string",
+        "minLength": 1,
+        "description": "who acted, as the source names them (TR-09)"
+      },
+      "uri": {
+        "type": "string",
+        "format": "uri",
+        "edge": "derived-from",
+        "description": "where the act lives (TR-16)"
+      },
+      "at": {
+        "type": "string",
+        "format": "date-time",
+        "description": "the source time (TR-16)"
+      },
+      "verified": {
+        "type": "boolean",
+        "description": "the result of the check (TR-16)"
+      },
+      "text": {
+        "type": "string",
+        "description": "the text of an answer (TR-14)"
+      }
+    },
+    "required": [
+      "verb",
+      "target",
+      "identity",
+      "uri",
+      "at",
+      "verified"
+    ]
+  }
+}

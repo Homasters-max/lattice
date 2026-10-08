@@ -1,0 +1,99 @@
+{
+  "extends": "std/knowledge@1",
+  "abstract": false,
+  "kind": "entity",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "supersedes": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/knowledge@1",
+            "pin": "pinned",
+            "label": "supersedes"
+          }
+        },
+        "description": "the pinned last revisions of the blocks this one replaces (TY-03, RF-12)"
+      },
+      "refs": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/knowledge@1",
+            "pin": "floating",
+            "label": "about"
+          }
+        },
+        "description": "the IDs its text mentions, as floating references (LG-42, G-01)"
+      },
+      "table": {
+        "type": "object",
+        "properties": {
+          "header": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "description": "the header cells, verbatim"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "the rows of cells, verbatim"
+          }
+        },
+        "required": [
+          "header",
+          "rows"
+        ],
+        "description": "a table without IDs attached to the block (LG-42, G-01)"
+      },
+      "list": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 1,
+        "description": "a list attached to the block (LG-42, G-01)"
+      },
+      "cells": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "column": {
+              "type": "string",
+              "minLength": 1,
+              "description": "the slug of the header of its column"
+            },
+            "text": {
+              "type": "string",
+              "description": "the text of the cell"
+            }
+          },
+          "required": [
+            "column",
+            "text"
+          ]
+        },
+        "minItems": 1,
+        "card_order": 1,
+        "description": "the cells of a table row of a document in column order (LG-42)"
+      }
+    },
+    "required": [
+      "cells"
+    ]
+  }
+}
