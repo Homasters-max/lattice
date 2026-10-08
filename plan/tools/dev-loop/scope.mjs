@@ -7,6 +7,7 @@
 //   triggers — триггеры аудита ST-15; expectations — тест-файлы, где ожидания изменены или отключены (PR-11);
 //   rebased — base не предок head: дельту посчитать нельзя, нужен круг без delta.
 import { execFileSync } from "node:child_process";
+import { conventionsOf } from "./conventions.mjs";
 
 const VERIFY_MAX_LINES = 40;
 // Признаки классов каталога обходов в добавленной строке чистого кода; строка с отступом — не уровень модуля.
@@ -191,11 +192,37 @@ export function changedLines({ base, head = "HEAD", dir = process.cwd() }) {
   return out;
 }
 
-// Строки CONVENTIONS.md из main, которые ветка убрала или переписала: правило меняет владелец, и итог цикла
-// выносит их в «Решить владельцу до merge». Строка, которая только переехала, правила не меняет.
+// Пункты CONVENTIONS.md из main, которые ветка убрала или переписала: правило меняет владелец, и итог цикла
+// выносит их в «Решить владельцу до merge» — `{id, title, gone}`. Пункт сверяется по номеру §N.M (conventions.mjs):
+// перестройка файла даёт номера пунктов, а не каждую строку. Файл main без пунктов сверяется по строкам — `{line}`;
+// строка, которая только переехала, правила не меняет.
 export function conventionsChanged({ main = "origin/main", head = "HEAD", dir = process.cwd() }) {
   cwd = dir;
-  const rows = git("diff", "-U0", git("merge-base", main, head).trim(), head, "--", "CONVENTIONS.md").split("\n");
+  const base = git("merge-base", main, head).trim();
+  const before = itemsAt(base);
+  if (before.size) {
+    const after = itemsAt(head);
+    return [...before].filter(([id, b]) => after.get(id)?.text !== b.text).map(([id, b]) => ({ id, title: b.title, gone: !after.has(id) }));
+  }
+  const rows = git("diff", "-U0", base, head, "--", "CONVENTIONS.md").split("\n");
   const added = new Set(rows.filter((r) => r.startsWith("+") && !r.startsWith("+++")).map((r) => r.slice(1)));
-  return rows.filter((r) => r.startsWith("-") && !r.startsWith("---") && r.slice(1).trim() && !added.has(r.slice(1))).map((r) => r.slice(1));
+  return rows.filter((r) => r.startsWith("-") && !r.startsWith("---") && r.slice(1).trim() && !added.has(r.slice(1))).map((r) => ({ line: r.slice(1) }));
+}
+
+// Текст каждого пункта CONVENTIONS.md в ref: от его заголовка до следующего пункта или раздела.
+function itemsAt(ref) {
+  let text = "";
+  try {
+    text = git("show", `${ref}:CONVENTIONS.md`);
+  } catch {
+    return new Map();
+  }
+  const rows = text.replace(/\r\n/g, "\n").split("\n");
+  const items = new Map();
+  for (const item of conventionsOf(text).items) {
+    let end = item.line;
+    while (end < rows.length && !/^###? /.test(rows[end])) end++;
+    items.set(item.id, { title: item.title, text: rows.slice(item.line - 1, end).join("\n").trim() });
+  }
+  return items;
 }

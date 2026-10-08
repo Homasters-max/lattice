@@ -35,7 +35,7 @@ Push автора — `git push origin HEAD:refs/heads/<branch>` (worktree в de
 |---|---|---|
 | `full` | круг 1 | весь diff `base..head` на своей оси |
 | `delta` | круг 2 и дальше | статус каждой своей находки из brief; новые находки — в hunk'ах дельты `base..head` |
-| `close` | дельта мала (`verifier`) | статусы всех находок из brief; каждый hunk дельты сопоставлен находке или сверен с правилом |
+| `close` | дельта мала (`verifier`) | статусы всех находок из brief; каждый hunk дельты сопоставлен находке или сверен с правилом — сопоставление в `summary`, новые находки в `findings` |
 | `status` | у находки нет оси в круге (`verifier`) | только статусы |
 | `conflicts` | после пересборки на `main` (`verifier`) | `git range-diff` по `range` и `files`: верно ли соединены обе стороны |
 
@@ -65,8 +65,9 @@ Push автора — `git push origin HEAD:refs/heads/<branch>` (worktree в de
 
 **reviewer** — `reviewer-spec`, `reviewer-standards`, `reviewer-architecture`, `verifier` (ось `verify`).
 - Вход: `axis`, `job`, `wave`, `base`, `head`, `reasons` (почему выбрана ось), `expectations` (Spec), `triggers` (Architecture), `files` и `range` (conflicts), `findings` — порученные находки, `disputed`, `answers` — ответ автора на них.
-- Выход: `{axis, head, summary, statuses: [{id, status, note?}], findings: [{kind, rule, where, quote, text, ratchet?}]}`.
-  - `summary` — что проверено, до 800 знаков.
+- Выход: `{axis, head, summary, statuses: [{id, status, note?}], findings: [{kind, rule, where, quote, text, ratchet?}]}` — все пять полей, других нет; у каждой роли выход — ровно поля её схемы, лишнее поле `dev-loop.mjs` отклоняет.
+  - `summary` — что проверено, до 800 знаков; в `close` и `conflicts` — как сопоставлены hunk'и.
+  - `statuses` и `findings` — списки, пустой, если нечего.
   - `where` — `файл:строка` в `head`.
   - `text` — что не так и что было бы верно, одно-два предложения по-русски.
   - `ratchet: true` — нарушение мог бы ловить тест или lint (ST-16).

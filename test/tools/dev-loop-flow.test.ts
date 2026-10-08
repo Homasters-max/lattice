@@ -202,7 +202,7 @@ describe.concurrent("dev-loop, outputs the protocol refuses", { timeout: 30_000 
     const v = agents(await dl(l, "wave", "--worktree", l.work))[0]!.brief;
     out(v, { axis: "verify", head: "", summary: "x", statuses: [{ id: "W1-T1", status: "dispute-kept", note: "n" }], findings: [null] });
     const errors = ((await dl(l, "merge")).errors as { [agent: string]: string[] }).verifier!;
-    expect(errors).toEqual([`head: ${fix}`, "findings: список объектов", "statuses.W1-T1: dispute-kept — автор не оспаривал"]);
+    expect(errors).toEqual([`head: пусто — нужно ${fix}`, "findings: [null] — нужен список объектов, пустой, если нечего", "statuses.W1-T1: dispute-kept — автор не оспаривал"]);
     out(v, { axis: "verify", head: fix, summary: "x", statuses: [], findings: [] });
     expect((await dl(l, "check", v.replace(".in.json", ".out.json"))).errors).toEqual(["statuses: нет статуса для W1-T1"]);
   });
@@ -268,5 +268,32 @@ describe.concurrent("dev-loop, nothing is lost before the end", { timeout: 30_00
     for (const a of agents(w2)) out(a.brief, { axis: read(a.brief).axis, head: rec, summary: "checked", statuses: [], findings: [] });
     expect(await dl(l, "merge")).toMatchObject({ ok: true, next: "done" });
     expect(readFileSync((await dl(l, "final", "--worktree", l.work)).comment as string, "utf8")).toContain("→ `plan/phases/S0/tasks/S0-98-x.md`");
+  });
+});
+
+// The final report lists for the owner what the branch changed in CONVENTIONS.md of main: an item by its number,
+// a file without items by its lines, and a rewrite of more lines than it lists by their count.
+describe.concurrent("dev-loop, CONVENTIONS.md of main in the final report", { timeout: 30_000 }, () => {
+  it("lists for the owner the items of CONVENTIONS.md of main the branch rewrote or removed, by number", async () => {
+    const item = (id: string, title: string, body: string) => [`### ${id} ${title}`, "Область: `src/**`", "", body, ""];
+    const main = ["# C", "", "## 1. Data", "", ...item("§1.1", "One", "Kept."), ...item("§1.2", "Two", "Old."), ...item("§1.3", "Three", "Gone.")].join("\n");
+    const branch = ["# C", "", "## 1. Data", "", ...item("§1.1", "One", "Kept."), ...item("§1.2", "Two", "New.")].join("\n");
+    const l = await loop({ "CONVENTIONS.md": branch }, { "CONVENTIONS.md": main });
+    expect(await round(l, [])).toMatchObject({ ok: true, next: "done" });
+    const fin = readFileSync((await dl(l, "final", "--worktree", l.work)).comment as string, "utf8");
+    expect(fin.match(/^- пункт.? CONVENTIONS\.md .*$/gm)).toEqual([
+      "- пункт CONVENTIONS.md §1.2 «Two» из main изменён",
+      "- пункт CONVENTIONS.md §1.3 «Three» из main убран",
+    ]);
+  });
+
+  it("sums up a rewrite of more lines of CONVENTIONS.md of main than it lists", async () => {
+    const many = (word: string) => ["# C", "", ...Array.from({ length: 12 }, (_, i) => `- ${word} rule ${i}`), ""].join("\n");
+    const l = await loop({ "CONVENTIONS.md": many("new") }, { "CONVENTIONS.md": many("old") });
+    expect(await round(l, [])).toMatchObject({ ok: true, next: "done" });
+    const fin = readFileSync((await dl(l, "final", "--worktree", l.work)).comment as string, "utf8");
+    expect(fin.match(/^- строк.? CONVENTIONS\.md .*$/gm)).toEqual([
+      "- строк CONVENTIONS.md из main изменено или убрано: 12 — перестройка файла; список — `git diff origin/main...HEAD -- CONVENTIONS.md`",
+    ]);
   });
 });
