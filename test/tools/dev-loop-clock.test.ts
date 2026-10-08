@@ -6,7 +6,7 @@ import { execFile } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { cp, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const tool = join(import.meta.dirname, "../../plan/tools/dev-loop.mjs");
@@ -15,7 +15,7 @@ const BRANCH = "s0-99-x";
 type Json = { [key: string]: unknown };
 type Loop = { work: string; dir: string };
 type Files = { readonly [path: string]: string };
-type Step = { kind: string; role: string | null; job: string | null; wave: number; start: string; end: string | null; green?: boolean; reason?: string };
+type Step = { kind: string; role: string | null; job: string | null; wave: number; head: string | null; start: string; end: string | null; green?: boolean; reason?: string };
 // The moment of a command: minute m of one morning.
 type At = { at: string; red?: boolean };
 
@@ -156,20 +156,24 @@ afterAll(() => {
 describe.concurrent("dev-loop, the time of every step", { timeout: 60_000 }, () => {
   it("keeps the start and the end of each agent, gate, round and owner in the state, and the comments keep them", async () => {
     const l = await loop();
+    // task — the head the executor pushed; fix — the head the fixer pushed, the head of every later step.
+    const task = await head(l);
     await wholeLoop(l);
+    const fix = await sh(l.work, "git", ["rev-parse", `origin/${BRANCH}`]);
+    expect(fix).not.toBe(task);
     const s = steps(l);
-    expect(s.map((x) => [x.kind, x.role, x.job, x.wave, x.start, x.end])).toEqual([
-      ["agent", "executor", null, 0, t(0).at, t(10).at],
-      ["gate", null, null, 0, t(12).at, t(12).at],
-      ["agent", "fixer", "verify-red", 0, t(13).at, t(15).at],
-      ["gate", null, null, 0, t(16).at, t(16).at],
-      ["review", "reviewer", null, 1, t(20).at, t(27).at],
-      ["agent", "fixer", "answer", 1, t(28).at, t(38).at],
-      ["gate", null, null, 1, t(39).at, t(39).at],
-      ["review", "reviewer", null, 2, t(40).at, t(42).at],
-      ["owner", null, null, 2, t(43).at, t(50).at],
-      ["gate", null, null, 2, t(53).at, t(53).at],
-      ["review", "reviewer", null, 3, t(54).at, t(55).at],
+    expect(s.map((x) => [x.kind, x.role, x.job, x.wave, x.head, x.start, x.end])).toEqual([
+      ["agent", "executor", null, 0, task, t(0).at, t(10).at],
+      ["gate", null, null, 0, task, t(12).at, t(12).at],
+      ["agent", "fixer", "verify-red", 0, task, t(13).at, t(15).at],
+      ["gate", null, null, 0, task, t(16).at, t(16).at],
+      ["review", "reviewer", null, 1, task, t(20).at, t(27).at],
+      ["agent", "fixer", "answer", 1, fix, t(28).at, t(38).at],
+      ["gate", null, null, 1, fix, t(39).at, t(39).at],
+      ["review", "reviewer", null, 2, fix, t(40).at, t(42).at],
+      ["owner", null, null, 2, fix, t(43).at, t(50).at],
+      ["gate", null, null, 2, fix, t(53).at, t(53).at],
+      ["review", "reviewer", null, 3, fix, t(54).at, t(55).at],
     ]);
     expect(s.every((x) => x.end !== null && x.start <= x.end)).toBe(true);
     expect(s.filter((x) => x.kind === "gate").map((x) => x.green)).toEqual([false, true, true, true]);
@@ -188,10 +192,36 @@ describe.concurrent("dev-loop, the time of every step", { timeout: 60_000 }, () 
     expect(report).toContain("Весь цикл 60.0 мин: в шагах 39.0, вне шагов 21.0.");
     for (const row of ["| executor | 1 | 10.0 |", "| ворота | 4, красных 1 | 0.0 |", "| круги: первый | 1 | 7.0 |", "| круги: блокирующие | 1 | 2.0 |", "| круги: tidy | 0 | 0.0 |", "| круги: владелец | 1 | 1.0 |", "| круги: rebase | 0 | 0.0 |", "| fixer | 2 | 12.0 |", "| владелец | 1 | 7.0 |"])
       expect(report).toContain(row);
-    const bytes = statSync(join(l.dir, "executor.in.json")).size;
-    expect(report).toContain(`| executor | 1 | ${bytes} | ${bytes} |`);
-    expect(report).toMatch(/^\| fixer-answer \| 1 \| \d+ \| \d+ \|$/m);
-    expect(report).toMatch(/^\| verifier \| 1 \| \d+ \| \d+ \|$/m);
+    // Each brief of the loop is on disk once: the table holds, by its name, the count, the largest and the sum of their sizes.
+    const sizes = new Map<string, number[]>();
+    for (const file of readdirSync(l.dir, { recursive: true, encoding: "utf8" }).filter((f) => f.endsWith(".in.json"))) {
+      const name = basename(file, ".in.json");
+      sizes.set(name, [...(sizes.get(name) ?? []), statSync(join(l.dir, file)).size]);
+    }
+    expect([...sizes.keys()]).toEqual(expect.arrayContaining(["executor", "fixer-verify-red", "fixer-answer", "verifier", "reviewer-standards"]));
+    const rows = [...sizes].map(([name, b]) => `| ${name} | ${b.length} | ${Math.max(...b)} | ${b.reduce((x, y) => x + y, 0)} |`);
+    // The brief table is the last of the report; its first row is the header.
+    const table = report.slice(report.indexOf("| Brief |")).split("\n").filter((line) => line.startsWith("| ")).slice(1);
+    expect(table.sort()).toEqual(rows.sort());
+  });
+});
+
+describe.concurrent("dev-loop, a fixer who asks the owner", { timeout: 60_000 }, () => {
+  it("ends the step of a fixer who asks the owner at dl answer, so the wait for the owner is the owner's step", async () => {
+    const l = await loop();
+    await dl(l, t(0), "init", "--pr", "9", "--task", "S0-99", "--branch", BRANCH);
+    expect(await round(l, t(1), t(2), [BLOCK])).toMatchObject({ ok: true, next: "fix" });
+    const fb = (await dl(l, t(3), "brief", "fixer", "--worktree", l.work, "--job", "answer")).brief as string;
+    const question = { text: "Which constant?", options: ["LAND", "ONE"], recommendation: "LAND" };
+    out(fb, { status: "needs_owner", head: await head(l), answers: [], question });
+    expect(await dl(l, t(5), "answer")).toMatchObject({ ok: true, status: "needs_owner" });
+    expect(await dl(l, t(6), "escalate", "--why", "вопрос исправляющего", "--from", outOf(fb))).toMatchObject({ ok: true });
+    expect(await dl(l, t(9), "owner", "--text", "LAND")).toMatchObject({ ok: true });
+    expect(steps(l).map((x) => [x.kind, x.role, x.job, x.start, x.end])).toEqual([
+      ["review", "reviewer", null, t(1).at, t(2).at],
+      ["agent", "fixer", "answer", t(3).at, t(5).at],
+      ["owner", null, null, t(6).at, t(9).at],
+    ]);
   });
 });
 
