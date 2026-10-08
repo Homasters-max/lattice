@@ -118,35 +118,10 @@ function expectationsOf(files, hunks) {
   return files.filter((f) => f.cls === "tests" && (fixture(f) || changed(f))).map((f) => f.path);
 }
 
-// Строки файла на ревизии со счётом повторов; файла нет — пусто.
-function lineCounts(rev, path) {
-  const counts = new Map();
-  let text = "";
-  try {
-    text = git("show", `${rev}:${path}`);
-  } catch {
-    // файла на ревизии нет
-  }
-  for (const l of text.split("\n")) counts.set(l, (counts.get(l) ?? 0) + 1);
-  return counts;
-}
-
-// Ответ на ревью убрал строку CONVENTIONS.md, которая есть на main: на head её копий меньше, чем на main.
-// Строки, добавленные самой веткой, правило main не меняют. Без main отличить нельзя — считается любая убранная строка.
-function conventionsRemoved(hunks, fork, head) {
-  const removed = (hunks.get("CONVENTIONS.md") ?? []).filter((l) => l.startsWith("-")).map((l) => l.slice(1));
-  if (!fork || removed.length === 0) return removed.length > 0;
-  const onMain = lineCounts(fork, "CONVENTIONS.md");
-  const onHead = lineCounts(head, "CONVENTIONS.md");
-  return removed.some((l) => (onHead.get(l) ?? 0) < (onMain.get(l) ?? 0));
-}
-
-function stopsOf(branch, hunks, delta, fork, head) {
+function stopsOf(branch) {
   const stops = [];
   if (branch.some((f) => f.cls === "design") && !branch.some((f) => f.path === "discussion/decisions.md"))
     stops.push("docs/design изменён без записи в discussion/decisions.md (AGENTS.md)");
-  if (delta && conventionsRemoved(hunks, fork, head))
-    stops.push("в ответе на ревью изменены или удалены строки CONVENTIONS.md из main: правило меняет владелец");
   return stops;
 }
 
@@ -166,12 +141,11 @@ export function scope({ base, head = "HEAD", delta = false, main = "origin/main"
   const from = delta ? base : git("merge-base", base, head).trim();
   const files = changes(from, head);
   const has = (...cls) => files.some((f) => cls.includes(f.cls) || cls.includes(classOf(f.old ?? "")));
-  const hunks = hunkLines(from, head, files.filter((f) => ["code", "tests", "conventions"].includes(f.cls)));
+  const hunks = hunkLines(from, head, files.filter((f) => ["code", "tests"].includes(f.cls)));
   const triggers = triggersOf(files, from, head);
   const expectations = expectationsOf(files, hunks);
   const total = files.reduce((n, f) => n + f.lines, 0);
-  const fork = delta && succeeds("rev-parse", "--verify", main) ? git("merge-base", main, head).trim() : null;
-  const branch = fork ? changes(fork, head) : files;
+  const branch = delta && succeeds("rev-parse", "--verify", main) ? changes(git("merge-base", main, head).trim(), head) : files;
   const reasons = {
     spec: specReasons(has, expectations, delta),
     standards: has("code", "tests", "config", "conventions") ? ["изменены код, тесты, конфигурация или CONVENTIONS.md"] : [],
@@ -187,7 +161,7 @@ export function scope({ base, head = "HEAD", delta = false, main = "origin/main"
     reasons.spec.push("изменения выше порога проверки закрытия");
 
   const axes = mode === "review" ? ["spec", "standards", "architecture"].filter((a) => reasons[a].length) : [];
-  const stops = stopsOf(branch, hunks, delta, fork, head);
+  const stops = stopsOf(branch);
   return { mode, axes, reasons, stops, triggers, expectations, rebased: false, lines: total, base: from, head: git("rev-parse", head).trim() };
 }
 
@@ -215,4 +189,13 @@ export function changedLines({ base, head = "HEAD", dir = process.cwd() }) {
     }
   }
   return out;
+}
+
+// Строки CONVENTIONS.md из main, которые ветка убрала или переписала: правило меняет владелец, и итог цикла
+// выносит их в «Решить владельцу до merge». Строка, которая только переехала, правила не меняет.
+export function conventionsChanged({ main = "origin/main", head = "HEAD", dir = process.cwd() }) {
+  cwd = dir;
+  const rows = git("diff", "-U0", git("merge-base", main, head).trim(), head, "--", "CONVENTIONS.md").split("\n");
+  const added = new Set(rows.filter((r) => r.startsWith("+") && !r.startsWith("+++")).map((r) => r.slice(1)));
+  return rows.filter((r) => r.startsWith("-") && !r.startsWith("---") && r.slice(1).trim() && !added.has(r.slice(1))).map((r) => r.slice(1));
 }
