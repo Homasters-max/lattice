@@ -26,9 +26,16 @@ rules: [ST-12]
 
 Не входит: выбор project по изменённым путям — S0-42.
 
+## Как сделано
+
+- `vitest.config.ts`: projects `lattice` (`test/**/*.test.ts` без `test/tools/**`) и `tools` (`test/tools/**/*.test.ts`); `npm test` — по-прежнему `vitest run`, он гоняет оба. Сверх наброска — тест в `test/smoke.test.ts` (ST-12): каждый файл тестов `test/` принадлежит ровно одному project, `npm test` гоняет все, в `tools` — только `test/tools/`. В `test/structure/` его нет: всё, что там лежит, — файлы skeleton (ST-15).
+- `dev-loop-{flow,start,scope}`: процессы — асинхронные (`execFile`), иначе `describe.concurrent` не идёт параллельно; репозиторий собирается один раз на вид начального состояния (база `scope`, изменение ветки `flow`, `main` origin впереди `start`) и копируется в папку случая; origin копии — `git remote set-url`; `git init --template=` — без образцов hooks копия в несколько раз быстрее; временные папки — под одной папкой файла, её удаляет `afterAll` (параллельные случаи не трут чужие). Шаги и ожидания случаев прежние; в `start` сдвиг `main` origin перенесён из случая в собранный репозиторий — состояние перед `start` то же.
+- Замер (Windows, Core Ultra 5 125H, 18 потоков): до — `flow` 22.9 с, `scope` 19.4 с, `start` 16.8 с (сумма случаев, файл идёт последовательно), `npm test` 28.5 с; после — в `vitest run --project tools` `flow` 8.2–9.4 с, `scope` 7.3–8.4 с, `start` 6.0–7.4 с; в полном `npm test`, рядом с project `lattice`, `flow` — 9–10 с; отдельно каждый файл — 4–6 с; `npm test` 14–15 с. Разброс — фоновая нагрузка ноутбука. Остаток — сам `dev-loop.mjs` (`wave` ≈ 0.4 с, `start` ≈ 0.75 с на вызов) и `git push` в локальный origin (≈ 0.3 с).
+- `.claude/agents/executor.md`: CI не ждать — ни `sleep`, ни опроса; его итог проверяет «Сдать» `/dev-loop`.
+
 ## Готово, когда
 
-- [ ] project `tools` выделен; ожидания тестов прежние
-- [ ] самый долгий файл тестов `tools` — не больше 10 с локально
-- [ ] executor не ждёт CI
-- [ ] `npm run verify` зелёный
+- [x] project `tools` выделен; ожидания тестов прежние
+- [x] самый долгий файл тестов `tools` — не больше 10 с локально
+- [x] executor не ждёт CI
+- [x] `npm run verify` зелёный
