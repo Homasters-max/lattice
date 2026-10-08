@@ -12,7 +12,7 @@
 | [S0-46](tasks/S0-46-loop-timing.md) | Замер цикла в dl — время шагов и тонкий dl gate | A | ✅ | [#39](https://github.com/Homasters-max/lattice/pull/39) | инструмент, разбор циклов |
 | [S0-47](tasks/S0-47-parallel-verify.md) | Параллельный verify — scripts/verify.mjs и кэши | A | ✅ | [#41](https://github.com/Homasters-max/lattice/pull/41) | инструмент, разбор циклов |
 | [S0-50](tasks/S0-50-conventions-one-home.md) | CONVENTIONS — один дом каждой нормы | A | ✅ | [#40](https://github.com/Homasters-max/lattice/pull/40) | инструмент, разбор циклов |
-| [S0-48](tasks/S0-48-minimal-brief.md) | Минимальный контекст — brief несёт всё нужное роли | A | ⬜ | | инструмент, разбор циклов |
+| [S0-48](tasks/S0-48-minimal-brief.md) | Минимальный контекст — brief несёт всё нужное роли | A | ✅ | [#47](https://github.com/Homasters-max/lattice/pull/47) | инструмент, разбор циклов |
 | [S0-51](tasks/S0-51-mechanical-steps.md) | Механические шаги в dl — старт и сдача задачи | A | ✅ | [#44](https://github.com/Homasters-max/lattice/pull/44) | инструмент, разбор циклов |
 | [S0-42](tasks/S0-42-verify-levels.md) | prove — доказательство затронутого, ratchet ST-18 | A | ⬜ | | инструмент |
 | [S0-44](tasks/S0-44-mutate.md) | Мутации в prove --ready — выживших решает executor | A | ⬜ | | инструмент |
