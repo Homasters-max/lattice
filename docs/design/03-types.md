@@ -78,7 +78,7 @@ TY-Z04. Behaviour types in `std`, each defined where it is used:
 |---|---|
 | `pipeline` | RT-01 |
 | `setup` | RT-10 |
-| `namespace` | TR-01 |
+| `namespace-policy` | TR-01, TR-02 |
 | `quality-profile` | ST-09 |
 | `test-set` | TY-13 |
 

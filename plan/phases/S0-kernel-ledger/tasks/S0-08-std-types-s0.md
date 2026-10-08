@@ -23,7 +23,7 @@ rules: [TY-01, TY-02, TY-03, TY-05, TY-06, TY-07, TY-11, TY-12, TY-13, TY-14, TY
 - **знания** TY-Z03: `requirement`, `scenario`, `decision`, `invariant`, `term`, `clause`, `prose`, `example`; поля кодека `refs`, `table`, `list` (G-01); `card_order` по колонке Card;
 - **композиции** TY-05: `domain`, `section` (`heading`, `level`, `items`);
 - **контракты и код** TY-06, TY-07, TY-11…TY-13: `stage`, `port` (операции с `class` и `memo`), abstract форма `code {module, hash}`, `implementation`, `judge`, `test-set`;
-- **behaviour** TY-Z04: `setup` (RT-10 — как тип), `namespace` (поля TR-02), `quality-profile` (ST-09), `test-set`;
+- **behaviour** TY-Z04: `setup` (RT-10 — как тип), `namespace-policy` (поля TR-02; Q-37), `quality-profile` (ST-09), `test-set`;
 - **события**: `act` (TR-14), abstract форма `fact` (TY-14) с аннотациями `key`, status facts `retired`, `alias` (TR-29); формы `valid-period` (TY-15);
 - **метки рёбер** TY-16 — как `labels` в политике namespace `std` (TR-03), а не как отдельный механизм.
 
@@ -33,7 +33,7 @@ rules: [TY-01, TY-02, TY-03, TY-05, TY-06, TY-07, TY-11, TY-12, TY-13, TY-14, TY
 
 Как сделано:
 - тип `core/session` — константа `SESSION_TYPE` ledger-кода в `src/ledger/session-type.ts`, как мета-тип в ядре: genesis (S0-23) пишет его, не видя `std`;
-- тело записи namespace `std` с метками TY-16 — `std/namespace.json`: не тип, поэтому вне `std/source/`; её id совпадает с id типа `std/namespace` — Q-37;
+- тип namespace — `std/namespace-policy` (`std/source/namespace-policy.json`; Q-37, D211): запись namespace `std` — `std/namespace`, и тип с тем же id был бы второй сущностью; тело этой записи с метками TY-16 — `std/namespace.json`: не тип, поэтому вне `std/source/`;
 - примеры — `test/ledger/examples/std/<slug>.json` и `test/ledger/examples/core/session.json`: `valid` — тела записей, `invalid` — тело с путём и ключевым словом нарушения; тест — `test/ledger/std-types.test.ts`, test set `ledger` владеет `std/` (`scripts/paths.mjs`);
 - имя формы `code` (TY-11) — слово, которое ядро писало в `parse.ts` как имя кодовой единицы: переменная переименована в `unit`, а аудит KR-01 не считает имена, которые объявляет платформа (`charCodeAt`, `fromCharCode`);
 - пробелы — G-31…G-34.

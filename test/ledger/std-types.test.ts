@@ -18,7 +18,7 @@ const SESSION = "core/session@1";
 /** The types of S0 by TY-Z02…TY-Z05 and the scope of S0-08; the rest of `std` is S0-09. */
 const S0_TYPES = [
   ...["act", "alias", "behaviour", "clause", "code", "composition", "contract", "decision", "decision-point", "domain", "example", "fact"],
-  ...["hint", "implementation", "invariant", "judge", "knowledge", "namespace", "port", "prose", "quality-profile", "requirement", "retired"],
+  ...["hint", "implementation", "invariant", "judge", "knowledge", "namespace-policy", "port", "prose", "quality-profile", "requirement", "retired"],
   ...["scenario", "section", "setup", "stage", "term", "test-set", "valid-period"],
 ];
 
@@ -218,17 +218,17 @@ describe("behaviour", () => {
     expect(check({ type: "std/setup@1", rev: 1, body: { stages: [], ports: [] } })).toEqual([]);
   });
 
-  it("TR-02, ST-09: namespace holds the fields of a policy; quality-profile its limits", () => {
-    expect([parentsOf("namespace"), Object.keys(fieldsOf("namespace"))]).toEqual([
+  it("TR-02, ST-09: namespace-policy holds the fields of a namespace policy; quality-profile its limits", () => {
+    expect([parentsOf("namespace-policy"), Object.keys(fieldsOf("namespace-policy"))]).toEqual([
       ["behaviour"],
       ["supersedes", "owner", "writers", "roles", "pins", "acts", "recovery", "delegation", "labels", "budget", "quality"],
     ]);
     expect([parentsOf("quality-profile"), required("quality-profile")]).toEqual([["behaviour"], ["complexity", "function_lines", "nesting", "parameters", "file_lines"]]);
   });
 
-  it("TY-16, TR-03, RF-07: the labels of TY-16 are labels of the policy of namespace std, and every label of std is one of them", () => {
+  it("TY-16, TR-03, RF-07: the labels of TY-16 are labels of the policy of namespace std (std/namespace, of type std/namespace-policy), and every label of std is one of them", () => {
     const policy = object(json("std/namespace.json"));
-    expect(check({ type: "std/namespace@1", rev: 1, body: policy })).toEqual([]);
+    expect(check({ type: "std/namespace-policy@1", rev: 1, body: policy })).toEqual([]);
     expect(Object.keys(object(policy.labels)).sort()).toEqual(LABELS);
     const used = new Set<string>();
     const walk = (value: JsonValue): void => {
