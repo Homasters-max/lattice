@@ -266,7 +266,9 @@ describe("prove, the key of a record: the test set, its inputs and the environme
   });
 });
 
-describe("prove, the records of its runs (S0-43)", () => {
+// A case of records or of the gate runs prove two or three times in a row: under the full run that goes past the
+// safeguard of one test (§8.5), so these name their own timeout, as the cases of dev-loop do (S0-45).
+describe("prove, the records of its runs (S0-43)", { timeout: 60_000 }, () => {
   it("ST-12: writes a record of each test set it ran, under the key of its inputs", async () => {
     const run = await proveRun();
     expect(run.report.sets.map((s) => [s.set, s.outcome, s.failed])).toEqual([["structure", "ok", []]]);
@@ -305,7 +307,7 @@ describe("prove, the records of its runs (S0-43)", () => {
   });
 });
 
-describe("prove --gate: the head by the records of its keys (S0-43)", () => {
+describe("prove --gate: the head by the records of its keys (S0-43)", { timeout: 60_000 }, () => {
   const ALL = ["kernel", "ledger", "structure", "tools", "trust"];
 
   it("ST-12: runs nothing — no test set, no step — when every key of the head has a record ok", async () => {
