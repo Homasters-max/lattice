@@ -16,7 +16,7 @@ const EVENT = "01JB2X0000000000000000SEEN";
 
 /** The store of these proposals, landed and opened from genesis (LG-02). */
 function opened(proposals: readonly JsonValue[]): Folded & { readonly commits: readonly Commit[] } {
-  const commits = landedChain(proposals);
+  const commits = deepFreeze(landedChain(proposals));
   const out = openLines(commits.map(commitLine), keyOfLand);
   if (!out.ok) throw new Error(`bug: a landed chain opens: ${JSON.stringify(out.rejections)}`);
   return { ...out.value, commits };
@@ -98,7 +98,7 @@ describe("blocks, standing and evidence (LG-38)", () => {
     expect([STORE.view.standing("demo/a"), STORE.view.standing("demo/a@1"), STORE.view.standing(EVENT), STORE.view.standing("not a ref")]).toEqual([null, null, null, null]);
     const standing = { inForce: true, basis: "asserted", use: "in-use", live: null };
     const rows: Row[] = [...STORE.rows, { key: "standing:demo/b@2", from: 2, to: null, value: standing }];
-    const view = viewOf(3, rows);
+    const view = viewOf(3, deepFreeze(rows));
     expect([view.standing("demo/b"), view.standing("demo/b@2"), view.standing("demo/b@1"), view.standing("demo/x")]).toEqual([standing, standing, null, null]);
   });
 
@@ -107,7 +107,7 @@ describe("blocks, standing and evidence (LG-38)", () => {
     const [first] = STORE.commits as [Commit];
     const delta = fold(viewOf(0, []), first, [file]);
     expect(delta.filter((r) => r.key.startsWith("evidence:"))).toEqual([{ key: `evidence:${file.hash}`, from: 1, to: null, value: { hash: file.hash } }]);
-    expect([viewOf(1, delta, [file]).evidence(file.hash), viewOf(0, delta, [file]).evidence(file.hash), viewOf(1, delta, []).evidence(file.hash)]).toEqual([file.bytes, null, null]);
+    expect([viewOf(1, deepFreeze(delta), [file]).evidence(file.hash), viewOf(0, delta, [file]).evidence(file.hash), viewOf(1, delta, []).evidence(file.hash)]).toEqual([file.bytes, null, null]);
     expect(STORE.view.evidence(file.hash)).toBeNull();
   });
 });
@@ -126,6 +126,8 @@ describe("a view at any seq and the feed (LG-41)", () => {
   it("LG-41: viewAt answers only a seq of the chain; the feed gives the commits from a seq on", () => {
     expect([STORE.viewAt(-1), STORE.viewAt(4), STORE.viewAt(1.5)]).toEqual([null, null, null]);
     expect([STORE.feed(1), STORE.feed(3), STORE.feed(4), STORE.feed(0)]).toEqual([STORE.commits, STORE.commits.slice(2), [], STORE.commits]);
+    // A `from` that is not an integer names no seq: the feed, like viewAt, answers null.
+    expect([STORE.feed(1.5), STORE.feed(Number.NaN), STORE.feed(Number.POSITIVE_INFINITY)]).toEqual([null, null, null]);
   });
 
   it("GL-05: the tail of an opened store is its last commit, the view at it is the view at the tail, and each commit's base names the tail it was applied on", () => {
@@ -200,6 +202,18 @@ describe("what fold reads of a record (LG-11, LG-19)", () => {
     expect(delta.map((r) => r.key.split(":")[0])).toEqual(["current", "latest", "revision"]);
   });
 
+  it("LG-19, LG-36: a new revision closes only the unique keys it still holds — one another entity took since stays with it", () => {
+    const title = { namespace: "demo", type: "demo/note", path: "/title", value: "demo/a" };
+    // demo/d takes the title of demo/a — a duplicate apply refuses (LG-36); then demo/a gets a revision with another title.
+    const took = withDelta(rowsAt(1), fold(at1, commitOf(2, [record("demo/d", 1, { title: "demo/a" })]), []));
+    const after = withDelta(took, fold(viewOf(2, took), commitOf(3, [record("demo/a", 2, { title: "a2" })]), []));
+    expect([viewOf(2, took).holder(title), viewOf(3, after).holder(title), viewOf(3, after).holder({ ...title, value: "a2" })]).toEqual(["demo/d", "demo/d", "demo/a"]);
+  });
+
+  it("LG-38: a question with values canon refuses names a key no row holds (KR-10)", () => {
+    const lone = "\ud800";
+    expect([STORE.view.referrers(lone), STORE.view.referrers("demo/a", lone), STORE.view.holder({ namespace: "demo", type: "demo/note", path: "/title", value: lone })]).toEqual([[], [], null]);
+  });
 });
 
 describe("fold is total on what apply refuses (LG-36)", () => {

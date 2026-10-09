@@ -7,10 +7,11 @@ import fc from "fast-check";
 import { afterAll, describe, expect, it } from "vitest";
 import { createStoreJsonl } from "../../src/adapters/store-jsonl/index.js";
 import { createStoreMemory } from "../../src/adapters/store-memory/index.js";
-import { serialize, type JsonValue } from "../../src/kernel/index.js";
+import { canon, type JsonValue } from "../../src/kernel/index.js";
 import { commitLine, fold, openLines, openStore, type Commit, type Row, type Store, type View } from "../../src/ledger/index.js";
 import { withDelta } from "../../src/ledger/rows.js";
 import { keyOfLand, landedChain } from "../support/chain.js";
+import { deepFreeze } from "../support/deep-freeze.js";
 import { scratch, type Scratch } from "../support/files.js";
 import { note, proposalOf, seen, TYPES } from "../support/notes.js";
 
@@ -94,17 +95,17 @@ describe("rebuild equals the accumulated rows (LG-37, LG-39)", () => {
         const store = make();
         let accumulated: readonly Row[] = [];
         for (const [i, c] of commits.entries()) {
-          const delta = fold(prefix(commits, i).view, c, []);
+          const delta = fold(prefix(commits, i).view, deepFreeze(c), []);
           accumulated = withDelta(accumulated, delta);
           await store.append({ commit: commitLine(c), delta, evidence: [] });
         }
         const kept = await all(store.rows(""));
         // Rebuilt: the lines folded from genesis, the store opened again on them.
         const rebuilt = prefix(commits, commits.length);
-        expect(serialize(rebuilt.rows)).toBe(serialize(accumulated));
+        expect(canon(rebuilt.rows)).toEqual(canon(accumulated));
         const reopened = await openStore(store, keyOfLand);
         expect(reopened.ok).toBe(true);
-        expect(serialize(await all(store.rows("")))).toBe(serialize(kept));
+        expect(canon(await all(store.rows("")))).toEqual(canon(kept));
         // LG-41: the view at any seq of the rebuild answers as the store of the commits up to it.
         for (let seq = 0; seq <= commits.length; seq++) expect(answers(rebuilt.viewAt(seq)!)).toEqual(answers(prefix(commits, seq).view));
       }),

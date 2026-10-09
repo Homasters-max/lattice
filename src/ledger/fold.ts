@@ -8,7 +8,7 @@
 // is apply's. It reads no clock, no ids and no order of a traversal: the delta
 // is sorted, and each key holds what the last record of the commit in its
 // canonical order (LG-06) gives it.
-import { isJsonObject, parseRef, serialize, valuesOf, type JsonValue, type Record, type ResolveType, type ValueAt } from "../kernel/index.js";
+import { canon, isJsonObject, parseRef, valuesOf, type JsonValue, type Record, type ResolveType, type ValueAt } from "../kernel/index.js";
 import { namespaceOf } from "../trust/index.js";
 import type { Commit, Evidence } from "./commit.js";
 import { currentKey, evidenceKey, holderKey, latestKey, referrerKey, revisionKey, sortRows, type Delta, type Referrer, type Rows } from "./rows.js";
@@ -63,18 +63,27 @@ function linksOf(r: Record, types: ResolveType): Change[] {
     const out: Change[] = [];
     if (target !== null && typeof at.value === "string") {
       const referrer: Referrer = { target, label: labelOf(at), source, path: at.path, ref: at.value };
-      out.push([referrerKey(referrer), referrer]);
+      out.push(...keyed(referrerKey(referrer), referrer));
     }
     // LG-19: uniqueness counts entities only, within the namespace of the entity; an event `id` has no namespace (TR-01).
     if (at.schema.unique === true && type !== null && namespace !== null) {
-      out.push([holderKey({ namespace, type, path: at.path, value: at.value }), { id: r.id }]);
+      out.push(...keyed(holderKey({ namespace, type, path: at.path, value: at.value }), { id: r.id }));
     }
     return out;
   });
 }
 
-/** Two values of rows alike: the same canonical JSON. A key without a row peeks `null`, which no row of fold holds. */
-const same = (a: JsonValue, b: JsonValue) => serialize(a) === serialize(b);
+/** The row a key opens; none where parts canon refuses name no key (rows.ts) — they are in no commit (KR-10). */
+const keyed = (key: string | null, value: JsonValue): Change[] => (key === null ? [] : [[key, value]]);
+
+/**
+ * Two values of rows alike: the same canonical JSON (`canon`, KR-10). A value canon refuses is in no commit and is like
+ * no other; a key without a row peeks `null`, which no row of fold holds.
+ */
+function same(a: JsonValue, b: JsonValue): boolean {
+  const [x, y] = [canon(a), canon(b)];
+  return x.ok && y.ok && x.value === y.value;
+}
 
 /**
  * An entity revision: it is the current revision (until S0-14, the one written last), the latest where no higher `rev`

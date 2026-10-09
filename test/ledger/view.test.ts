@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { commitLine, openLines } from "../../src/ledger/index.js";
 import { createView, type View } from "../../src/ledger/view.js";
 import { keyOfLand, landedChain } from "../support/chain.js";
+import { deepFreeze } from "../support/deep-freeze.js";
 import { note, proposalOf, TYPES } from "../support/notes.js";
 
 /** Every question of the view of S0 about demo/a and demo/b. */
@@ -29,10 +30,10 @@ describe("the read view of runtime and capabilities (LG-38)", () => {
   it("LG-38: createView over the rows of a store answers every question of S0 as the view of the store does", () => {
     const opened = openLines(landedChain([proposalOf(...TYPES, note("demo/a"), note("demo/b", { refs: ["demo/a"] }))]).map(commitLine), keyOfLand);
     if (!opened.ok) throw new Error("bug: a landed chain opens");
-    const view = createView(1, opened.value.rows);
+    const view = createView(1, deepFreeze(opened.value.rows));
     expect(ask(view)).toEqual(ask(opened.value.view));
     expect(["row" in view, view.referrers("demo/a").length]).toEqual([false, 1]);
     // Rows in any order give the same answers, in the order of their keys (CONVENTIONS.md §5.5).
-    expect(ask(createView(1, [...opened.value.rows].reverse()))).toEqual(ask(view));
+    expect(ask(createView(1, deepFreeze([...opened.value.rows].reverse())))).toEqual(ask(view));
   });
 });

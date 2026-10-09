@@ -6,7 +6,7 @@
 // (LG-02) and those each delta leaves (Q-27). Fold reads the rows behind a
 // view; every other reader asks only the questions of View, through the entry
 // `ledger/view` (ST-01).
-import { compareText, parseRef, serialize, type JsonValue, type Record } from "../kernel/index.js";
+import { canon, compareText, parseRef, type JsonValue, type Record } from "../kernel/index.js";
 import { namespaceOf } from "../trust/index.js";
 import type { Evidence } from "./commit.js";
 
@@ -79,8 +79,9 @@ export interface View {
 /*
  * The key schema of rows (LG-34): a prefix per kind of projection, then what names the row. An `id` (KR-06) and a hash
  * (KR-12) are written as they are — their grammars hold no `:` or `@` that would make two keys one; a key of several
- * parts is the canonical JSON of their array, so that a part may be any string or value and a prefix of the array is a
- * prefix of the key.
+ * parts is the canonical JSON of their array (`canon`, KR-10, CONVENTIONS.md §7.1), so that a part may be any string or
+ * value and a prefix of the array is a prefix of the key. Parts canon refuses are in no commit (KR-10): they name no
+ * key, so fold, which is total (LG-36), writes no row of them and the view finds none.
  */
 export const KEYS = {
   current: "current:",
@@ -101,17 +102,29 @@ export const latestKey = (id: string): string => `${KEYS.latest}${id}`;
 /** The key of the revision `n` of an entity. */
 export const revisionKey = (id: string, n: number): string => `${KEYS.revision}${id}@${n}`;
 
-/** The key of one edge: its target, label, source and path. */
-export const referrerKey = (r: Referrer): string => `${KEYS.referrers}${serialize([r.target, r.label, r.source, r.path])}`;
-
-/** The prefix of the keys of the edges into a target, of one label if it is given: the canonical JSON of the array, open. */
-function referrersPrefix(target: string, label: string | null | undefined): string {
-  const parts = label === undefined ? [target] : [target, label];
-  return `${KEYS.referrers}${serialize(parts).slice(0, -1)},`;
+/** The canonical JSON of the parts of a key, or `null` for parts canon refuses (KR-10). */
+function partsOf(parts: readonly JsonValue[]): string | null {
+  const text = canon(parts);
+  return text.ok ? text.value : null;
 }
 
-/** The key of a unique key. */
-export const holderKey = (u: Unique): string => `${KEYS.holder}${serialize([u.namespace, u.type, u.path, u.value])}`;
+/** The key of one edge: its target, label, source and path; `null` for parts canon refuses. */
+export function referrerKey(r: Referrer): string | null {
+  const parts = partsOf([r.target, r.label, r.source, r.path]);
+  return parts === null ? null : `${KEYS.referrers}${parts}`;
+}
+
+/** The prefix of the keys of the edges into a target, of one label if it is given: the canonical JSON of the array, open. */
+function referrersPrefix(target: string, label: string | null | undefined): string | null {
+  const parts = partsOf(label === undefined ? [target] : [target, label]);
+  return parts === null ? null : `${KEYS.referrers}${parts.slice(0, -1)},`;
+}
+
+/** The key of a unique key; `null` for parts canon refuses. */
+export function holderKey(u: Unique): string | null {
+  const parts = partsOf([u.namespace, u.type, u.path, u.value]);
+  return parts === null ? null : `${KEYS.holder}${parts}`;
+}
 
 /** The key of the standing of a pinned reference `id@n`, or of an event `id`. */
 export const standingKey = (ref: string): string => `${KEYS.standing}${ref}`;
@@ -167,9 +180,8 @@ function pinnedOf(ref: string, current: (id: string) => Record | null): string |
  */
 export function viewOf(seq: number, rows: readonly Row[], files: readonly Evidence[] = []): View & Rows {
   const holding = held(rows, seq);
-  let sorted: readonly Row[] | null = null;
   const row = (key: string) => holding.get(key) ?? null;
-  const under = (prefix: string): JsonValue[] => (sorted ??= sortRows([...holding.values()])).filter((r) => r.key.startsWith(prefix)).map((r) => r.value);
+  const under = (prefix: string): JsonValue[] => sortRows([...holding.values()].filter((r) => r.key.startsWith(prefix))).map((r) => r.value);
   // Fold writes these rows (fold.ts): a revision row holds the record, a holder row `{id}`, an edge row its referrer.
   const record = (key: string) => (row(key)?.value ?? null) as Record | null;
   const current = (id: string) => record(currentKey(id));
@@ -184,8 +196,14 @@ export function viewOf(seq: number, rows: readonly Row[], files: readonly Eviden
     current,
     latest: (id) => record(latestKey(id)),
     revision: (id, n) => record(revisionKey(id, n)),
-    referrers: (target, label) => under(referrersPrefix(target, label)) as Referrer[],
-    holder: (unique) => (row(holderKey(unique))?.value as { readonly id: string } | undefined)?.id ?? null,
+    referrers: (target, label) => {
+      const prefix = referrersPrefix(target, label);
+      return prefix === null ? [] : (under(prefix) as Referrer[]);
+    },
+    holder: (unique) => {
+      const key = holderKey(unique);
+      return key === null ? null : ((row(key)?.value as { readonly id: string } | undefined)?.id ?? null);
+    },
     standing,
     blocks: (types, namespaces) =>
       (under(KEYS.current) as Record[]).filter((r) => types.some((t) => t === typeIdOf(r.type)) && namespaces.some((n) => n === namespaceOf(r.id))),

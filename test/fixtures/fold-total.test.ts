@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import type { JsonValue } from "../../src/kernel/index.js";
 import { fold, type Commit } from "../../src/ledger/index.js";
 import { viewOf, withDelta } from "../../src/ledger/rows.js";
+import { deepFreeze } from "../support/deep-freeze.js";
 import { loadFolders } from "./load.js";
 
 /** A JSON object of a fixture. */
@@ -54,19 +55,20 @@ function recordsOf(input: unknown): Commit["records"] {
   return [...types, ...named, ...records];
 }
 
-const commitOf = (seq: number, records: Commit["records"]): Commit => ({
-  seq,
-  prev: null,
-  kernel: "0",
-  base: seq - 1,
-  proposal: "sha256:0",
-  proposal_sig: null,
-  by: HEADER.by,
-  at: HEADER.at,
-  request: null,
-  sig: null,
-  records,
-});
+const commitOf = (seq: number, records: Commit["records"]): Commit =>
+  deepFreeze({
+    seq,
+    prev: null,
+    kernel: "0",
+    base: seq - 1,
+    proposal: "sha256:0",
+    proposal_sig: null,
+    by: HEADER.by,
+    at: HEADER.at,
+    request: null,
+    sig: null,
+    records,
+  });
 
 describe("fold is total on the inputs of refusals (LG-36)", () => {
   it("LG-36: folds every trigger input of every rule fixture without a throw, as one commit and again record by record", () => {
