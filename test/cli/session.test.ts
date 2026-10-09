@@ -26,7 +26,7 @@ const assembled = () => assembleForTests({ git: { dir: home.dir, branches: { mai
 async function lattice(...argv: string[]) {
   const out: string[] = [];
   const err: string[] = [];
-  const code = await run(argv, { out: (t) => out.push(t), err: (t) => err.push(t), assembled: assembled(), cwd: home.dir });
+  const code = await run(deepFreeze(argv), { out: (t) => out.push(t), err: (t) => err.push(t), assembled: assembled(), cwd: home.dir });
   return { code, out: out.join(""), err: err.join("") };
 }
 
@@ -130,7 +130,7 @@ describe("lattice session that does not start a session", () => {
 
   it("RT-32: names the task that brings the store configuration", async () => {
     const err: string[] = [];
-    const code = await run(["session", "--participant", "alice", "--role", "author"], { out: () => undefined, err: (t) => err.push(t), assembled: null, cwd: home.dir });
+    const code = await run(deepFreeze(["session", "--participant", "alice", "--role", "author"]), { out: () => undefined, err: (t) => err.push(t), assembled: null, cwd: home.dir });
     expect([code, err.join("")]).toEqual([2, "lattice session: no store is configured — store/lattice.json arrives with plan task S0-23\n"]);
   });
 });

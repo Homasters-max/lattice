@@ -7,6 +7,7 @@ import { run } from "../../src/cli/run.js";
 import type { JsonValue } from "../../src/kernel/index.js";
 import { NO_FACTS, proposalHash, readProposal } from "../../src/ledger/index.js";
 import { assembleForTests, type FixtureConfig } from "../support/assembly.js";
+import { deepFreeze } from "../support/deep-freeze.js";
 import { hashOf } from "../support/hash-of.js";
 import { owned, scratch, type Scratch } from "../support/files.js";
 
@@ -38,7 +39,7 @@ const configIn = (dir: string): FixtureConfig => ({
 async function lattice(assembled: Assembly, ...argv: string[]) {
   const out: string[] = [];
   const err: string[] = [];
-  const code = await run(argv, { out: (t) => out.push(t), err: (t) => err.push(t), assembled, cwd: "." });
+  const code = await run(deepFreeze(argv), { out: (t) => out.push(t), err: (t) => err.push(t), assembled, cwd: "." });
   return { code, out: out.join(""), err: err.join("") };
 }
 
