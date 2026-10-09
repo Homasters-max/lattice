@@ -42,8 +42,10 @@ import {
   type ResolveType,
 } from "../../src/kernel/index.js";
 import {
+  ACT_TYPE,
   apply,
   commitLine,
+  coversProposal,
   createView,
   KNOWLEDGE,
   land,
@@ -59,7 +61,10 @@ import {
   readProposal,
   signCommit,
   signProposal,
+  TR_15,
+  TR_16,
   verifyProposal,
+  type Act,
   type Commit,
   type Proposal,
 } from "../../src/ledger/index.js";
@@ -239,6 +244,19 @@ const policy: FixtureCheck = {
   run: admittedPolicy,
 };
 
+/**
+ * `input`: `{ act, proposal }` — the body of an `act` event its type `std/act@1` admits (KR-21), as landing wrote it,
+ * and the hash of a proposal: whether the act covers that proposal, refused from the root of the act (TR-15, TR-16).
+ */
+const act: FixtureCheck = {
+  enforces: [TR_15.id, TR_16.id],
+  run: (input) => {
+    const body = field(input, "act") as JsonValue;
+    if (!checkAgainstType({ type: ACT_TYPE, body }, std().resolve, ROOT).ok) throw new Error("bug: the act of a fixture is admitted by its type");
+    return coversProposal(body as Act, String(field(input, "proposal")), ROOT);
+  },
+};
+
 /** The session of a proposal value with its certificate signed by the test key `by` — the session is written unsigned. */
 function certified(proposal: JsonValue, by: unknown): JsonValue {
   if (typeof by !== "string" || !isJsonObject(proposal)) return proposal;
@@ -361,6 +379,7 @@ export const CHECKS: { readonly [check: string]: FixtureCheck } = {
   chain,
   policy,
   session,
+  act,
   land: landCheck,
   md,
   import: importCheck,

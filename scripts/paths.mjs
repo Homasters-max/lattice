@@ -45,6 +45,9 @@ const OWNS = {
   // form.test.ts and imports.test.ts audit the files of src/ through repoTree of test/structure/tree.ts; import.test.ts
   // checks the bodies it imports against the types of std/ (S0-26).
   codec: ["src/", "package.json", "package-lock.json", "std/"],
+  // the acts of acts-local are git commits and tags signed with the dev keys (Q-04); every act an adapter gives is a body
+  // its type std/act of std/source admits (TR-16).
+  contract: ["test/keys/", "std/"],
   // vectors.test.ts reads the frozen vectors (KR-13).
   kernel: ["test/vectors/"],
   // std-types.test.ts checks the sources of std/ — the types of std as data (S0-08, S0-09).

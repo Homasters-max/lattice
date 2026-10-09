@@ -1,0 +1,18 @@
+{
+  "check": "act",
+  "input": {
+    "act": {
+      "verb": "approve",
+      "target": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "identity": "ssh:SHA256:/qeQPvSZ++WtdXC/R1N0hRnV2NWTE7niYmvBePEWsDk",
+      "uri": "git:6d1f0b7c2e5a4d3c9b8a7f6e5d4c3b2a1f0e9d8c",
+      "at": "2026-10-09T12:00:00.000000Z",
+      "verified": true
+    },
+    "proposal": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "expect": {
+    "rule": "TR-15",
+    "path": "/target"
+  }
+}

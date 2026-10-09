@@ -5,9 +5,10 @@
 // commit to the `jsonl` store on the worktree — nothing for a no-op (LG-25) —
 // removes the proposal and pushes; every worktree it prepared is released, on
 // any outcome (LG-23, D206). Every refusal is placed from the root of the tree
-// of the change request (Q-29). Rebuilds on a moved `main`,
-// `awaiting-act`, the land session event, acts as events, the trailers of
-// OB-07 and `request` arrive with S0-19 and S0-20.
+// of the change request (Q-29). It reads the acts of the change request once
+// and the commit holds each as an `act` event (TR-16, S0-19). Rebuilds on a
+// moved `main`, `awaiting-act`, the land session event, the trailers of OB-07
+// and `request` arrive with S0-20.
 import { parseJsonBytes, refuse, reject, ROOT, type Rejections, type Result } from "../kernel/index.js";
 import { apply, type LandActs } from "./apply.js";
 import { openStore } from "./chain.js";
@@ -160,10 +161,19 @@ async function pushed(ports: LandingPorts, checked: Checked, commit: Commit | nu
   return done === "moved" ? { outcome: "moved" } : ended(commit, true);
 }
 
+/**
+ * LG-22, TR-16: the land session and the acts of the change request, read once through the port `acts`, each formed
+ * as an `act` event — its `id` from the port `ids`, its `at` the time of landing — that the commit holds.
+ */
+async function landActs(ports: LandingPorts, request: string): Promise<LandActs> {
+  const session = { id: ports.ids.ulid(), at: ports.clock.now() };
+  const read = await ports.acts.read(request);
+  return { session, events: read.map((body) => ({ id: ports.ids.ulid(), at: session.at, body })) };
+}
+
 /** Apply on `before`, then the push — or, with `dryRun`, only the outcome (LG-26). */
 async function applied(ports: LandingPorts, checked: Checked, request: string, options: LandOptions): Promise<LandingOutcome> {
-  const acts: LandActs = { session: { id: ports.ids.ulid(), at: ports.clock.now() }, events: await ports.acts.read(request) };
-  const result = apply(checked.view, checked.proposal, acts, []);
+  const result = apply(checked.view, checked.proposal, await landActs(ports, request), []);
   if (!result.ok) return rejected(result);
   const commit = result.value === "no-op" ? null : chainTo(result.value, checked.tail);
   return options.dryRun ? ended(commit, false) : pushed(ports, checked, commit);

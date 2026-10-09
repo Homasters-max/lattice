@@ -66,12 +66,13 @@ describe("walking skeleton (SL-05)", () => {
     expect(refused.out).toContain('KR-06 at /id (intent "Demo/Hello")');
     expect((await viewOf(assembled)).current("demo/hello")).toBeNull();
 
+    // The type, the note and the act of the owner, which the commit holds as an `act` event (TR-16).
     const checked = await lattice(assembled, "land", "cr/good", "--dry-run");
-    expect([checked.code, checked.out]).toEqual([0, "dry run: commit 1 would land 2 records\n"]);
+    expect([checked.code, checked.out]).toEqual([0, "dry run: commit 1 would land 3 records\n"]);
     expect((await viewOf(assembled)).seq).toBe(0);
 
     const landed = await lattice(assembled, "land", "cr/good");
-    expect([landed.code, landed.out]).toEqual([0, "landed: commit 1 with 2 records\n"]);
+    expect([landed.code, landed.out]).toEqual([0, "landed: commit 1 with 3 records\n"]);
 
     // The view opens the store of the tail of main: the commit is in git.
     const view = await viewOf(assembled);
