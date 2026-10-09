@@ -65,8 +65,8 @@ function linksOf(r: Record, types: ResolveType): Change[] {
       const referrer: Referrer = { target, label: labelOf(at), source, path: at.path, ref: at.value };
       out.push([referrerKey(referrer), referrer]);
     }
-    // LG-19: uniqueness counts entities only, within the namespace of the entity.
-    if (at.schema.unique === true && r.rev !== undefined && type !== null && namespace !== null) {
+    // LG-19: uniqueness counts entities only, within the namespace of the entity; an event `id` has no namespace (TR-01).
+    if (at.schema.unique === true && type !== null && namespace !== null) {
       out.push([holderKey({ namespace, type, path: at.path, value: at.value }), { id: r.id }]);
     }
     return out;
