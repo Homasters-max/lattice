@@ -4,7 +4,7 @@ title: Fold, проекции, read view и verify-store
 phase: S0
 stage: E
 size: L
-modules: [ledger, cli]
+modules: [kernel, ledger, assembly, cli]
 depends: [S0-11]
 rules: [LG-34, LG-35, LG-36, LG-37, LG-38, LG-39, LG-41, RF-09, PR-04, GL-05, RT-32]
 ---
@@ -20,12 +20,13 @@ rules: [LG-34, LG-35, LG-36, LG-37, LG-38, LG-39, LG-41, RF-09, PR-04, GL-05, RT
 Входит:
 - **`fold(view, commit, evidence) → delta`** (LG-35): delta — строки, которые commit открывает и закрывает; строка — канонический JSON с `from` и `to`; без часов, id и порядка параллельного обхода; evidence в S0 не декодируется — fold принимает его, но run из него не читает;
 - **fold тотален** (LG-36): висячая ссылка или дубликат сворачиваются как есть;
-- **проекции S0** (LG-34): текущая и последняя ревизии, referrers по ссылкам и внешним ссылкам (RF-09), держатель уникального значения (LG-19 — строка; проверка — S0-15), строки standing — каркас, правила приходят из S0-14;
-- **ключи строк**: префиксы по видам проекций, детерминированная сортировка; схема ключей — в `CONVENTIONS.md`;
-- **read view** (LG-38): `seq`, `current(id)`, `latest(id)`, `revision(id, n)`, `referrers(target, label?)`, `holder(key)`, `standing(ref)`, `blocks(types, namespaces)`, `evidence(hash)`; `view(seq)` — строки с `from ≤ seq` и `to` пустым или больше; `tuple` — S1;
+- **проекции S0** (LG-34): текущая и последняя ревизии и каждая ревизия, referrers по ссылкам и внешним ссылкам (RF-09), держатель уникального значения (LG-19 — строка; проверка — S0-15), процитированное evidence; строки standing — каркас: ключ и вопрос есть, строки и правила приходят из S0-14; до S0-14 текущая ревизия — записанная последней;
+- **ссылки и уникальные значения тела** читает обход тела по схеме его типа — `valuesOf` ядра (`src/kernel/values-of.ts`): `$ref`, ветка union, items, values и поля, как обходит `validate`; тип берётся из того же коммита или из view (LG-11);
+- **ключи строк**: префиксы по видам проекций, детерминированная сортировка; схема ключей — в коде, `KEYS` и функции ключей `src/ledger/rows.ts` (API кода живёт в коде, не в `CONVENTIONS.md`);
+- **read view** (LG-38): `seq`, `current(id)`, `latest(id)`, `revision(id, n)`, `referrers(target, label?)`, `holder(unique)`, `standing(ref)`, `blocks(types, namespaces)`, `evidence(hash)`; `view(seq)` — строки с `from ≤ seq` и `to` пустым или больше; `tuple` — S1; форма `holder` и `blocks` — G-53;
 - view — интерфейс, который можно составить из нескольких: своего fold и fold библиотек (S0-22);
-- **лента и view на любой `seq`** (LG-41);
-- **`lattice verify-store`** (RT-32): открыть store, проверить цепочку, свернуть с genesis и сравнить с накопленными строками (LG-37).
+- **лента и view на любой `seq`** (LG-41): `feed(from)` и `viewAt(seq)` открытого store;
+- **`lattice verify-store <путь>`** (RT-32): открыть `jsonl` store каталога той же операцией, что `openTail`, проверить цепочку и подписи ключами land sessions, чьи события store хранит (`RECORDED`, LG-22, TR-11, G-51), свернуть с genesis и сравнить строки, которые store отдаёт через порт, со свёрнутыми (LG-37); команде нужна сборка без портов — `verifyStoreAt` в `assembly`.
 
 ## Тесты и фикстуры
 
@@ -44,3 +45,4 @@ LG-39: rebuild с genesis равен строкам, накопленным ко
 - Если задача растёт сверх L — делить на «fold и строки» и «read view и `verify-store`».
 - От архитектурного разбора, волна 2 (2026-10-07): read view и rows сейчас разложены по шести местам — `view.ts` (13 строк, вход ST-01), `rows-view.ts` (21, проход насквозь: `View` определён в нём и реэкспортирован `view.ts`, импортируется по обоим путям), `rows.ts`, `fold.ts`, `keptRows` в `ports/store.ts`, `openLines` в `tail.ts`. S0-11 сводит rows в один модуль; эта задача строит fold и вопросы view на нём, а `verify-store` открывает store той же операцией, что `openTail` («строки → проверенный tail», S0-11).
 - От S0-11: rows — один модуль `src/ledger/rows.ts`: `Row`, `Delta`, `View`, `withDelta` (закрытие строки, которой нет, — `bug:`), `held`, `viewOf`, `sortRows` и `keptRows` порта; вход `ledger/view` реэкспортирует `View`. Открытие store — `openLines(lines, keyOfSession)` и `openStore(store, keyOfSession)` в `src/ledger/chain.ts`: разбор канонических байтов строки (`parseCanonical` ядра, KR-10), форма, цепочка и подписи, fold с genesis и передача строк адаптеру (`Store.keep`). `verify-store` зовёт `openStore` с ключами сессий; fold при открытии пока получает пустой список evidence.
+- Сделано иначе, чем в наброске: задача задела `kernel` (обход `valuesOf` и экспорт `serialize` — ключи строк из любых значений, fold не бросает на неканоническом входе) и `assembly` (`verifyStoreAt`: `cli` импортирует только `assembly`, G-15) — четыре модуля, триггер аудита ST-15; схема ключей — в коде; ключи подписей `verify-store` — из событий land session в самом store (G-51); семантика referrers — G-52.
