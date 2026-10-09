@@ -1,15 +1,18 @@
-// assembly (ST-01): wires landing and the read view to the ports; the only
-// module that imports adapters (ST-06). The store on a worktree is always the
-// `jsonl` adapter (LG-23). The working adapters of `git`, `acts`, `clock` and
-// `ids` and reading `store/lattice.json` arrive with S0-19, S0-20 and S0-23;
-// the adapters for tests are assembled only by tests (test/support/assembly.ts,
-// plan/closure-check.md, the bypass class of acts: TR-14…TR-17).
+// assembly (ST-01): wires landing, the read view and the start of a session
+// to the ports; the only module that imports adapters (ST-06). The store on a
+// worktree is always the `jsonl` adapter (LG-23). The working adapters of
+// `git`, `acts`, `clock` and `ids` and reading `store/lattice.json` arrive
+// with S0-19, S0-20 and S0-23; the adapters for tests are assembled only by
+// tests (test/support/assembly.ts, plan/closure-check.md, the bypass class of
+// acts: TR-14…TR-17).
 import { createStoreJsonl } from "../adapters/store-jsonl/index.js";
 import type { Result } from "../kernel/index.js";
 import { land, openTail, type LandingOutcome, type LandingPorts, type LandOptions, type View } from "../ledger/index.js";
+import { startSession, type SessionOutcome, type SessionRequest } from "./session.js";
 
 export type { Rejection, Result } from "../kernel/index.js";
 export type { LandingOutcome, LandOptions, View };
+export type { SessionOutcome, SessionRequest };
 
 /** The ports assembly is given; it opens the store itself. */
 interface Ports {
@@ -19,10 +22,11 @@ interface Ports {
   readonly ids: LandingPorts["ids"];
 }
 
-/** What the commands reach: landing and the read view at the tail of `main`. */
+/** What the commands reach: landing, the read view at the tail of `main` and the start of a session. */
 export interface Assembly {
   readonly land: (request: string, options: LandOptions) => Promise<LandingOutcome>;
   readonly view: () => Promise<Result<View>>;
+  readonly session: (request: SessionRequest) => SessionOutcome;
 }
 
 /** The ports of landing: those given and the `jsonl` store on every worktree (LG-23). */
@@ -34,5 +38,5 @@ export function assemble(ports: Ports): Assembly {
     const opened = await openTail(all);
     return opened.ok ? { ok: true, value: opened.value.view } : opened;
   };
-  return { land: (request, options) => land(all, request, options), view };
+  return { land: (request, options) => land(all, request, options), view, session: (request) => startSession(ports, request) };
 }

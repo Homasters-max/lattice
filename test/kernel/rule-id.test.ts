@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { RULES as CODEC } from "../../src/codec/index.js";
 import { isId, isIdLike, isRuleId, isZBlockId, RULES as KERNEL } from "../../src/kernel/index.js";
 import { RULES as LEDGER } from "../../src/ledger/index.js";
+import { RULES as TRUST } from "../../src/trust/index.js";
 
 describe("the grammar of an ID (RM-02)", () => {
   it("RM-02: a rule ID is <PREFIX>-<NN>", () => {
@@ -28,6 +29,6 @@ describe("the grammar of an ID (RM-02)", () => {
   });
 
   it("RM-02, LG-17: every rule ID a registry names is of the grammar", () => {
-    for (const { id } of [...KERNEL, ...LEDGER, ...CODEC]) expect([id, isRuleId(id)]).toEqual([id, true]);
+    for (const { id } of [...KERNEL, ...LEDGER, ...CODEC, ...TRUST]) expect([id, isRuleId(id)]).toEqual([id, true]);
   });
 });

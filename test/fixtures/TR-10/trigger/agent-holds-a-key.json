@@ -1,0 +1,21 @@
+{
+  "check": "policy",
+  "input": {
+    "policy": {
+      "owner": "alice",
+      "writers": [
+        {
+          "participant": "claude",
+          "kind": "agent",
+          "keys": [
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICfrHwkVc3TDxqfPB512ABrpmYen4arK3SuQt1p9eGFa"
+          ]
+        }
+      ]
+    }
+  },
+  "expect": {
+    "rule": "TR-10",
+    "path": "/writers/0/keys"
+  }
+}

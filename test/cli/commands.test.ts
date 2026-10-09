@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { COMMANDS } from "../../src/cli/commands.js";
 import { run } from "../../src/cli/run.js";
+import { deepFreeze } from "../support/deep-freeze.js";
 import { knowledge } from "../support/files.js";
 
 const S0 = ["init", "draft", "land", "verify-store", "export", "migrate", "session"];
@@ -14,13 +15,12 @@ const STUBS: readonly (readonly [string, string])[] = [
   ["verify-store", "S0-12"],
   ["export", "S0-27"],
   ["migrate", "S0-18"],
-  ["session", "S0-16"],
 ];
 
 async function lattice(...argv: string[]) {
   const out: string[] = [];
   const err: string[] = [];
-  const code = await run(argv, { out: (t) => out.push(t), err: (t) => err.push(t), assembled: null });
+  const code = await run(deepFreeze(argv), { out: (t) => out.push(t), err: (t) => err.push(t), assembled: null, cwd: "." });
   return { code, out: out.join(""), err: err.join("") };
 }
 

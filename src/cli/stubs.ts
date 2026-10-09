@@ -8,5 +8,4 @@ export const STUBS: { readonly [command: string]: string } = {
   "verify-store": "S0-12",
   export: "S0-27",
   migrate: "S0-18",
-  session: "S0-16",
 };

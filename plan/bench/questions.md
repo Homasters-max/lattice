@@ -52,3 +52,7 @@
 | 44 | Which rule refuses a record whose type the ledger does not know, before references are checked? | — | blank | S0-36, G-28 (LG-16 читает тело против `type@n`, RF-03 — фаза 4; решено: KR-15 на `/type`) | 2026-10-07 |
 | 45 | Does the code hash of a test set include the code under test that its tests import? | — | blank | S0-39, G-29 (RT-12 называет файлы test set и их транзитивные импорты; RT-21 даёт код под тестом отдельно) | 2026-10-07 |
 | 46 | May a test read a file outside its test set at run time? | lattice/st-18 | normal | S0-39 | 2026-10-07 |
+| 47 | Against which time is the expiry of a session certificate checked when a proposal is applied? | lattice/tr-11 | normal | S0-16 | 2026-10-09 |
+| 48 | Which phase of apply verifies the certificate of a session and the signature of a proposal? | lattice/lg-16, lattice/tr-12 | normal | S0-16 | 2026-10-09 |
+| 49 | Over which bytes does a participant sign the certificate of a session? | — | blank | S0-16, G-48 (TR-11 называет подпись, но не байты) | 2026-10-09 |
+| 50 | Which key signs the certificate of an agent session? | lattice/tr-11, lattice/tr-12 | normal | S0-16 | 2026-10-09 |

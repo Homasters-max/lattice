@@ -1,0 +1,51 @@
+{
+  "check": "session",
+  "input": {
+    "policy": {
+      "owner": "alice",
+      "writers": [
+        {
+          "participant": "alice",
+          "kind": "human",
+          "keys": [
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHdbHm3SGrugedxix21nrQCJQsF1pIQAheFFod0356F1"
+          ],
+          "roles": [
+            "author"
+          ]
+        }
+      ]
+    },
+    "proposal": {
+      "session": {
+        "id": "01JB2X00000000000000000SES",
+        "at": "2026-10-06T11:00:00.000000Z",
+        "body": {
+          "participant": "alice",
+          "kind": "human",
+          "role": "author",
+          "purpose": "work",
+          "for": {
+            "reason": "requirement",
+            "requirement": "demo/requirement@1"
+          },
+          "software": "lattice",
+          "version": "0",
+          "certificate": {
+            "key": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ",
+            "expires": "2026-10-07T11:00:00.000000Z"
+          }
+        }
+      },
+      "intents": [],
+      "sig": null
+    },
+    "certifiedBy": "alice",
+    "signedBy": "session",
+    "at": "2026-10-06T12:00:00.000000Z"
+  },
+  "expect": {
+    "rule": "TR-10",
+    "path": "/session/body/certificate/key"
+  }
+}

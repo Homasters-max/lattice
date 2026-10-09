@@ -1,0 +1,21 @@
+{
+  "check": "policy",
+  "input": {
+    "policy": {
+      "owner": "alice",
+      "writers": [
+        {
+          "participant": "alice",
+          "kind": "human",
+          "identities": [
+            "ssh:alice@laptop"
+          ]
+        }
+      ]
+    }
+  },
+  "expect": {
+    "rule": "TR-09",
+    "path": "/writers/0/identities/0"
+  }
+}

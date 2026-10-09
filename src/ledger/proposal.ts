@@ -2,8 +2,9 @@
 // (LG-10) and the canonical order of its intents (LG-06, G-03). The form is
 // closed: an intent carries every value not computed from the tail, and its
 // `by` is the proposal's session, so it holds no `by`, `rev`, `seq` or `hash`.
-// The session event with its certificate and the chain of TR-12 arrive with
-// S0-16.
+// The session event `{id, at, body}` with its certificate (TR-11, G-47) is
+// read by trust, which verifies the chain of TR-12 to the key that signs the
+// proposal; phase 5 of apply runs it (S0-17).
 import {
   canon,
   closedForm,
@@ -28,7 +29,7 @@ import { signHash, verifyHash, type PublicKey, type SessionKey } from "../trust/
 import { known, unsigned } from "./commit.js";
 import { LG_09, LG_10 } from "./rules.js";
 
-/** The authoring session event (TR-11); its certificate arrives with S0-16. */
+/** The authoring session event (TR-11): LG-09 asks only for its `id`; its form is `readSession` of trust (G-47). */
 type Session = JsonObject & { readonly id: string };
 
 export type Intent = {
@@ -138,7 +139,7 @@ export function signProposal(p: Proposal, sessionKey: SessionKey, keyOf: KeyOf):
 /**
  * LG-10: the proposal, verified, or the rejection of one whose `sig` is not the signature of its hash by `key`, the
  * key of its session (TR-12), at `/sig` under the place the caller names — where the proposal sits. That the key is
- * the session's is the chain of TR-12 (S0-16).
+ * the session's is the chain of TR-12: `verifySession` of trust gives this check the key its certificate names.
  */
 export function verifyProposal(p: Proposal, key: PublicKey, keyOf: KeyOf, place: Place = ROOT): Result<Proposal> {
   const signed = proposalHash(p, keyOf);
