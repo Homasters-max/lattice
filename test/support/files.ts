@@ -137,6 +137,7 @@ export function scratch(prefix: string): Scratch {
       mkdirSync(folder, { recursive: true });
       return folder;
     },
-    remove: (path) => rmSync(path === undefined ? dir : at(path), { recursive: true, force: true }),
+    // On Windows a folder a process has just left can stay busy for a moment (EBUSY): removing it tries again.
+    remove: (path) => rmSync(path === undefined ? dir : at(path), { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }),
   };
 }

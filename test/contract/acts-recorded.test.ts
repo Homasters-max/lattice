@@ -8,7 +8,8 @@ import { createActsFixture } from "../../src/adapters/acts-fixture/index.js";
 import { createActsLocal } from "../../src/adapters/acts-local/index.js";
 import { createActsRecorded } from "../../src/adapters/acts-recorded/index.js";
 import { parseJson, ROOT } from "../../src/kernel/index.js";
-import { ACT_TYPE, coversProposal, land, NO_FACTS, proposalHash, readProposal, type Act, type Acts, type Commit } from "../../src/ledger/index.js";
+import { ACT_TYPE, land, NO_FACTS, proposalHash, readProposal, type Acts, type Commit } from "../../src/ledger/index.js";
+import { coversProposal, type Act } from "../../src/trust/index.js";
 import { AT, landingPortsForTests } from "../support/assembly.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 import { scratch, type Scratch } from "../support/files.js";
@@ -55,16 +56,16 @@ function counted(acts: Acts): { readonly port: Acts; readonly reads: string[] } 
   return { port: { read: (request) => (reads.push(request), acts.read(request)) }, reads };
 }
 
-async function landed(acts: Acts, dryRun: boolean): Promise<Commit> {
+async function landed(acts: Acts, dryRun: boolean, file = FILE): Promise<Commit> {
   const dir = scratch("lattice-acts-landing-");
   dirs.push(dir);
-  const repository = { dir: dir.dir, branches: { main: { files: { "README.md": "demo\n" } }, "cr/a": { from: "main", files: { "store/proposals/cr-a.json": FILE } } } };
+  const repository = { dir: dir.dir, branches: { main: { files: { "README.md": "demo\n" } }, "cr/a": { from: "main", files: { "store/proposals/cr-a.json": file } } } };
   const out = await land(landingPortsForTests(repository, { acts }), "cr/a", { dryRun });
   if (out.outcome !== "commit") throw new Error(`bug: the change request of the tests lands; it ended ${out.outcome}`);
   return out.commit;
 }
 
-const decisions = (acts: readonly Act[]) => acts.map((a) => coversProposal(a, HASH, ROOT)).map((r) => (r.ok ? "counts" : r.rejections.map((x) => x.rule)));
+const decisions = (acts: readonly Act[]) => deepFreeze(acts).map((a) => coversProposal(a, HASH, ROOT)).map((r) => (r.ok ? "counts" : r.rejections.map((x) => x.rule)));
 
 describe.each(SOURCES)("acts read once, from $name", ({ make }) => {
   it("TR-16, LG-22: landing reads the acts once and the commit holds each as an act event of the land session", async () => {
@@ -85,5 +86,21 @@ describe.each(SOURCES)("acts read once, from $name", ({ make }) => {
     expect(recorded).toEqual(read);
     expect(decisions(recorded)).toEqual(decisions(read));
     expect(decisions(recorded)).toEqual(["counts", ["TR-15"], ["TR-16"]]);
+  });
+});
+
+/** The proposal file of `cr/a` with an event of the type of an act beside its intent: an approve of its own hash, verified. */
+function carryingAnAct(): string {
+  const value = JSON.parse(FILE) as { readonly intents: readonly unknown[] };
+  const event = { op: "event", id: "01JB2X0000000000000000FAKE", type: ACT_TYPE, expected: null, at: AT, body: fixtureAct(HASH, true) };
+  return JSON.stringify({ ...value, intents: [...value.intents, event] });
+}
+
+describe("acts-recorded: the acts landing read, and no other event", () => {
+  it("TR-14, LG-22: an event of the type of an act that a proposal carries is no act; recorded reads only those by the land session", async () => {
+    const landedAct = fixtureAct(OTHER, true);
+    const commit = await landed(createActsFixture(deepFreeze({ acts: { "cr/a": [landedAct] } })), true, carryingAnAct());
+    expect(commit.records.filter((r) => r.type === ACT_TYPE).map((r) => r.by === commit.by)).toEqual([true, false]);
+    expect(await createActsRecorded(deepFreeze({ commits: { "cr/a": commit } })).read("cr/a")).toEqual([landedAct]);
   });
 });

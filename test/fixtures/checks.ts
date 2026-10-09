@@ -45,7 +45,6 @@ import {
   ACT_TYPE,
   apply,
   commitLine,
-  coversProposal,
   createView,
   KNOWLEDGE,
   land,
@@ -61,16 +60,14 @@ import {
   readProposal,
   signCommit,
   signProposal,
-  TR_15,
-  TR_16,
   verifyProposal,
-  type Act,
   type Commit,
   type Proposal,
 } from "../../src/ledger/index.js";
-import { readPolicy, signSession, TR_09, TR_10, TR_11, TR_12, verifySession, type UnsignedSession } from "../../src/trust/index.js";
+import { coversProposal, readPolicy, signSession, TR_09, TR_10, TR_11, TR_12, TR_15, TR_16, verifySession, type Act, type UnsignedSession } from "../../src/trust/index.js";
 import { std } from "../ledger/std-sources.js";
 import { landingPortsForTests, type GitFixtureOptions } from "../support/assembly.js";
+import { deepFreeze } from "../support/deep-freeze.js";
 // The land session of every fixture: apply takes the commit's `by` and `at` from it (LG-22).
 import { keyOfLand, LAND, landedChain } from "../support/chain.js";
 import { scratch } from "../support/files.js";
@@ -253,7 +250,7 @@ const act: FixtureCheck = {
   run: (input) => {
     const body = field(input, "act") as JsonValue;
     if (!checkAgainstType({ type: ACT_TYPE, body }, std().resolve, ROOT).ok) throw new Error("bug: the act of a fixture is admitted by its type");
-    return coversProposal(body as Act, String(field(input, "proposal")), ROOT);
+    return coversProposal(deepFreeze(body as Act), String(field(input, "proposal")), ROOT);
   },
 };
 

@@ -3,7 +3,7 @@
 // with every reason it does not, placed where the caller says the act sits.
 import { describe, expect, it } from "vitest";
 import { reject } from "../../src/kernel/index.js";
-import { coversProposal, TR_15, TR_16, type Act } from "../../src/ledger/index.js";
+import { coversProposal, TR_15, TR_16, type Act } from "../../src/trust/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 
 const HASH = "sha256:1111111111111111111111111111111111111111111111111111111111111111";

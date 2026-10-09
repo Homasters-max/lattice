@@ -1,7 +1,8 @@
 // The rule registry of trust (CONVENTIONS.md §3.5): one constant per rule ID
 // its hard checks enforce — the writers of a namespace policy (TR-09, TR-10),
-// sessions and their certificates (TR-11, TR-12). The form of a policy and of
-// a session body is the schema of its type (KR-21), not a check of trust.
+// sessions and their certificates (TR-11, TR-12), and whether an act counts for
+// a proposal (TR-15, TR-16). The form of a policy, of a session body and of an
+// act is the schema of its type (KR-21), not a check of trust.
 import type { Rule } from "../kernel/index.js";
 
 export const TR_09 = {
@@ -28,4 +29,14 @@ export const TR_12 = {
   message: { en: "the certificate of a session is signed by a key the policy lists for its participant; expected {expected}, got {got}" },
 } as const satisfies Rule;
 
-export const RULES: readonly Rule[] = [TR_09, TR_10, TR_11, TR_12];
+export const TR_15 = {
+  id: "TR-15",
+  message: { en: "an approve act counts for the proposal whose hash it names; expected {expected}, got {got}" },
+} as const satisfies Rule;
+
+export const TR_16 = {
+  id: "TR-16",
+  message: { en: "acts are checked once, at their source, and an act counts only where that check passed; expected {expected}, got {got}" },
+} as const satisfies Rule;
+
+export const RULES: readonly Rule[] = [TR_09, TR_10, TR_11, TR_12, TR_15, TR_16];

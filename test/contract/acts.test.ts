@@ -27,7 +27,8 @@ function landedWith(acts: readonly Act[]): Commit {
   const read = value.ok ? readProposal(value.value) : value;
   if (!read.ok) throw new Error("bug: the proposal of the tests has the form of LG-09");
   const events = acts.map((body, i) => ({ id: `01JB2X000000000000000ACT0${i}`, at: AT, body }));
-  const applied = apply(createView(0, []), read.value, { session: { id: "01JB2X00000000000000000LND", at: AT }, events }, []);
+  const land = deepFreeze({ session: { id: "01JB2X00000000000000000LND", at: AT }, events });
+  const applied = apply(deepFreeze(createView(0, [])), deepFreeze(read.value), land, deepFreeze([]));
   if (!applied.ok || applied.value === "no-op") throw new Error("bug: the proposal of the tests lands");
   return applied.value;
 }

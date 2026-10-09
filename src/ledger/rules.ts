@@ -1,6 +1,5 @@
 // The rule registry of the ledger (CONVENTIONS.md §3.5): one constant per rule
-// ID its hard checks enforce — and those of the act a proposal counts (TR-15,
-// TR-16): acts reach LATTICE only through the port `acts` of the ledger.
+// ID its hard checks enforce.
 import type { Rule } from "../kernel/index.js";
 
 export const LG_04 = {
@@ -40,14 +39,4 @@ export const LG_54 = {
   message: { en: "a change request carries exactly one proposal in store/proposals/; expected {expected}, got {got}" },
 } as const satisfies Rule;
 
-export const TR_15 = {
-  id: "TR-15",
-  message: { en: "an approve act counts for the proposal whose hash it names; expected {expected}, got {got}" },
-} as const satisfies Rule;
-
-export const TR_16 = {
-  id: "TR-16",
-  message: { en: "acts are checked once, at their source, and an act counts only where that check passed; expected {expected}, got {got}" },
-} as const satisfies Rule;
-
-export const RULES: readonly Rule[] = [LG_04, LG_05, LG_06, LG_09, LG_10, LG_23, LG_54, TR_15, TR_16];
+export const RULES: readonly Rule[] = [LG_04, LG_05, LG_06, LG_09, LG_10, LG_23, LG_54];

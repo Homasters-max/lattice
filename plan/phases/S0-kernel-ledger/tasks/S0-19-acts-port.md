@@ -4,7 +4,7 @@ title: Порт acts — адаптеры local, init, fixture, recorded
 phase: S0
 stage: G
 size: M
-modules: [adapters, ledger]
+modules: [adapters, ledger, trust]
 depends: [S0-16]
 rules: [TR-14, TR-15, TR-16]
 ---
@@ -44,4 +44,4 @@ Act — единственный путь человеческого решен�
 
 - Время источника у `local` — время коммита, которое задаёт автор; дизайн это допускает: срок сертификата проверяется по нему (TR-11).
 - От S0-03 (Q-13, Q-20): `acts-fixture` уже есть — acts из тестовых данных по change request, без разрешающего умолчания (Q-20); его подключает только тестовая сборка `test/support/assembly.ts`, импорт из `src/` тест структуры отклоняет (ST-07).
-- Сделано (G-55): тесты `local` — `test/contract/acts-local.test.ts` на временном репозитории `test/support/signed-git.ts` с dev-ключами `test/keys/` (`dev-owner` — ключ policy, `dev-land` — чужой); «записаны landing и читаются через `recorded`» — `test/contract/acts-recorded.test.ts` на `fixture` и `local`. Решение «засчитан ли act» — `coversProposal` (TR-15, TR-16) с фикстурами `test/fixtures/TR-15/`, `TR-16/`; его вызывает фаза 5 (S0-17). TR-14 — граница ревью и тесты адаптеров: жёсткой проверки с этим rule ID нет.
+- Сделано (G-55): тесты `local` — `test/contract/acts-local.test.ts` на временном репозитории `test/support/signed-git.ts` с dev-ключами `test/keys/` (`dev-owner` — ключ policy, `dev-land` — чужой); «записаны landing и читаются через `recorded`» — `test/contract/acts-recorded.test.ts` на `fixture` и `local`. Решение «засчитан ли act» — `coversProposal` в `src/trust/act.ts` (TR-15, TR-16; ревью: правило trust, RM-Z04) с фикстурами `test/fixtures/TR-15/`, `TR-16/`; его вызывает фаза 5 (S0-17). TR-14 — граница ревью и тесты адаптеров: жёсткой проверки с этим rule ID нет.

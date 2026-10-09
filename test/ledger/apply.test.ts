@@ -1,10 +1,12 @@
 // The thin apply of the walking skeleton: phase 1 checks ids (KR-06) and
 // collects every rejection; the candidate commit carries kernel 0 (KR-03),
 // the next seq, rev and hash, the land session's `by` and `at` (LG-22), and
-// its records in canonical order (LG-06, LG-10).
+// its records in canonical order (LG-06, LG-10); phase 1 checks the act
+// events landing formed as it checks intents (TR-16).
 import { describe, expect, it } from "vitest";
 import { BODY_LIMIT, KERNEL_VERSION, type JsonValue } from "../../src/kernel/index.js";
 import {
+  ACT_TYPE,
   apply,
   commitHash,
   commitLine,
@@ -14,6 +16,7 @@ import {
   openLines,
   proposalHash,
   readProposal,
+  type Act,
   type Commit,
   type LandActs,
   type Proposal,
@@ -78,6 +81,36 @@ describe("apply, phase 1: canonical form and the body limit (KR-10, KR-13)", () 
     const at = (bytes: number) => ({ session: { id: "01JB2X00000000000000000SES" }, intents: [intent("demo/a", "x".repeat(bytes - 2))], sig: null });
     expect(refusals(at(BODY_LIMIT + 1))).toEqual([["KR-13", "demo/a", "/body"]]);
     expect(refusals(at(BODY_LIMIT))).toEqual([]);
+  });
+});
+
+describe("apply, phase 1: the act events landing formed (TR-16, LG-22)", () => {
+  const ACT: Act = { verb: "approve", target: hashOf("demo/note@1", { text: "demo/a" }), identity: "ssh:SHA256:dev", uri: "fixture:cr/a", at: AT, verified: true };
+  const refusals = (events: LandActs["events"]) => {
+    const out = apply(empty(), proposal(intent("demo/a")), deepFreeze({ session: LAND.session, events }), deepFreeze([]));
+    return out.ok ? [] : out.rejections.map((r) => [r.rule, r.intent, r.path]);
+  };
+
+  it("KR-06, KR-10, KR-13: refuses an act event as it refuses an intent — its id, its body in canonical form and within the limit", () => {
+    const events = [
+      { id: "not-a-ulid", at: AT, body: ACT },
+      { id: "01JB2X000000000000000ACT01", at: AT, body: { ...ACT, text: "e\u0301" } },
+      { id: "01JB2X000000000000000ACT02", at: AT, body: { ...ACT, text: "x".repeat(BODY_LIMIT) } },
+    ];
+    expect(refusals(events)).toEqual([
+      ["KR-10", "01JB2X000000000000000ACT01", "/body/text"],
+      ["KR-13", "01JB2X000000000000000ACT02", "/body"],
+      ["KR-06", "not-a-ulid", "/id"],
+    ]);
+  });
+
+  it("TR-16: an act event in canonical form is written beside the intents, by the land session", () => {
+    const out = apply(empty(), proposal(intent("demo/a")), deepFreeze({ session: LAND.session, events: [{ id: "01JB2X000000000000000ACT00", at: AT, body: ACT }] }), deepFreeze([]));
+    if (!out.ok || out.value === "no-op") throw new Error("bug: a proposal with one intent and a canonical act applies to a commit");
+    expect(out.value.records.map((r) => [r.id, r.type, r.by])).toEqual([
+      ["demo/a", "demo/note@1", "01JB2X00000000000000000SES"],
+      ["01JB2X000000000000000ACT00", ACT_TYPE, LAND.session.id],
+    ]);
   });
 });
 

@@ -6,8 +6,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { createActsLocal } from "../../src/adapters/acts-local/index.js";
 import { checkAgainstType, ROOT } from "../../src/kernel/index.js";
-import { coversProposal, type Act } from "../../src/ledger/index.js";
-import { readPolicy } from "../../src/trust/index.js";
+import { coversProposal, readPolicy, type Act } from "../../src/trust/index.js";
 import { std } from "../ledger/std-sources.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 import { identityOf, publicKeyOf, SIGNED_AT, signedRepo, type SignedRepo } from "../support/signed-git.js";
@@ -41,7 +40,7 @@ async function actsOf(name: string, build: (branch: string) => void): Promise<re
   return createActsLocal(deepFreeze({ dir: repo.dir, base: "main", keys: keysOfPolicy() })).read(name);
 }
 
-const covers = (acts: readonly Act[]) => acts.map((a) => coversProposal(a, HASH, ROOT)).map((r) => (r.ok ? "counts" : r.rejections.map((x) => [x.rule, x.path])));
+const covers = (acts: readonly Act[]) => deepFreeze(acts).map((a) => coversProposal(a, HASH, ROOT)).map((r) => (r.ok ? "counts" : r.rejections.map((x) => [x.rule, x.path])));
 
 describe("acts-local: signatures", () => {
   it("TR-14, TR-16: a commit signed by a key of the policy with the trailer is an act, verified, that counts for the proposal it names", async () => {
@@ -144,10 +143,16 @@ describe("acts-local: trailers, messages and tags", () => {
 describe("acts-local: the keys of the policy, not of the machine", () => {
   it("TR-16, Q-04: a key the machine allows signers by, and the policy does not list, verifies no act", async () => {
     const machine = repo.allowOnMachine("dev-land");
-    // The adapter runs git in this environment, with the configuration of the machine.
+    // The adapter runs in the environment of a machine that names this configuration.
     vi.stubEnv("GIT_CONFIG_GLOBAL", machine.GIT_CONFIG_GLOBAL);
     const acts = await actsOf("cr/machine", (b) => repo.commit(b, approve(HASH), "dev-land"));
     expect(repo.machineVerifies("cr/machine")).toBe(true);
     expect(acts.map((a) => [a.identity, a.verified])).toEqual([[identityOf("dev-land"), false]]);
+  });
+
+  it("TR-16, G-55: a key of the policy the machine revokes still verifies its act — no key of the configuration of the machine reaches the check", async () => {
+    vi.stubEnv("GIT_CONFIG_GLOBAL", repo.revokeOnMachine("dev-owner").GIT_CONFIG_GLOBAL);
+    const acts = await actsOf("cr/revoked", (b) => repo.commit(b, approve(HASH), "dev-owner"));
+    expect(acts.map((a) => [a.identity, a.verified])).toEqual([[identityOf("dev-owner"), true]]);
   });
 });

@@ -6,12 +6,13 @@
 // where it points at one of them. The signature is checked by
 // `git verify-commit` or `git verify-tag` against allowed signers made of the
 // keys the caller gives — those of the writers of the policy — and of no other:
-// the allowed signers of the machine never reach the check. The identity of
-// an act is the fingerprint of the key that signed it (TR-09), the act is
-// `verified` only where that key is allowed (TR-16), and its source time is
-// the time of the commit or tag, which its author sets (TR-11). A commit or tag
-// without a signature is no local act; a GPG signature is read on demand
-// (Q-04), until then none is (G-55).
+// git runs without the configuration of the machine, so neither its allowed
+// signers nor any other key of it reaches the check. The identity of an act is
+// the fingerprint of the key that signed it (TR-09), the act is `verified`
+// only where that key is allowed (TR-16), and its source time is the time of
+// the commit or tag, which its author sets (TR-11). A commit or tag without a
+// signature is no local act; a GPG signature is read on demand (Q-04), until
+// then none is (G-55).
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -32,17 +33,30 @@ type Ran = { readonly status: number; readonly stdout: string; readonly stderr: 
 
 const MAX_BUFFER = 1 << 26;
 
-function run(dir: string, args: readonly string[]): Promise<Ran> {
+/** A repository and the environment git runs in there. */
+type Repo = { readonly dir: string; readonly env: NodeJS.ProcessEnv };
+
+/**
+ * G-55: the environment of git without the configuration of the machine — no system file, an empty global one, none
+ * passed through the environment — so no key of it (`gpg.ssh.program`, `gpg.ssh.revocationFile`,
+ * `gpg.minTrustLevel`, its allowed signers) changes what verifies.
+ */
+function isolated(global: string): NodeJS.ProcessEnv {
+  const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_CONFIG")));
+  return { ...env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: global };
+}
+
+function run(repo: Repo, args: readonly string[]): Promise<Ran> {
   return new Promise((resolve) => {
-    execFile("git", ["-C", dir, ...args], { encoding: "utf8", maxBuffer: MAX_BUFFER, windowsHide: true }, (error, stdout, stderr) => {
+    execFile("git", ["-C", repo.dir, ...args], { env: repo.env, encoding: "utf8", maxBuffer: MAX_BUFFER, windowsHide: true }, (error, stdout, stderr) => {
       resolve({ status: error === null ? 0 : typeof error.code === "number" ? error.code : 1, stdout, stderr });
     });
   });
 }
 
 /** The output of a git command that must succeed; a failure of git is a failure of the outside world (CONVENTIONS.md §2.3). */
-async function output(dir: string, args: readonly string[]): Promise<string> {
-  const ran = await run(dir, args);
+async function output(repo: Repo, args: readonly string[]): Promise<string> {
+  const ran = await run(repo, args);
   if (ran.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${ran.stderr.trim()}`);
   return ran.stdout;
 }
@@ -114,32 +128,32 @@ function trailersOf(message: string): { readonly verb: Act["verb"]; readonly tar
 /** TR-14: the text of an answer — the message before its trailers. */
 const textOf = (message: string): string => paragraphs(message).slice(0, -1).join("\n\n");
 
-async function signedOf(dir: string, kind: Signed["kind"], id: string): Promise<Signed> {
-  return parsed(kind, id, await output(dir, ["cat-file", kind, id]));
+async function signedOf(repo: Repo, kind: Signed["kind"], id: string): Promise<Signed> {
+  return parsed(kind, id, await output(repo, ["cat-file", kind, id]));
 }
 
 /** The commits of a change request, oldest first, and the annotated tags that point at them, in the order of their names. */
-async function sourcesOf(dir: string, base: string, request: string): Promise<Signed[]> {
-  const commits = (await output(dir, ["rev-list", "--reverse", "--topo-order", `${base}..${request}`])).split("\n").filter((l) => l !== "");
+async function sourcesOf(repo: Repo, base: string, request: string): Promise<Signed[]> {
+  const commits = (await output(repo, ["rev-list", "--reverse", "--topo-order", `${base}..${request}`])).split("\n").filter((l) => l !== "");
   // `%(*objectname)` is what an annotated tag points at, and empty for a lightweight one, which no one signs.
-  const refs = (await output(dir, ["for-each-ref", "--format=%(objectname) %(*objectname)", "refs/tags"])).split("\n");
+  const refs = (await output(repo, ["for-each-ref", "--format=%(objectname) %(*objectname)", "refs/tags"])).split("\n");
   const tags = refs.map((l) => l.split(" ")).filter(([, target]) => commits.includes(target ?? ""));
   const all = [...commits.map((c) => ["commit", c] as const), ...tags.map(([tag]) => ["tag", tag ?? ""] as const)];
-  return Promise.all(all.map(([kind, id]) => signedOf(dir, kind, id)));
+  return Promise.all(all.map(([kind, id]) => signedOf(repo, kind, id)));
 }
 
 /** TR-16: whether git verifies the signature of a commit or tag against these allowed signers and no others. */
-async function verified(dir: string, signers: string, s: Signed): Promise<boolean> {
-  const ran = await run(dir, ["-c", `gpg.ssh.allowedSignersFile=${signers}`, s.kind === "commit" ? "verify-commit" : "verify-tag", s.id]);
+async function verified(repo: Repo, signers: string, s: Signed): Promise<boolean> {
+  const ran = await run(repo, ["-c", `gpg.ssh.allowedSignersFile=${signers}`, s.kind === "commit" ? "verify-commit" : "verify-tag", s.id]);
   return ran.status === 0;
 }
 
 /** The acts of one commit or tag: one per trailer, under the key that signed it; none without an SSH signature. */
-async function actsIn(dir: string, signers: string, s: Signed): Promise<Act[]> {
+async function actsIn(repo: Repo, signers: string, s: Signed): Promise<Act[]> {
   const signer = s.signature === null ? null : signerOf(s.signature);
   const trailers = trailersOf(s.message);
   if (signer === null || trailers.length === 0) return [];
-  const [ok, at] = [await verified(dir, signers, s), timeOf(s)];
+  const [ok, at] = [await verified(repo, signers, s), timeOf(s)];
   const source = { identity: `ssh:${signer}`, uri: `git:${s.id}`, at, verified: ok };
   return trailers.map(({ verb, target }) => (verb === "answer" ? { verb, target, ...source, text: textOf(s.message) } : { verb, target, ...source }));
 }
@@ -157,9 +171,11 @@ export function createActsLocal({ dir, base, keys }: ActsLocalOptions): Acts {
       const home = await mkdtemp(join(tmpdir(), "lattice-acts-"));
       try {
         const signers = join(home, "allowed_signers");
-        await writeFile(signers, allowedSigners(keys));
-        const sources = await sourcesOf(dir, base, request);
-        return (await Promise.all(sources.map((s) => actsIn(dir, signers, s)))).flat();
+        const global = join(home, "gitconfig");
+        await Promise.all([writeFile(signers, allowedSigners(keys)), writeFile(global, "")]);
+        const repo: Repo = { dir, env: isolated(global) };
+        const sources = await sourcesOf(repo, base, request);
+        return (await Promise.all(sources.map((s) => actsIn(repo, signers, s)))).flat();
       } finally {
         await rm(home, { recursive: true, force: true });
       }

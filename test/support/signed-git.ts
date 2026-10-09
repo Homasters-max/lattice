@@ -38,6 +38,8 @@ export interface SignedRepo {
    * environment that makes git read that configuration.
    */
   allowOnMachine(key: DevKey): { readonly GIT_CONFIG_GLOBAL: string };
+  /** G-55: the machine revokes `key` — its global configuration of git names a revocation file of it; that environment. */
+  revokeOnMachine(key: DevKey): { readonly GIT_CONFIG_GLOBAL: string };
   /** Whether git, with the configuration of the machine, verifies the signature of the commit `rev`. */
   machineVerifies(rev: string): boolean;
   remove(): void;
@@ -76,13 +78,15 @@ export function signedRepo({ objectFormat = "sha1" }: SignedRepoOptions = {}): S
     run(["update-ref", `refs/heads/${branch}`, id]);
     return id;
   };
+  // The global configuration of the machine names a file of `text` under `name`.
+  const onMachine = (name: string, file: string, text: string) => {
+    run(["config", "--file", global, name, home.write(file, text)]);
+    return { GIT_CONFIG_GLOBAL: global };
+  };
   return {
     dir,
-    allowOnMachine: (key) => {
-      const signers = home.write("machine_signers", `* ${publicKeyOf(key)}\n`);
-      run(["config", "--file", global, "gpg.ssh.allowedSignersFile", signers]);
-      return { GIT_CONFIG_GLOBAL: global };
-    },
+    allowOnMachine: (key) => onMachine("gpg.ssh.allowedSignersFile", "machine_signers", `* ${publicKeyOf(key)}\n`),
+    revokeOnMachine: (key) => onMachine("gpg.ssh.revocationFile", "machine_revoked", `${publicKeyOf(key)}\n`),
     machineVerifies: (rev) => git.run(["-C", dir, "verify-commit", rev], { env }).status === 0,
     commit: (branch, message, by) => moved(branch, run([...signer(by), "commit-tree", empty, ...parentOf(branch), by === null ? "--no-gpg-sign" : "-S", "-m", message])),
     crafted: (branch, header, message) => {
