@@ -21,9 +21,9 @@ const OTHER = "sha256:2222222222222222222222222222222222222222222222222222222222
 
 function hashOfFile(): string {
   const value = parseJson(FILE);
-  const read = value.ok ? readProposal(value.value) : value;
+  const read = value.ok ? readProposal(deepFreeze(value.value)) : value;
   if (!read.ok) throw new Error("bug: the proposal of the tests has the form of LG-09");
-  return proposalHash(read.value, NO_FACTS);
+  return proposalHash(deepFreeze(read.value), NO_FACTS);
 }
 const HASH = hashOfFile();
 

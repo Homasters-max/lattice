@@ -16,8 +16,8 @@ const OTHER = "sha256:2222222222222222222222222222222222222222222222222222222222
 
 /** The keys of the writers of a policy that lists `dev-owner` (TR-10): the only keys `acts-local` is given. */
 function keysOfPolicy(): readonly string[] {
-  const body = { owner: "owner", writers: [{ participant: "owner", kind: "human", identities: [identityOf("dev-owner")], keys: [publicKeyOf("dev-owner")] }] };
-  if (!checkAgainstType({ type: "std/namespace-policy@1", rev: 1, body }, std().resolve, ROOT).ok) throw new Error("bug: the policy of the tests is admitted by its type");
+  const body = deepFreeze({ owner: "owner", writers: [{ participant: "owner", kind: "human", identities: [identityOf("dev-owner")], keys: [publicKeyOf("dev-owner")] }] });
+  if (!checkAgainstType(deepFreeze({ type: "std/namespace-policy@1", rev: 1, body }), std().resolve, ROOT).ok) throw new Error("bug: the policy of the tests is admitted by its type");
   const policy = readPolicy(body, ROOT);
   if (!policy.ok) throw new Error("bug: the policy of the tests reads");
   return (policy.value.writers ?? []).flatMap((w) => w.keys ?? []);

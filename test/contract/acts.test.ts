@@ -24,7 +24,7 @@ afterAll(() => repos.forEach((r) => r.remove()));
 /** A commit landing formed for a proposal of `cr/a`, holding `acts` as `act` events (TR-16). */
 function landedWith(acts: readonly Act[]): Commit {
   const value = parseJson(proposal("demo/a"));
-  const read = value.ok ? readProposal(value.value) : value;
+  const read = value.ok ? readProposal(deepFreeze(value.value)) : value;
   if (!read.ok) throw new Error("bug: the proposal of the tests has the form of LG-09");
   const events = acts.map((body, i) => ({ id: `01JB2X000000000000000ACT0${i}`, at: AT, body }));
   const land = deepFreeze({ session: { id: "01JB2X00000000000000000LND", at: AT }, events });
@@ -68,7 +68,7 @@ describe.each(ADAPTERS)("acts port: $name", ({ make }) => {
   it("TR-16: every act is the body of an act event its type admits, with the result of its check", async () => {
     const { acts } = make();
     for (const act of await acts.read("cr/a")) {
-      expect(rejectionsOf(checkAgainstType({ type: ACT_TYPE, body: act }, std().resolve, ROOT))).toEqual([]);
+      expect(rejectionsOf(checkAgainstType(deepFreeze({ type: ACT_TYPE, body: act }), std().resolve, ROOT))).toEqual([]);
     }
   });
 

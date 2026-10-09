@@ -248,9 +248,9 @@ const policy: FixtureCheck = {
 const act: FixtureCheck = {
   enforces: [TR_15.id, TR_16.id],
   run: (input) => {
-    const body = field(input, "act") as JsonValue;
-    if (!checkAgainstType({ type: ACT_TYPE, body }, std().resolve, ROOT).ok) throw new Error("bug: the act of a fixture is admitted by its type");
-    return coversProposal(deepFreeze(body as Act), String(field(input, "proposal")), ROOT);
+    const body = deepFreeze(field(input, "act") as JsonValue);
+    if (!checkAgainstType(deepFreeze({ type: ACT_TYPE, body }), std().resolve, ROOT).ok) throw new Error("bug: the act of a fixture is admitted by its type");
+    return coversProposal(body as Act, String(field(input, "proposal")), ROOT);
   },
 };
 
