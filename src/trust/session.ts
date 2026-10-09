@@ -155,20 +155,30 @@ function unsigned(s: UnsignedSession | Session): UnsignedSession {
 export const certificateHash = (s: UnsignedSession | Session, place: Place): Result<string> => hash(unsigned(s), place);
 
 /** TR-11: the session with its certificate signed by the key of its participant. */
-export function signSession(s: UnsignedSession, participantKey: SessionKey, place: Place): Result<Session> {
-  const signed = certificateHash(s, place);
+export function signSession(s: UnsignedSession | Session, participantKey: SessionKey, place: Place): Result<Session> {
+  const covered = unsigned(s);
+  const signed = certificateHash(covered, place);
   if (!signed.ok) return signed;
-  return { ok: true, value: { ...s, body: { ...s.body, certificate: { ...s.body.certificate, sig: signHash(signed.value, participantKey) } } } };
+  return { ok: true, value: { ...covered, body: { ...covered.body, certificate: { ...covered.body.certificate, sig: signHash(signed.value, participantKey) } } } };
+}
+
+/** A session value with the signature of its certificate set to `sig`, where it has a certificate to hold one. */
+function withSignature(value: JsonValue, sig: string): JsonValue {
+  if (!isJsonObject(value) || !isJsonObject(value.body) || !isJsonObject(value.body.certificate)) return value;
+  return { ...value, body: { ...value.body, certificate: { ...value.body.certificate, sig } } };
 }
 
 /**
- * TR-11: a session issued for a `human` or `machine` participant, its certificate signed by the participant's own
- * key, read back as apply reads it; a session of an agent gets its certificate from a caller (S3).
+ * TR-11: a session issued for a `human` or `machine` participant from the JSON value of an unsigned session — read
+ * as apply reads a session, at the place the caller names — its certificate signed by the participant's own key; a
+ * session of an agent gets its certificate from a caller (S3).
  */
-export function issueSession(s: UnsignedSession, participantKey: SessionKey, place: Place): Result<Session> {
-  if (s.body.kind === "agent") return refuse(reject(TR_11, { ...under(place, "body", "kind"), expected: "human or machine: an agent session is certified by its caller", got: s.body.kind }));
-  const signed = signSession(s, participantKey, place);
-  return signed.ok ? readSession(signed.value, place) : signed;
+export function issueSession(value: JsonValue, participantKey: SessionKey, place: Place): Result<Session> {
+  const read = readSession(withSignature(value, ""), place);
+  if (!read.ok) return read;
+  const { kind } = read.value.body;
+  if (kind === "agent") return refuse(reject(TR_11, { ...under(place, "body", "kind"), expected: "human or machine: an agent session is certified by its caller", got: kind }));
+  return signSession(read.value, participantKey, place);
 }
 
 /** TR-11: the certificate has not expired at the time it is checked against. */

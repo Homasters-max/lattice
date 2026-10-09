@@ -34,3 +34,7 @@ rules: [RT-32, LG-09, LG-54]
 
 - [ ] `lattice draft` → `lattice land --dry-run` → `lattice land` проходит во временном репозитории
 - [ ] G-08 записан в `CONVENTIONS.md`
+
+## Риски и заметки
+
+- От S0-16: текущая сессия — `.lattice/session.json` (событие `{id, at, body}`, G-45; оно же `session` proposal) и `.lattice/session.key` (PKCS #8 PEM); подпись — `signProposal` этим ключом.

@@ -7,4 +7,5 @@ process.exitCode = await run(process.argv.slice(2), {
   err: (text) => void process.stderr.write(text),
   // store/lattice.json is read from S0-23 (LG-50); until then no command reaches a store.
   assembled: null,
+  cwd: process.cwd(),
 });

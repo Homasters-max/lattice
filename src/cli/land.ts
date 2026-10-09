@@ -1,21 +1,11 @@
 // `lattice land <request> [--dry-run]` (RT-Z03, LG-22, LG-26): thin — it
 // parses arguments, asks assembly to land and prints the outcome.
-import type { Assembly, LandingOutcome, Rejection } from "../assembly/index.js";
-
-type Print = (text: string) => void;
-
-/** What the command reaches: its output streams and the assembled ports, `null` while no store is configured. */
-interface Reach {
-  readonly out: Print;
-  readonly err: Print;
-  readonly assembled: Assembly | null;
-}
+import type { LandingOutcome } from "../assembly/index.js";
+import { rejectionLines, type Print, type Reach } from "./reach.js";
 
 const USAGE = "usage: lattice land <request> [--dry-run]\n";
 
 const records = (n: number) => `${n} record${n === 1 ? "" : "s"}`;
-const intentOf = (r: Rejection) => (r.intent === null ? "" : ` (intent ${JSON.stringify(r.intent)})`);
-const lineOf = (r: Rejection) => `${r.rule} at ${r.path}${intentOf(r)}: ${r.message}\n`;
 
 function report(o: LandingOutcome, out: Print): number {
   switch (o.outcome) {
@@ -28,7 +18,7 @@ function report(o: LandingOutcome, out: Print): number {
       out(o.pushed ? "landed: no-op — no knowledge commit, the proposal file is removed\n" : "dry run: no-op — the proposal changes no knowledge\n");
       return 0;
     case "rejections":
-      out(`rejections: ${o.rejections.length}\n${o.rejections.map(lineOf).join("")}`);
+      out(rejectionLines(o.rejections));
       return 1;
     case "moved":
       out("moved: main moved while landing\n");

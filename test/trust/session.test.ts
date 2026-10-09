@@ -111,6 +111,14 @@ describe("certificates (TR-11, G-46)", () => {
     expect(where(issueSession({ ...UNSIGNED, body: { ...UNSIGNED.body, kind: "agent" } }, ALICE.key, ROOT))).toEqual([["TR-11", "/body/kind"]]);
     expect(where(issueSession({ ...UNSIGNED, body: { ...UNSIGNED.body, purpose: "init" } }, ALICE.key, ROOT))).toEqual([["TR-11", "/body/for"]]);
   });
+
+  it("TR-11: issues from the value of an unsigned session — a signature it holds is replaced; a value out of form is refused", () => {
+    const stale = { ...UNSIGNED, body: { ...UNSIGNED.body, certificate: { ...UNSIGNED.body.certificate, sig: "ed25519:stale" } } };
+    expect(issueSession(deepFreeze(stale), ALICE.key, ROOT)).toEqual({ ok: true, value: signed(UNSIGNED) });
+    expect(where(issueSession({ ...UNSIGNED, body: { ...UNSIGNED.body, certificate: "a key" } }, ALICE.key, ROOT))).toEqual([["TR-11", "/body/certificate"]]);
+    expect(where(issueSession({ ...UNSIGNED, body: "a body" }, ALICE.key, ROOT))).toEqual([["TR-11", "/body"]]);
+    expect(where(issueSession("a session", ALICE.key, ROOT))).toEqual([["TR-11", ""]]);
+  });
 });
 
 /** The chain of a session to its key alone, at `at`, under `policy`. */

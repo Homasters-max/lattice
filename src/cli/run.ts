@@ -2,13 +2,14 @@
 // handler; a command without one names the plan task where it arrives.
 import { COMMANDS } from "./commands.js";
 import { landCommand } from "./land.js";
+import { sessionCommand } from "./session.js";
 import { STUBS } from "./stubs.js";
 
 /** Every handler has the shape of the first one, `land`: its arguments and what it reaches. */
 type Handler = typeof landCommand;
 type Env = Parameters<Handler>[1];
 
-const HANDLERS: { readonly [command: string]: Handler } = { land: landCommand };
+const HANDLERS: { readonly [command: string]: Handler } = { land: landCommand, session: sessionCommand };
 
 function help(): string {
   const rows = COMMANDS.map((c) => `  ${c.name.padEnd(14)}${c.does}\n`);

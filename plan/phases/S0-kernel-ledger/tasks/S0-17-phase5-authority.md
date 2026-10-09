@@ -40,3 +40,4 @@ rules: [TR-04, TR-08, TR-14, TR-15, TR-17, TR-42, PR-19]
 ## Риски и заметки
 
 - Delegation (TR-18) — S3: поле policy читается, но ничего не меняет.
+- От S0-16: цепочка TR-12 — `verifySession({session, policy, at}, place, (key) => verifyProposal(p, key, keyOf, place))` из `src/trust`: `session` — `proposal.session` на `/session`, `policy` — `policyOf(before, namespace)` (TR-06) того namespace, куда пишет intent, `at` — время источника первого засчитанного act или `at` коммита (TR-11). Отказы — TR-10, TR-11, TR-12 и LG-10, фикстуры — строка `session` в `test/fixtures/checks.ts`. Сессия `agent` проходит цепочку только с сертификатом caller (S3): до тех пор её отклоняет TR-12 — у `agent` в policy нет ключей (TR-10).

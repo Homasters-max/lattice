@@ -38,7 +38,7 @@ const configIn = (dir: string): FixtureConfig => ({
 async function lattice(assembled: Assembly, ...argv: string[]) {
   const out: string[] = [];
   const err: string[] = [];
-  const code = await run(argv, { out: (t) => out.push(t), err: (t) => err.push(t), assembled });
+  const code = await run(argv, { out: (t) => out.push(t), err: (t) => err.push(t), assembled, cwd: "." });
   return { code, out: out.join(""), err: err.join("") };
 }
 
