@@ -76,7 +76,7 @@ export function withIntents(proposal: JsonValue, ...intents: JsonValue[]): JsonV
 
 /**
  * A chain whose first commit records the event of its land session, as landing writes it into the commit it lands from
- * S0-20 (LG-22): a store of it opens by the keys it records (`RECORDED`, TR-11). A trigger changes that event by `change`.
+ * S0-20 (LG-22): a store of it opens by the keys of the store (`STORE_KEYS`, TR-11). A trigger changes that event by `change`.
  */
 export function recordedChain(proposals: readonly JsonValue[], change: SessionChange = {}): Commit[] {
   const [first, ...rest] = proposals;

@@ -40,12 +40,12 @@ describe("the bin lattice (RT-32)", () => {
     ]);
   });
 
-  it("RT-32, LG-37: the built bin verifies the jsonl store of a directory and prints the outcome, exit 0", () => {
+  it("RT-32, LG-05: the built bin verifies the jsonl store of a directory and prints the outcome, exit 0", () => {
     const store = scratch("lattice-bin-store-");
     try {
       store.write(KNOWLEDGE, Uint8Array.from(recordedChain([proposalOf(...TYPES, note("demo/a"))]).flatMap((c) => [...commitLine(c)])));
       const run = lattice("verify-store", store.dir);
-      expect([run.status, run.stdout, run.stderr]).toEqual([0, expect.stringMatching(/^verified: 1 commit — chain, signatures and a rebuild of \d+ rows/), ""]);
+      expect([run.status, run.stdout, run.stderr]).toEqual([0, expect.stringMatching(/^verified: 1 commit — chain and signatures \(LG-05\); \d+ rows rebuilt from genesis\n$/), ""]);
     } finally {
       store.remove();
     }

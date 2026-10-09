@@ -1,14 +1,15 @@
 // ST-07, LG-03, LG-39: the read view and the verification of a store on every
 // adapter of `store`. Commits landed into a store and the store opened again
 // answer every question of the view of S0 alike on `memory` and `jsonl`; a
-// store verifies by the keys of the land sessions it records (LG-05, TR-11),
-// and the rows it keeps are the rows its commits fold to (LG-37).
+// store verifies by the keys of the land sessions it holds (LG-05, TR-11) and
+// rebuilds its rows from genesis.
 import { afterAll, describe, expect, it } from "vitest";
 import { createStoreJsonl } from "../../src/adapters/store-jsonl/index.js";
 import { createStoreMemory } from "../../src/adapters/store-memory/index.js";
 import type { JsonValue } from "../../src/kernel/index.js";
 import { commitLine, fold, KNOWLEDGE, openLines, openStore, verifyStore, type Commit, type Store, type View } from "../../src/ledger/index.js";
 import { keyOfLand, landedChain, landSessionIntent, recordedChain, withIntents } from "../support/chain.js";
+import { deepFreeze } from "../support/deep-freeze.js";
 import { scratch, type Scratch } from "../support/files.js";
 import { testKey } from "../support/keys.js";
 import { note, proposalOf, seen, TYPES } from "../support/notes.js";
@@ -42,7 +43,7 @@ async function appended(store: Store, commits: readonly Commit[]): Promise<Store
     // As landing opens the store at the tail: without signatures until S0-20 (Q-39).
     const before = openLines(commits.slice(0, i).map(commitLine), null);
     if (!before.ok) throw new Error("bug: the commits before a landed one open");
-    await store.append({ commit: commitLine(c), delta: fold(before.value.view, c, []), evidence: [] });
+    await store.append({ commit: commitLine(c), delta: fold(before.value.view, deepFreeze(c), []), evidence: [] });
   }
   return store;
 }
@@ -100,7 +101,7 @@ describe("projections are dropped and rebuilt (LG-34, PR-04)", () => {
   });
 });
 
-describe("verifying a store on every adapter (RT-32, LG-05, LG-37)", () => {
+describe("verifying a store on every adapter (RT-32, LG-05)", () => {
   it.each(ADAPTERS)("LG-05, TR-11: a store verifies by the keys of the land sessions it records, and counts its commits and rows — $name", async ({ make }) => {
     const store = await appended(make(), recordedChain(PROPOSALS));
     expect(await verifyStore(store)).toEqual({ ok: true, value: { commits: 3, rows: (await all(store.rows(""))).length } });
@@ -129,11 +130,5 @@ describe("verifying a store on every adapter (RT-32, LG-05, LG-37)", () => {
     // The same session recorded again with another key: the first event counts.
     const again = withIntents(PROPOSALS[1] as JsonValue, landSessionIntent({ key: testKey("mallory").publicKey }));
     expect(await refused(recordedChain([PROPOSALS[0] as JsonValue, again]))).toEqual([]);
-  });
-
-  it("LG-37: rows a store answers that are not those its commits fold to are a bug, which no input can make", async () => {
-    const store = await appended(createStoreMemory(), recordedChain(PROPOSALS));
-    const lying: Store = { ...store, rows: (prefix) => store.rows(prefix === "" ? "current:" : prefix) };
-    await expect(verifyStore(lying)).rejects.toThrow(/^bug: .*LG-37/);
   });
 });

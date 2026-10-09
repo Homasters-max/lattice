@@ -8,7 +8,7 @@
 // 1 as `seq` is (Q-29). `openTail` and `verifyStore` open a store through it;
 // the next commit on a tail (S0-20) is the second operation here. An opened
 // store gives the feed of its commits by `seq` and a view at any `seq` (LG-41).
-import { isJsonObject, parseCanonicalLine, serialize, type Place, type Result } from "../kernel/index.js";
+import { isJsonObject, parseCanonicalLine, type Place, type Result } from "../kernel/index.js";
 import { isPublicKey, type PublicKey } from "../trust/index.js";
 import { readCommit, verifyChain, type Commit, type KeyOfSession } from "./commit.js";
 import { fold } from "./fold.js";
@@ -30,13 +30,13 @@ function readLine(line: Uint8Array, place: Place): Result<Commit> {
 }
 
 /**
- * The keys a store opens by: the caller's `keyOfSession`; `RECORDED` — the key in the certificate of each session event
- * the store holds (TR-11): landing writes the event of its land session into the commit it lands (LG-22, S0-20); or
- * `null` — no signature checked (Q-39).
+ * The keys a store opens by: the caller's `keyOfSession`; `STORE_KEYS` — the keys of the store itself, the key in the
+ * certificate of each session event it holds (TR-11): landing writes the event of its land session into the commit it
+ * lands (LG-22, S0-20); or `null` — no signature checked (Q-39).
  */
-export const RECORDED = "recorded";
+export const STORE_KEYS = "store-keys";
 
-export type Keys = KeyOfSession | typeof RECORDED | null;
+export type Keys = KeyOfSession | typeof STORE_KEYS | null;
 
 const SESSION = `${SESSION_TYPE.id}@${String(SESSION_TYPE.rev)}`;
 
@@ -44,7 +44,7 @@ const SESSION = `${SESSION_TYPE.id}@${String(SESSION_TYPE.rev)}`;
  * TR-11: the session key of every record of the session type the commits hold, by its `id`; the first of an `id`
  * counts. That a session is an event (KR-05) and its body what its type admits (KR-21) apply checked when it landed.
  */
-function recordedKeys(commits: readonly Commit[]): KeyOfSession {
+function storeKeys(commits: readonly Commit[]): KeyOfSession {
   const keys = new Map<string, PublicKey>();
   for (const r of commits.flatMap((c) => c.records)) {
     const certificate = r.type === SESSION && isJsonObject(r.body) ? r.body.certificate : undefined;
@@ -54,8 +54,8 @@ function recordedKeys(commits: readonly Commit[]): KeyOfSession {
   return (session) => keys.get(session) ?? null;
 }
 
-/** LG-41: the commits of a store from `seq` on, in order — its feed. */
-export type Feed = (from: number) => readonly Commit[];
+/** LG-41: the commits of a store from `seq` on, in order — its feed; `null` for a `from` that is no `seq`, not an integer. */
+export type Feed = (from: number) => readonly Commit[] | null;
 
 /** The lines of a store folded: its rows, the view at its tail over them, the tail commit, its feed and a view at any `seq` (LG-41). */
 export type Folded = {
@@ -81,13 +81,13 @@ export function openLines(lines: readonly Uint8Array[], keys: Keys): Result<Fold
     if (!commit.ok) return commit;
     commits.push(commit.value);
   }
-  const chain = verifyChain(commits, keys === RECORDED ? recordedKeys(commits) : keys, { intent: null, path: `/${KNOWLEDGE}` });
+  const chain = verifyChain(commits, keys === STORE_KEYS ? storeKeys(commits) : keys, { intent: null, path: `/${KNOWLEDGE}` });
   if (!chain.ok) return chain;
   let rows: readonly Row[] = [];
   for (const c of chain.value) rows = withDelta(rows, fold(viewOf(c.seq - 1, rows), c, []));
   const tail = chain.value.at(-1) ?? null;
   const last = tail?.seq ?? 0;
-  const feed: Feed = (from) => chain.value.slice(Math.max(from, 1) - 1);
+  const feed: Feed = (from) => (Number.isSafeInteger(from) ? chain.value.slice(Math.max(from, 1) - 1) : null);
   const viewAt = (seq: number) => (Number.isSafeInteger(seq) && seq >= 0 && seq <= last ? viewOf(seq, rows) : null);
   return { ok: true, value: { rows, view: viewOf(last, rows), tail, feed, viewAt } };
 }
@@ -103,34 +103,24 @@ async function linesOf(store: Store): Promise<Uint8Array[]> {
 
 /** LG-02: opens a store — its lines from genesis, verified and folded as `openLines` does — and hands the rows to it. */
 export async function openStore(store: Store, keys: Keys): Promise<Result<Opened>> {
-  const folded = await opening(store, keys);
+  const folded = openLines(await linesOf(store), keys);
   if (!folded.ok) return folded;
+  await store.keep(folded.value.rows);
   const { view, tail, feed, viewAt } = folded.value;
   return { ok: true, value: { store, view, tail, feed, viewAt } };
 }
 
-async function opening(store: Store, keys: Keys): Promise<Result<Folded>> {
-  const folded = openLines(await linesOf(store), keys);
-  if (folded.ok) await store.keep(folded.value.rows);
-  return folded;
-}
-
-/** What `verify-store` found: the commits of the chain and the rows that hold at its tail (RT-32). */
+/** What `verify-store` found: the commits of the chain and the rows that hold at its tail, rebuilt from genesis (RT-32). */
 export type Verified = { readonly commits: number; readonly rows: number };
 
 /**
- * RT-32, LG-05, LG-37: a store verified — its lines, the chain and the signature of every commit by the key of its land
- * session as the store records it, folded from genesis — or the rejections of opening it. The rows the store then
- * answers through its port are those folded, byte for byte (LG-37); any other answer is a bug of the ledger or of the
- * adapter, which no input can make.
+ * RT-32, LG-05: a store verified — its lines, the chain and the signature of every commit by the key of its land session
+ * as the store holds it, and its rows rebuilt from genesis — or the rejections of opening it. A rebuild here has nothing
+ * to be compared with: `memory` and `jsonl` keep no rows between openings, so that it equals the rows accumulated commit
+ * by commit (LG-37) is shown by the property test of fold; a store that keeps its rows is compared with them in S1.
  */
 export async function verifyStore(store: Store): Promise<Result<Verified>> {
-  const folded = await opening(store, RECORDED);
+  const folded = openLines(await linesOf(store), STORE_KEYS);
   if (!folded.ok) return folded;
-  // The rows of a fold come in the order of sortRows (withDelta), and those that hold keep it.
-  const rebuilt = [...held(folded.value.rows).values()];
-  const kept: Row[] = [];
-  for await (const row of store.rows("")) kept.push(row);
-  if (serialize(kept) !== serialize(rebuilt)) throw new Error("bug: the rows the store keeps are not the rows its commits fold to from genesis (LG-37)");
-  return { ok: true, value: { commits: folded.value.tail?.seq ?? 0, rows: rebuilt.length } };
+  return { ok: true, value: { commits: folded.value.tail?.seq ?? 0, rows: held(folded.value.rows).size } };
 }

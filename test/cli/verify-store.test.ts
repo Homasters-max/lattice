@@ -1,7 +1,7 @@
 // `lattice verify-store <path>` (RT-32, RT-Z03): opens the `jsonl` store of a
-// directory, verifies its chain and signatures (LG-05) and the rebuild of its
-// rows (LG-37), and prints the outcome — the counts, or the rejections one per
-// line; exit 0 verified, 1 refused, 2 not run.
+// directory, verifies its chain and signatures (LG-05), rebuilds its rows from
+// genesis and prints the outcome — the counts, or the rejections one per line;
+// exit 0 verified, 1 refused, 2 not run.
 import { afterAll, describe, expect, it } from "vitest";
 import { run } from "../../src/cli/run.js";
 import { commitLine, KNOWLEDGE, type Commit } from "../../src/ledger/index.js";
@@ -31,11 +31,11 @@ async function lattice(cwd: string, ...argv: string[]) {
 }
 
 describe("lattice verify-store (RT-32)", () => {
-  it("RT-32, LG-37: verifies a jsonl store and prints its commits and rows; no store configured is needed", async () => {
+  it("RT-32, LG-05: verifies a jsonl store and prints its commits and rows; no store configured is needed", async () => {
     const dir = storeOf(recordedChain(PROPOSALS));
     const out = await lattice(".", "verify-store", dir.dir);
     expect([out.code, out.err]).toEqual([0, ""]);
-    expect(out.out).toMatch(/^verified: 2 commits — chain, signatures and a rebuild of \d+ rows \(LG-05, LG-37\)\n$/);
+    expect(out.out).toMatch(/^verified: 2 commits — chain and signatures \(LG-05\); \d+ rows rebuilt from genesis\n$/);
     // A relative path is a path from the folder it runs in.
     expect((await lattice(dir.dir, "verify-store", ".")).out).toBe(out.out);
   });

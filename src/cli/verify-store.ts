@@ -1,4 +1,4 @@
-// `lattice verify-store <path>` (RT-Z03, LG-37): thin — it parses arguments,
+// `lattice verify-store <path>` (RT-Z03, LG-05): thin — it parses arguments,
 // asks assembly to verify the `jsonl` store of the directory and prints the
 // outcome: the commits and rows verified, or the rejections of opening it.
 import { resolve } from "node:path";
@@ -19,7 +19,7 @@ export async function verifyStoreCommand(args: readonly string[], { out, err, cw
   const o = await verifyStoreAt(dir);
   switch (o.outcome) {
     case "verified":
-      out(`verified: ${plural(o.commits, "commit")} — chain, signatures and a rebuild of ${plural(o.rows, "row")} (LG-05, LG-37)\n`);
+      out(`verified: ${plural(o.commits, "commit")} — chain and signatures (LG-05); ${plural(o.rows, "row")} rebuilt from genesis\n`);
       return 0;
     case "rejections":
       out(rejectionLines(o.rejections));
