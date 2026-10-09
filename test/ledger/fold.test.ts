@@ -127,6 +127,11 @@ describe("a view at any seq and the feed (LG-41)", () => {
     expect([STORE.viewAt(-1), STORE.viewAt(4), STORE.viewAt(1.5)]).toEqual([null, null, null]);
     expect([STORE.feed(1), STORE.feed(3), STORE.feed(4), STORE.feed(0)]).toEqual([STORE.commits, STORE.commits.slice(2), [], STORE.commits]);
   });
+
+  it("GL-05: the tail of an opened store is its last commit, the view at it is the view at the tail, and each commit's base names the tail it was applied on", () => {
+    expect([STORE.tail, STORE.view.seq, STORE.commits.map((c) => c.base)]).toEqual([STORE.commits[2], 3, [0, 1, 2]]);
+    expect(STORE.viewAt(3)?.current("demo/b")).toEqual(STORE.view.current("demo/b"));
+  });
 });
 
 /** The rows of the store of the first `n` commits. */
@@ -136,7 +141,7 @@ function rowsAt(n: number): readonly Row[] {
   return out.value.rows;
 }
 
-/** A commit of these records, by hand: fold takes what apply refuses (LG-36). */
+/** A commit of these records, by hand: fold takes what apply refuses (LG-36) — raw commits for totality, never a pass case (plan/closure-check.md). */
 const commitOf = (seq: number, records: readonly JsonValue[]): Commit =>
   deepFreeze({ ...(STORE.commits[0] as Commit), seq, records: records as Commit["records"] });
 

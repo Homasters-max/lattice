@@ -85,6 +85,21 @@ describe("the read view on every adapter (LG-03, LG-38, LG-39)", () => {
   });
 });
 
+describe("projections are dropped and rebuilt (LG-34, PR-04)", () => {
+  it.each(ADAPTERS)("LG-34, PR-04: the rows of a store are dropped and rebuilt from its commits alone, and the view answers as before — $name", async ({ make }) => {
+    const store = await appended(make(), landedChain(PROPOSALS));
+    const seen = async () => {
+      const opened = await openStore(store, keyOfLand);
+      if (!opened.ok) throw new Error("bug: a landed store opens");
+      return [await all(store.rows("")), answers(opened.value.view)];
+    };
+    const before = await seen();
+    await store.keep([]);
+    expect(await all(store.rows(""))).toEqual([]);
+    expect(await seen()).toEqual(before);
+  });
+});
+
 describe("verifying a store on every adapter (RT-32, LG-05, LG-37)", () => {
   it.each(ADAPTERS)("LG-05, TR-11: a store verifies by the keys of the land sessions it records, and counts its commits and rows — $name", async ({ make }) => {
     const store = await appended(make(), recordedChain(PROPOSALS));

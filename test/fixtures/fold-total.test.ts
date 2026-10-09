@@ -3,7 +3,8 @@
 // repository is folded: each object it holds as a record — its own `id`,
 // `rev`, `type` and `body` where it has them — and each type body it holds as
 // a type of the same commit, so references, unique values and unions meet what
-// the refusals were made of.
+// the refusals were made of. The commits are raw, built by hand — only for
+// the totality of fold (LG-36, plan/closure-check.md, «Не обход»).
 import { describe, expect, it } from "vitest";
 import type { JsonValue } from "../../src/kernel/index.js";
 import { fold, type Commit } from "../../src/ledger/index.js";
