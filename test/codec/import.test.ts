@@ -181,6 +181,11 @@ describe("blocks (RM-Z03, LG-42)", () => {
     expect(bodyOf(intents, "lattice/kr-z03")).toEqual({ text: "KR-Z03. A list:", list: ["first, KR-Z01", "second"], refs: ["lattice/kr-z01"] });
   });
 
+  it("RM-Z03, G-45: the whole field table is text of its block — an ID in its header is a ref, as one in its rows", () => {
+    const intents = imported({ "02-kernel.md": md("# Doc", "", "KR-Z01. Forms:", "", "| Form of KR-Z02 | Block |", "|---|---|", "| a row | KR-Z03 |", "", "KR-Z02. x", "", "KR-Z03. y") });
+    expect(refsOf(bodyOf(intents, "lattice/kr-z01") ?? null)).toEqual(["lattice/kr-z02", "lattice/kr-z03"]);
+  });
+
   it("RM-Z03: an ID of a range of two kinds or two prefixes is mentioned, the range itself not expanded", () => {
     const intents = imported({ "02-kernel.md": md("# Doc", "", "KR-Z01. See KR-01…KR-Z03 and KR-02…TY-04.", "", "| ID | Rule |", "|---|---|", "| KR-01 | x |", "| KR-02 | x |", "| KR-03 | x |"), "03-types.md": md("# T", "", "TY-Z03. x", "", "TY-Z04. TY-04 is not here:", "", "- KR-Z01 KR-Z02") });
     expect(refsOf(bodyOf(intents, "lattice/kr-z01") ?? null)).toEqual(["lattice/kr-01", "lattice/kr-02", "lattice/kr-z03", "lattice/ty-04"]);
