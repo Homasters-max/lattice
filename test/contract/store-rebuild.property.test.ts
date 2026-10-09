@@ -93,10 +93,10 @@ describe("rebuild equals the accumulated rows (LG-37, LG-39)", () => {
         const commits = landedChain(proposalsOf(steps));
         // Accumulated: each commit appended with the delta landing folds for it on the store at its tail (LG-02, LG-35).
         const store = make();
-        let accumulated: readonly Row[] = [];
+        let accumulated: readonly Row[] = deepFreeze([]);
         for (const [i, c] of commits.entries()) {
-          const delta = deepFreeze(fold(prefix(commits, i).view, deepFreeze(c), []));
-          accumulated = withDelta(accumulated, delta);
+          const delta = deepFreeze(fold(prefix(commits, i).view, deepFreeze(c), deepFreeze([])));
+          accumulated = deepFreeze(withDelta(accumulated, delta));
           await store.append({ commit: commitLine(c), delta, evidence: deepFreeze([]) });
         }
         const kept = await all(store.rows(""));

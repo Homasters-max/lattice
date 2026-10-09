@@ -42,7 +42,7 @@ async function appended(store: Store, commits: readonly Commit[]): Promise<Store
     // As landing opens the store at the tail: without signatures until S0-20 (Q-39).
     const before = openLines(commits.slice(0, i).map(commitLine), null);
     if (!before.ok) throw new Error("bug: the commits before a landed one open");
-    await store.append({ commit: commitLine(c), delta: deepFreeze(fold(before.value.view, deepFreeze(c), [])), evidence: deepFreeze([]) });
+    await store.append({ commit: commitLine(c), delta: deepFreeze(fold(before.value.view, deepFreeze(c), deepFreeze([]))), evidence: deepFreeze([]) });
   }
   return store;
 }

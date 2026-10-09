@@ -14,12 +14,16 @@ import { note, proposalOf, seen, TYPES } from "../support/notes.js";
 
 const EVENT = "01JB2X0000000000000000SEEN";
 
+/** No files and no rows: every input of fold, withDelta and viewOf here is frozen, so one that mutates it fails (CONVENTIONS §1.5). */
+const NO_FILES: readonly Evidence[] = deepFreeze([]);
+const NO_ROWS: readonly Row[] = deepFreeze([]);
+
 /** The store of these proposals, landed and opened from genesis (LG-02). */
 function opened(proposals: readonly JsonValue[]): Folded & { readonly commits: readonly Commit[] } {
   const commits = deepFreeze(landedChain(proposals));
   const out = openLines(commits.map(commitLine), keyOfLand);
   if (!out.ok) throw new Error(`bug: a landed chain opens: ${JSON.stringify(out.rejections)}`);
-  return { ...out.value, commits };
+  return deepFreeze({ ...out.value, commits });
 }
 
 /** Types and two notes in one commit (LG-11); demo/b cites demo/a; then demo/b again, citing demo/c; then an event about demo/a. */
@@ -36,8 +40,8 @@ const pairs = (rows: readonly { readonly source: string; readonly path: string; 
 describe("the projections of S0 (LG-34, LG-35)", () => {
   it("LG-34: the projections of S0 are rows fold computes from the commits alone — each commit folded on the view of the rows before it", () => {
     expect([...new Set(STORE.rows.map((r) => r.key.split(":")[0]))]).toEqual(["current", "holder", "latest", "referrers", "revision"]);
-    let rows: readonly Row[] = deepFreeze([]);
-    for (const c of STORE.commits) rows = deepFreeze(withDelta(rows, fold(viewOf(c.seq - 1, rows), c, [])));
+    let rows = NO_ROWS;
+    for (const c of STORE.commits) rows = deepFreeze(withDelta(rows, deepFreeze(fold(viewOf(c.seq - 1, rows), c, NO_FILES))));
     expect(canon(STORE.rows)).toEqual(canon(rows));
   });
 
@@ -48,7 +52,7 @@ describe("the projections of S0 (LG-34, LG-35)", () => {
   it("LG-35: every row is canonical JSON with from and to, and a delta is sorted by key", () => {
     for (const row of STORE.rows) expect(canon(row)).toMatchObject({ ok: true });
     const [, second] = STORE.commits as [Commit, Commit];
-    const delta = fold(STORE.viewAt(1)!, second, []);
+    const delta = fold(STORE.viewAt(1)!, second, NO_FILES);
     expect(delta.map((r) => r.key)).toEqual([...delta.map((r) => r.key)].sort());
   });
 
@@ -126,11 +130,13 @@ describe("blocks, standing and evidence (LG-38)", () => {
   });
 
   it("LG-30, LG-38: evidence gives the bytes of a file a commit up to the seq cited, by its hash; in S0 fold reads no run from it", () => {
-    const file: Evidence = { hash: hashBytes(Uint8Array.from([1, 2, 255])), bytes: Uint8Array.from([1, 2, 255]) };
+    // Bytes refuse Object.freeze — a typed array with elements does: the file and the list that holds it are frozen.
+    const file: Evidence = Object.freeze({ hash: hashBytes(Uint8Array.from([1, 2, 255])), bytes: Uint8Array.from([1, 2, 255]) });
+    const files: readonly Evidence[] = Object.freeze([file]);
     const [first] = STORE.commits as [Commit];
-    const delta = fold(viewOf(0, []), first, [file]);
+    const delta = deepFreeze(fold(viewOf(0, NO_ROWS), first, files));
     expect(delta.filter((r) => r.key.startsWith("evidence:"))).toEqual([{ key: `evidence:${file.hash}`, from: 1, to: null, value: { hash: file.hash } }]);
-    expect([viewOf(1, deepFreeze(delta), [file]).evidence(file.hash), viewOf(0, delta, [file]).evidence(file.hash), viewOf(1, delta, []).evidence(file.hash)]).toEqual([file.bytes, null, null]);
+    expect([viewOf(1, delta, files).evidence(file.hash), viewOf(0, delta, files).evidence(file.hash), viewOf(1, delta, NO_FILES).evidence(file.hash)]).toEqual([file.bytes, null, null]);
     expect(STORE.view.evidence(file.hash)).toBeNull();
   });
 });
@@ -163,7 +169,7 @@ describe("a view at any seq and the feed (LG-41)", () => {
 function rowsAt(n: number): readonly Row[] {
   const out = openLines(STORE.commits.slice(0, n).map(commitLine), keyOfLand);
   if (!out.ok) throw new Error("bug: a prefix of a chain opens");
-  return out.value.rows;
+  return deepFreeze(out.value.rows);
 }
 
 /** A commit of these records, by hand: fold takes what apply refuses (LG-36) — raw commits for totality, never a pass case (plan/closure-check.md). */
@@ -186,13 +192,13 @@ const at1 = STORE.viewAt(1)!;
 
 describe("fold is total (LG-36)", () => {
   it("LG-36: a dangling reference is folded as it is — its edge is indexed", () => {
-    const delta = fold(at1, commitOf(2, [record("demo/d", 1, { title: "d", refs: ["demo/nowhere"] })]), []);
+    const delta = fold(at1, commitOf(2, [record("demo/d", 1, { title: "d", refs: ["demo/nowhere"] })]), NO_FILES);
     expect(delta.map((r) => r.key)).toContain('referrers:["demo/nowhere","cites","demo/d@1","/refs/0"]');
   });
 
   it("LG-36: a duplicate is folded as it is — the last record of the commit holds the key, the rows of the one before close", () => {
-    const delta = fold(at1, commitOf(2, [record("demo/a", 2, { title: "x", refs: ["demo/b"] }), record("demo/a", 2, { title: "y" }), record("demo/b", 1, { title: "a" })]), []);
-    const view = viewOf(2, withDelta(rowsAt(1), delta));
+    const delta = deepFreeze(fold(at1, commitOf(2, [record("demo/a", 2, { title: "x", refs: ["demo/b"] }), record("demo/a", 2, { title: "y" }), record("demo/b", 1, { title: "a" })]), NO_FILES));
+    const view = viewOf(2, deepFreeze(withDelta(rowsAt(1), delta)));
     expect([view.current("demo/a")?.body, view.revision("demo/a", 2)?.body, view.referrers("demo/b"), view.holder({ namespace: "demo", type: "demo/note", path: "/title", value: "a" })]).toEqual([
       { title: "y" },
       { title: "y" },
@@ -203,8 +209,8 @@ describe("fold is total (LG-36)", () => {
 
   it("LG-36: a revision lower than the latest is the current one and leaves the latest; a type that is no reference is the type of no block", () => {
     const at2 = STORE.viewAt(2)!;
-    const delta = fold(at2, commitOf(3, [record("demo/b", 1, { title: "old" }), record("demo/g", 1, { title: "g" }, "not a type")]), []);
-    const view = viewOf(3, withDelta(rowsAt(2), delta));
+    const delta = deepFreeze(fold(at2, commitOf(3, [record("demo/b", 1, { title: "old" }), record("demo/g", 1, { title: "g" }, "not a type")]), NO_FILES));
+    const view = viewOf(3, deepFreeze(withDelta(rowsAt(2), delta)));
     expect([view.current("demo/b")?.body, view.latest("demo/b")?.rev, view.current("demo/g")?.type]).toEqual([{ title: "old" }, 2, "not a type"]);
     expect(view.blocks(["demo/note", "not a type", ""], ["demo"]).map((r) => r.id)).toEqual(["demo/a", "demo/b", "demo/c"]);
   });
@@ -215,21 +221,21 @@ describe("what fold reads of a record (LG-11, LG-19)", () => {
   it("LG-11, KR-15: a type is read at its revision — one written in the same commit at another revision is not it", () => {
     const refs = { type: "array", items: { type: "string", format: "ref", ref: { to: "demo/note@1", pin: "any", label: "quotes" } } };
     const quoting = { abstract: false, kind: "entity", schema: { type: "object", properties: { title: { type: "string" }, refs }, required: ["title"] } };
-    const delta = fold(at1, commitOf(2, [record("demo/note", 2, quoting, "core/type@1"), record("demo/d", 1, { title: "d", refs: ["demo/a"] })]), []);
+    const delta = fold(at1, commitOf(2, [record("demo/note", 2, quoting, "core/type@1"), record("demo/d", 1, { title: "d", refs: ["demo/a"] })]), NO_FILES);
     expect(delta.filter((r) => r.key.startsWith("referrers:")).map((r) => (r.value as { label: string }).label)).toEqual(["cites"]);
   });
 
   it("LG-19: uniqueness counts entities only — an event with a unique value holds nothing", () => {
     const mark = { abstract: false, kind: "event", schema: { type: "object", properties: { code: { type: "string", unique: true } }, required: ["code"] } };
-    const delta = fold(at1, commitOf(2, [record("demo/mark", 1, mark, "core/type@1"), record(EVENT, undefined, { code: "x" }, "demo/mark@1")]), []);
+    const delta = fold(at1, commitOf(2, [record("demo/mark", 1, mark, "core/type@1"), record(EVENT, undefined, { code: "x" }, "demo/mark@1")]), NO_FILES);
     expect(delta.map((r) => r.key.split(":")[0])).toEqual(["current", "latest", "revision"]);
   });
 
   it("LG-19, LG-36: a new revision closes only the unique keys it still holds — one another entity took since stays with it", () => {
     const title = { namespace: "demo", type: "demo/note", path: "/title", value: "demo/a" };
     // demo/d takes the title of demo/a — a duplicate apply refuses (LG-36); then demo/a gets a revision with another title.
-    const took = deepFreeze(withDelta(rowsAt(1), fold(at1, commitOf(2, [record("demo/d", 1, { title: "demo/a" })]), [])));
-    const after = withDelta(took, fold(viewOf(2, took), commitOf(3, [record("demo/a", 2, { title: "a2" })]), []));
+    const took = deepFreeze(withDelta(rowsAt(1), deepFreeze(fold(at1, commitOf(2, [record("demo/d", 1, { title: "demo/a" })]), NO_FILES))));
+    const after = deepFreeze(withDelta(took, deepFreeze(fold(viewOf(2, took), commitOf(3, [record("demo/a", 2, { title: "a2" })]), NO_FILES))));
     expect([viewOf(2, took).holder(title), viewOf(3, after).holder(title), viewOf(3, after).holder({ ...title, value: "a2" })]).toEqual(["demo/d", "demo/d", "demo/a"]);
   });
 
@@ -244,7 +250,7 @@ describe("fold is total on what apply refuses (LG-36)", () => {
     const delta = fold(
       at1,
       commitOf(2, [record("demo/e", 1, { anything: [1, 2] }, "demo/unknown@1"), record("demo/f", 1, "not an object"), record("demo/b", 1, { title: 7, refs: "demo/a", source: 3 })]),
-      [],
+      NO_FILES,
     );
     // demo/b@1 again, with no value of its type: its rows change, the edges and the unique key of the one before close.
     expect(delta.filter((r) => r.to === null).map((r) => r.key)).toEqual([
@@ -262,7 +268,7 @@ describe("fold is total on what apply refuses (LG-36)", () => {
 
   it("LG-35: any order of the records of a commit without duplicates folds to the same bytes", () => {
     const records = [record("demo/d", 1, { title: "d", refs: ["demo/a"] }), record("demo/a", 2, { title: "a2" }), record(EVENT, undefined, { of: "demo/d" }, "demo/seen@1")];
-    const bytes = (rs: readonly JsonValue[]) => canon(fold(at1, commitOf(2, rs), []));
+    const bytes = (rs: readonly JsonValue[]) => canon(fold(at1, commitOf(2, rs), NO_FILES));
     expect(bytes([...records].reverse())).toEqual(bytes(records));
   });
 });

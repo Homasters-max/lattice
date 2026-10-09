@@ -55,13 +55,13 @@ describe("valuesOf (KR-18, KR-19)", () => {
   });
 
   it("KR-18: does not look into type any, nor into a value its schema does not admit, nor into a branch no tag chooses", () => {
-    const body = { title: 7, refs: "demo/a", tags: ["https://x.org"], any: { to: "demo/a" }, part: { kind: "c", to: "demo/p" }, shape: "demo/s" };
+    const body = deepFreeze({ title: 7, refs: "demo/a", tags: ["https://x.org"], any: { to: "demo/a" }, part: { kind: "c", to: "demo/p" }, shape: "demo/s" });
     expect(marked(body)).toEqual([]);
     expect(valuesOf(body, "demo/note@1", resolve).map((v) => v.path)).toEqual(["", "/any", "/part", "/shape"]);
   });
 
   it("KR-15, Q-33: a type the kernel does not read gives no values; a $ref that comes back to itself stops", () => {
-    expect([valuesOf({}, "demo/none@1", resolve), valuesOf({ x: 1 }, "demo/broken@1", resolve), valuesOf({}, "not a ref", resolve)]).toEqual([[], [], []]);
-    expect(valuesOf({ title: "t", loop: { a: 1 } }, "demo/note@1", resolve).map((v) => v.path)).toEqual(["", "/loop", "/loop", "/title"]);
+    expect([valuesOf(deepFreeze({}), "demo/none@1", resolve), valuesOf(deepFreeze({ x: 1 }), "demo/broken@1", resolve), valuesOf(deepFreeze({}), "not a ref", resolve)]).toEqual([[], [], []]);
+    expect(valuesOf(deepFreeze({ title: "t", loop: { a: 1 } }), "demo/note@1", resolve).map((v) => v.path)).toEqual(["", "/loop", "/loop", "/title"]);
   });
 });

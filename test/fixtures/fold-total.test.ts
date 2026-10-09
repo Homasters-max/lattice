@@ -7,7 +7,7 @@
 // the totality of fold (LG-36, plan/closure-check.md, «Не обход»).
 import { describe, expect, it } from "vitest";
 import type { JsonValue } from "../../src/kernel/index.js";
-import { fold, type Commit } from "../../src/ledger/index.js";
+import { fold, type Commit, type Evidence, type Row } from "../../src/ledger/index.js";
 import { viewOf, withDelta } from "../../src/ledger/rows.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 import { loadFolders } from "./load.js";
@@ -35,6 +35,10 @@ function parsed(text: string): unknown {
     return null;
   }
 }
+
+/** No files and no rows: every input of fold, withDelta and viewOf here is frozen, so one that mutates it fails (CONVENTIONS §1.5). */
+const NO_FILES: readonly Evidence[] = deepFreeze([]);
+const NO_ROWS: readonly Row[] = deepFreeze([]);
 
 const HEADER = { hash: "sha256:0", by: "01JB2X00000000000000000SES", at: "2026-10-06T11:00:00.000000Z" };
 
@@ -76,9 +80,9 @@ describe("fold is total on the inputs of refusals (LG-36)", () => {
     expect(cases.length).toBeGreaterThan(50);
     for (const [name, data] of cases) {
       const records = recordsOf(data);
-      const first = fold(viewOf(0, []), commitOf(1, records), []);
-      let rows = deepFreeze(withDelta([], first));
-      for (const [i, r] of records.entries()) rows = deepFreeze(withDelta(rows, fold(viewOf(i + 1, rows), commitOf(i + 2, [r]), [])));
+      const first = deepFreeze(fold(viewOf(0, NO_ROWS), commitOf(1, records), NO_FILES));
+      let rows = deepFreeze(withDelta(NO_ROWS, first));
+      for (const [i, r] of records.entries()) rows = deepFreeze(withDelta(rows, deepFreeze(fold(viewOf(i + 1, rows), commitOf(i + 2, [r]), NO_FILES))));
       expect([name, rows.length >= first.length]).toEqual([name, true]);
     }
   });
