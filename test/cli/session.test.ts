@@ -6,13 +6,12 @@
 import { createPrivateKey } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { run } from "../../src/cli/run.js";
-import type { JsonValue } from "../../src/kernel/index.js";
+import { ROOT, type JsonValue } from "../../src/kernel/index.js";
 import { publicKeyOf, verifySession, type Policy } from "../../src/trust/index.js";
 import { assembleForTests } from "../support/assembly.js";
 import { owned, scratch, type Scratch } from "../support/files.js";
 
 const AT = "2026-10-06T12:30:00.000000Z";
-const ROOT = { intent: null, path: "" };
 
 let home: Scratch;
 beforeEach(() => {

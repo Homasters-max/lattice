@@ -4,7 +4,7 @@
 // key; the certificate is signed by the participant's own key, read from an
 // unencrypted OpenSSH key file (Q-04). `cli` reads and writes the files.
 import { generateKeyPairSync } from "node:crypto";
-import { canon, KERNEL_VERSION, type JsonObject, type Rejections } from "../kernel/index.js";
+import { canon, KERNEL_VERSION, ROOT, type JsonObject, type Rejections } from "../kernel/index.js";
 import type { Clock, Ids } from "../ledger/index.js";
 import { issueSession, publicKeyOf, readOpenSshKey, type Session } from "../trust/index.js";
 
@@ -60,7 +60,7 @@ export function startSession(ports: { readonly clock: Clock; readonly ids: Ids }
   const participantKey = readOpenSshKey(request.participantKey);
   if (participantKey === null) return { outcome: "not-a-key" };
   const { privateKey } = generateKeyPairSync("ed25519");
-  const issued = issueSession(unsigned(request, ports, publicKeyOf(privateKey)), participantKey, { intent: null, path: "" });
+  const issued = issueSession(unsigned(request, ports, publicKeyOf(privateKey)), participantKey, ROOT);
   if (!issued.ok) return { outcome: "rejections", rejections: issued.rejections };
   const text = canon(issued.value);
   if (!text.ok) throw new Error("bug: an issued session is canonical");
