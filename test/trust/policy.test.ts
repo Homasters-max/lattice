@@ -111,6 +111,10 @@ describe("the kinds, identities and keys of writer entries (TR-07, TR-09, TR-10)
     for (const kind of ["robot", "Human"]) expect(ofType({ owner: "alice", writers: [{ participant: "p", kind }] })).toEqual([["KR-21", "/body/writers/0/kind"]]);
   });
 
+  it("TR-07: a machine writer is a program name without a version — its version is the session's", () => {
+    expect(ofType({ owner: "alice", writers: [{ participant: "land", kind: "machine", version: "1" }] })).toEqual([["KR-21", "/body/writers/0/version"]]);
+  });
+
   it("TR-09: an identity is github:<login>, gitlab:<user> or ssh:<key fingerprint>", () => {
     const writer = (identities: string[]) => ({ owner: "alice", writers: [{ participant: "alice", kind: "human", identities }] });
     expect(refusals(writer(["github:alice", "gitlab:alice", FINGERPRINT]))).toEqual([]);

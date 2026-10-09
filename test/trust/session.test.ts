@@ -71,8 +71,7 @@ function withoutReason<B extends { readonly for?: unknown }>(body: B): Omit<B, "
 /** `UNSIGNED` with its body changed, then signed. */
 const sessionWith = (body: Partial<UnsignedSession["body"]>, by = ALICE.key) => signed({ ...UNSIGNED, body: { ...UNSIGNED.body, ...body } }, by);
 
-const where = (r: { readonly ok: boolean; readonly rejections?: readonly { readonly rule: string; readonly path: string }[] }) =>
-  r.ok ? [] : (r.rejections ?? []).map((x) => [x.rule, x.path]);
+const where = (r: { readonly ok: boolean; readonly rejections?: readonly { readonly rule: string; readonly path: string }[] }) => (r.ok ? [] : (r.rejections ?? []).map((x) => [x.rule, x.path]));
 
 const read = (value: JsonValue, place = ROOT) => readSession(deepFreeze(value), TYPES, place);
 const issue = (value: JsonValue, place = ROOT) => issueSession(deepFreeze(value), ALICE.key, TYPES, place);
@@ -204,6 +203,11 @@ describe("the chain of a session (TR-12)", () => {
 });
 
 describe("the binding and the expiry of a certificate (TR-10, TR-11)", () => {
+  it("TR-07: a machine is a program name without a version: each version is a new session of the one participant of the policy", () => {
+    const land = (id: string, version: string) => chainOf(signed({ ...UNSIGNED, id, body: { ...UNSIGNED.body, participant: "bob", kind: "machine", role: "land", version } }, BOB.key));
+    expect([land("01JB2X00000000000000000SE0", "0"), land("01JB2X00000000000000000SE1", "1")]).toEqual([keyOnly(SESSION_KEY.publicKey), keyOnly(SESSION_KEY.publicKey)]);
+  });
+
   it("TR-10: the key binds its participant to the kind and the roles of its writer entry", () => {
     expect(where(chainOf(sessionWith({ kind: "machine" })))).toEqual([["TR-10", "/session/body/kind"]]);
     expect(where(chainOf(sessionWith({ role: "land" })))).toEqual([["TR-10", "/session/body/role"]]);
