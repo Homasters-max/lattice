@@ -37,18 +37,7 @@
           }
         }
       },
-      "intents": [
-        {
-          "op": "entity",
-          "id": "demo/a",
-          "type": "demo/note@1",
-          "expected": null,
-          "at": "2026-10-06T11:30:00.000000Z",
-          "body": {
-            "text": "demo/a"
-          }
-        }
-      ],
+      "intents": [],
       "sig": null
     },
     "certifiedBy": "alice",
