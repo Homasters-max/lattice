@@ -47,9 +47,12 @@ function rangeOf(stem: string, from: number, to: number): string[] {
   return Array.from({ length: Math.abs(to - from) + 1 }, (_, k) => `${stem}${String(low + k).padStart(2, "0")}`);
 }
 
-/** RM-Z03: the IDs a text mentions — each ID, and each ID of a range — outside inline code. */
+/**
+ * RM-Z03: the IDs a text mentions — each ID, and each ID of a range — outside inline code. The code becomes a space,
+ * not nothing: its neighbours are not glued into one word, so an ID right after it is still mentioned.
+ */
 const mentioned = (text: string): string[] =>
-  [...text.replace(INLINE_CODE, "").matchAll(MENTION)].flatMap(([id, prefix, z, from, to]) => (to === undefined ? [id] : rangeOf(`${prefix}-${z}`, Number(from), Number(to))));
+  [...text.replace(INLINE_CODE, " ").matchAll(MENTION)].flatMap(([id, prefix, z, from, to]) => (to === undefined ? [id] : rangeOf(`${prefix}-${z}`, Number(from), Number(to))));
 
 /** The text of a block that may mention IDs: its cells or its paragraph — an example's text is never parsed — and its field. */
 function textOf(block: Block): readonly string[] {

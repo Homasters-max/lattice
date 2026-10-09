@@ -181,6 +181,11 @@ describe("blocks (RM-Z03, LG-42)", () => {
     expect(bodyOf(intents, "lattice/kr-z03")).toEqual({ text: "KR-Z03. A list:", list: ["first, KR-Z01", "second"], refs: ["lattice/kr-z01"] });
   });
 
+  it("RM-Z03: inline code is cut out as a space — an ID glued to its end is still mentioned, an ID inside it is not", () => {
+    const body = bodyOf(imported({ "02-kernel.md": md("# Doc", "", "KR-Z01. See`KR-Z03`KR-Z02.", "", "KR-Z02. x", "", "KR-Z03. y") }), "lattice/kr-z01");
+    expect(refsOf(body ?? null)).toEqual(["lattice/kr-z02"]);
+  });
+
   it("RM-Z03, G-45: the whole field table is text of its block — an ID in its header is a ref, as one in its rows", () => {
     const intents = imported({ "02-kernel.md": md("# Doc", "", "KR-Z01. Forms:", "", "| Form of KR-Z02 | Block |", "|---|---|", "| a row | KR-Z03 |", "", "KR-Z02. x", "", "KR-Z03. y") });
     expect(refsOf(bodyOf(intents, "lattice/kr-z01") ?? null)).toEqual(["lattice/kr-z02", "lattice/kr-z03"]);
