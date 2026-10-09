@@ -33,7 +33,7 @@ async function bytesOf(file: string): Promise<Uint8Array | null> {
 }
 
 /** The lines of the file: the bytes up to and with each line feed, then the bytes after the last one if there are any — a cut line. */
-async function linesOf(file: string): Promise<Uint8Array[]> {
+async function linesOf(file: string): Promise<readonly Uint8Array[]> {
   const bytes = (await bytesOf(file)) ?? new Uint8Array();
   const lines: Uint8Array[] = [];
   let start = 0;
@@ -45,7 +45,7 @@ async function linesOf(file: string): Promise<Uint8Array[]> {
 }
 
 /** The evidence files an append writes; a hash that is no hash of KR-12 is a bug of the ledger, thrown before any write. */
-function filesOf(dir: string, evidence: Append["evidence"]): { readonly file: string; readonly bytes: Uint8Array }[] {
+function filesOf(dir: string, evidence: Append["evidence"]): readonly { readonly file: string; readonly bytes: Uint8Array }[] {
   return evidence.map((e) => {
     const name = evidenceName(e.hash);
     if (name === null) throw new Error(`bug: evidence is cited by a hash of KR-12, not ${e.hash}`);

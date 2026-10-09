@@ -90,7 +90,7 @@ export type KeyOfSession = (session: string) => PublicKey | null;
 const under = (place: Place, name: string | number): Place => ({ intent: place.intent, path: `${place.path}/${name}` });
 
 /** LG-06: `sig` is the signature of the commit's hash by the key of its land session, `by`; none checked without keys (Q-39). */
-function signatureRejections(c: Commit, keyOfSession: KeyOfSession | null, place: Place): Rejection[] {
+function signatureRejections(c: Commit, keyOfSession: KeyOfSession | null, place: Place): readonly Rejection[] {
   if (keyOfSession === null) return [];
   const key = keyOfSession(c.by);
   const signed = commitHash(c);
