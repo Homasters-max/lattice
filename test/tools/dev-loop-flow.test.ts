@@ -7,6 +7,7 @@
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { scratch, type Scratch } from "../support/files.js";
+import { NO_MAINTENANCE } from "../support/git.js";
 import { program, type Program } from "../support/program.js";
 
 const tool = program("plan/tools/dev-loop.mjs");
@@ -20,7 +21,7 @@ type Json = { [key: string]: unknown };
 type Loop = { work: string; dir: string };
 type Files = { readonly [path: string]: string };
 
-async function sh(cwd: string, cmd: Program, args: string[], env = process.env): Promise<string> {
+async function sh(cwd: string, cmd: Program, args: readonly string[], env = process.env): Promise<string> {
   const ran = await cmd.start(args, { cwd, env });
   if (ran.status !== 0 && cmd === git) throw new Error(`git ${args.join(" ")}: ${ran.stderr}`);
   return ran.stdout.trim();
@@ -52,8 +53,8 @@ async function build(change: Files, main: Files): Promise<string> {
   const work = join(root, "work");
   for (const [path, text] of Object.entries({ "src/ledger/land.ts": land(1), "CONVENTIONS.md": CONVENTIONS, ...main })) temp.write(join(work, path), text);
   // --template= leaves out the sample hooks: a repository without them copies several times faster.
-  const origin = sh(root, git, ["init", "-q", "--template=", "--bare", "origin.git"]);
-  for (const args of [["init", "-q", "--template="], ["config", "user.email", "t@t"], ["config", "user.name", "t"], ["config", "core.autocrlf", "false"], ["remote", "add", "origin", join(root, "origin.git")]]) await sh(work, git, args);
+  const origin = sh(root, git, ["init", "-q", "--template=", "--bare", "origin.git"]).then(() => sh(join(root, "origin.git"), git, NO_MAINTENANCE));
+  for (const args of [["init", "-q", "--template="], NO_MAINTENANCE, ["config", "user.email", "t@t"], ["config", "user.name", "t"], ["config", "core.autocrlf", "false"], ["remote", "add", "origin", join(root, "origin.git")]]) await sh(work, git, args);
   await sh(work, git, ["add", "-A"]);
   await sh(work, git, ["commit", "-q", "-m", "base"]);
   await origin;

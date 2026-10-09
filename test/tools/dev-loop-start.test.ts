@@ -8,6 +8,7 @@
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { scratch, type Scratch } from "../support/files.js";
+import { NO_MAINTENANCE } from "../support/git.js";
 import { program, type Program } from "../support/program.js";
 
 const tool = program("plan/tools/dev-loop.mjs");
@@ -17,7 +18,7 @@ let folders = 0;
 type Json = { [key: string]: unknown };
 type Repo = { root: string; work: string; github: string };
 
-async function exec(cwd: string, cmd: Program, args: string[], env = process.env): Promise<{ ok: boolean; stdout: string; stderr: string }> {
+async function exec(cwd: string, cmd: Program, args: readonly string[], env = process.env): Promise<{ ok: boolean; stdout: string; stderr: string }> {
   const ran = await cmd.start(args, { cwd, env });
   return { ok: ran.status === 0, stdout: ran.stdout, stderr: ran.stderr };
 }
@@ -25,7 +26,7 @@ async function exec(cwd: string, cmd: Program, args: string[], env = process.env
 /** A new folder of the run inside the scratch folder of this file. */
 const folder = (prefix: string) => temp.mkdir(`${prefix}${++folders}`);
 
-async function sh(cwd: string, args: string[]): Promise<string> {
+async function sh(cwd: string, args: readonly string[]): Promise<string> {
   const r = await exec(cwd, git, args);
   if (!r.ok) throw new Error(`git ${args.join(" ")}: ${r.stderr}`);
   return r.stdout.trim();
@@ -35,7 +36,7 @@ async function sh(cwd: string, args: string[]): Promise<string> {
 async function advance(root: string, files: { [path: string]: string } = { "b.txt": "b\n" }): Promise<void> {
   const other = join(root, "other");
   await sh(root, ["clone", "-q", "--template=", "-b", "main", join(root, "origin.git"), other]);
-  for (const args of [["config", "user.email", "t@t"], ["config", "user.name", "t"]]) await sh(other, args);
+  for (const args of [NO_MAINTENANCE, ["config", "user.email", "t@t"], ["config", "user.name", "t"]]) await sh(other, args);
   for (const [path, text] of Object.entries(files)) temp.write(join(other, path), text);
   await sh(other, ["add", "-A"]);
   await sh(other, ["commit", "-q", "-m", "merged"]);
@@ -51,7 +52,8 @@ async function build(ahead: boolean): Promise<string> {
   temp.mkdir(work);
   // --template= leaves out the sample hooks: a repository without them copies several times faster.
   await sh(root, ["init", "-q", "--template=", "--bare", "origin.git"]);
-  for (const args of [["init", "-q", "--template=", "-b", "main"], ["config", "user.email", "t@t"], ["config", "user.name", "t"], ["remote", "add", "origin", join(root, "origin.git")]]) await sh(work, args);
+  await sh(join(root, "origin.git"), NO_MAINTENANCE);
+  for (const args of [["init", "-q", "--template=", "-b", "main"], NO_MAINTENANCE, ["config", "user.email", "t@t"], ["config", "user.name", "t"], ["remote", "add", "origin", join(root, "origin.git")]]) await sh(work, args);
   temp.write(join(work, "a.txt"), "a\n");
   // The records of runs (S0-43) are in .lattice/, which git ignores: a checkout with them is clean.
   temp.write(join(work, ".gitignore"), ".lattice/\n");
