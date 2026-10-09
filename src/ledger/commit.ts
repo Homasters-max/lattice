@@ -125,8 +125,7 @@ export function verifyChain(commits: readonly Commit[], keyOfSession: KeyOfSessi
 }
 
 /** G-17: the line a store keeps for a commit — its canonical JSON (KR-10) in UTF-8, and a line feed. */
-export const commitLine = (c: Commit): Uint8Array => new TextEncoder().encode(`${known(canon(c), "a commit")}
-`);
+export const commitLine = (c: Commit): Uint8Array => new TextEncoder().encode(`${known(canon(c), "a commit")}\n`);
 
 /** What the closed form of a commit admits: its header, and its records as JSON values, each read by `checkHeader`. */
 type Fields = Omit<Commit, "records"> & { readonly records: readonly JsonValue[] };
