@@ -16,7 +16,7 @@
 //   npm run mutate -- --at <src/file.ts:line> [--operator <operator>] [--base <ref>]
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { availableParallelism, tmpdir } from "node:os";
 import { delimiter, dirname, join, posix, relative, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
@@ -63,11 +63,27 @@ function walk(root, at = "") {
   return out;
 }
 
-/** The copy `to` holds the files of `dir` and nothing else; node_modules is a link to that of `dir`. */
-function syncCopy(dir, files, to) {
+/** Removes the folders under `root` that hold no file, but its node_modules; → whether `root/at` holds none. */
+function pruneEmpty(root, at = "") {
+  let empty = true;
+  for (const e of readdirSync(join(root, at), { withFileTypes: true })) {
+    const path = at ? `${at}/${e.name}` : e.name;
+    if (e.isDirectory() && path !== "node_modules" && pruneEmpty(root, path)) rmdirSync(join(root, path));
+    else empty = false;
+  }
+  return empty;
+}
+
+/**
+ * The copy `to` holds the files of `dir` and nothing else — no folder that a removed file left empty either: a test
+ * that reads a folder, as that of the fixtures, would see one the branch has deleted. node_modules is a link to that
+ * of `dir`.
+ */
+export function syncCopy(dir, files, to) {
   mkdirSync(to, { recursive: true });
   const wanted = new Set(files);
   for (const p of walk(to)) if (!wanted.has(p)) rmSync(join(to, p), { force: true });
+  pruneEmpty(to);
   for (const p of files) {
     const bytes = readFileSync(join(dir, p));
     const target = join(to, p);

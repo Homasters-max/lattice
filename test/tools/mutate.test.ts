@@ -2,11 +2,13 @@
 // a mutant runs against the test sets that reach its file, and its outcome — killed by a named test, survived, stopped
 // over its budget — goes to the report; a cache keeps the outcome while the mutant and its test sets stay the same. `mutate --at` runs one mutant
 // at a line. These cases run prove on a throwaway repository: its steps stand in for those of verify, and its test
-// runner, in place of vitest, runs the cases a test file exports and writes the JSON report vitest writes. The cases name
-// no rule ID: they show the tool, not a hard check of ST-17.
+// runner, in place of vitest, runs the cases a test file exports and writes the JSON report vitest writes. A copy of the
+// working tree, where the mutants run, holds its files and no folder they have left. The cases name no rule ID: they
+// show the tool, not a hard check of ST-17.
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { OPERATORS } from "../../scripts/mutants.mjs";
+import { syncCopy } from "../../scripts/mutate.mjs";
 import { scratch, type Scratch } from "../support/files.js";
 import { program } from "../support/program.js";
 
@@ -219,5 +221,26 @@ describe("mutate, the budget", { timeout: 120_000 }, () => {
     const ran = await mutate.start(["--at", "src/kernel/loop.ts:2", "--operator", "refusal", "--base", "main"], { cwd: stand.dir, env: env({ MUTATE_BUDGET_MIN_MS: "1000" }) });
     expect(ran.status).toBe(0);
     expect(JSON.parse(ran.stdout.trim())).toMatchObject({ outcome: "passed", mutant: { operator: "refusal", outcome: "budget-exceeded", killer: null } });
+  });
+});
+
+describe("mutate, the copies", () => {
+  // S0-16 (PR #58) deleted test/fixtures/TR-02/: its empty folder stayed in the copy, and the test of the coverage of
+  // the fixtures, which reads the folders, made the baseline red.
+  it("a sync removes the folder of a deleted fixture and a folder whose path a file now takes", () => {
+    const tree = scratch("mutate-tree-");
+    const pool = scratch("mutate-pool-");
+    stands.push(tree, pool);
+    const before = ["package.json", "src/a/b.ts", "test/fixtures/TR-01/pass.json", "test/fixtures/TR-02/trigger.json", "test/fixtures/TR-02/pass/case.json"];
+    for (const path of before) tree.write(path, path);
+    const copy = pool.path("w0");
+    syncCopy(tree.dir, before, copy);
+    expect(pool.list("w0/test/fixtures")).toEqual(["TR-01", "TR-02"]);
+    tree.remove("test/fixtures/TR-02");
+    tree.remove("src/a");
+    tree.write("src/a", "a file");
+    syncCopy(tree.dir, ["package.json", "src/a", "test/fixtures/TR-01/pass.json"], copy);
+    expect(pool.list("w0", { recursive: true })).toEqual(["package.json", "src", "src/a", "test", "test/fixtures", "test/fixtures/TR-01", "test/fixtures/TR-01/pass.json"]);
+    expect(pool.text("w0/src/a")).toBe("a file");
   });
 });
