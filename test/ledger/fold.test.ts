@@ -23,15 +23,22 @@ function opened(proposals: readonly JsonValue[]): Folded & { readonly commits: r
 }
 
 /** Types and two notes in one commit (LG-11); demo/b cites demo/a; then demo/b again, citing demo/c; then an event about demo/a. */
-const STORE = opened([
+const PROPOSALS: readonly JsonValue[] = [
   proposalOf(...TYPES, note("demo/a", { source: "https://example.org/a" }), note("demo/b", { refs: ["demo/a", "demo/a@1#title"], parent: { to: "demo/a" } })),
   proposalOf(note("demo/b", { refs: ["demo/c"] }, 1), note("demo/c")),
   proposalOf(seen(EVENT, "demo/a")),
-]);
+];
+
+const STORE = opened(PROPOSALS);
 
 const pairs = (rows: readonly { readonly source: string; readonly path: string; readonly label: string | null }[]) => rows.map((r) => [r.source, r.path, r.label]);
 
 describe("the projections of S0 (LG-34, LG-35)", () => {
+  it("LG-34: the projections of S0 are rows fold computes from the commits — the same rows on every opening of the lines", () => {
+    expect([...new Set(STORE.rows.map((r) => r.key.split(":")[0]))]).toEqual(["current", "holder", "latest", "referrers", "revision"]);
+    expect(canon(opened(PROPOSALS).rows)).toEqual(canon(STORE.rows));
+  });
+
   it("LG-35: every row is canonical JSON with from and to, and a delta is sorted by key", () => {
     for (const row of STORE.rows) expect(canon(row)).toMatchObject({ ok: true });
     const [, second] = STORE.commits as [Commit, Commit];
@@ -66,15 +73,6 @@ describe("the projections of S0 (LG-34, LG-35)", () => {
     expect(pairs(STORE.view.referrers("demo/a"))).toEqual([[EVENT, "/of", "about"]]);
   });
 
-  it("RF-09: referrers answer who points at an event — a reference to it by its id", () => {
-    const store = opened([proposalOf(...TYPES, note("demo/a")), proposalOf(seen(EVENT, "demo/a")), proposalOf(note("demo/b", { parent: { to: EVENT } }))]);
-    expect([pairs(store.view.referrers(EVENT)), store.view.referrers(EVENT).map((r) => r.ref), pairs(store.viewAt(2)!.referrers(EVENT))]).toEqual([
-      [["demo/b@1", "/parent/to", null]],
-      [EVENT],
-      [],
-    ]);
-  });
-
   it("RF-09: a referrer that names a label no edge has, or a target nothing points at, has none", () => {
     expect([STORE.view.referrers("demo/c", "about"), STORE.view.referrers("demo/z"), STORE.view.referrers("demo/c", null)]).toEqual([[], [], []]);
   });
@@ -86,7 +84,17 @@ describe("the projections of S0 (LG-34, LG-35)", () => {
     const held = STORE.rows.filter((r) => r.key.startsWith("holder:") && r.value !== null && (r.value as { id: string }).id === "demo/b");
     expect(held.map((r) => [r.from, r.to])).toEqual([[1, null]]);
   });
+});
 
+describe("referrers of an event (RF-09)", () => {
+  it("RF-09: referrers answer who points at an event — a reference to it by its id", () => {
+    const store = opened([proposalOf(...TYPES, note("demo/a")), proposalOf(seen(EVENT, "demo/a")), proposalOf(note("demo/b", { parent: { to: EVENT } }))]);
+    expect([pairs(store.view.referrers(EVENT)), store.view.referrers(EVENT).map((r) => r.ref), pairs(store.viewAt(2)!.referrers(EVENT))]).toEqual([
+      [["demo/b@1", "/parent/to", null]],
+      [EVENT],
+      [],
+    ]);
+  });
 });
 
 describe("blocks, standing and evidence (LG-38)", () => {

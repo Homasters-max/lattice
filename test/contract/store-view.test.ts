@@ -86,7 +86,7 @@ describe("the read view on every adapter (LG-03, LG-38, LG-39)", () => {
 });
 
 describe("projections are dropped and rebuilt (LG-34, PR-04)", () => {
-  it.each(ADAPTERS)("LG-34, PR-04: the rows of a store are dropped and rebuilt from its commits alone, and the view answers as before — $name", async ({ make }) => {
+  it.each(ADAPTERS)("PR-04: the rows of a store are dropped and rebuilt from its commits alone, and the view answers as before (LG-34) — $name", async ({ make }) => {
     const store = await appended(make(), landedChain(PROPOSALS));
     const seen = async () => {
       const opened = await openStore(store, keyOfLand);
