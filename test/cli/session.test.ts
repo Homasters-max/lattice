@@ -10,6 +10,7 @@ import { ROOT, type JsonValue } from "../../src/kernel/index.js";
 import { SESSION_TYPE } from "../../src/ledger/index.js";
 import { publicKeyOf, verifySession, type Policy } from "../../src/trust/index.js";
 import { assembleForTests } from "../support/assembly.js";
+import { deepFreeze } from "../support/deep-freeze.js";
 import { owned, scratch, type Scratch } from "../support/files.js";
 
 const AT = "2026-10-06T12:30:00.000000Z";
@@ -44,7 +45,7 @@ const saved = () => JSON.parse(home.text(".lattice/session.json")) as JsonValue 
 /** The chain of TR-12 of the saved session to its key, under a policy that lists `writer`. */
 function chainOf(writer: Policy["writers"] & object) {
   const types = (ref: string) => (ref === "core/session@1" ? SESSION_TYPE.body : null);
-  return verifySession({ session: saved(), types, policy: { owner: "owner", writers: writer }, at: AT }, ROOT, (key) => ({ ok: true, value: key }));
+  return verifySession(deepFreeze({ session: saved(), types, policy: { owner: "owner", writers: writer }, at: AT }), ROOT, (key) => ({ ok: true, value: key }));
 }
 
 describe("lattice session (RT-32, TR-11)", () => {

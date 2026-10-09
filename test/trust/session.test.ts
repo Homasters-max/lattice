@@ -58,7 +58,7 @@ const UNSIGNED: UnsignedSession = deepFreeze({
 });
 
 function signed(s: UnsignedSession, by = ALICE.key): Session {
-  const out = signSession(s, by, ROOT);
+  const out = signSession(deepFreeze(s), by, ROOT);
   if (!out.ok) throw new Error("bug: a session of this test is canonical");
   return out.value;
 }
@@ -74,8 +74,8 @@ const sessionWith = (body: Partial<UnsignedSession["body"]>, by = ALICE.key) => 
 const where = (r: { readonly ok: boolean; readonly rejections?: readonly { readonly rule: string; readonly path: string }[] }) =>
   r.ok ? [] : (r.rejections ?? []).map((x) => [x.rule, x.path]);
 
-const read = (value: JsonValue, place = ROOT) => readSession(value, TYPES, place);
-const issue = (value: JsonValue, place = ROOT) => issueSession(value, ALICE.key, TYPES, place);
+const read = (value: JsonValue, place = ROOT) => readSession(deepFreeze(value), TYPES, place);
+const issue = (value: JsonValue, place = ROOT) => issueSession(deepFreeze(value), ALICE.key, TYPES, place);
 
 /** The chain to nothing past the certificate: the session key it yields. */
 const keyOnly = (key: string) => ({ ok: true as const, value: key });
@@ -95,7 +95,7 @@ describe("session events (TR-11)", () => {
       [{ ...session, by: session.id }, [["TR-11", "/session/by"]]],
       [{ ...session, id: 7 }, [["TR-11", "/session/id"]]],
     ];
-    for (const [value, expected] of cases) expect(where(readSession(value, TYPES, AT_SESSION)), JSON.stringify(value)).toEqual(expected);
+    for (const [value, expected] of cases) expect(where(readSession(deepFreeze(value), TYPES, AT_SESSION)), JSON.stringify(value)).toEqual(expected);
   });
 
   it("KR-06, KR-11, G-45: the id of a session is a ULID, its at a time", () => {
@@ -105,7 +105,7 @@ describe("session events (TR-11)", () => {
   });
 
   it("KR-15: a session is read against the type its caller resolves; without core/session@1 it is no session", () => {
-    expect(where(readSession(signed(UNSIGNED), () => null, AT_SESSION))).toEqual([["KR-15", "/session/type"]]);
+    expect(where(readSession(deepFreeze(signed(UNSIGNED)), () => null, AT_SESSION))).toEqual([["KR-15", "/session/type"]]);
   });
 });
 
@@ -150,12 +150,12 @@ describe("the reason of a session (TR-11, OB-01)", () => {
 describe("certificates (TR-11, G-46)", () => {
   it("TR-11, G-46: the certificate signs the hash of the session without its signature, by the participant's key", () => {
     const session = signed(UNSIGNED);
-    const hash = certificateHash(UNSIGNED, ROOT);
-    expect(certificateHash(session, ROOT)).toEqual(hash);
+    const hash = certificateHash(deepFreeze(UNSIGNED), ROOT);
+    expect(certificateHash(deepFreeze(session), ROOT)).toEqual(hash);
     expect(hash.ok && verifyHash(hash.value, session.body.certificate.sig, ALICE.publicKey)).toBe(true);
     // Every field of the session is covered: a changed role or expiry is another hash.
-    expect(certificateHash({ ...UNSIGNED, body: { ...UNSIGNED.body, role: "owner" } }, ROOT)).not.toEqual(hash);
-    expect(certificateHash({ ...UNSIGNED, body: { ...UNSIGNED.body, certificate: { ...UNSIGNED.body.certificate, expires: "2027-10-07T11:00:00.000000Z" } } }, ROOT)).not.toEqual(hash);
+    expect(certificateHash(deepFreeze({ ...UNSIGNED, body: { ...UNSIGNED.body, role: "owner" } }), ROOT)).not.toEqual(hash);
+    expect(certificateHash(deepFreeze({ ...UNSIGNED, body: { ...UNSIGNED.body, certificate: { ...UNSIGNED.body.certificate, expires: "2027-10-07T11:00:00.000000Z" } } }), ROOT)).not.toEqual(hash);
   });
 
   it("TR-11: issues a session of a human or a machine by its own key; an agent's session comes from its caller (S3)", () => {
@@ -235,18 +235,18 @@ describe("the binding and the expiry of a certificate (TR-10, TR-11)", () => {
 
 /** A proposal of the session `session`, with one intent, signed by `by` when given. */
 function proposalOf(session: Session, by?: typeof SESSION_KEY): Proposal {
-  const read = readProposal({
+  const read = readProposal(deepFreeze({
     session,
     intents: [{ op: "entity", id: "demo/a", type: "demo/note@1", expected: null, at: "2026-10-06T11:30:00.000000Z", body: { text: "a" } }],
     sig: null,
-  });
+  }));
   if (!read.ok) throw new Error("bug: the proposal of this test has its form");
-  return by === undefined ? read.value : signProposal(read.value, by.key, NO_FACTS);
+  return by === undefined ? read.value : signProposal(deepFreeze(read.value), by.key, NO_FACTS);
 }
 
 /** The whole chain of TR-12: key in the policy → certificate → proposal, its last link LG-10. */
 const toProposal = (p: Proposal, policy: Policy = POLICY) =>
-  verifySession({ session: p.session, types: TYPES, policy, at: AT }, AT_SESSION, (key) => verifyProposal(p, key, NO_FACTS, ROOT));
+  verifySession(deepFreeze({ session: p.session, types: TYPES, policy, at: AT }), AT_SESSION, (key) => verifyProposal(deepFreeze(p), key, NO_FACTS, ROOT));
 
 describe("the chain to the proposal (TR-12, LG-10)", () => {
   it("TR-12, LG-10: a proposal signed by the session key passes the whole chain", () => {
@@ -262,7 +262,7 @@ describe("the chain to the proposal (TR-12, LG-10)", () => {
 
   it("TR-12: the proposal is not checked while the chain to its session key is broken", () => {
     let checked = false;
-    const out = verifySession({ session: signed(UNSIGNED, MALLORY.key), types: TYPES, policy: POLICY, at: AT }, AT_SESSION, (key) => {
+    const out = verifySession(deepFreeze({ session: signed(UNSIGNED, MALLORY.key), types: TYPES, policy: POLICY, at: AT }), AT_SESSION, (key) => {
       checked = true;
       return keyOnly(key);
     });
@@ -320,7 +320,7 @@ describe("what a rejection of a session names (TR-11)", () => {
         reject(TR_11, { ...at("/body/for"), expected: "a reason: a session with purpose bench names it (OB-01)", got: "absent" }),
       ],
     ];
-    for (const [value, rejection] of cases) expect(readSession(value, TYPES, IN_INTENT), JSON.stringify(value)).toEqual({ ok: false, rejections: [rejection] });
+    for (const [value, rejection] of cases) expect(readSession(deepFreeze(value), TYPES, IN_INTENT), JSON.stringify(value)).toEqual({ ok: false, rejections: [rejection] });
   });
 
   it("TR-11: an agent's session is refused at its kind when issued by its own key", () => {
@@ -333,7 +333,7 @@ describe("what a rejection of a session names (TR-11)", () => {
 
 describe("what a rejection of the chain names (TR-10, TR-11, TR-12)", () => {
   it("TR-10, TR-11, TR-12: the chain names the expiry, the writer's kind and roles, the hash and the key it expected", () => {
-    const chain = (session: Session, policy: Policy = POLICY, time = AT) => verifySession({ session, types: TYPES, policy, at: time }, IN_INTENT, keyOnly);
+    const chain = (session: Session, policy: Policy = POLICY, time = AT) => verifySession(deepFreeze({ session, types: TYPES, policy, at: time }), IN_INTENT, keyOnly);
     const expired = signed(UNSIGNED);
     expect(chain(expired, POLICY, "2026-10-08T00:00:00.000000Z")).toEqual({
       ok: false,
@@ -344,7 +344,7 @@ describe("what a rejection of the chain names (TR-10, TR-11, TR-12)", () => {
       rejections: [reject(TR_10, { ...at("/body/kind"), expected: "human", got: "machine" }), reject(TR_10, { ...at("/body/role"), expected: ["author"], got: "land" })],
     });
     const foreign = signed(UNSIGNED, MALLORY.key);
-    const hash = certificateHash(foreign, ROOT);
+    const hash = certificateHash(deepFreeze(foreign), ROOT);
     expect(chain(foreign)).toEqual({
       ok: false,
       rejections: [reject(TR_12, { ...at("/body/certificate/sig"), expected: { hash: hash.ok ? hash.value : "", by: "a key of alice in the policy" }, got: foreign.body.certificate.sig })],
