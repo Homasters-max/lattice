@@ -36,4 +36,5 @@ export { checkSchema, type Schema } from "./schema.js";
 export type { ResolveType, Type } from "./type.js";
 export { checkUri, isUri } from "./uri.js";
 export { validate, type Violation, type Violations } from "./validate.js";
+export { valuesOf, type ValueAt } from "./values-of.js";
 export { KERNEL_VERSION } from "./version.js";

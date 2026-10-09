@@ -101,9 +101,12 @@ describe("apply, the candidate commit", () => {
     const view = opened([first]);
     const second = landed(view, proposal(intent("demo/a", { text: "again" })));
     expect(second.records.map((r) => [r.id, r.rev])).toEqual([["demo/a", 2]]);
-    expect(fold(view, second, []).map((r) => [r.key, r.from, r.to])).toEqual([
+    expect(fold(view, second, deepFreeze([])).map((r) => [r.key, r.from, r.to])).toEqual([
       ["current:demo/a", 1, 2],
       ["current:demo/a", 2, null],
+      ["latest:demo/a", 1, 2],
+      ["latest:demo/a", 2, null],
+      ["revision:demo/a@2", 2, null],
     ]);
   });
 

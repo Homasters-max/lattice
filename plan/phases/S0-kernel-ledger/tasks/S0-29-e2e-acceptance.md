@@ -20,7 +20,7 @@ rules: [SL-01, SL-02, SL-03, SL-04, SL-07, LG-37, LG-51, ST-12, RM-06]
 Входит:
 - **пересборка из дизайна** (SL-04, Q-07): `scripts/rebuild-from-design` — временный git-репозиторий → `lattice init` → import `docs/design` (S0-26) → proposal → `land` с act dev-владельца → store `jsonl`;
 - **round-trip** (SL-Z02, SL-02, RM-06): `lattice export --docs` из этого store побайтно равен `docs/design`;
-- **rebuild** (LG-37): `lattice verify-store` на `jsonl` и `memory`; ночное задание пересобирает с нуля;
+- **rebuild** (LG-37): `lattice verify-store` на `jsonl` и `memory`; ночное задание пересобирает с нуля. От S0-12: `verify-store` в S0 проверяет цепочку (подписи — с S0-20, G-51) и пересобирает строки с genesis, но сравнить пересборку ему не с чем — `memory` и `jsonl` не хранят строк между открытиями; равенство пересборки накопленным строкам показывает property-тест `test/contract/store-rebuild.property.test.ts`, сравнение с хранимыми строками — со store, который их хранит (S1; G-54);
 - **CI по LG-51** на тестовом репозитории: (1) `land --dry-run` на tail `main` с `local` acts — отказ валит проверку, только `awaiting-act` проходит с перечнем; (3) fitness-тесты ST-12 в части S0 — структура, type check, профиль качества, покрытие фикстурами; (2) и (4) — SW;
 - **приёмка**: `npm run accept:s0` — всё выше одной командой с понятным отчётом;
 - **трассируемость** (SL-07): отчёт — какие rule ID S0 упомянуты в тестах и фикстурах; непокрытые — список для аудита (до переключения это не gap TR-36, а информация);

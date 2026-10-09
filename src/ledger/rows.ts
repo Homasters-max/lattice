@@ -1,12 +1,14 @@
 // Rows (LG-35, LG-38), one module of the ledger: a row is canonical JSON with
 // `from` and `to`, the `seq` that opened and closed it; `to` is `null` while it
-// holds. Here are applying a delta, the order of keys (Q-18), `view(seq)` over
-// rows, and the rows a store keeps — those the ledger hands it when it opens
-// the store (LG-02) and those each delta leaves (Q-27). Fold reads the rows
-// behind a view; every other reader asks only the questions of View, through
-// the entry `ledger/view` (ST-01). The key schema of rows and the other
-// questions of View arrive with S0-12.
-import { compareText, type JsonValue, type Record } from "../kernel/index.js";
+// holds. Here are the key schema of the projections (LG-34), applying a delta,
+// the order of keys (Q-18), `view(seq)` over rows — the read view (LG-38) — and
+// the rows a store keeps: those the ledger hands it when it opens the store
+// (LG-02) and those each delta leaves (Q-27). Fold reads the rows behind a
+// view; every other reader asks only the questions of View, through the entry
+// `ledger/view` (ST-01).
+import { canon, compareText, parseRef, type JsonValue, type Record } from "../kernel/index.js";
+import { namespaceOf } from "../trust/index.js";
+import type { Evidence } from "./commit.js";
 
 export type Row = {
   readonly key: string;
@@ -24,15 +26,111 @@ export interface Rows {
   row(key: string): Row | null;
 }
 
-/** The read view (LG-38). The walking skeleton answers `seq` and `current`; the other questions arrive with S0-12. */
+/**
+ * RF-09: one edge into a target — a reference to a block or an event, or an external link to a URI — from the record
+ * `source` (`id@n` of an entity revision, the `id` of an event) at `path` of its body, with its edge label, `null`
+ * where the schema names none (G-31), and the reference or URI as written.
+ */
+export type Referrer = {
+  readonly target: string;
+  readonly label: string | null;
+  readonly source: string;
+  readonly path: string;
+  readonly ref: string;
+};
+
+/** LG-19, KR-19: a unique key — the value at `path` of a body of the type `type` (its `id`), among the entities of `namespace`. */
+export type Unique = {
+  readonly namespace: string;
+  readonly type: string;
+  readonly path: string;
+  readonly value: JsonValue;
+};
+
+/** TR-25: the standing of a reference. Its rows and the rules of trust that compute them arrive with S0-14. */
+export type Standing = {
+  readonly inForce: boolean;
+  readonly basis: string;
+  readonly use: string;
+  readonly live: boolean | null;
+};
+
+/** The read view (LG-38): the questions asked at one `seq`; `tuple` arrives with S1. */
 export interface View {
   readonly seq: number;
-  /** The current revision of an entity (TR-22), or `null`. */
+  /** The current revision of an entity (TR-22), or `null`. Until S0-14 brings in force, the revision written last. */
   current(id: string): Record | null;
+  /** The latest revision of an entity — the highest `rev` (TR-22) — or `null`. */
+  latest(id: string): Record | null;
+  /** The revision `n` of an entity, or `null`. */
+  revision(id: string, n: number): Record | null;
+  /** RF-09: who points at a target, by key; with `label`, only the edges of that label — `null` for edges with none. */
+  referrers(target: string, label?: string | null): readonly Referrer[];
+  /** LG-19: the `id` of the entity that holds a unique key, or `null`. */
+  holder(unique: Unique): string | null;
+  /** TR-25: the standing of a reference, or `null`. */
+  standing(ref: string): Standing | null;
+  /** The current revisions of the entities of these types (by `id`, any revision) in these namespaces, by `id`. */
+  blocks(types: readonly string[], namespaces: readonly string[]): readonly Record[];
+  /** LG-30: the bytes of an evidence file a commit up to `seq` cited, by its hash (KR-12), or `null`; opaque in S0. */
+  evidence(hash: string): Uint8Array | null;
 }
 
+/*
+ * The key schema of rows (LG-34): a prefix per kind of projection, then what names the row. An `id` (KR-06) and a hash
+ * (KR-12) are written as they are — their grammars hold no `:` or `@` that would make two keys one; a key of several
+ * parts is the canonical JSON of their array (`canon`, KR-10, CONVENTIONS.md §7.1), so that a part may be any string or
+ * value and a prefix of the array is a prefix of the key. Parts canon refuses are in no commit (KR-10): they name no
+ * key, so fold, which is total (LG-36), writes no row of them and the view finds none.
+ */
+export const KEYS = {
+  current: "current:",
+  latest: "latest:",
+  revision: "revision:",
+  referrers: "referrers:",
+  holder: "holder:",
+  standing: "standing:",
+  evidence: "evidence:",
+} as const;
+
 /** The key of the current revision of an entity. */
-export const currentKey = (id: string): string => `current:${id}`;
+export const currentKey = (id: string): string => `${KEYS.current}${id}`;
+
+/** The key of the latest revision of an entity. */
+export const latestKey = (id: string): string => `${KEYS.latest}${id}`;
+
+/** The key of the revision `n` of an entity. */
+export const revisionKey = (id: string, n: number): string => `${KEYS.revision}${id}@${n}`;
+
+/** The canonical JSON of the parts of a key, or `null` for parts canon refuses (KR-10). */
+function partsOf(parts: readonly JsonValue[]): string | null {
+  const text = canon(parts);
+  return text.ok ? text.value : null;
+}
+
+/** The key of one edge: its target, label, source and path; `null` for parts canon refuses. */
+export function referrerKey(r: Referrer): string | null {
+  const parts = partsOf([r.target, r.label, r.source, r.path]);
+  return parts === null ? null : `${KEYS.referrers}${parts}`;
+}
+
+/** The prefix of the keys of the edges into a target, of one label if it is given: the canonical JSON of the array, open. */
+function referrersPrefix(target: string, label: string | null | undefined): string | null {
+  const parts = partsOf(label === undefined ? [target] : [target, label]);
+  return parts === null ? null : `${KEYS.referrers}${parts.slice(0, -1)},`;
+}
+
+/** The key of a unique key; `null` for parts canon refuses. */
+export function holderKey(u: Unique): string | null {
+  const parts = partsOf([u.namespace, u.type, u.path, u.value]);
+  return parts === null ? null : `${KEYS.holder}${parts}`;
+}
+
+/** The key of the standing of a pinned reference `id@n`, or of an event `id`. */
+export const standingKey = (ref: string): string => `${KEYS.standing}${ref}`;
+
+/** The key of an evidence file a commit cited. */
+export const evidenceKey = (hash: string): string => `${KEYS.evidence}${hash}`;
 
 const order = (a: Row, b: Row) => compareText(a.key, b.key) || a.from - b.from;
 
@@ -60,12 +158,57 @@ export function held(rows: readonly Row[], seq = Number.POSITIVE_INFINITY): Read
   return new Map(rows.filter((r) => r.from <= seq && (r.to === null || r.to > seq)).map((r) => [r.key, r]));
 }
 
-/** `view(seq)`: the rows with `from ≤ seq` and `to` null or greater. */
-export function viewOf(seq: number, rows: readonly Row[]): View & Rows {
+/** The `id` a reference names — of the type of a record, which is pinned, `type@n` (KR-07) — or `null` for no reference. */
+function typeIdOf(ref: string): string | null {
+  const parsed = parseRef(ref);
+  return parsed.ok ? parsed.value.id : null;
+}
+
+/** A reference without its fragment, pinned: `id@n` of an entity — a floating one at its current revision — or an event `id`; `null` for none. */
+function pinnedOf(ref: string, current: (id: string) => Record | null): string | null {
+  const parsed = parseRef(ref);
+  if (!parsed.ok) return null;
+  const target = parsed.value;
+  if (target.kind === "event") return target.id;
+  const rev = target.rev ?? current(target.id)?.rev;
+  return rev === undefined ? null : `${target.id}@${rev}`;
+}
+
+/**
+ * `view(seq)`: the rows with `from ≤ seq` and `to` null or greater, and the evidence files the store holds, of which a
+ * view gives only those a commit up to `seq` cited.
+ */
+export function viewOf(seq: number, rows: readonly Row[], files: readonly Evidence[] = []): View & Rows {
   const holding = held(rows, seq);
   const row = (key: string) => holding.get(key) ?? null;
-  // A current row holds the record fold wrote for it (fold.ts).
-  return { seq, row, current: (id) => (row(currentKey(id))?.value as Record | undefined) ?? null };
+  const under = (prefix: string): JsonValue[] => sortRows([...holding.values()].filter((r) => r.key.startsWith(prefix))).map((r) => r.value);
+  // Fold writes these rows (fold.ts): a revision row holds the record, a holder row `{id}`, an edge row its referrer.
+  const record = (key: string) => (row(key)?.value ?? null) as Record | null;
+  const current = (id: string) => record(currentKey(id));
+  // TR-25: a floating reference stands as the current revision it resolves to (RF-02); a pinned one as written.
+  const standing = (ref: string) => {
+    const pinned = pinnedOf(ref, current);
+    return pinned === null ? null : ((row(standingKey(pinned))?.value ?? null) as Standing | null);
+  };
+  return {
+    seq,
+    row,
+    current,
+    latest: (id) => record(latestKey(id)),
+    revision: (id, n) => record(revisionKey(id, n)),
+    referrers: (target, label) => {
+      const prefix = referrersPrefix(target, label);
+      return prefix === null ? [] : (under(prefix) as Referrer[]);
+    },
+    holder: (unique) => {
+      const key = holderKey(unique);
+      return key === null ? null : ((row(key)?.value as { readonly id: string } | undefined)?.id ?? null);
+    },
+    standing,
+    blocks: (types, namespaces) =>
+      (under(KEYS.current) as Record[]).filter((r) => types.some((t) => t === typeIdOf(r.type)) && namespaces.some((n) => n === namespaceOf(r.id))),
+    evidence: (hash) => (row(evidenceKey(hash)) === null ? null : (files.find((f) => f.hash === hash)?.bytes ?? null)),
+  };
 }
 
 /** What `keptRows` gives an adapter: the rows handed on opening, each delta, and `row` and `rows` of the port `store`. */
