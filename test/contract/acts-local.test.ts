@@ -155,4 +155,19 @@ describe("acts-local: the keys of the policy, not of the machine", () => {
     const acts = await actsOf("cr/revoked", (b) => repo.commit(b, approve(HASH), "dev-owner"));
     expect(acts.map((a) => [a.identity, a.verified])).toEqual([[identityOf("dev-owner"), true]]);
   });
+
+  it("TR-16, G-55: a key of the policy the repository's own configuration distrusts still verifies its act — no key of that configuration reaches the check", async () => {
+    const own = signedRepo();
+    try {
+      own.commit("main", "start", null);
+      own.branch("cr/a", "main");
+      own.commit("cr/a", approve(HASH), "dev-owner");
+      own.distrustInRepository("dev-owner");
+      expect(own.machineVerifies("cr/a")).toBe(false);
+      const acts = await createActsLocal(deepFreeze({ dir: own.dir, base: "main", keys: keysOfPolicy() })).read("cr/a");
+      expect(acts.map((a) => [a.identity, a.verified])).toEqual([[identityOf("dev-owner"), true]]);
+    } finally {
+      own.remove();
+    }
+  });
 });

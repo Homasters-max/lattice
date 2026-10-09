@@ -40,7 +40,13 @@ export interface SignedRepo {
   allowOnMachine(key: DevKey): { readonly GIT_CONFIG_GLOBAL: string };
   /** G-55: the machine revokes `key` — its global configuration of git names a revocation file of it; that environment. */
   revokeOnMachine(key: DevKey): { readonly GIT_CONFIG_GLOBAL: string };
-  /** Whether git, with the configuration of the machine, verifies the signature of the commit `rev`. */
+  /**
+   * G-55: the configuration of the repository itself (`.git/config`) distrusts `key` — names a revocation file of it,
+   * a signing program that does not exist and the trust level `ultimate`, any of which fails its check. No commit or
+   * tag is signed in the repository after it.
+   */
+  distrustInRepository(key: DevKey): void;
+  /** Whether git, with the configuration of the machine and of the repository, verifies the signature of the commit `rev`. */
   machineVerifies(rev: string): boolean;
   remove(): void;
 }
@@ -52,6 +58,13 @@ export type SignedRepoOptions = { readonly objectFormat?: "sha1" | "sha256" };
 
 /** The committer of a crafted commit, at SIGNED_AT. */
 const CRAFTER = `dev <dev@lattice.invalid> ${Date.parse(SIGNED_AT.replace(".000000", "")) / 1000} +0000`;
+
+/** G-55: the settings of a repository, each of which fails the check of a key its file `revoked` names. */
+const distrusting = (revoked: string): readonly (readonly [string, string])[] => [
+  ["gpg.ssh.revocationFile", revoked],
+  ["gpg.ssh.program", "no-such-ssh-keygen"],
+  ["gpg.minTrustLevel", "ultimate"],
+];
 
 export function signedRepo({ objectFormat = "sha1" }: SignedRepoOptions = {}): SignedRepo {
   const home: Scratch = scratch("lattice-acts-");
@@ -87,6 +100,7 @@ export function signedRepo({ objectFormat = "sha1" }: SignedRepoOptions = {}): S
     dir,
     allowOnMachine: (key) => onMachine("gpg.ssh.allowedSignersFile", "machine_signers", `* ${publicKeyOf(key)}\n`),
     revokeOnMachine: (key) => onMachine("gpg.ssh.revocationFile", "machine_revoked", `${publicKeyOf(key)}\n`),
+    distrustInRepository: (key) => distrusting(home.write("repo_revoked", `${publicKeyOf(key)}\n`)).forEach(([name, value]) => run(["config", "--local", name, value])),
     machineVerifies: (rev) => git.run(["-C", dir, "verify-commit", rev], { env }).status === 0,
     commit: (branch, message, by) => moved(branch, run([...signer(by), "commit-tree", empty, ...parentOf(branch), by === null ? "--no-gpg-sign" : "-S", "-m", message])),
     crafted: (branch, header, message) => {
