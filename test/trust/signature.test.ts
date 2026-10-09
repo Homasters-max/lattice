@@ -1,9 +1,11 @@
 // Signatures and keys as LATTICE writes them (G-10, TR-10): Ed25519 by
 // `node:crypto` (D-06), checked against RFC 8032 §7.1, test 1; what is signed
-// is the UTF-8 text of a hash (G-24).
+// is the UTF-8 text of a hash (G-24); the key file a participant signs with is
+// an unencrypted OpenSSH file (Q-04).
 import { sign } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { publicKeyOf, signHash, verifyHash } from "../../src/trust/index.js";
+import { isPublicKey, publicKeyOf, readOpenSshKey, signHash, verifyHash } from "../../src/trust/index.js";
+import { owned } from "../support/files.js";
 import { keyOfSeed, testKey } from "../support/keys.js";
 
 // RFC 8032 §7.1, test 1: the empty message.
@@ -77,5 +79,66 @@ describe("spellings that are no signature or key (G-10)", () => {
       "",
     ];
     for (const key of keys) expect(verifyHash("", RFC_SIG, key), key).toBe(false);
+  });
+});
+
+// An OpenSSH key file of ssh-keygen encrypted with a passphrase, and one of an ECDSA key: neither is the key file of
+// Q-04. Generated once for this test; neither key signs anything.
+const ENCRYPTED = `-----BEGIN OPENSSH PRIVATE KEY-----
+b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABBsrRJ3qO
+wvCTljnHbcqLnQAAAAGAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIEZFW50Yfw4Nzxva
+0k2Kb/bHN9+MlKdyvlP1ZAAXZjehAAAAkCaC5Grp+EQBiYi7hndEH7OKo5RayeFMNlSeJL
+N3M8jf8IjZk2qTtyZmjb+ltc33sFK1xfOVh1M4W0nsXRU8kme+1pJiODefcRA+rUjEOg8y
+hmSQnjoSJ6JAanF7/XM3y2iAXfwrribZV3JBdea/GIqNwquBYr7RDhducMy9C4eO5Rc55G
+x1hB4AEg9x7hPd2g==
+-----END OPENSSH PRIVATE KEY-----
+`;
+const ECDSA = `-----BEGIN OPENSSH PRIVATE KEY-----
+b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAaAAAABNlY2RzYS
+1zaGEyLW5pc3RwMjU2AAAACG5pc3RwMjU2AAAAQQR6WolIhFO81NT3P+tBMUfO9oblig51
+MNDQrh127LgEkkSDndsZyn9y7H6vFzwcj/iVUlqkXk3C3Zyr4rv/5t2MAAAAoBRqzqEUas
+6hAAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBHpaiUiEU7zU1Pc/
+60ExR872huWKDnUw0NCuHXbsuASSRIOd2xnKf3Lsfq8XPByP+JVSWqReTcLdnKviu//m3Y
+wAAAAhAMdsa0MTQk/r6xvscgu6dgY5TvtIm+FJvy788NcpLv7sAAAABWVjZHNhAQI=
+-----END OPENSSH PRIVATE KEY-----
+`;
+
+/** The OpenSSH line of a `.pub` file without its comment. */
+const lineOf = (pub: string) => pub.split(" ").slice(0, 2).join(" ");
+
+describe("OpenSSH key files (Q-04)", () => {
+  it("TR-10, Q-04: the dev keys of test/keys are unencrypted Ed25519 OpenSSH files, each the key its .pub names", () => {
+    for (const name of ["dev-owner", "dev-land"]) {
+      const key = readOpenSshKey(owned.text(`test/keys/${name}`));
+      expect(key, name).not.toBeNull();
+      expect(publicKeyOf(key!)).toBe(lineOf(owned.text(`test/keys/${name}.pub`).trim()));
+      expect(isPublicKey(owned.text(`test/keys/${name}.pub`).trim())).toBe(true);
+    }
+  });
+
+  it("TR-11, Q-04: a key read from its file signs as the key itself, with CRLF line ends too", () => {
+    const text = owned.text("test/keys/dev-owner");
+    const key = readOpenSshKey(text.replaceAll("\n", "\r\n"))!;
+    expect(verifyHash(HASH, signHash(HASH, key), lineOf(owned.text("test/keys/dev-owner.pub")))).toBe(true);
+  });
+
+  it("Q-04: an encrypted file, a key that is not Ed25519 and a text that is no key file are no key", () => {
+    const text = owned.text("test/keys/dev-owner");
+    const body = text.split("\n").slice(1, -2).join("");
+    const bytes = Buffer.from(body, "base64");
+    const flipped = Buffer.from(bytes);
+    // The public half of the private pair, the last copy of the public key in the file, flipped: the pair is no longer that key.
+    const raw = Buffer.from(lineOf(owned.text("test/keys/dev-owner.pub")).split(" ")[1]!, "base64").subarray(-32);
+    const at = bytes.lastIndexOf(raw);
+    flipped[at] = (flipped[at] ?? 0) ^ 1;
+    const armored = (b: Buffer) => `-----BEGIN OPENSSH PRIVATE KEY-----\n${b.toString("base64")}\n-----END OPENSSH PRIVATE KEY-----\n`;
+    for (const file of [ENCRYPTED, ECDSA, "", text.replace("OPENSSH", "RSA"), armored(flipped), armored(bytes.subarray(0, 100))]) {
+      expect(readOpenSshKey(file), file).toBeNull();
+    }
+    expect(readOpenSshKey(armored(bytes))).not.toBeNull();
+  });
+
+  it("TR-10: an OpenSSH line names a key; other text does not", () => {
+    expect([isPublicKey(RFC_KEY), isPublicKey(`${RFC_KEY} with a comment`), isPublicKey(`ssh-rsa ${RFC_KEY.slice(12)}`), isPublicKey("")]).toEqual([true, true, false, false]);
   });
 });

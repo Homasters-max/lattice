@@ -1,0 +1,78 @@
+{
+  "check": "session",
+  "input": {
+    "policy": {
+      "owner": "alice",
+      "writers": [
+        {
+          "participant": "alice",
+          "kind": "human",
+          "identities": [
+            "github:alice"
+          ],
+          "keys": [
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHdbHm3SGrugedxix21nrQCJQsF1pIQAheFFod0356F1"
+          ],
+          "roles": [
+            "author"
+          ]
+        },
+        {
+          "participant": "land",
+          "kind": "machine",
+          "keys": [
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFPLvuGDMrkpIv327l5Xet8bwJIZiLX4bun0PfHUgVGD"
+          ],
+          "roles": [
+            "land"
+          ],
+          "grants": [
+            "runner"
+          ]
+        }
+      ]
+    },
+    "proposal": {
+      "session": {
+        "id": "01JB2X00000000000000000SES",
+        "at": "2026-10-06T11:00:00.000000Z",
+        "body": {
+          "participant": "alice",
+          "kind": "human",
+          "role": "author",
+          "purpose": "play",
+          "for": {
+            "reason": "requirement",
+            "requirement": "demo/requirement@1"
+          },
+          "software": "lattice",
+          "version": "0",
+          "certificate": {
+            "key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICfrHwkVc3TDxqfPB512ABrpmYen4arK3SuQt1p9eGFa",
+            "expires": "2026-10-07T11:00:00.000000Z"
+          }
+        }
+      },
+      "intents": [
+        {
+          "op": "entity",
+          "id": "demo/a",
+          "type": "demo/note@1",
+          "expected": null,
+          "at": "2026-10-06T11:30:00.000000Z",
+          "body": {
+            "text": "demo/a"
+          }
+        }
+      ],
+      "sig": null
+    },
+    "certifiedBy": "alice",
+    "signedBy": "session",
+    "at": "2026-10-06T12:00:00.000000Z"
+  },
+  "expect": {
+    "rule": "TR-11",
+    "path": "/session/body/purpose"
+  }
+}

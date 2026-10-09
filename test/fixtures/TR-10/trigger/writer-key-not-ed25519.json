@@ -1,0 +1,27 @@
+{
+  "check": "policy",
+  "input": {
+    "policy": {
+      "owner": "alice",
+      "writers": [
+        {
+          "participant": "alice",
+          "kind": "human",
+          "identities": [
+            "github:alice"
+          ],
+          "keys": [
+            "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ"
+          ],
+          "roles": [
+            "author"
+          ]
+        }
+      ]
+    }
+  },
+  "expect": {
+    "rule": "TR-10",
+    "path": "/writers/0/keys/0"
+  }
+}

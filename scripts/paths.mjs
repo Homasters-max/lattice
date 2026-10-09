@@ -39,8 +39,9 @@ export function testSetOf(path) {
 // What a test set reads at run time beyond its folder test/<set>/ (ST-18; G-30): the files of the repository it checks
 // as data. A fitness test set checks the whole repository on every change request, so it owns every file.
 const OWNS = {
-  // bin.test.ts builds src/ into the bin with tsconfig.build.json and reads the bin of package.json.
-  cli: ["src/", "package.json", "tsconfig.json", "tsconfig.build.json"],
+  // bin.test.ts builds src/ into the bin with tsconfig.build.json and reads the bin of package.json; session.test.ts
+  // issues sessions with the dev keys (Q-04).
+  cli: ["src/", "package.json", "tsconfig.json", "tsconfig.build.json", "test/keys/"],
   // form.test.ts and imports.test.ts audit the files of src/ through repoTree of test/structure/tree.ts; import.test.ts
   // checks the bodies it imports against the types of std/ (S0-26).
   codec: ["src/", "package.json", "package-lock.json", "std/"],
@@ -50,6 +51,8 @@ const OWNS = {
   ledger: ["std/"],
   // budget.test.ts reads every test file for the budget of its properties.
   support: ["test/"],
+  // signature.test.ts reads the dev keys as OpenSSH files (Q-04).
+  trust: ["test/keys/"],
   // the tests of the tools run them on copies of the plan and check the documents of the loop against them, and
   // that every file those documents name exists.
   tools: ["plan/", "scripts/", "discussion/tools/", ".claude/", "AGENTS.md", "CONVENTIONS.md", "test/structure/skeleton-files.txt", "test/support/assembly.ts"],

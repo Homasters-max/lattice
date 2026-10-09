@@ -1,0 +1,15 @@
+{
+  "check": "policy",
+  "input": {
+    "policy": {
+      "owner": "alice",
+      "admins": [
+        "bob"
+      ]
+    }
+  },
+  "expect": {
+    "rule": "TR-02",
+    "path": "/admins"
+  }
+}
