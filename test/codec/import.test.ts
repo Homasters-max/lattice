@@ -211,6 +211,33 @@ describe("blocks (RM-Z03, LG-42)", () => {
   });
 });
 
+/** A document whose blocks mention an ID again: in the text and its list, twice in a cell, alone and in a range. */
+const REPEATS = md(
+  "# Doc",
+  "",
+  "KR-Z01. See KR-Z03, then KR-Z02 and KR-Z03 again:",
+  "",
+  "- KR-Z02 once more",
+  "",
+  "| ID | Rule |",
+  "|---|---|",
+  "| KR-01 | KR-03, KR-03 and KR-02…KR-03 |",
+  "| KR-02 | x |",
+  "| KR-03 | x |",
+  "",
+  "KR-Z02. x",
+  "",
+  "KR-Z03. y",
+);
+
+describe("refs (RM-Z03, G-45)", () => {
+  it("RM-Z03, G-45: an ID mentioned again — in one cell, in the text and its field, alone and in a range — is one ref, the refs sorted", () => {
+    const intents = imported({ "02-kernel.md": REPEATS });
+    expect(refsOf(bodyOf(intents, "lattice/kr-z01") ?? null)).toEqual(["lattice/kr-z02", "lattice/kr-z03"]);
+    expect(refsOf(bodyOf(intents, "lattice/kr-01") ?? null)).toEqual(["lattice/kr-02", "lattice/kr-03"]);
+  });
+});
+
 describe("sections and ids (RM-Z03, Q-02)", () => {
   const doc = md("# 00. Read Me", "", "RM-Z01. Intro.", "", "## Rules", "", "| ID | Rule |", "|---|---|", "| RM-01 | One. |", "", "### — Deep, deeper —", "", "RM-Z02. Deep.", "", "## Later", "", "RM-Z03. Last.");
 
