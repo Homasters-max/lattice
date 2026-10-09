@@ -110,40 +110,41 @@ describe("the corpus: docs/design imported into one proposal (S0-26)", () => {
   });
 
   it("RM-Z03: the clause LG-42 has its cells by column slug, its field table and the IDs it mentions", () => {
-    const body = bodyOf(design(), "lattice/lg-42");
-    expect(isJsonObject(body) && Array.isArray(body.cells) && body.cells[0]).toEqual({ column: "id", text: "LG-42" });
-    expect(isJsonObject(body) && Array.isArray(body.cells) && isJsonObject(body.cells[1] ?? null) && body.cells[1]?.column).toBe("rule");
-    expect(isJsonObject(body) && isJsonObject(body.table ?? null) && body.table?.header).toEqual(["`md`", "Block"]);
-    expect(refsOf(body ?? null)).toContain("lattice/rm-z03");
+    const body = bodyOf(design(), "lattice/lg-42") ?? null;
+    expect(body).toMatchObject({ cells: [{ column: "id", text: "LG-42" }, { column: "rule" }], table: { header: ["`md`", "Block"] } });
+    expect(refsOf(body)).toContain("lattice/rm-z03");
   });
 });
 
+/** A document with a block of each kind, a field of each kind, ranges and an ID in inline code. */
+const KERNEL = md(
+  "# 02. Kernel",
+  "",
+  "KR-Z01. The record is KR-04…KR-13, as KR-Z01 says; `KR-20` is text.",
+  "",
+  "## (Canon) and Hash!",
+  "",
+  "| ID | Rule (short) |",
+  "|---|---|",
+  "| KR-01 | One, see KR-02. |",
+  "| KR-02 | Two, from KR-03…KR-01: |",
+  "",
+  "| `md` | Block |",
+  "|---|---|",
+  "| a row | KR-Z02 |",
+  "",
+  "```json KR-Z02",
+  "{ \"see\": \"KR-01\" }",
+  "```",
+  "",
+  "KR-Z03. A list:",
+  "",
+  "- first, KR-Z01",
+  "- second",
+);
+
 describe("blocks (RM-Z03, LG-42)", () => {
-  const doc = md(
-    "# 02. Kernel",
-    "",
-    "KR-Z01. The record is KR-04…KR-13, as KR-Z01 says; `KR-20` is text.",
-    "",
-    "## (Canon) and Hash!",
-    "",
-    "| ID | Rule (short) |",
-    "|---|---|",
-    "| KR-01 | One, see KR-02. |",
-    "| KR-02 | Two, from KR-03…KR-01: |",
-    "",
-    "| `md` | Block |",
-    "|---|---|",
-    "| a row | KR-Z02 |",
-    "",
-    "```json KR-Z02",
-    "{ \"see\": \"KR-01\" }",
-    "```",
-    "",
-    "KR-Z03. A list:",
-    "",
-    "- first, KR-Z01",
-    "- second",
-  );
+  const doc = KERNEL;
 
   it("RM-Z03: a paragraph with an ID is prose — its text verbatim, the IDs it mentions as refs; a range gives each of its IDs", () => {
     const body = bodyOf(imported({ "02-kernel.md": doc }), "lattice/kr-z01");
