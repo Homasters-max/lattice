@@ -55,7 +55,7 @@ describe("namespace policy (TR-02)", () => {
     expect(refusals({ owner: "alice", writers: {} })).toEqual([["TR-02", "/writers"]]);
   });
 
-  it("TR-02, TR-07: refuses a writer entry out of its form, with every other entry read", () => {
+  it("TR-02: refuses a writer entry out of its form, with every other entry read", () => {
     const writers = [{ participant: "bob", kind: "robot" }, "carol", { participant: "dan", kind: "human", keys: ["ssh-rsa AAAA"] }];
     expect(refusals({ owner: 1, writers })).toEqual([
       ["TR-02", "/owner"],
@@ -67,6 +67,11 @@ describe("namespace policy (TR-02)", () => {
 });
 
 describe("writer entries (TR-09, TR-10)", () => {
+  it("TR-07: a writer entry is of a participant of kind human, agent or machine", () => {
+    const kinds = ["human", "agent", "machine", "robot", "Human"].map((kind) => refusals({ owner: "alice", writers: [{ participant: "p", kind }] }));
+    expect(kinds).toEqual([[], [], [], [["TR-02", "/writers/0/kind"]], [["TR-02", "/writers/0/kind"]]]);
+  });
+
   it("TR-09: an identity is github:<login>, gitlab:<user> or ssh:<key fingerprint>", () => {
     const writer = (identities: string[]) => ({ owner: "alice", writers: [{ participant: "alice", kind: "human", identities }] });
     expect(refusals(writer(["github:alice", "gitlab:alice", FINGERPRINT]))).toEqual([]);
@@ -103,18 +108,18 @@ function beforeOf(records: { readonly [id: string]: JsonValue }): Before {
 }
 
 describe("namespaces and owners (TR-01, TR-05)", () => {
-  it("TR-01, KR-06: the namespace of an entity is the prefix of its id; an event id has none", () => {
+  it("TR-01: the namespace of an entity is the prefix of its id (KR-06); an event id has none", () => {
     expect([namespaceOf("demo/a"), namespaceOf("std/namespace"), namespaceOf("01JB2X00000000000000000SES")]).toEqual(["demo", "std", null]);
     expect(namespaceId("demo")).toBe("demo/namespace");
   });
 
-  it("TR-01, TR-06: the policy of a namespace is the body of its namespace entity in before; none where before holds none", () => {
+  it("TR-01: the policy of a namespace is the body of its namespace entity in before; none where before holds none", () => {
     const before = beforeOf({ "demo/namespace": FULL });
     expect(policyOf(before, "demo", ROOT)).toEqual({ ok: true, value: FULL });
     expect(policyOf(before, "other", ROOT)).toEqual({ ok: true, value: null });
   });
 
-  it("TR-05, GL-07: the owner of an entity is the owner of its namespace — of a type, a contract, any entity of it", () => {
+  it("TR-05: the owner of an entity is the owner of its namespace — of a type, a contract, any entity of it", () => {
     const before = beforeOf({ "demo/namespace": FULL, "team/namespace": { owner: "bob" } });
     expect(["demo/a", "demo/note", "team/contract", "other/a", "01JB2X00000000000000000SES"].map((id) => ownerOf(before, id, ROOT))).toEqual([
       { ok: true, value: "alice" },
@@ -123,6 +128,13 @@ describe("namespaces and owners (TR-01, TR-05)", () => {
       { ok: true, value: null },
       { ok: true, value: null },
     ]);
+  });
+
+  it("GL-07: the owner of a namespace is the participant its policy names — the human writer whose act is an owner act (TR-17)", () => {
+    const before = beforeOf({ "demo/namespace": FULL });
+    const owner = ownerOf(before, "demo/a", ROOT);
+    expect(owner).toEqual({ ok: true, value: "alice" });
+    expect(FULL.writers.find((w) => w.participant === (owner.ok ? owner.value : null))?.kind).toBe("human");
   });
 
   it("TR-02: the owner of a namespace whose policy is out of its form is not read", () => {
