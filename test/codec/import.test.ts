@@ -9,7 +9,7 @@ import type { Intent } from "../../src/ledger/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 import { knowledge, repoRoot } from "../support/files.js";
 import { program } from "../support/program.js";
-import { std } from "../ledger/std-sources.js";
+import { parentsOf, std } from "../ledger/std-sources.js";
 
 const AT = "2026-10-09T12:00:00.000000Z";
 const md = (...lines: string[]): string => `${lines.join("\n")}\n`;
@@ -75,7 +75,7 @@ function modelCount(s: Section): { clause: number; prose: number; example: numbe
 const refsOf = (body: JsonValue): readonly JsonValue[] => (isJsonObject(body) && Array.isArray(body.refs) ? (body.refs as readonly JsonValue[]) : []);
 
 describe("the corpus: docs/design imported into one proposal (S0-26)", () => {
-  it("LG-42, RM-07: every file of docs/design is imported into the intents of one proposal without a refusal", () => {
+  it("LG-42, RM-07, SL-02: the first corpus — every file of docs/design — is imported into the intents of one proposal without a refusal", () => {
     const intents = design();
     expect(intents.length).toBeGreaterThan(FILES.length);
     expect(new Set(intents.map((i) => i.id)).size).toBe(intents.length);
@@ -107,6 +107,17 @@ describe("the corpus: docs/design imported into one proposal (S0-26)", () => {
   it("TY-Z03, G-01: the body of every intent passes the check of its type of std (S0-08)", () => {
     const refused = design().flatMap((i) => rejectionsOf(checkAgainstType(deepFreeze({ type: i.type, rev: 1, body: i.body }), std().resolve, ROOT)).map((r) => [i.id, r.rule, r.path]));
     expect(refused).toEqual([]);
+  });
+
+  it("GL-01, GL-02: every block imported is a content block — of a type that extends knowledge or composition", () => {
+    const types = [...new Set(design().map((i) => i.type))].sort();
+    const bases = types.map((t) => [t, parentsOf(/^std\/(.+)@1$/.exec(t)?.[1] ?? "").at(-1)]);
+    expect(bases).toEqual([
+      ["std/clause@1", "knowledge"],
+      ["std/example@1", "knowledge"],
+      ["std/prose@1", "knowledge"],
+      ["std/section@1", "composition"],
+    ]);
   });
 
   it("RM-Z03: the clause LG-42 has its cells by column slug, its field table and the IDs it mentions", () => {

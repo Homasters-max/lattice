@@ -32,3 +32,4 @@ rules: [SL-01, SL-02, SL-03, SL-04, SL-07, LG-37, LG-51, ST-12, RM-06]
 - [ ] round-trip и rebuild — отдельные задания CI; ночное задание настроено
 - [ ] отчёт трассируемости S0 приложен к PR
 - [ ] раздел 9 плана отражает, какие условия SL-03 закрыты
+- [ ] proposal импорта `docs/design` (`importMd`, S0-26) проходит `land --dry-run` на store с `std` (перенесено из [S0-26](S0-26-codec-import.md))
