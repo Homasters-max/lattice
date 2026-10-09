@@ -43,5 +43,6 @@ rules: [LG-42, RM-07, GL-01, GL-02, PR-14, RM-03, SL-02, KR-10]
 ## Готово, когда
 
 - [ ] весь `docs/design` импортируется в один proposal без отказов
-- [ ] proposal проходит `land --dry-run` на store с `std` (после S0-24 — в S0-29) — перенесён в [S0-29](S0-29-e2e-acceptance.md): store с `std` появится с S0-24; до него тела проверены по типам `std` в `test/codec/import.test.ts`
 - [ ] id документов и секций и `column` клеток — по RM-Z03
+
+Перенесено в [S0-29](S0-29-e2e-acceptance.md) с согласия владельца (2026-10-09, PR #59): «proposal проходит `land --dry-run` на store с `std`» — store с `std` появится только с S0-24; до него тела проверены по типам `std` в `test/codec/import.test.ts`.
