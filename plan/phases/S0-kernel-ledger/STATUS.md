@@ -40,7 +40,7 @@
 | [S0-13](tasks/S0-13-apply-core.md) | Apply — каркас, кандидат, before/after, фазы 1–3 | F | ⬜ | | |
 | [S0-14](tasks/S0-14-standing.md) | Standing — basis, in force, use, факты | F | ⬜ | | |
 | [S0-15](tasks/S0-15-phase4-references.md) | Фаза 4 — ссылки, метки, фрагменты, memo, уникальность | F | ⬜ | | |
-| [S0-16](tasks/S0-16-namespace-sessions.md) | Namespace, policy, участники, сессии, сертификаты и команда session | F | ⬜ | | |
+| [S0-16](tasks/S0-16-namespace-sessions.md) | Namespace, policy, участники, сессии, сертификаты и команда session | F | ✅ | [#58](https://github.com/Homasters-max/lattice/pull/58) | |
 | [S0-17](tasks/S0-17-phase5-authority.md) | Фаза 5 — полномочия, acts, floor и act requirements | F | ⬜ | | |
 | [S0-18](tasks/S0-18-phase6-evolution.md) | Фаза 6 — эволюция типов и контрактов, identity, migrate | F | ⬜ | | |
 | [S0-19](tasks/S0-19-acts-port.md) | Порт acts — адаптеры local, init, fixture, recorded | G | ⬜ | | |

@@ -1,0 +1,19 @@
+{
+  "check": "policy",
+  "input": {
+    "policy": {
+      "owner": "alice",
+      "writers": [
+        {
+          "participant": "alice",
+          "kind": "human",
+          "identities": [
+            "github:alice",
+            "gitlab:alice",
+            "ssh:SHA256:uNiVztksCsDhcc0u9e8BujQXVUpKZIDTMczCvj3tD2s"
+          ]
+        }
+      ]
+    }
+  }
+}
