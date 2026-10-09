@@ -6,7 +6,7 @@
 // certificate, to the signature of the proposal by the session key (LG-10).
 import { describe, expect, it } from "vitest";
 import { reject, ROOT, type JsonValue, type ResolveType } from "../../src/kernel/index.js";
-import { createView, NO_FACTS, openLines, readProposal, encodeCommit, signProposal, verifyProposal, type Proposal } from "../../src/ledger/index.js";
+import { commitLine, createView, NO_FACTS, openLines, readProposal, signProposal, verifyProposal, type Proposal } from "../../src/ledger/index.js";
 import {
   certificateHash,
   issueSession,
@@ -23,7 +23,7 @@ import {
   type UnsignedSession,
 } from "../../src/trust/index.js";
 import { std } from "../ledger/std-sources.js";
-import { landedChain } from "../support/chain.js";
+import { keyOfLand, landedChain } from "../support/chain.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 import { testKey } from "../support/keys.js";
 
@@ -285,9 +285,9 @@ describe("policy from before (TR-06)", () => {
   it("TR-06: a change of policy applies from the commit after the one that lands it", () => {
     const v1 = { owner: "alice", writers: [{ participant: "alice", kind: "human", keys: [MALLORY.publicKey], roles: ["author"] }] };
     const v2 = { owner: "alice", writers: [{ participant: "alice", kind: "human", keys: [ALICE.publicKey], roles: ["author"] }] };
-    const lines = landedChain([namespaceProposal(v1, null), namespaceProposal(v2, 1)]).map((c) => new TextEncoder().encode(encodeCommit(c)));
+    const lines = landedChain([namespaceProposal(v1, null), namespaceProposal(v2, 1)]).map(commitLine);
     const viewAt = (n: number) => {
-      const opened = openLines(lines.slice(0, n));
+      const opened = openLines(lines.slice(0, n), keyOfLand);
       if (!opened.ok) throw new Error("bug: the chain of this test opens");
       return opened.value.view;
     };
