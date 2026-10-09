@@ -204,10 +204,13 @@ describe("store port: every adapter alike (LG-03)", () => {
     for (const { make } of ADAPTERS) {
       const store = make();
       await appended(store, CHAIN);
-      seen.push(await answers(store));
+      // The rows the deltas of the appends left, before opening hands the folded rows in their place (LG-02).
+      const kept = [await all(store.rows("")), await store.row("current:demo/a")];
+      seen.push({ kept, ...(await answers(store)) });
     }
     const [first, ...rest] = seen;
     expect(first?.commits).toEqual(CHAIN.map(commitLine));
+    expect(first?.kept).toEqual([first?.rows, first?.row]);
     expect(first?.row).toMatchObject({ key: "current:demo/a", from: 3, to: null });
     expect(first?.evidence).toEqual([EVIDENCE.bytes, null]);
     for (const other of rest) expect(other).toEqual(first);
