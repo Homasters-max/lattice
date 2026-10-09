@@ -171,7 +171,7 @@ describe("namespaces and owners (TR-01, TR-05)", () => {
     ]);
   });
 
-  it("GL-07: the owner of a namespace is the participant its policy names; that the owner is human is checked with owner acts (S0-17)", () => {
+  it("GL-07, G-48: the owner of a namespace is the participant its policy names; that the owner is human is checked with owner acts (S0-17)", () => {
     expect(ownerOf(beforeOf({ "demo/namespace": FULL }), "demo/a", ROOT)).toEqual({ ok: true, value: "alice" });
   });
 
