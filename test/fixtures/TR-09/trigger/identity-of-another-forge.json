@@ -10,12 +10,6 @@
           "identities": [
             "github:alice",
             "bitbucket:alice"
-          ],
-          "keys": [
-            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHdbHm3SGrugedxix21nrQCJQsF1pIQAheFFod0356F1"
-          ],
-          "roles": [
-            "author"
           ]
         }
       ]

@@ -7,14 +7,8 @@
         {
           "participant": "alice",
           "kind": "human",
-          "identities": [
-            "github:alice"
-          ],
           "keys": [
             "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ"
-          ],
-          "roles": [
-            "author"
           ]
         }
       ]
