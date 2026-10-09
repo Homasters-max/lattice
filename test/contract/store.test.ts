@@ -117,6 +117,15 @@ describe.each(ADAPTERS)("store port: $name", ({ make }) => {
     expect(await store.row("missing")).toBeNull();
   });
 
+  it("ST-07: keeps the evidence a commit cites, byte for byte", async () => {
+    const store = make();
+    await store.append({ commit: utf8("1\n"), delta: [], evidence: [EVIDENCE] });
+    expect(await store.evidence(EVIDENCE.hash)).toEqual(EVIDENCE.bytes);
+    expect(await store.evidence(hashBytes(utf8("none")))).toBeNull();
+  });
+});
+
+describe.each(ADAPTERS)("the rows a store keeps: $name (LG-02, LG-35)", ({ make }) => {
   it("LG-35: a row a delta closes without opening another holds no more — gone from row and rows", async () => {
     const store = make();
     await store.append({ commit: utf8("1\n"), delta: [row("current:a", 1), row("current:b", 1)], evidence: [] });
@@ -145,13 +154,6 @@ describe.each(ADAPTERS)("store port: $name", ({ make }) => {
     await store.keep(deepFreeze([row("current:b", 1), row("current:a", 2, null), row("current:a", 1, 2)]));
     expect(await store.row("current:x")).toBeNull();
     expect((await all(store.rows(""))).map((r) => [r.key, r.from])).toEqual([["current:a", 2], ["current:b", 1]]);
-  });
-
-  it("ST-07: keeps the evidence a commit cites, byte for byte", async () => {
-    const store = make();
-    await store.append({ commit: utf8("1\n"), delta: [], evidence: [EVIDENCE] });
-    expect(await store.evidence(EVIDENCE.hash)).toEqual(EVIDENCE.bytes);
-    expect(await store.evidence(hashBytes(utf8("none")))).toBeNull();
   });
 });
 
@@ -278,8 +280,7 @@ describe("store-jsonl", () => {
     const own = fresh();
     own.write("store/knowledge.jsonl", "x\n");
     const store = createStoreJsonl({ dir: own.dir });
-    // The last names store/knowledge.jsonl, which is there, were any digits after `:` taken for a file name.
-    const paths = ["../knowledge", "sha256:../../store/knowledge", "sha256:x/../../knowledge"];
-    expect(await Promise.all(paths.map((p) => store.evidence(p)))).toEqual([null, null, null]);
+    // The last names store/knowledge.jsonl, which is there, were whatever follows `:` taken for a file name.
+    expect(await Promise.all(["../knowledge", "sha256:../../store/knowledge", "sha256:x/../../knowledge"].map((p) => store.evidence(p)))).toEqual([null, null, null]);
   });
 });
