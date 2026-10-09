@@ -41,7 +41,7 @@ const MENTION = /\b([A-Z]{2})-(Z?)(\d{2})(?:…\1-\2(\d{2}))?\b/g;
 /** RM-Z03: an ID inside inline code is text, not a reference. */
 const INLINE_CODE = /`[^`]*`/g;
 
-/** Every ID of a range, from its lower end to its higher, whichever is written first. */
+/** RM-Z03, G-45: every ID of a range, from its lower end to its higher, whichever is written first. */
 function rangeOf(stem: string, from: number, to: number): string[] {
   const low = Math.min(from, to);
   return Array.from({ length: Math.abs(to - from) + 1 }, (_, k) => `${stem}${String(low + k).padStart(2, "0")}`);
@@ -54,7 +54,7 @@ function rangeOf(stem: string, from: number, to: number): string[] {
 const mentioned = (text: string): string[] =>
   [...text.replace(INLINE_CODE, " ").matchAll(MENTION)].flatMap(([id, prefix, z, from, to]) => (to === undefined ? [id] : rangeOf(`${prefix}-${z}`, Number(from), Number(to))));
 
-/** The text of a block that may mention IDs: its cells or its paragraph — an example's text is never parsed — and its field. */
+/** RM-Z03, G-45: the text of a block that may mention IDs: its cells or its paragraph — an example's text is never parsed — and its whole field. */
 function textOf(block: Block): readonly string[] {
   const own = block.type === "clause" ? block.cells : block.type === "prose" ? [block.text] : [];
   const field = block.table !== undefined ? [...block.table.header, ...block.table.rows.flat()] : (block.list ?? []);
@@ -85,6 +85,7 @@ function blockBody(block: Block, header: readonly string[]): JsonObject {
   return { ...own, ...field, ...(refs.length === 0 ? {} : { refs }) };
 }
 
+/** RM-Z03: a block is the entity of its ID, of the type of std of its kind; `header` names the cells of a clause. */
 function blockOf(block: Block, header: readonly string[]): Written {
   const id = idOf(block);
   return { id: entityOf(id), type: TYPES[block.type], body: blockBody(block, header), block: id };
@@ -97,7 +98,7 @@ function itemsOf(item: Item, document: string): JsonValue[] {
   return [{ item: "table", header: item.header }, ...item.rows.map((row) => ({ item: "block", ref: entityOf(idOf(row)) }))];
 }
 
-/** A section and, in document order, everything it holds: its blocks, the rows of its tables, its subsections. */
+/** LG-42, RM-Z03: a section and, in document order, everything it holds: its blocks, the rows of its tables, its subsections. */
 function sectionWritten(section: Section, id: string, document: string): Written[] {
   const own: Written = { id, type: TYPES.section, body: { heading: section.heading, level: section.level, items: section.items.flatMap((i) => itemsOf(i, document)) }, block: null };
   const inner = section.items.flatMap((item): Written[] => {
