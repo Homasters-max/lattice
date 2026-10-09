@@ -39,13 +39,23 @@ function requestOf(o: Options): Omit<SessionRequest, "participantKey"> | null {
 const STATE = ".lattice";
 const KEY_PATH = "participant-key";
 
-/** Q-04: the key file named by `--key`, or the one the last session named in `.lattice/`; `null` for none. */
-function keyFile(cwd: string, key: string | undefined): string | null {
+/** Whether a failure of the file system is that the file is not there. */
+const isMissing = (e: unknown) => e instanceof Error && "code" in e && e.code === "ENOENT";
+
+/**
+ * Q-04: the key file named by `--key`, or the one the last session named in `.lattice/`; `null` for none — no such
+ * file, or an empty one; `undefined`, the reason printed, where that file is there but cannot be read: a failure of
+ * the outside world is no "no key".
+ */
+function keyFile(cwd: string, key: string | undefined, err: Print): string | null | undefined {
   if (key !== undefined) return resolve(cwd, key);
+  const path = join(cwd, STATE, KEY_PATH);
   try {
-    return readFileSync(join(cwd, STATE, KEY_PATH), "utf8").trim() || null;
-  } catch {
-    return null;
+    return readFileSync(path, "utf8").trim() || null;
+  } catch (e) {
+    if (isMissing(e)) return null;
+    err(`lattice session: cannot read ${path}, the path of the last key file (Q-04)\n`);
+    return undefined;
   }
 }
 
@@ -93,7 +103,8 @@ export function sessionCommand(args: readonly string[], reach: Reach): Promise<n
     reach.err("lattice session: no store is configured — store/lattice.json arrives with plan task S0-23\n");
     return Promise.resolve(2);
   }
-  const file = keyFile(reach.cwd, options.key);
+  const file = keyFile(reach.cwd, options.key, reach.err);
+  if (file === undefined) return Promise.resolve(2);
   if (file === null) {
     reach.err("lattice session: no key — give --key <file>, the unencrypted OpenSSH private key of the participant (Q-04)\n");
     return Promise.resolve(2);

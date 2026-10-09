@@ -103,6 +103,11 @@ describe("lattice session that does not start a session", () => {
     // An empty file of the path names no key file either.
     home.write(".lattice/participant-key", "\n");
     expect((await lattice("session", "--participant", "alice", "--role", "author")).err).toBe(noKey);
+    // A path file that is there but cannot be read is no "no key": the command says so.
+    home.remove(".lattice/participant-key");
+    home.write(".lattice/participant-key/inside", "\n");
+    const unread = await lattice("session", "--participant", "alice", "--role", "author");
+    expect([unread.code, unread.err]).toEqual([2, `lattice session: cannot read ${home.path(".lattice/participant-key")}, the path of the last key file (Q-04)\n`]);
   });
 
   it("RT-32: asks for the participant and the role, and takes each option once", async () => {
