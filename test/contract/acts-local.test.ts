@@ -75,15 +75,15 @@ const MAGIC = [..."SSHSIG"].map((c) => c.charCodeAt(0));
 
 describe("acts-local: what signs an act", () => {
   it("TR-14: a signature that holds no SSH key — of GPG, of another format, its key missing or cut short — makes no act", async () => {
+    const key = [...Buffer.from(publicKeyOf("dev-owner").split(" ")[1] ?? "", "base64")];
     const signatures = [
       "-----BEGIN PGP SIGNATURE-----\niQ==\n-----END PGP SIGNATURE-----",
-      sshSignature([..."NOTSIG".split("").map((c) => c.charCodeAt(0)), ...new Array<number>(40).fill(1)]),
+      sshSignature([..."NOTSIG".split("").map((c) => c.charCodeAt(0)), 0, 0, 0, 1, 0, 0, 0, key.length, ...key]),
       sshSignature([...MAGIC, 0, 0, 0, 1]),
       sshSignature([...MAGIC, 0, 0, 0, 1, 0, 0, 0, 0, ...new Array<number>(10).fill(1)]),
       sshSignature([...MAGIC, 0, 0, 0, 1, 0, 0, 3, 232, 1, 2, 3, 4, 5]),
     ];
     // The one that holds the key of `dev-owner` names it, though git verifies no signature of it.
-    const key = [...Buffer.from(publicKeyOf("dev-owner").split(" ")[1] ?? "", "base64")];
     const named = sshSignature([...MAGIC, 0, 0, 0, 1, 0, 0, 0, key.length, ...key, 0, 0, 0, 3, 103, 105, 116]);
     const acts = await actsOf("cr/crafted", (b) => [...signatures, named].forEach((s) => repo.crafted(b, gpgsig(s), approve(HASH))));
     expect(acts.map((a) => [a.identity, a.verified])).toEqual([[identityOf("dev-owner"), false]]);
