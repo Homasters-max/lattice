@@ -66,6 +66,15 @@ describe("the projections of S0 (LG-34, LG-35)", () => {
     expect(pairs(STORE.view.referrers("demo/a"))).toEqual([[EVENT, "/of", "about"]]);
   });
 
+  it("RF-09: referrers answer who points at an event — a reference to it by its id", () => {
+    const store = opened([proposalOf(...TYPES, note("demo/a")), proposalOf(seen(EVENT, "demo/a")), proposalOf(note("demo/b", { parent: { to: EVENT } }))]);
+    expect([pairs(store.view.referrers(EVENT)), store.view.referrers(EVENT).map((r) => r.ref), pairs(store.viewAt(2)!.referrers(EVENT))]).toEqual([
+      [["demo/b@1", "/parent/to", null]],
+      [EVENT],
+      [],
+    ]);
+  });
+
   it("RF-09: a referrer that names a label no edge has, or a target nothing points at, has none", () => {
     expect([STORE.view.referrers("demo/c", "about"), STORE.view.referrers("demo/z"), STORE.view.referrers("demo/c", null)]).toEqual([[], [], []]);
   });

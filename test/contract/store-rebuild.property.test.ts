@@ -1,8 +1,8 @@
-// LG-37, LG-39: folding every commit from genesis gives the same bytes as the
-// rows accumulated commit by commit — on random sequences of landed commits,
-// each appended to a store with the delta landing folds for it on the store
-// at its tail, on every adapter of `store`; and a view at any `seq` of the
-// rebuild answers as the store of the commits up to it (LG-41).
+// ST-07, LG-37, LG-39: folding every commit from genesis gives the same bytes
+// as the rows accumulated commit by commit — on random sequences of
+// landed commits, each appended to the store with the delta landing folds for
+// it on the store at its tail, on every adapter of `store`; and a view at any
+// `seq` of the rebuild answers as the store of the commits up to it (LG-41).
 import fc from "fast-check";
 import { afterAll, describe, expect, it } from "vitest";
 import { createStoreJsonl } from "../../src/adapters/store-jsonl/index.js";
@@ -95,9 +95,9 @@ describe("rebuild equals the accumulated rows (LG-37, LG-39)", () => {
         const store = make();
         let accumulated: readonly Row[] = [];
         for (const [i, c] of commits.entries()) {
-          const delta = fold(prefix(commits, i).view, deepFreeze(c), []);
+          const delta = deepFreeze(fold(prefix(commits, i).view, deepFreeze(c), []));
           accumulated = withDelta(accumulated, delta);
-          await store.append({ commit: commitLine(c), delta, evidence: [] });
+          await store.append({ commit: commitLine(c), delta, evidence: deepFreeze([]) });
         }
         const kept = await all(store.rows(""));
         // Rebuilt: the lines folded from genesis, the store opened again on them.
