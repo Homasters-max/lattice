@@ -3,7 +3,7 @@
 // (LG-05, G-14) and signed by the key of the land session (LG-06). Everything
 // goes through public functions of the ledger; no commit is built by hand.
 import type { JsonValue } from "../../src/kernel/index.js";
-import { apply, chainTo, encodeCommit, openLines, readProposal, signCommit, type Commit, type KeyOfSession, type LandActs } from "../../src/ledger/index.js";
+import { apply, chainTo, commitLine, openLines, readProposal, signCommit, type Commit, type KeyOfSession, type LandActs } from "../../src/ledger/index.js";
 import { testKey } from "./keys.js";
 
 /** The land session of a chain: apply takes the commit's `by` and `at` from it (LG-22); its key is the test key `land`. */
@@ -14,11 +14,9 @@ export const LAND_KEY = testKey("land");
 /** The keys of sessions a chain knows: the land session's. */
 export const keyOfLand: KeyOfSession = (session) => (session === LAND.session.id ? LAND_KEY.publicKey : null);
 
-const lineOf = (c: Commit) => new TextEncoder().encode(encodeCommit(c));
-
 /** One more commit: the proposal applied on the store of `commits`, chained to its tail and signed. */
 function next(commits: readonly Commit[], value: JsonValue): Commit {
-  const opened = openLines(commits.map(lineOf));
+  const opened = openLines(commits.map(commitLine), keyOfLand);
   if (!opened.ok) throw new Error("bug: the commits of a chain open as a store");
   const read = readProposal(value);
   const out = read.ok ? apply(opened.value.view, read.value, LAND, []) : read;

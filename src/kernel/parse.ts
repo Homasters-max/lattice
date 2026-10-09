@@ -8,7 +8,7 @@
 // depth of nesting overflows, and the values it gives are frozen.
 import { numberRejections, stringRejections } from "./canon.js";
 import { hashBytes } from "./hash.js";
-import { pointer, type JsonValue } from "./json.js";
+import { pointer, serialize, type JsonValue } from "./json.js";
 import { refuse, refused, reject, ROOT, type Place, type Rejection, type Result } from "./rejection.js";
 import { KR_10 } from "./rules.js";
 
@@ -209,4 +209,35 @@ export function parseJson(text: string, place: Place = ROOT): Result<JsonValue> 
 export function parseJsonBytes(bytes: Uint8Array, place: Place = ROOT): Result<JsonValue> {
   const text = decodeUtf8(bytes, place);
   return text.ok ? parseJson(text.value, place) : text;
+}
+
+/**
+ * KR-10: the value of bytes that are its canonical form (RFC 8785), with those bytes — refused at the place the caller
+ * names as `parseJsonBytes` refuses (a byte order mark among them: the decode keeps it, the parse refuses it), and as a
+ * whole when they are other bytes of the same value (a carriage return, spaces, another order of keys): never
+ * repaired. What it gives is known canonical, so its holder keeps the bytes and never encodes the value again to
+ * compare. Bytes are no JSON value: the refusal names the canonical bytes and the bytes given by their hashes
+ * (CONVENTIONS.md §3.3).
+ */
+export function parseCanonical(bytes: Uint8Array, place: Place = ROOT): Result<{ readonly value: JsonValue; readonly bytes: Uint8Array }> {
+  const text = decodeUtf8(bytes, place);
+  if (!text.ok) return text;
+  const value = parseJson(text.value, place);
+  if (!value.ok) return value;
+  // The parse admits only I-JSON in NFC, so the value has a canonical text; UTF-8 is one to one on such text.
+  const canonical = serialize(value.value);
+  if (text.value === canonical) return { ok: true, value: { value: value.value, bytes } };
+  return refuse(reject(KR_10, { ...place, expected: hashBytes(new TextEncoder().encode(canonical)), got: hashBytes(bytes) }));
+}
+
+const LF = 0x0a;
+
+/**
+ * KR-10, G-17: the value of a line — canonical bytes and a line feed — with those bytes, refused at the place the
+ * caller names as `parseCanonical` refuses. A line without its line feed is cut — its write did not end — and is
+ * refused as a whole, named by the hash of its bytes, never repaired.
+ */
+export function parseCanonicalLine(line: Uint8Array, place: Place = ROOT): Result<{ readonly value: JsonValue; readonly bytes: Uint8Array }> {
+  if (line.at(-1) !== LF) return refuse(reject(KR_10, { ...place, expected: "a line ending in a line feed", got: hashBytes(line) }));
+  return parseCanonical(line.subarray(0, -1), place);
 }

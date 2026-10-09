@@ -7,8 +7,8 @@ import { BODY_LIMIT, KERNEL_VERSION, type JsonValue } from "../../src/kernel/ind
 import {
   apply,
   commitHash,
+  commitLine,
   createView,
-  encodeCommit,
   fold,
   NO_FACTS,
   openLines,
@@ -41,7 +41,7 @@ const empty = () => deepFreeze(createView(0, []));
 
 /** The read view of a store of these commits, opened from genesis (LG-02): fold reads its rows. */
 function opened(commits: readonly Commit[]) {
-  const out = openLines(commits.map((c) => new TextEncoder().encode(encodeCommit(c))));
+  const out = openLines(commits.map(commitLine), null);
   if (!out.ok) throw new Error("bug: the commits of apply open as a store");
   return deepFreeze(out.value.view);
 }
