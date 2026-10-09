@@ -94,9 +94,11 @@ describe("lattice session that does not start a session", () => {
       err: `lattice session: ${home.path("not-a-key")} is not an unencrypted Ed25519 OpenSSH private key (Q-04)\n`,
     });
     expect((await lattice("session", "--participant", "alice", "--role", "author", "--key", "missing")).err).toBe(`lattice session: cannot read the key file ${home.path("missing")}\n`);
-    expect((await lattice("session", "--participant", "alice", "--role", "author")).err).toBe(
-      "lattice session: no key — give --key <file>, the unencrypted OpenSSH private key of the participant (Q-04)\n",
-    );
+    const noKey = "lattice session: no key — give --key <file>, the unencrypted OpenSSH private key of the participant (Q-04)\n";
+    expect((await lattice("session", "--participant", "alice", "--role", "author")).err).toBe(noKey);
+    // An empty file of the path names no key file either.
+    home.write(".lattice/participant-key", "\n");
+    expect((await lattice("session", "--participant", "alice", "--role", "author")).err).toBe(noKey);
   });
 
   it("RT-32: asks for the participant and the role, and takes each option once", async () => {
@@ -109,6 +111,7 @@ describe("lattice session that does not start a session", () => {
       ["--participant", "alice", "--role", "author", "--role", "owner"],
       ["--participant", "alice", "--role"],
       ["alice", "author"],
+      ["participant", "alice", "--role", "author"],
     ]) {
       const used = await lattice("session", ...argv);
       expect([argv, used.code, used.err.startsWith("usage: lattice session --participant <name> --role <role>")]).toEqual([argv, 2, true]);

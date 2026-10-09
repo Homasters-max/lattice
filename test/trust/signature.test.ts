@@ -142,3 +142,90 @@ describe("OpenSSH key files (Q-04)", () => {
     expect([isPublicKey(RFC_KEY), isPublicKey(`${RFC_KEY} with a comment`), isPublicKey(`ssh-rsa ${RFC_KEY.slice(12)}`), isPublicKey("")]).toEqual([true, true, false, false]);
   });
 });
+
+/** The parts of an OpenSSH key file (PROTOCOL.key of OpenSSH) and of its private section. */
+type KeyFile = {
+  readonly cipher: string;
+  readonly kdf: string;
+  readonly options: string;
+  readonly count: number;
+  readonly publicBlob: Buffer;
+  readonly checks: readonly [number, number];
+  readonly type: string;
+  readonly raw: Buffer;
+  readonly pair: Buffer;
+  readonly rest: Buffer;
+  /** How many bytes more the private section claims than it holds. */
+  readonly claimed?: number;
+};
+
+const uint32 = (n: number) => {
+  const b = Buffer.alloc(4);
+  b.writeUInt32BE(n);
+  return b;
+};
+const string = (b: Buffer | string) => Buffer.concat([uint32(Buffer.byteLength(b)), Buffer.from(b)]);
+
+/** The parts of an OpenSSH key file as ssh-keygen wrote it. */
+function partsOf(file: string): KeyFile {
+  const bytes = Buffer.from(file.split("\n").slice(1, -2).join(""), "base64");
+  let at = "openssh-key-v1\0".length;
+  const read = () => {
+    const n = bytes.readUInt32BE(at);
+    at += 4 + n;
+    return bytes.subarray(at - n, at);
+  };
+  const [cipher, kdf, options] = [read().toString(), read().toString(), read().toString()];
+  const count = bytes.readUInt32BE(at);
+  at += 4;
+  const publicBlob = read();
+  const section = read();
+  const checks: [number, number] = [section.readUInt32BE(0), section.readUInt32BE(4)];
+  at = 8;
+  const s = { bytes: section };
+  const field = () => {
+    const n = s.bytes.readUInt32BE(at);
+    at += 4 + n;
+    return s.bytes.subarray(at - n, at);
+  };
+  const [type, raw, pair] = [field().toString(), field(), field()];
+  return { cipher, kdf, options, count, publicBlob, checks, type, raw, pair, rest: section.subarray(at) };
+}
+
+/** The key file of these parts. */
+function fileOf(k: KeyFile): string {
+  const section = Buffer.concat([uint32(k.checks[0]), uint32(k.checks[1]), string(k.type), string(k.raw), string(k.pair), k.rest]);
+  const bytes = Buffer.concat([
+    Buffer.from("openssh-key-v1\0"),
+    string(k.cipher),
+    string(k.kdf),
+    string(k.options),
+    uint32(k.count),
+    string(k.publicBlob),
+    uint32(section.length + (k.claimed ?? 0)),
+    section,
+  ]);
+  return `-----BEGIN OPENSSH PRIVATE KEY-----\n${bytes.toString("base64")}\n-----END OPENSSH PRIVATE KEY-----\n`;
+}
+
+describe("the parts of an OpenSSH key file (Q-04)", () => {
+  it("Q-04: a file made again of its own parts is the same key", () => {
+    const text = owned.text("test/keys/dev-owner");
+    expect(publicKeyOf(readOpenSshKey(fileOf(partsOf(text)))!)).toBe(lineOf(owned.text("test/keys/dev-owner.pub")));
+  });
+
+  it("Q-04: a file with any part another than one unencrypted Ed25519 key is no key", () => {
+    const k = partsOf(owned.text("test/keys/dev-owner"));
+    const changed: readonly (readonly [string, KeyFile])[] = [
+      ["cipher", { ...k, cipher: "nonf" }],
+      ["kdf", { ...k, kdf: "bcry" }],
+      ["kdf options", { ...k, options: "x" }],
+      ["two keys", { ...k, count: 2 }],
+      ["checks that differ", { ...k, checks: [k.checks[0], k.checks[0] + 1] }],
+      ["another key type", { ...k, type: "ssh-ed25518" }],
+      ["a short public key", { ...k, raw: k.raw.subarray(1) }],
+      ["a private section longer than the file", { ...k, claimed: 8 }],
+    ];
+    for (const [what, parts] of changed) expect(readOpenSshKey(fileOf(parts)), what).toBeNull();
+  });
+});

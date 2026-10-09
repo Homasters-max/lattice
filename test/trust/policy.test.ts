@@ -3,8 +3,8 @@
 // (TR-09) and Ed25519 keys bound to a kind (TR-10); the owner of an entity is
 // the owner of its namespace (GL-07), read in `before` (TR-06).
 import { describe, expect, it } from "vitest";
-import { ROOT, type JsonValue, type Record } from "../../src/kernel/index.js";
-import { namespaceId, namespaceOf, ownerOf, policyOf, readPolicy, type Before } from "../../src/trust/index.js";
+import { reject, ROOT, type JsonValue, type Record } from "../../src/kernel/index.js";
+import { namespaceId, namespaceOf, ownerOf, policyOf, readPolicy, TR_02, TR_09, TR_10, type Before } from "../../src/trust/index.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 import { testKey } from "../support/keys.js";
 
@@ -40,6 +40,7 @@ describe("namespace policy (TR-02)", () => {
   it("TR-02: reads every field of a policy as it is", () => {
     expect(read(FULL)).toEqual({ ok: true, value: FULL });
     expect(read({ owner: "alice" })).toEqual({ ok: true, value: { owner: "alice" } });
+    expect(read({ owner: "alice", pins: { lattice: "0" } })).toEqual({ ok: true, value: { owner: "alice", pins: { lattice: "0" } } });
   });
 
   it("TR-02: refuses a policy without an owner, with a field it does not name, or a field out of its form", () => {
@@ -53,6 +54,16 @@ describe("namespace policy (TR-02)", () => {
     expect(refusals({ owner: "alice", budget: { usd: 1 } })).toEqual([["TR-02", "/budget"]]);
     expect(refusals({ owner: "alice", labels: { blocks: "" } })).toEqual([["TR-02", "/labels"]]);
     expect(refusals({ owner: "alice", writers: {} })).toEqual([["TR-02", "/writers"]]);
+    // Lists of texts, counts from 1, sizes from 0, whole numbers, libraries of their form.
+    const cases: readonly (readonly [JsonValue, string])[] = [
+      [{ delegation: [""] }, "/delegation"],
+      [{ recovery: { participants: ["bob"], count: 1.5 } }, "/recovery"],
+      [{ budget: { ms: 1.5 } }, "/budget"],
+      [{ budget: { calls: -1 } }, "/budget"],
+      [{ pins: { lattice: "0", libraries: [{ name: "std" }] } }, "/pins"],
+      [{ pins: { lattice: "0", libraries: {} } }, "/pins"],
+    ];
+    for (const [field, path] of cases) expect(refusals({ owner: "alice", ...(field as object) }), path).toEqual([["TR-02", path]]);
   });
 
   it("TR-02: refuses a writer entry out of its form, with every other entry read", () => {
@@ -67,6 +78,22 @@ describe("namespace policy (TR-02)", () => {
 });
 
 describe("writer entries (TR-09, TR-10)", () => {
+  it("TR-02, TR-09, TR-10: a rejection names what the policy expected and what it got, inside the place the caller names", () => {
+    const at = { intent: "demo/namespace", path: "/body" };
+    const writers = [{ participant: "alice", kind: "human", identities: ["bitbucket:alice"], keys: ["ssh-rsa AAAA"] }, { participant: "claude", kind: "agent", keys: [ALICE.publicKey] }, "carol"];
+    const under = (path: string) => ({ intent: "demo/namespace", path: `/body${path}` });
+    expect(readPolicy(deepFreeze({ owner: "alice", writers }), at)).toEqual({
+      ok: false,
+      rejections: [
+        reject(TR_09, { ...under("/writers/0/identities/0"), expected: "github:<login>, gitlab:<user> or ssh:SHA256:<fingerprint>", got: "bitbucket:alice" }),
+        reject(TR_10, { ...under("/writers/0/keys/0"), expected: "ssh-ed25519 <base64> [comment]", got: "ssh-rsa AAAA" }),
+        reject(TR_10, { ...under("/writers/1/keys"), expected: "no key: an agent holds only its session key", got: [ALICE.publicKey] }),
+        reject(TR_02, { ...under("/writers/2"), expected: "a writer entry", got: "carol" }),
+      ],
+    });
+    expect(readPolicy("alice", at)).toEqual({ ok: false, rejections: [reject(TR_02, { ...at, expected: "a namespace policy", got: "alice" })] });
+  });
+
   it("TR-07: a writer entry is of a participant of kind human, agent or machine", () => {
     const kinds = ["human", "agent", "machine", "robot", "Human"].map((kind) => refusals({ owner: "alice", writers: [{ participant: "p", kind }] }));
     expect(kinds).toEqual([[], [], [], [["TR-02", "/writers/0/kind"]], [["TR-02", "/writers/0/kind"]]]);
@@ -109,7 +136,7 @@ function beforeOf(records: { readonly [id: string]: JsonValue }): Before {
 
 describe("namespaces and owners (TR-01, TR-05)", () => {
   it("TR-01: the namespace of an entity is the prefix of its id (KR-06); an event id has none", () => {
-    expect([namespaceOf("demo/a"), namespaceOf("std/namespace"), namespaceOf("01JB2X00000000000000000SES")]).toEqual(["demo", "std", null]);
+    expect([namespaceOf("demo/a"), namespaceOf("std/namespace"), namespaceOf("01JB2X00000000000000000SES"), namespaceOf("/a")]).toEqual(["demo", "std", null, null]);
     expect(namespaceId("demo")).toBe("demo/namespace");
   });
 

@@ -21,6 +21,7 @@ import {
   reject,
   rejectionsOf,
   STRING,
+  type JsonObject,
   type JsonValue,
   type MembersOf,
   type Place,
@@ -73,25 +74,24 @@ const isOneOf =
   <T extends string>(values: readonly T[]) =>
   (v: Value): v is T =>
     values.some((x) => x === v);
-const same = (v: Value, keys: readonly string[]) => isJsonObject(v) && Object.keys(v).sort().join() === [...keys].sort().join();
+/** An object with exactly these fields, each a text beside its `reason`. */
+const exactly = (v: JsonObject, texts: readonly string[]) => Object.keys(v).length === texts.length + 1 && texts.every((k) => isText(v[k]));
 
 const isReason = (v: Value): v is Reason =>
-  isJsonObject(v) &&
-  ((v.reason === "requirement" && same(v, ["reason", "requirement"]) && isText(v.requirement)) ||
-    (v.reason === "finding" && same(v, ["reason", "rule", "subject"]) && isText(v.rule) && isText(v.subject)));
+  isJsonObject(v) && ((v.reason === "requirement" && exactly(v, ["requirement"])) || (v.reason === "finding" && exactly(v, ["rule", "subject"])));
 
 const KINDS: readonly ParticipantKind[] = ["human", "agent", "machine"];
 const PURPOSES: readonly Purpose[] = ["init", "work", "import", "check", "bench", "explore"];
 
 /** What the closed form of a session admits: its body as a JSON object, read by `BODY`. */
-type SessionFields = Omit<Session, "body"> & { readonly body: JsonValue };
-type BodyFields = Omit<SessionBody, "certificate"> & { readonly certificate: JsonValue };
+type SessionFields = Omit<Session, "body"> & { readonly body: JsonObject };
+type BodyFields = Omit<SessionBody, "certificate"> & { readonly certificate: JsonObject };
 
 /** TR-11, LG-09: the members of a session event in a proposal; no other field. */
 const SESSION: MembersOf<SessionFields> = {
   id: STRING,
   at: STRING,
-  body: { expected: "the body of a session", fits: (v): v is JsonValue => isJsonObject(v) },
+  body: { expected: "the body of a session", fits: isJsonObject },
 };
 
 /** TR-11: the members of the body of a session; no other field. */
@@ -104,7 +104,7 @@ const BODY: MembersOf<BodyFields> = {
   parent: { expected: "a step", fits: optionalText },
   software: { expected: "a software", fits: isText },
   version: { expected: "its version", fits: isText },
-  certificate: { expected: "a certificate {key, expires, sig}", fits: (v): v is JsonValue => isJsonObject(v) },
+  certificate: { expected: "a certificate {key, expires, sig}", fits: isJsonObject },
 };
 
 /** TR-11: the members of a certificate; no other field. */
@@ -114,8 +114,8 @@ const CERTIFICATE: MembersOf<Certificate> = { key: STRING, expires: STRING, sig:
 const under = (place: Place, ...names: readonly string[]): Place => ({ intent: place.intent, path: [place.path, ...names].join("/") });
 
 /** TR-11: the certificate of a session body — its form and the spelling of its expiry (KR-11). */
-function readCertificate(v: JsonValue, place: Place): Result<Certificate> {
-  const form = isJsonObject(v) ? closedForm(v, CERTIFICATE, TR_11, place) : refuse<Certificate>(reject(TR_11, { ...place, expected: "a certificate", got: v }));
+function readCertificate(v: JsonObject, place: Place): Result<Certificate> {
+  const form = closedForm(v, CERTIFICATE, TR_11, place);
   if (!form.ok) return form;
   return refused<Certificate>(rejectionsOf(checkFormat("date-time", form.value.expires, under(place, "expires")))) ?? form;
 }
@@ -125,8 +125,8 @@ const reasonRejections = (b: BodyFields, place: Place): Rejection[] =>
   b.purpose === "init" && b.for !== undefined ? [reject(TR_11, { ...under(place, "for"), expected: "absent: a session with purpose init has no reason", got: b.for })] : [];
 
 /** TR-11: the body of a session — its form, its reason and its certificate. */
-function readBody(v: JsonValue, place: Place): Result<SessionBody> {
-  const form = isJsonObject(v) ? closedForm(v, BODY, TR_11, place) : refuse<BodyFields>(reject(TR_11, { ...place, expected: "the body of a session", got: v }));
+function readBody(v: JsonObject, place: Place): Result<SessionBody> {
+  const form = closedForm(v, BODY, TR_11, place);
   if (!form.ok) return form;
   const certificate = readCertificate(form.value.certificate, under(place, "certificate"));
   const refusal = refused<SessionBody>([...reasonRejections(form.value, place), ...rejectionsOf(certificate)]);

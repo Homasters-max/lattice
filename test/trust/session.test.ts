@@ -3,7 +3,7 @@
 // chain runs from a key the policy in `before` lists (TR-06), through the
 // certificate, to the signature of the proposal by the session key (LG-10).
 import { describe, expect, it } from "vitest";
-import { ROOT, type JsonValue } from "../../src/kernel/index.js";
+import { reject, ROOT, type JsonValue } from "../../src/kernel/index.js";
 import { createView, NO_FACTS, openLines, readProposal, encodeCommit, signProposal, verifyProposal, type Proposal } from "../../src/ledger/index.js";
 import {
   certificateHash,
@@ -11,6 +11,9 @@ import {
   policyOf,
   readSession,
   signSession,
+  TR_10,
+  TR_11,
+  TR_12,
   verifySession,
   verifyHash,
   type Policy,
@@ -243,5 +246,72 @@ describe("policy from before (TR-06)", () => {
     // A later change never changes what an earlier commit needed: the view at 1 still holds v1.
     expect(policyAt(1)).toEqual(v1);
     expect(policyOf(createView(0, []), "demo", ROOT)).toEqual({ ok: true, value: null });
+  });
+});
+
+/** The place of a session in a proposal of the intent `x`: rejections inside it keep the intent. */
+const IN_INTENT = { intent: "x", path: "/session" };
+const at = (path: string) => ({ intent: "x", path: `/session${path}` });
+
+describe("what a rejection of a session names (TR-10, TR-11, TR-12)", () => {
+  it("TR-11: the form of a session — what was expected, what came, inside the place the caller names", () => {
+    const session = signed(UNSIGNED);
+    const cases: readonly (readonly [JsonValue, ReturnType<typeof reject>])[] = [
+      ["a session", reject(TR_11, { ...IN_INTENT, expected: "a session event", got: "a session" })],
+      [{ ...session, body: "a body" }, reject(TR_11, { ...at("/body"), expected: "the body of a session", got: "a body" })],
+      [{ ...session, body: { ...session.body, certificate: "a key" } }, reject(TR_11, { ...at("/body/certificate"), expected: "a certificate {key, expires, sig}", got: "a key" })],
+      [
+        { ...session, body: { ...session.body, purpose: "init" } },
+        reject(TR_11, { ...at("/body/for"), expected: "absent: a session with purpose init has no reason", got: session.body.for ?? null }),
+      ],
+    ];
+    for (const [value, rejection] of cases) expect(readSession(value, IN_INTENT), JSON.stringify(value)).toEqual({ ok: false, rejections: [rejection] });
+  });
+
+  it("TR-11: an empty participant or step and a reason out of its form are refused; a finding is a reason", () => {
+    const body = (over: JsonValue) => ({ ...signed(UNSIGNED), body: { ...signed(UNSIGNED).body, ...(over as object) } });
+    const finding = { reason: "finding", rule: "TR-34", subject: "demo/a@1" };
+    expect(readSession(body({ for: finding }), ROOT).ok).toBe(true);
+    const cases: readonly (readonly [JsonValue, string])[] = [
+      [{ participant: "" }, "/body/participant"],
+      [{ parent: "" }, "/body/parent"],
+      [{ for: { reason: "requirement", requirement: "" } }, "/body/for"],
+      [{ for: { reason: "requirement", requirement: "demo/r@1", rule: "TR-34" } }, "/body/for"],
+      [{ for: { reason: "finding", rule: "TR-34" } }, "/body/for"],
+      [{ for: { ...finding, rule: "" } }, "/body/for"],
+      [{ for: { ...finding, reason: "wish" } }, "/body/for"],
+    ];
+    for (const [over, path] of cases) expect(where(readSession(body(over), ROOT)), path).toEqual([["TR-11", path]]);
+  });
+
+});
+
+describe("what a rejection of the chain names (TR-10, TR-11, TR-12)", () => {
+  it("TR-11: an agent's session is refused at its kind when issued by its own key", () => {
+    expect(issueSession({ ...UNSIGNED, body: { ...UNSIGNED.body, kind: "agent" } }, ALICE.key, IN_INTENT)).toEqual({
+      ok: false,
+      rejections: [reject(TR_11, { ...at("/body/kind"), expected: "human or machine: an agent session is certified by its caller", got: "agent" })],
+    });
+  });
+
+  it("TR-10, TR-11, TR-12: the chain names the expiry, the writer's kind and roles, the hash and the key it expected", () => {
+    const chain = (session: Session, policy: Policy = POLICY, time = AT) => verifySession({ session, policy, at: time }, IN_INTENT, keyOnly);
+    const expired = signed(UNSIGNED);
+    expect(chain(expired, POLICY, "2026-10-08T00:00:00.000000Z")).toEqual({
+      ok: false,
+      rejections: [reject(TR_11, { ...at("/body/certificate/expires"), expected: "later than 2026-10-08T00:00:00.000000Z", got: "2026-10-07T11:00:00.000000Z" })],
+    });
+    expect(chain(sessionWith({ kind: "machine", role: "land" }))).toEqual({
+      ok: false,
+      rejections: [reject(TR_10, { ...at("/body/kind"), expected: "human", got: "machine" }), reject(TR_10, { ...at("/body/role"), expected: ["author"], got: "land" })],
+    });
+    const foreign = signed(UNSIGNED, MALLORY.key);
+    const hash = certificateHash(foreign, ROOT);
+    expect(chain(foreign)).toEqual({
+      ok: false,
+      rejections: [reject(TR_12, { ...at("/body/certificate/sig"), expected: { hash: hash.ok ? hash.value : "", by: "a key of alice in the policy" }, got: foreign.body.certificate.sig })],
+    });
+    const rsa = sessionWith({ certificate: { key: "ssh-rsa AAAA", expires: UNSIGNED.body.certificate.expires } });
+    expect(chain(rsa)).toEqual({ ok: false, rejections: [reject(TR_10, { ...at("/body/certificate/key"), expected: "ssh-ed25519 <base64> [comment]", got: "ssh-rsa AAAA" })] });
   });
 });
