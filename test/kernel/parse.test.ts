@@ -97,6 +97,7 @@ describe("the parse of canonical bytes (KR-10)", () => {
     expect(where(parseCanonical(utf8('{"a":-0}'), FILE))).toEqual([["KR-10", "/f/a", "a number other than -0", "-0"]]);
     expect(where(parseCanonical(Uint8Array.from([0x7b, 0xff, 0x7d]), FILE)).map(([rule, path, expected]) => [rule, path, expected])).toEqual([["KR-10", "/f", "UTF-8"]]);
     expect(where(parseCanonical(utf8(""), FILE))).toEqual([["KR-10", "/f", "a JSON text", ""]]);
+    expect(where(parseCanonical(utf8("\uFEFF{}"), FILE))).toEqual([["KR-10", "/f", "a JSON text", "\uFEFF{}"]]);
   });
 
   it("KR-10: a line is canonical bytes and a line feed — it gives the value and its bytes without the line feed", () => {
