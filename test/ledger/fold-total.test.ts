@@ -10,7 +10,7 @@ import type { JsonValue } from "../../src/kernel/index.js";
 import { fold, type Commit, type Evidence, type Row } from "../../src/ledger/index.js";
 import { viewOf, withDelta } from "../../src/ledger/rows.js";
 import { deepFreeze } from "../support/deep-freeze.js";
-import { loadFolders } from "./load.js";
+import { loadFolders } from "../fixtures/load.js";
 
 /** A JSON object of a fixture. */
 type Obj = { readonly [key: string]: unknown };

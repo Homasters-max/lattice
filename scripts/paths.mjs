@@ -47,8 +47,9 @@ const OWNS = {
   codec: ["src/", "package.json", "package-lock.json", "std/"],
   // vectors.test.ts reads the frozen vectors (KR-13).
   kernel: ["test/vectors/"],
-  // std-types.test.ts checks the sources of std/ — the types of std as data (S0-08, S0-09).
-  ledger: ["std/"],
+  // std-types.test.ts checks the sources of std/ — the types of std as data (S0-08, S0-09); fold-total.test.ts folds
+  // the trigger inputs of test/fixtures/ (LG-36).
+  ledger: ["std/", "test/fixtures/"],
   // budget.test.ts reads every test file for the budget of its properties.
   support: ["test/"],
   // signature.test.ts reads the dev keys as OpenSSH files (Q-04); policy.test.ts and session.test.ts read a policy
