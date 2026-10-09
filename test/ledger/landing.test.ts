@@ -5,7 +5,7 @@
 // writes the store itself (LG-23).
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { hashBytes } from "../../src/kernel/index.js";
-import { commitHash, KNOWLEDGE, land, openTail, type Git, type LandingOutcome, type LandingPorts, type Push } from "../../src/ledger/index.js";
+import { commitHash, KNOWLEDGE, land, openTail, type Git, type LandingOutcome, type LandingPorts, type Push, type Row, type Store } from "../../src/ledger/index.js";
 import { AT, gitForTests, landingPortsForTests, type GitFixtureBranch, type GitFixtureOptions } from "../support/assembly.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 import { moveMain, onMain, proposal, refusals, storeTextOf, text } from "../support/landing.js";
@@ -72,6 +72,25 @@ function recording(branches = BRANCHES): { readonly git: Git; readonly pushes: P
   return { git: { tail: (ref) => inner.tail(ref), prepare: (p) => inner.prepare(p), push }, pushes };
 }
 
+/** The ports of landing, every store they open kept in `opened`, in order. */
+function openingStores(): { readonly ports: LandingPorts; readonly opened: readonly Store[] } {
+  const inner = portsOf();
+  const opened: Store[] = [];
+  const openStore: LandingPorts["openStore"] = (worktree) => {
+    const store = inner.openStore(worktree);
+    opened.push(store);
+    return store;
+  };
+  return { ports: { ...inner, openStore }, opened };
+}
+
+/** What a store answers through `rows` and `row` about the entities of cr/a and cr/b. */
+async function rowsOfDemo(store: Pick<Store, "row" | "rows">) {
+  const rows: Row[] = [];
+  for await (const r of store.rows("")) rows.push(r);
+  return [rows, await store.row("current:demo/a"), await store.row("current:demo/b")];
+}
+
 const utf8 = (text: string) => new TextEncoder().encode(text);
 
 describe("landing into git (LG-22, LG-23)", () => {
@@ -101,6 +120,18 @@ describe("landing into git (LG-22, LG-23)", () => {
     for await (const r of store.rows("")) rows.push(`${r.key}@${r.from}`);
     expect(rows).toEqual(["current:demo/a@1", "current:demo/b@2"]);
     expect(await store.row("current:demo/b")).toMatchObject({ key: "current:demo/b", from: 2, to: null });
+  });
+
+  // LG-35: append carries the delta of the commit, so the store landing appended to answers what folding again gives.
+  it("LG-02: the store landing appends to answers row and rows as the store on main opened again", async () => {
+    const { ports, opened } = openingStores();
+    await landed(ports, "cr/a");
+    await landed(ports, "cr/b");
+    // The last store landing opened is the one on the worktree of cr/b, which took its commit.
+    const [appendedTo] = opened.slice(-1) as [Store];
+    const again = await rowsOfDemo((await storeOnMain(ports)).store);
+    expect(again[0]).toHaveLength(2);
+    expect(await rowsOfDemo(appendedTo)).toEqual(again);
   });
 
   it("LG-26: a dry run pushes nothing", async () => {
