@@ -41,8 +41,9 @@ export function testSetOf(path) {
 const OWNS = {
   // bin.test.ts builds src/ into the bin with tsconfig.build.json and reads the bin of package.json.
   cli: ["src/", "package.json", "tsconfig.json", "tsconfig.build.json"],
-  // form.test.ts and imports.test.ts audit the files of src/ through repoTree of test/structure/tree.ts.
-  codec: ["src/", "package.json", "package-lock.json"],
+  // form.test.ts and imports.test.ts audit the files of src/ through repoTree of test/structure/tree.ts; import.test.ts
+  // checks the bodies it imports against the types of std/ (S0-26).
+  codec: ["src/", "package.json", "package-lock.json", "std/"],
   // vectors.test.ts reads the frozen vectors (KR-13).
   kernel: ["test/vectors/"],
   // std-types.test.ts checks the sources of std/ — the types of std as data (S0-08, S0-09).
