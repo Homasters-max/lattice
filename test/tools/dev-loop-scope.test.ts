@@ -6,6 +6,7 @@
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { scratch, type Scratch } from "../support/files.js";
+import { NO_MAINTENANCE } from "../support/git.js";
 import { program, type Program } from "../support/program.js";
 
 const tool = program("plan/tools/dev-loop.mjs");
@@ -28,7 +29,7 @@ type Scope = {
 };
 type Repo = { dir: string; base: string };
 
-async function run(dir: string, cmd: Program, args: string[]): Promise<string> {
+async function run(dir: string, cmd: Program, args: readonly string[]): Promise<string> {
   const ran = await cmd.start(args, { cwd: dir });
   if (ran.status !== 0) throw new Error(`${cmd === git ? "git" : "dl"} ${args.join(" ")}: ${ran.stderr}`);
   return ran.stdout.trim();
@@ -57,6 +58,7 @@ async function build(base: Files): Promise<Repo> {
   const dir = folder("base-");
   // --template= leaves out the sample hooks: a repository without them copies several times faster.
   await run(dir, git, ["init", "-q", "--template="]);
+  await run(dir, git, NO_MAINTENANCE);
   await run(dir, git, ["config", "user.email", "t@t"]);
   await run(dir, git, ["config", "user.name", "t"]);
   await run(dir, git, ["config", "core.autocrlf", "false"]);
