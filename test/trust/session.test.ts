@@ -280,6 +280,7 @@ describe("what a rejection of a session names (TR-10, TR-11, TR-12)", () => {
       [{ for: { reason: "finding", rule: "TR-34" } }, "/body/for"],
       [{ for: { ...finding, rule: "" } }, "/body/for"],
       [{ for: { ...finding, reason: "wish" } }, "/body/for"],
+      [{ for: { reason: "wish", requirement: "demo/r@1" } }, "/body/for"],
     ];
     for (const [over, path] of cases) expect(where(readSession(body(over), ROOT)), path).toEqual([["TR-11", path]]);
   });

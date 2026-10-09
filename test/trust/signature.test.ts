@@ -157,6 +157,8 @@ type KeyFile = {
   readonly rest: Buffer;
   /** How many bytes more the private section claims than it holds. */
   readonly claimed?: number;
+  /** The public key blob left out, its length claiming more bytes than the file holds. */
+  readonly blobMissing?: boolean;
 };
 
 const uint32 = (n: number) => {
@@ -201,7 +203,7 @@ function fileOf(k: KeyFile): string {
     string(k.kdf),
     string(k.options),
     uint32(k.count),
-    string(k.publicBlob),
+    k.blobMissing === true ? uint32(0xffff) : string(k.publicBlob),
     uint32(section.length + (k.claimed ?? 0)),
     section,
   ]);
@@ -225,6 +227,7 @@ describe("the parts of an OpenSSH key file (Q-04)", () => {
       ["another key type", { ...k, type: "ssh-ed25518" }],
       ["a short public key", { ...k, raw: k.raw.subarray(1) }],
       ["a private section longer than the file", { ...k, claimed: 8 }],
+      ["a public key longer than the file", { ...k, blobMissing: true }],
     ];
     for (const [what, parts] of changed) expect(readOpenSshKey(fileOf(parts)), what).toBeNull();
   });
