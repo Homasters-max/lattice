@@ -141,6 +141,10 @@ describe("OpenSSH key files (Q-04)", () => {
   it("TR-10: an OpenSSH line names a key; other text does not", () => {
     expect([isPublicKey(RFC_KEY), isPublicKey(`${RFC_KEY} with a comment`), isPublicKey(`ssh-rsa ${RFC_KEY.slice(12)}`), isPublicKey("")]).toEqual([true, true, false, false]);
   });
+
+  it("TR-10: a key whose comment spans lines is no OpenSSH line, so no key", () => {
+    expect([isPublicKey(`${RFC_KEY} a\nb`), isPublicKey(`${RFC_KEY} a\rb`), isPublicKey(`${RFC_KEY}\n`)]).toEqual([false, false, false]);
+  });
 });
 
 /** The parts of an OpenSSH key file (PROTOCOL.key of OpenSSH) and of its private section. */

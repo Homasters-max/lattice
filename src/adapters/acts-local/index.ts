@@ -172,7 +172,7 @@ async function actsIn(repo: Repo, check: readonly string[], s: Signed): Promise<
 /** Q-04: the allowed signers file of these keys, for every principal, for signatures of git. */
 function allowedSigners(keys: readonly string[]): string {
   const bad = keys.find((k) => /[\r\n]/.test(k));
-  if (bad !== undefined) throw new Error("bug: a key of the policy spans lines; the policy admits only OpenSSH public keys (TR-10)");
+  if (bad !== undefined) throw new Error("bug: a key of the policy spans lines; reading the policy refuses a key that is no OpenSSH line (TR-10)");
   return keys.map((k) => `* namespaces="git" ${k}\n`).join("");
 }
 
