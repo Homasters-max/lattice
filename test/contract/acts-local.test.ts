@@ -68,6 +68,45 @@ describe("acts-local: signatures", () => {
   });
 });
 
+/** The header `gpgsig` of a commit whose signature is `armored`: its lines continued by a leading space, as git writes them. */
+const gpgsig = (armored: string) => `gpgsig ${armored.split("\n").join("\n ")}`;
+const sshSignature = (bytes: readonly number[]) => `-----BEGIN SSH SIGNATURE-----\n${Buffer.from(bytes).toString("base64")}\n-----END SSH SIGNATURE-----`;
+const MAGIC = [..."SSHSIG"].map((c) => c.charCodeAt(0));
+
+describe("acts-local: what signs an act", () => {
+  it("TR-14: a signature that holds no SSH key — of GPG, of another format, its key missing or cut short — makes no act", async () => {
+    const signatures = [
+      "-----BEGIN PGP SIGNATURE-----\niQ==\n-----END PGP SIGNATURE-----",
+      sshSignature([..."NOTSIG".split("").map((c) => c.charCodeAt(0)), ...new Array<number>(40).fill(1)]),
+      sshSignature([...MAGIC, 0, 0, 0, 1]),
+      sshSignature([...MAGIC, 0, 0, 0, 1, 0, 0, 0, 0, ...new Array<number>(10).fill(1)]),
+      sshSignature([...MAGIC, 0, 0, 0, 1, 0, 0, 3, 232, 1, 2, 3, 4, 5]),
+    ];
+    // The one that holds the key of `dev-owner` names it, though git verifies no signature of it.
+    const key = [...Buffer.from(publicKeyOf("dev-owner").split(" ")[1] ?? "", "base64")];
+    const named = sshSignature([...MAGIC, 0, 0, 0, 1, 0, 0, 0, key.length, ...key, 0, 0, 0, 3, 103, 105, 116]);
+    const acts = await actsOf("cr/crafted", (b) => [...signatures, named].forEach((s) => repo.crafted(b, gpgsig(s), approve(HASH))));
+    expect(acts.map((a) => [a.identity, a.verified])).toEqual([[identityOf("dev-owner"), false]]);
+  });
+
+  it("TR-14: in a repository of SHA-256 objects a signed commit is an act too", async () => {
+    const sha256 = signedRepo({ objectFormat: "sha256" });
+    try {
+      sha256.commit("main", "start", null);
+      sha256.branch("cr/a", "main");
+      const id = sha256.commit("cr/a", approve(HASH), "dev-owner");
+      const acts = await createActsLocal(deepFreeze({ dir: sha256.dir, base: "main", keys: keysOfPolicy() })).read("cr/a");
+      expect(acts).toEqual([{ verb: "approve", target: HASH, identity: identityOf("dev-owner"), uri: `git:${id}`, at: SIGNED_AT, verified: true }]);
+    } finally {
+      sha256.remove();
+    }
+  });
+
+  it("CONVENTIONS.md §2.3: a change request git does not know is a failure of git, not one without acts", async () => {
+    await expect(createActsLocal(deepFreeze({ dir: repo.dir, base: "main", keys: [] })).read("cr/none")).rejects.toThrow(/^git rev-list .* failed/);
+  });
+});
+
 describe("acts-local: trailers, messages and tags", () => {
   it("TR-14: the commits on main are no change request's; each trailer of a commit is an act, and a verb TR-14 does not name is none", async () => {
     const acts = await actsOf("cr/many", (b) => repo.commit(b, `two acts\n\nLattice-Act: approve ${HASH}\nLattice-Act: veto ${HASH}\nLattice-Act: acknowledge signal-1\n`, "dev-owner"));

@@ -75,12 +75,16 @@ function parsed(kind: Signed["kind"], id: string, raw: string): Signed {
   return { kind, id, head, message: at < 0 ? body : body.slice(0, at), signature: at < 0 ? null : body.slice(at) };
 }
 
-/** The fingerprint of the key in an SSH signature (PROTOCOL.sshsig: "SSHSIG", a version, then the public key); `null` for one that is not. */
+/**
+ * The fingerprint of the key in an SSH signature — PROTOCOL.sshsig: the magic "SSHSIG", a version of 4 bytes, then
+ * the public key as a string, its length in 4 bytes before it — or `null` for one that holds no key so.
+ */
 function signerOf(signature: string): string | null {
   if (!signature.startsWith(SSH_SIGNATURE)) return null;
   const blob = Buffer.from(signature.replace(/-----[A-Z ]+-----/g, "").replace(/\s+/g, ""), "base64");
-  if (blob.length < 14 || blob.subarray(0, 6).toString("latin1") !== "SSHSIG") return null;
-  const key = blob.subarray(14, 14 + blob.readUInt32BE(10));
+  const length = blob.length < 14 ? 0 : blob.readUInt32BE(10);
+  const key = blob.subarray(14, 14 + length);
+  if (blob.subarray(0, 6).toString("latin1") !== "SSHSIG" || length === 0 || key.length !== length) return null;
   return `SHA256:${createHash("sha256").update(key).digest("base64").replace(/=+$/, "")}`;
 }
 
@@ -117,9 +121,10 @@ async function signedOf(dir: string, kind: Signed["kind"], id: string): Promise<
 /** The commits of a change request, oldest first, and the annotated tags that point at them, in the order of their names. */
 async function sourcesOf(dir: string, base: string, request: string): Promise<Signed[]> {
   const commits = (await output(dir, ["rev-list", "--reverse", "--topo-order", `${base}..${request}`])).split("\n").filter((l) => l !== "");
-  const refs = (await output(dir, ["for-each-ref", "--format=%(objecttype) %(objectname) %(*objectname)", "refs/tags"])).split("\n");
-  const tags = refs.map((l) => l.split(" ")).filter(([type, , target]) => type === "tag" && commits.includes(target ?? ""));
-  const all = [...commits.map((c) => ["commit", c] as const), ...tags.map(([, tag]) => ["tag", tag ?? ""] as const)];
+  // `%(*objectname)` is what an annotated tag points at, and empty for a lightweight one, which no one signs.
+  const refs = (await output(dir, ["for-each-ref", "--format=%(objectname) %(*objectname)", "refs/tags"])).split("\n");
+  const tags = refs.map((l) => l.split(" ")).filter(([, target]) => commits.includes(target ?? ""));
+  const all = [...commits.map((c) => ["commit", c] as const), ...tags.map(([tag]) => ["tag", tag ?? ""] as const)];
   return Promise.all(all.map(([kind, id]) => signedOf(dir, kind, id)));
 }
 

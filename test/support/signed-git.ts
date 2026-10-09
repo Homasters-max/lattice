@@ -31,6 +31,8 @@ export interface SignedRepo {
   branch(name: string, from: string): void;
   /** An annotated tag of `target`, signed by `by`, or unsigned with `null`; the id of the tag object. */
   tag(name: string, target: string, message: string, by: DevKey | null): string;
+  /** A commit on `branch` whose header ends with `header` — a signature no signing tool wrote, as git writes headers; its id. */
+  crafted(branch: string, header: string, message: string): string;
   /**
    * Q-04: the machine allows signers by `key` — its global configuration of git names a file of them; the
    * environment that makes git read that configuration.
@@ -43,7 +45,13 @@ export interface SignedRepo {
 
 const git = program("git");
 
-export function signedRepo(): SignedRepo {
+/** The objects of a repository: SHA-1, or SHA-256, whose commits carry their signature in `gpgsig-sha256`. */
+export type SignedRepoOptions = { readonly objectFormat?: "sha1" | "sha256" };
+
+/** The committer of a crafted commit, at SIGNED_AT. */
+const CRAFTER = `dev <dev@lattice.invalid> ${Date.parse(SIGNED_AT.replace(".000000", "")) / 1000} +0000`;
+
+export function signedRepo({ objectFormat = "sha1" }: SignedRepoOptions = {}): SignedRepo {
   const home: Scratch = scratch("lattice-acts-");
   const dir = home.mkdir("repo");
   const global = home.write("gitconfig", "");
@@ -56,9 +64,18 @@ export function signedRepo(): SignedRepo {
     return ran.stdout.trim();
   };
   const signer = (by: DevKey | null) => (by === null ? [] : ["-c", `user.signingkey=${keyFile(by)}`]);
-  run(["init", "-q", "-b", "main"]);
+  run(["init", "-q", "-b", "main", `--object-format=${objectFormat}`]);
   run(NO_MAINTENANCE);
   const empty = run(["mktree"], "");
+  const tipOf = (branch: string) => git.run(["-C", dir, "rev-parse", "--verify", "-q", `refs/heads/${branch}`], { env }).stdout.trim();
+  const parentOf = (branch: string) => {
+    const tip = tipOf(branch);
+    return tip === "" ? [] : ["-p", tip];
+  };
+  const moved = (branch: string, id: string) => {
+    run(["update-ref", `refs/heads/${branch}`, id]);
+    return id;
+  };
   return {
     dir,
     allowOnMachine: (key) => {
@@ -67,12 +84,11 @@ export function signedRepo(): SignedRepo {
       return { GIT_CONFIG_GLOBAL: global };
     },
     machineVerifies: (rev) => git.run(["-C", dir, "verify-commit", rev], { env }).status === 0,
-    commit: (branch, message, by) => {
-      const tip = git.run(["-C", dir, "rev-parse", "--verify", "-q", `refs/heads/${branch}`], { env }).stdout.trim();
-      const signing = by === null ? ["--no-gpg-sign"] : ["-S"];
-      const id = run([...signer(by), "commit-tree", empty, ...(tip === "" ? [] : ["-p", tip]), ...signing, "-m", message]);
-      run(["update-ref", `refs/heads/${branch}`, id]);
-      return id;
+    commit: (branch, message, by) => moved(branch, run([...signer(by), "commit-tree", empty, ...parentOf(branch), by === null ? "--no-gpg-sign" : "-S", "-m", message])),
+    crafted: (branch, header, message) => {
+      const tip = tipOf(branch);
+      const head = [`tree ${empty}`, ...(tip === "" ? [] : [`parent ${tip}`]), `author ${CRAFTER}`, `committer ${CRAFTER}`, header];
+      return moved(branch, run(["hash-object", "-t", "commit", "-w", "--stdin"], `${head.join("\n")}\n\n${message}`));
     },
     branch: (name, from) => {
       run(["update-ref", `refs/heads/${name}`, `refs/heads/${from}`]);
