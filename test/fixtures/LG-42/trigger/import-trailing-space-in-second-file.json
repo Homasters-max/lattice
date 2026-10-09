@@ -1,0 +1,13 @@
+{
+  "check": "import",
+  "input": {
+    "files": {
+      "a.md": "# A\n\nAA-Z01. Fine.\n",
+      "b.md": "# B\n\nAA-Z02. Trailing. \n"
+    }
+  },
+  "expect": {
+    "rule": "LG-42",
+    "path": "/docs/design/b.md/3"
+  }
+}

@@ -51,7 +51,7 @@
 | [S0-24](tasks/S0-24-std-ledger.md) | Ledger std — воспроизводимая сборка и загрузка в проект | G | ⬜ | | |
 | [S0-25](tasks/S0-25-codec-md-model.md) | Codec — модель md, разбор и канонический вывод | H | ✅ | [#20](https://github.com/Homasters-max/lattice/pull/20) | G-25 |
 | [S0-38](tasks/S0-38-md-model-tables.md) | Модель md с целыми таблицами — документ, который печатается обратно | H | ✅ | [#30](https://github.com/Homasters-max/lattice/pull/30) | разбор волны 2 |
-| [S0-26](tasks/S0-26-codec-import.md) | Codec — import md в proposal | H | ⬜ | | |
+| [S0-26](tasks/S0-26-codec-import.md) | Codec — import md в proposal | H | ✅ | [#59](https://github.com/Homasters-max/lattice/pull/59) | |
 | [S0-27](tasks/S0-27-codec-export.md) | Codec — export blocks в md и команда export | H | ⬜ | | |
 | [S0-28](tasks/S0-28-generate.md) | Generate — TS-типы, валидаторы и конфиг линтера из типов | H | ⬜ | | |
 | [S0-29](tasks/S0-29-e2e-acceptance.md) | Сквозная проверка S0, CI и команда приёмки | I | ⬜ | | |

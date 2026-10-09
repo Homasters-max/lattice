@@ -1,0 +1,8 @@
+{
+  "check": "import",
+  "input": {
+    "files": {
+      "a.md": "# A\n\nAA-Z01. Caf\u00e9.\n"
+    }
+  }
+}

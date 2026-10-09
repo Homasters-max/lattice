@@ -8,7 +8,7 @@
 // A row hands on the Result of its check as it is (CONVENTIONS.md §2.1); a
 // check placed by its caller is placed at the root of the input, `ROOT`.
 import { fileOf } from "../../src/adapters/store-jsonl/index.js";
-import { LG_42, parse, RM_01, RM_02 } from "../../src/codec/index.js";
+import { importMd, LG_42, parse, RM_01, RM_02 } from "../../src/codec/index.js";
 import {
   checkAgainstType,
   checkFormat,
@@ -219,6 +219,22 @@ const md: FixtureCheck = {
   run: (input) => parse(bytesOf(field(input, "bytes") ?? field(input, "text")), ROOT),
 };
 
+/** The time an imported fixture is written at: import takes it from its caller (S0-26). */
+const IMPORTED_AT = "2026-10-09T12:00:00.000000Z";
+
+/**
+ * `input`: `{ files }` — documents in md by file name, imported together, each at /docs/design/<file> (S0-26): a
+ * refusal of the codec names its file and line (LG-42, RM-01, RM-02), an ID of two files is refused at the second
+ * (RM-01), a string not in NFC when its block becomes an intent (KR-10).
+ */
+const importCheck: FixtureCheck = {
+  enforces: [LG_42.id, RM_01.id, RM_02.id, KR_10.id],
+  run: (input) => {
+    const files = Object.entries(field(input, "files") as { readonly [name: string]: string });
+    return importMd(files.map(([name, text]) => ({ path: `/docs/design/${name}`, bytes: bytesOf(text) })), IMPORTED_AT);
+  },
+};
+
 type FixtureFile = string | Uint8Array | null;
 
 /**
@@ -283,4 +299,5 @@ export const CHECKS: { readonly [check: string]: FixtureCheck } = {
   chain,
   land: landCheck,
   md,
+  import: importCheck,
 };

@@ -10,7 +10,7 @@ export const LG_42 = {
 
 export const RM_01 = {
   id: "RM-01",
-  message: { en: "every block of md has an ID — a table row whose first cell is its ID or a paragraph that starts with it; got {got} at {path}" },
+  message: { en: "one ID — one block: every block of md has an ID — a table row whose first cell is its ID or a paragraph that starts with it — and no two blocks share one; expected {expected}, got {got} at {path}" },
 } as const satisfies Rule;
 
 export const RM_02 = {

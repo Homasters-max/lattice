@@ -1,0 +1,8 @@
+{
+  "check": "import",
+  "input": {
+    "files": {
+      "b.md": "# B\n\n| ID | Rule |\n|---|---|\n| AA-01 | A rule in a row. |\n"
+    }
+  }
+}
