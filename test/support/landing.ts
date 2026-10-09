@@ -2,8 +2,7 @@
 // change request brings to create one entity, the text of a store of given
 // commits, a worktree of main, main moved by someone else, and the refusals of
 // an outcome. The ports of landing come from the test assembly (assembly.ts).
-import { fileOf } from "../../src/adapters/store-jsonl/index.js";
-import { encodeCommit, type Commit, type Git, type LandingOutcome } from "../../src/ledger/index.js";
+import { commitLine, type Commit, type Git, type LandingOutcome } from "../../src/ledger/index.js";
 import { AT } from "./assembly.js";
 
 /** The proposal file of a change request that creates the entity `id`; every intent is `at` the time of the clock of the tests. */
@@ -17,8 +16,8 @@ export const proposal = (id: string): string =>
 /** The bytes of `store/knowledge.jsonl` as text; `""` where there is no file, the empty store. */
 export const text = (bytes: Uint8Array | null): string => (bytes === null ? "" : new TextDecoder().decode(bytes));
 
-/** The text of a store of exactly these commits, in order: the lines landing writes, framed by `fileOf` of `store-jsonl`. */
-export const storeTextOf = (commits: readonly Commit[]): string => commits.map((c) => text(fileOf(encodeCommit(c)))).join("");
+/** The text of a store of exactly these commits, in order: the lines landing writes (`commitLine`). */
+export const storeTextOf = (commits: readonly Commit[]): string => commits.map((c) => text(commitLine(c))).join("");
 
 /** The tail of main and a worktree of `request` prepared onto it; without `request`, of the tail commit alone. The caller releases it, or pushes it. */
 export async function onMain(git: Git, request?: string) {

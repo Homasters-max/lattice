@@ -10,18 +10,18 @@
 // OB-07 and `request` arrive with S0-19 and S0-20.
 import { parseJsonBytes, refuse, reject, ROOT, type Rejections, type Result } from "../kernel/index.js";
 import { apply, type LandActs } from "./apply.js";
-import { chainTo, encodeCommit, type Commit } from "./commit.js";
+import { openStore } from "./chain.js";
+import { chainTo, commitLine, type Commit } from "./commit.js";
 import { fold } from "./fold.js";
 import type { Acts } from "./ports/acts.js";
 import type { Clock } from "./ports/clock.js";
 import type { Trailer, Worktree } from "./ports/git.js";
 import type { Ids } from "./ports/ids.js";
-import type { Store } from "./ports/store.js";
+import { KNOWLEDGE, type Store } from "./ports/store.js";
 import { NO_FACTS, proposalHash, readProposal, type Proposal } from "./proposal.js";
-import type { Rows } from "./rows.js";
-import type { View } from "./rows-view.js";
+import type { Rows, View } from "./rows.js";
 import { LG_23, LG_54 } from "./rules.js";
-import { atPath, KNOWLEDGE, MAIN, nameOf, openTail, type AtPath, type OpenedTail, type TailPorts } from "./tail.js";
+import { atPath, MAIN, nameOf, openTail, type AtPath, type OpenedTail, type TailPorts } from "./tail.js";
 
 export interface LandingPorts extends TailPorts {
   readonly acts: Acts;
@@ -116,6 +116,17 @@ async function opened(ports: LandingPorts, request: string): Promise<LandingOutc
   return before.ok ? before.value : rejected(before);
 }
 
+/**
+ * The store on the worktree of a change request, opened (LG-02) to take the commit: it brings `store/knowledge.jsonl`
+ * byte for byte as at the tail of main (LG-23), so it opens as that store did, and its rows are those of `before`.
+ */
+async function storeOn(ports: LandingPorts, worktree: Worktree): Promise<Store> {
+  // Q-39: without signatures, as the store at the tail opens until S0-20.
+  const opened = await openStore(ports.openStore(worktree), null);
+  if (!opened.ok) throw new Error("bug: the store a change request brings as at the tail of main does not open as that store did");
+  return opened.value.store;
+}
+
 /** The checks on the worktree of a change request that merged, the rest of G-19: its proposal (LG-54, KR-10, LG-09); the bytes of the store it brings (LG-23). */
 async function checkOn(ports: LandingPorts, before: OpenedTail, worktree: Worktree): Promise<LandingOutcome | Checked> {
   const found = await proposalOf(worktree);
@@ -123,7 +134,7 @@ async function checkOn(ports: LandingPorts, before: OpenedTail, worktree: Worktr
   const kept = keptKnowledge(before.file, await atPath(worktree, KNOWLEDGE));
   if (!kept.ok) return rejected(kept);
   const { onto, view, tail } = before;
-  return { ...found.value, onto, view, tail, worktree, store: ports.openStore(worktree) };
+  return { ...found.value, onto, view, tail, worktree, store: await storeOn(ports, worktree) };
 }
 
 /** LG-22: the trailers of the landing commit that name the proposal and the `seq`; those of OB-07 arrive with S0-20. */
@@ -141,7 +152,7 @@ const ended = (commit: Commit | null, pushed: boolean): LandingOutcome => (commi
  */
 async function pushed(ports: LandingPorts, checked: Checked, commit: Commit | null): Promise<LandingOutcome> {
   const { onto, worktree, store, path, proposal, view } = checked;
-  if (commit !== null) await store.append({ commit: encodeCommit(commit), delta: fold(view, commit, []), evidence: [] });
+  if (commit !== null) await store.append({ commit: commitLine(commit), delta: fold(view, commit, []), evidence: [] });
   await worktree.remove(path);
   const message = commit === null ? "lattice: land no-op" : `lattice: land commit ${commit.seq}`;
   const trailers = trailersOf(proposalHash(proposal, NO_FACTS), commit?.seq ?? null);

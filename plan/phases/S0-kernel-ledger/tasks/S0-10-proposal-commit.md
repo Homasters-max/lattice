@@ -36,18 +36,20 @@ verifyHash(hash, sig, key: PublicKey): boolean          // ключ — стро
 publicKeyOf(key: SessionKey): PublicKey
 
 // src/ledger/proposal.ts
-readProposal(value, path?): Result<Proposal>            // LG-09, форма закрыта
-canonicalIntents(intents, keyOf: KeyOf): Intent[]       // LG-06, G-03; keyOf — ключ факта по аннотации key, NO_FACTS до S0-13
-proposalHash(p, keyOf): string                          // LG-10
+readProposal(value, place: Place = ROOT): Result<Proposal>                  // LG-09, форма закрыта
+canonicalIntents(intents, keyOf: KeyOf): Intent[]                          // LG-06, G-03; keyOf — ключ факта по аннотации key, NO_FACTS до S0-13
+proposalHash(p, keyOf): string                                             // LG-10
 signProposal(p, sessionKey, keyOf): Proposal
-verifyProposal(p, key, keyOf, path?): Rejection[]       // LG-10
+verifyProposal(p, key, keyOf, place: Place = ROOT): Result<Proposal>       // LG-10
 
 // src/ledger/commit.ts
-commitHash(c): string                                   // LG-06, без sig
-chainTo(candidate, tail): Commit                        // LG-05, G-14: prev — hash tail
-signCommit(c, landKey): Commit                          // LG-06
-verifyChain(commits, keyOfSession, path): Rejection[]   // LG-04, LG-05, LG-06
+commitHash(c): string                                                      // LG-06, без sig
+chainTo(candidate, tail): Commit                                           // LG-05, G-14: prev — hash tail
+signCommit(c, landKey): Commit                                             // LG-06
+verifyChain(commits, keyOfSession, place: Place): Result<readonly Commit[]> // LG-04, LG-05, LG-06
 ```
+
+С S0-37 (`CONVENTIONS.md` §2.2) проверки отдают `Result` с проверенным значением и берут `place: Place` — место проверяемой части во входе (§3.2), а не `path`.
 
 ## Тесты и фикстуры
 
@@ -67,7 +69,7 @@ verifyChain(commits, keyOfSession, path): Rejection[]   // LG-04, LG-05, LG-06
 
 - Ed25519 детерминирован: одинаковые ключ и данные дают одинаковую подпись — на этом стоит воспроизводимая сборка `std` (S0-24).
 - От S0-03 (Q-10): `readProposal` в `src/ledger/proposal.ts` проверяет форму поверхностно — поля и их виды JSON, отказ LG-09 с фикстурами `test/fixtures/LG-09/`; задача доводит форму до LG-09 полностью. Канонический порядок `canonicalIntents` сейчас — сущности, затем события, по `id`; группа фактов по ключу (G-03) — здесь. Коммит в store — каноническая строка: `encodeCommit` и `decodeCommit` в `src/ledger/commit.ts`; `readCommit` уже проверяет форму коммита поверхностно — поля заголовка и их виды JSON, отказ LG-06 с фикстурами `test/fixtures/LG-06/` (ревью S0-03, волна 2); задача доводит LG-06 до цепочки и подписей.
-- Сделано иначе, чем в наброске: `canonicalOrder(records, keyOf)` стал `canonicalIntents(intents, keyOf)` — records коммита идут в порядке intents, из которых apply их строит, и тот же порядок нужен hash proposal (LG-10); поэтому `proposalHash` и `signProposal` тоже берут `keyOf`. `verifyChain` возвращает отказы (`Rejection[]`, `CONVENTIONS.md` §2), а не `Violation[]`, и берёт `path` — место строк store (Q-29). Добавлены `signCommit`, `chainTo` (бывший `onTail` landing) и проверка LG-10 `verifyProposal` — без неё у LG-10 нет жёсткой проверки для фикстур.
+- Сделано иначе, чем в наброске: `canonicalOrder(records, keyOf)` стал `canonicalIntents(intents, keyOf)` — records коммита идут в порядке intents, из которых apply их строит, и тот же порядок нужен hash proposal (LG-10); поэтому `proposalHash` и `signProposal` тоже берут `keyOf`. `verifyChain` возвращает `Result<readonly Commit[]>` — проверенные коммиты или отказы (`CONVENTIONS.md` §2.1, §2.2; с S0-37), а не `Violation[]`, и берёт `place: Place` — место строк store (Q-29, §3.2). Добавлены `signCommit`, `chainTo` (бывший `onTail` landing) и проверка LG-10 `verifyProposal` — без неё у LG-10 нет жёсткой проверки для фикстур.
 - Закрытый ключ сессии — `SessionKey`, ключ платформы (`KeyObject`): формат файла ключа выбирает `cli` (S0-16, S0-21), чистый код его не читает. Подписываемые байты — UTF-8 текста hash: пробел G-24.
 - `verifyChain` не проверяет `proposal_sig`: ключ сессии proposal даёт её сертификат, это цепочка TR-12 в apply (S0-16). Порядок records внутри коммита он тоже не сверяет — для фактов нужны типы; records покрыты подписью коммита.
 - Форма LG-09 закрыта: лишние поля proposal и intent (`by`, `rev`, `seq`, `hash`) отклоняются; `sig` — строка или `null` по форме, подпись ли это — LG-10.

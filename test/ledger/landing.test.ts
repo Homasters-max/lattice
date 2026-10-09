@@ -5,16 +5,7 @@
 // writes the store itself (LG-23).
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { hashBytes } from "../../src/kernel/index.js";
-import {
-  commitHash,
-  land,
-  openTail,
-  type Git,
-  type LandingOutcome,
-  type LandingPorts,
-  type Push,
-  type Store,
-} from "../../src/ledger/index.js";
+import { commitHash, KNOWLEDGE, land, openTail, type Git, type LandingOutcome, type LandingPorts, type Push, type Row, type Store } from "../../src/ledger/index.js";
 import { AT, gitForTests, landingPortsForTests, type GitFixtureBranch, type GitFixtureOptions } from "../support/assembly.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 import { moveMain, onMain, proposal, refusals, storeTextOf, text } from "../support/landing.js";
@@ -35,25 +26,14 @@ const DRY_RUN = deepFreeze({ dryRun: true });
 
 let own: Scratch;
 let dir = "";
-let opened: Store[] = [];
 beforeEach(() => {
   own = scratch("lattice-landing-");
   dir = own.dir;
-  opened = [];
 });
 afterEach(() => own.remove());
 
-/** The ports of landing, frozen by the test assembly; every store landing opens is kept in `opened`, in order. */
-function portsOf(over: Partial<LandingPorts> = {}, branches = BRANCHES): LandingPorts {
-  const ports = landingPortsForTests({ dir, branches }, over);
-  const openStore: LandingPorts["openStore"] = (w) => {
-    const store = ports.openStore(w);
-    opened.push(store);
-    return store;
-  };
-  // Landing never changes its ports: the assembly froze them deep, and the object that adds the recording openStore is frozen too.
-  return Object.freeze({ ...ports, openStore });
-}
+/** The ports of landing, frozen by the test assembly: landing never changes its ports. */
+const portsOf = (over: Partial<LandingPorts> = {}, branches = BRANCHES): LandingPorts => landingPortsForTests({ dir, branches }, over);
 
 /** The store on main, as opening it at the tail reads it (LG-02, LG-38); a store opening refuses fails the test. */
 async function storeOnMain(ports: LandingPorts) {
@@ -92,6 +72,25 @@ function recording(branches = BRANCHES): { readonly git: Git; readonly pushes: P
   return { git: { tail: (ref) => inner.tail(ref), prepare: (p) => inner.prepare(p), push }, pushes };
 }
 
+/** The ports of landing, every store they open kept in `opened`, in order. */
+function openingStores(): { readonly ports: LandingPorts; readonly opened: readonly Store[] } {
+  const inner = portsOf();
+  const opened: Store[] = [];
+  const openStore: LandingPorts["openStore"] = (worktree) => {
+    const store = inner.openStore(worktree);
+    opened.push(store);
+    return store;
+  };
+  return { ports: deepFreeze({ ...inner, openStore }), opened };
+}
+
+/** What a store answers through `rows` and `row` about the entities of cr/a and cr/b. */
+async function rowsOfDemo(store: Pick<Store, "row" | "rows">) {
+  const rows: Row[] = [];
+  for await (const r of store.rows("")) rows.push(r);
+  return [rows, await store.row("current:demo/a"), await store.row("current:demo/b")];
+}
+
 const utf8 = (text: string) => new TextEncoder().encode(text);
 
 describe("landing into git (LG-22, LG-23)", () => {
@@ -112,12 +111,27 @@ describe("landing into git (LG-22, LG-23)", () => {
     expect([view.seq, view.current("demo/a")?.rev, view.current("demo/b")?.rev]).toEqual([2, 1, 1]);
   });
 
-  it("LG-02: append carries the delta the commit folds to, into the store on the worktree", async () => {
+  it("LG-02: the store on main, opened again, answers row with the rows the commits landed fold to", async () => {
     const ports = portsOf();
     await landed(ports, "cr/a");
+    await landed(ports, "cr/b");
+    const { store } = await storeOnMain(ports);
     const rows: string[] = [];
-    for await (const r of opened.at(-1)?.rows("") ?? []) rows.push(`${r.key}@${r.from}`);
-    expect(rows).toEqual(["current:demo/a@1"]);
+    for await (const r of store.rows("")) rows.push(`${r.key}@${r.from}`);
+    expect(rows).toEqual(["current:demo/a@1", "current:demo/b@2"]);
+    expect(await store.row("current:demo/b")).toMatchObject({ key: "current:demo/b", from: 2, to: null });
+  });
+
+  // LG-35: append carries the delta of the commit, so the store landing appended to answers what folding again gives.
+  it("LG-02: the store landing appends to answers row and rows as the store on main opened again", async () => {
+    const { ports, opened } = openingStores();
+    await landed(ports, "cr/a");
+    await landed(ports, "cr/b");
+    // The last store landing opened is the one on the worktree of cr/b, which took its commit.
+    const [appendedTo] = opened.slice(-1) as [Store];
+    const again = await rowsOfDemo((await storeOnMain(ports)).store);
+    expect(again[0]).toHaveLength(2);
+    expect(await rowsOfDemo(appendedTo)).toEqual(again);
   });
 
   it("LG-26: a dry run pushes nothing", async () => {
@@ -145,8 +159,6 @@ describe("the landing commit in git (LG-22)", () => {
     ]);
   });
 });
-
-const KNOWLEDGE = "store/knowledge.jsonl";
 
 describe("the store a change request brings (LG-14, LG-23)", () => {
   /** Main holds the store landing wrote for cr/a; cr/x, a change request from that main, writes `files` of that file. */
