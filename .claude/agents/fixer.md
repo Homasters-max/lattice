@@ -14,7 +14,7 @@ effort: high
 
 ## Brief
 
-Прочитай его первым. `job` — поручение; `branch` — ветка, push — `git push origin HEAD:refs/heads/<branch>`, после rebase — с `--force-with-lease`; `base` — ревьюированный head; `since` — начало ветки (`tidy`). `findings` — блокирующие находки, `advice` — советы (в `answer` — советы круга, в `tidy` — оставшиеся), `decisions` — решения владельца `{id, action, note}`, `owner` — поручение владельца, `log` — лог красных ворот (`prove --gate`).
+Прочитай его первым. `job` — поручение; `branch` — ветка, push — `git push origin HEAD:refs/heads/<branch>`, после rebase — с `--force-with-lease`; `base` — ревьюированный head; `since` — начало ветки (`tidy`). `findings` — блокирующие находки, `advice` — советы (в `answer` — советы круга, в `tidy` — оставшиеся; в `owner` `findings` и `advice` — те, что поручение называет по id), `decisions` — решения владельца `{id, action, note}`, `owner` — поручение владельца, `log` — лог красных ворот (`prove --gate`).
 
 `context`: `hunks` — hunk ветки у каждой находки (или строки файла вокруг неё); `rules` — тексты правил находок дословно из `docs/design`; `conventions` — пункты `CONVENTIONS.md`, которые находки называют или чья область задевает их пути; `runs` — записи run'ов красных test-sets ворот: test-set, упавшие тесты (`failed`), `seed` и исход (`verify-red`); `failed` — упавшие шаги и прогоны test-sets из лога с их выводом (`verify-red`). `cut` — что не вошло в бюджет и где это взять.
 
@@ -24,7 +24,7 @@ effort: high
 - `tidy`: каждый совет и каждую находку вне дельты исправь, если она в объёме задачи и мала; иначе отложи записью в план (`dl step deviation`); совет, который не стоит делать, отклони с причиной.
 - `verify-red`: причина по `runs` и `failed` (PR-11) — исправление, не ослабление теста; тест воспроизводится с `LATTICE_SEED` из записи.
 - `rebase`: rebase на `origin/main`; конфликт — обычный шаг интеграции (PR-18): изменения обеих сторон сохранены.
-- `owner`: исполни поручение владельца.
+- `owner`: исполни поручение владельца; находки и советы из `findings` и `advice` реши, как в `answer`.
 
 Строки `CONVENTIONS.md` из `main` не правь, чтобы закрыть находку или совет: предложение изменить правило — в «Открытое» PR. Перед push — `dl step selfcheck --task <task>` по закоммиченному: каждый пункт `todo` сверь с diff, соседей исправленного (тот же паттерн в других файлах ветки) исправь тем же коммитом; `npm run prove --ready` по закоммиченному зелёный: итог — `outcome` в JSON последней строки и код выхода, вывод не режь `| tail`. Каждого выжившего мутанта из `.lattice/mutants.json`, которого `dl` ещё не помнит, реши: `killed` — тест закоммичен, и новый `prove --ready` это показывает; `equivalent` или `deferred` — с `reason`.
 
@@ -36,8 +36,8 @@ effort: high
 
 `out.json` по пути `out` из brief: `{status: "done" | "needs_owner", head, answers: [{id, action, commits?, where?, note?}], mutants?: [{id, decision, commit?, reason?}], conflicts?: [файл], question?, gaps?, context_missing?: [строка]}` — других полей нет.
 
-- На каждую находку из `findings` и `advice` и каждое решение `task` или `gap` — ровно один ответ.
-- `action`: `fixed` | `disputed` | `deferred` | `declined` — и в `answer`, и в `tidy`.
+- На каждую находку из `findings` и `advice` и каждое решение `task` или `gap` — ровно один ответ; id, которого нет в brief, `dl` не принимает.
+- `action`: `fixed` | `disputed` | `deferred` | `declined` — в `answer`, `tidy` и `owner`.
 - `fixed` — `commits` из `base..head`; в `tidy` — из `since..head`.
 - `disputed` — только о блокирующей находке; `note` называет правило, которое говорит иное. «Трудно» или «вне объёма» — не довод, а `deferred` или вопрос владельцу.
 - `deferred` — совет, находка `late` или решение владельца `task` и `gap`; `where`: файл задачи или `PLAN.md` фазы, изменённый в этом ответе. Блокирующую находку дельты исправь или оспорь. `declined` — только совет, причина в `note`.

@@ -37,11 +37,14 @@ const BOARD = (other: string) => ["# S0", "", "| Задача | Название
 const REPO: Files = {
   "plan/phases/S0-x/tasks/S0-99-x.md": TASK,
   "plan/tools/plan-check.mjs": 'console.log("plan-check");\nprocess.exit(process.env.PLAN_RED ? 1 : 0);\n',
+  // Like the real one, the fake finds the repository by the git of its cwd; FAKE_DRAFT and FAKE_LABELS are the PR.
   "gh.mjs": [
-    'import { appendFileSync } from "node:fs";',
+    'import { appendFileSync, existsSync } from "node:fs";',
     "const args = process.argv.slice(2);",
+    'if (!existsSync(".git") || process.env.FAKE_GH_FAIL) { console.error("failed to run git: fatal: not a git repository"); process.exit(1); }',
     'appendFileSync(process.env.FAKE_GH_LOG, JSON.stringify(args) + "\\n");',
-    'if (args[1] === "view") console.log(JSON.stringify({ url: `https://example.test/pull/${args[2]}` }));',
+    'const labels = (process.env.FAKE_LABELS ?? "").split(",").filter(Boolean).map((name) => ({ name }));',
+    'if (args[1] === "view") console.log(JSON.stringify({ url: `https://example.test/pull/${args[2]}`, isDraft: process.env.FAKE_DRAFT === "1", labels }));',
   ].join("\n"),
 };
 
@@ -87,9 +90,10 @@ async function executorOut(c: Case, done: readonly string[] | undefined): Promis
   return join(c.dir, "executor.out.json");
 }
 
-async function dl(c: Case, args: string[], env: NodeJS.ProcessEnv = {}): Promise<Json> {
+// dl runs in the worktree, or in cwd — the folder of the loop, as the orchestrator may run it.
+async function dl(c: Case, args: string[], env: NodeJS.ProcessEnv = {}, cwd = c.work): Promise<Json> {
   const all = { ...process.env, DEV_LOOP_GH: join(c.root, "work", "gh.mjs"), FAKE_GH_LOG: join(c.root, "gh.log"), DEV_LOOP_NOW: "2026-10-08T10:00:00.000Z", ...env };
-  return JSON.parse(await sh(c.work, tool, [...args], all)) as Json;
+  return JSON.parse(await sh(cwd, tool, [...args], all)) as Json;
 }
 
 const ghCalls = (c: Case): string[][] => {
@@ -100,8 +104,8 @@ const ghCalls = (c: Case): string[][] => {
   }
 };
 const file = (c: Case, path: string) => temp.text(join(c.work, path));
-const ready = async (c: Case, done: readonly string[] | undefined, env: NodeJS.ProcessEnv = {}) =>
-  dl(c, ["ready", "--worktree", c.work, "--from", await executorOut(c, done), "--dir", c.dir], env);
+const ready = async (c: Case, done: readonly string[] | undefined, env: NodeJS.ProcessEnv = {}, cwd = c.work) =>
+  dl(c, ["ready", "--worktree", c.work, "--from", await executorOut(c, done), "--dir", c.dir], env, cwd);
 
 beforeAll(() => {
   temp = scratch("dev-loop-ready-");
@@ -122,6 +126,13 @@ describe.concurrent("dev-loop ready, a task handed in", { timeout: 60_000 }, () 
     expect(await sh(c.work, git, ["log", "-1", "--format=%s"])).toMatch(/^S0-99: /);
     expect((await sh(c.work, git, ["ls-remote", "origin", `refs/heads/${BRANCH}`])).split("\t")[0]).toBe(await head(c));
     expect(ghCalls(c)).toContainEqual(["pr", "ready", "9"]);
+  });
+
+  // gh finds the PR by the git of its cwd: dl runs it in the worktree, wherever dl itself was started.
+  it("asks GitHub from the worktree when dl runs in the folder of the loop", async () => {
+    const c = await repo("🔄 в работе", "⬜");
+    expect(await ready(c, ITEMS, {}, c.dir)).toMatchObject({ ok: true, next: "gate" });
+    expect(ghCalls(c)).toEqual([["pr", "view", "9", "--json", "url"], ["pr", "ready", "9"]]);
   });
 
   // Two cases of the phase, each with its two repositories: one case of four ran at the edge of the safeguard of time.
@@ -173,5 +184,33 @@ describe.concurrent("dev-loop check, the items an executor names done", { timeou
     expect(await check(ITEMS)).toEqual([]);
     expect(await check(undefined)).toEqual(["done: нет — нужен список выполненных пунктов «Готово, когда», словами файла задачи"]);
     expect(await check(["something else"])).toEqual(["done[0]: «something else» — нет такого пункта «Готово, когда» в файле задачи"]);
+  });
+});
+
+// An escalation turns the PR to draft with the label blocked, the final report turns it ready without the label
+// (plan/dev-loop.md, «Обмен»); the label goes by REST — `gh pr edit` reads projects by GraphQL and fails without read:org.
+describe.concurrent("dev-loop escalate and final, the PR on GitHub", { timeout: 60_000 }, () => {
+  const LABELS = "repos/{owner}/{repo}/issues/9/labels";
+  const VIEW = ["pr", "view", "9", "--json", "isDraft,labels"];
+  const init = (c: Case) => dl(c, ["init", "--pr", "9", "--task", "S0-99", "--branch", BRANCH, "--dir", c.dir]);
+
+  it("turns the PR to draft with the label blocked on an escalation and back to ready without it in the final report", async () => {
+    const c = await repo("🔄 в работе", "⬜");
+    await init(c);
+    expect(await dl(c, ["escalate", "--why", "проверить", "--dir", c.dir])).toMatchObject({ ok: true });
+    expect(ghCalls(c)).toEqual([VIEW, ["pr", "ready", "9", "--undo"], ["api", "-X", "POST", LABELS, "-f", "labels[]=blocked"]]);
+    expect(await dl(c, ["final", "--worktree", c.work, "--dir", c.dir], { FAKE_DRAFT: "1", FAKE_LABELS: "blocked" })).toMatchObject({ ok: true });
+    expect(ghCalls(c).slice(3)).toEqual([VIEW, ["api", "-X", "DELETE", `${LABELS}/blocked`], ["pr", "ready", "9"]]);
+  });
+
+  it("leaves a PR that already is so as it is, and writes nothing when GitHub does not answer", async () => {
+    const c = await repo("🔄 в работе", "⬜");
+    await init(c);
+    expect(await dl(c, ["escalate", "--why", "проверить", "--dir", c.dir], { FAKE_DRAFT: "1", FAKE_LABELS: "blocked" })).toMatchObject({ ok: true });
+    expect(await dl(c, ["final", "--worktree", c.work, "--dir", c.dir])).toMatchObject({ ok: true });
+    expect(ghCalls(c)).toEqual([VIEW, VIEW]);
+    const failed = await dl(c, ["escalate", "--why", "снова", "--dir", c.dir], { FAKE_GH_FAIL: "1" });
+    expect(failed).toMatchObject({ ok: false, error: "gh: failed to run git: fatal: not a git repository — PR #9 не переведён в draft с меткой blocked" });
+    expect(temp.list(join(c.dir, "comments")).filter((f) => f.endsWith(".md"))).toEqual(["01-escalation.md", "02-final.md"]);
   });
 });

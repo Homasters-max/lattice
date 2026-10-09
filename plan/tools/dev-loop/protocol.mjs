@@ -191,8 +191,9 @@ function reviewer(brief, out, errors, repo) {
 }
 
 // Действия ответа: answer — блокирующие находки круга и его советы (S0-45); tidy — советы и находки вне дельты перед
-// сдачей. Отложить можно совет, находку вне дельты и решение владельца task или gap; отклонить — только совет.
-const ANSWER_JOBS = ["answer", "tidy"];
+// сдачей; owner — находки и советы, которые назвало поручение владельца, а id, которого brief не поручил, — ошибка.
+// Отложить можно совет, находку вне дельты и решение владельца task или gap; отклонить — только совет.
+const ANSWER_JOBS = ["answer", "tidy", "owner"];
 const ACTIONS = ["fixed", "disputed", "deferred", "declined"];
 
 function answer(errors, a, ctx) {
@@ -201,7 +202,7 @@ function answer(errors, a, ctx) {
   need(errors, a.note === undefined || text(a.note, LIMITS.note), `answers.${a.id}.note: до ${LIMITS.note} знаков`);
   if (a.action === "fixed")
     need(errors, Array.isArray(a.commits) && a.commits.length > 0 && a.commits.every((c) => range.some((r) => sameSha(r, c))),
-      `answers.${a.id}: commits — коммиты из ${from.slice(0, 7)}..head`);
+      `answers.${a.id}: commits — коммиты из ${short(from)}..head`);
   if (a.action === "disputed") {
     need(errors, !advice.has(a.id) && RULE.test(a.note ?? ""), `answers.${a.id}: спор — только о блокирующей находке и с правилом`);
     references(errors, a.note, repo, `answers.${a.id}.note`);
@@ -217,15 +218,17 @@ function answers(brief, out, errors, repo) {
   const items = list(errors, out.answers, "answers");
   const advice = new Set((brief.advice ?? []).map((f) => f.id));
   const decided = (brief.decisions ?? []).filter((d) => d.action !== "fix").map((d) => d.id);
-  const expected = [...brief.findings.map((f) => f.id), ...advice, ...decided];
-  const deferrable = new Set([...advice, ...brief.findings.filter((f) => f.late === true).map((f) => f.id), ...decided]);
+  const findings = brief.findings ?? [];
+  const expected = [...findings.map((f) => f.id), ...advice, ...decided];
+  const deferrable = new Set([...advice, ...findings.filter((f) => f.late === true).map((f) => f.id), ...decided]);
   const ids = items.map((a) => a.id);
   for (const id of expected) need(errors, ids.includes(id), `answers: нет ответа на ${id}`);
   need(errors, new Set(ids).size === ids.length, "answers: на находку — ровно один ответ");
   // tidy: хвост мог закрыть любой коммит ветки — например, поручение владельца до последнего круга.
+  // Коммиты и файлы ответа git считает, только если ответ их называет: у поручения владельца до первого круга base нет.
   const from = brief.job === "tidy" ? brief.since : brief.base;
-  const range = isSha(out.head) ? repo.commits(from, out.head) : [];
-  const changed = isSha(out.head) ? repo.changed(brief.base, out.head) : [];
+  const range = items.some((a) => a.action === "fixed") && isSha(out.head) && from ? repo.commits(from, out.head) : [];
+  const changed = items.some((a) => a.action === "deferred") && isSha(out.head) && brief.base ? repo.changed(brief.base, out.head) : [];
   for (const a of items) {
     need(errors, expected.includes(a.id), `answers: ${a.id} не поручен`);
     answer(errors, a, { brief, from, range, changed, advice, deferrable, repo });
