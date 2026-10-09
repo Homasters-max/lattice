@@ -87,6 +87,9 @@ async function answers(store: Store) {
   };
 }
 
+/** What an append writes, as the store gives it back: the lines, the tail, the evidence of `EVIDENCE` and the rows. */
+const written = async (store: Store) => [await all(store.commits(1)), await store.tail(), await store.evidence(EVIDENCE.hash), await all(store.rows(""))];
+
 const refusals = (out: { readonly ok: boolean; readonly rejections?: readonly { readonly rule: string; readonly path: string }[] }) =>
   (out.rejections ?? []).map((r) => [r.rule, r.path]);
 
@@ -122,11 +125,13 @@ describe.each(ADAPTERS)("store port: $name", ({ make }) => {
     expect((await all(store.rows("current:"))).map((r) => r.key)).toEqual(["current:b"]);
   });
 
-  // Q-27: a delta closes a row the fold of the ledger saw; one the store does not keep is a bug, never a silent no-op.
-  it("LG-35: a delta that closes a row the store does not keep is a bug of the ledger, thrown", async () => {
+  // Q-27: a delta closes a row the fold saw; one the store does not keep is a bug, never a no-op — and the append stays atomic.
+  it("LG-02, LG-35: a delta that closes a row the store does not keep is a bug of the ledger, thrown before anything is written", async () => {
     const store = make();
     await store.append({ commit: utf8("1\n"), delta: [row("current:a", 1)], evidence: [] });
-    await expect(store.append({ commit: utf8("2\n"), delta: [row("current:b", 1, 2)], evidence: [] })).rejects.toThrow(/^bug:/);
+    const before = await written(store);
+    await expect(store.append({ commit: utf8("2\n"), delta: [row("current:c", 2), row("current:b", 1, 2)], evidence: [EVIDENCE] })).rejects.toThrow(/^bug:/);
+    expect(await written(store)).toEqual(before);
   });
 
   // Q-18: whatever order the ledger hands the rows in, the store answers in the order of sortRows.
@@ -144,7 +149,6 @@ describe.each(ADAPTERS)("store port: $name", ({ make }) => {
     expect(await store.evidence(EVIDENCE.hash)).toEqual(EVIDENCE.bytes);
     expect(await store.evidence(hashBytes(utf8("none")))).toBeNull();
   });
-
 });
 
 describe.each(ADAPTERS)("opening a store: $name (LG-02, LG-05)", ({ make }) => {
