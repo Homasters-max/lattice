@@ -19,7 +19,7 @@ export {
   type RoleRights,
   type Writer,
 } from "./policy.js";
-export { RULES, TR_02, TR_09, TR_10, TR_11, TR_12 } from "./rules.js";
+export { RULES, TR_09, TR_10, TR_11, TR_12 } from "./rules.js";
 export {
   certificateHash,
   issueSession,
@@ -34,4 +34,4 @@ export {
   type SessionBody,
   type UnsignedSession,
 } from "./session.js";
-export { isPublicKey, publicKeyOf, readOpenSshKey, signHash, verifyHash, type PublicKey, type SessionKey } from "./signature.js";
+export { isPublicKey, publicKeyOf, readOpenSshKey, signHash, verifyHash, type ParticipantKey, type PublicKey, type SessionKey } from "./signature.js";

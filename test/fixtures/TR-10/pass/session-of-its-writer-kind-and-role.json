@@ -5,19 +5,6 @@
       "owner": "alice",
       "writers": [
         {
-          "participant": "alice",
-          "kind": "human",
-          "identities": [
-            "github:alice"
-          ],
-          "keys": [
-            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHdbHm3SGrugedxix21nrQCJQsF1pIQAheFFod0356F1"
-          ],
-          "roles": [
-            "author"
-          ]
-        },
-        {
           "participant": "land",
           "kind": "machine",
           "keys": [
@@ -25,9 +12,6 @@
           ],
           "roles": [
             "land"
-          ],
-          "grants": [
-            "runner"
           ]
         }
       ]

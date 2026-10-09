@@ -51,8 +51,9 @@ const OWNS = {
   ledger: ["std/"],
   // budget.test.ts reads every test file for the budget of its properties.
   support: ["test/"],
-  // signature.test.ts reads the dev keys as OpenSSH files (Q-04).
-  trust: ["test/keys/"],
+  // signature.test.ts reads the dev keys as OpenSSH files (Q-04); policy.test.ts and session.test.ts read a policy
+  // and a session against their types — std/namespace-policy of std/source and core/session (KR-21).
+  trust: ["test/keys/", "std/"],
   // the tests of the tools run them on copies of the plan and check the documents of the loop against them, and
   // that every file those documents name exists.
   tools: ["plan/", "scripts/", "discussion/tools/", ".claude/", "AGENTS.md", "CONVENTIONS.md", "test/structure/skeleton-files.txt", "test/support/assembly.ts"],

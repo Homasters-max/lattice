@@ -7,9 +7,6 @@
         {
           "participant": "alice",
           "kind": "human",
-          "identities": [
-            "github:alice"
-          ],
           "keys": [
             "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHdbHm3SGrugedxix21nrQCJQsF1pIQAheFFod0356F1"
           ],
@@ -22,12 +19,6 @@
           "kind": "machine",
           "keys": [
             "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFPLvuGDMrkpIv327l5Xet8bwJIZiLX4bun0PfHUgVGD"
-          ],
-          "roles": [
-            "land"
-          ],
-          "grants": [
-            "runner"
           ]
         }
       ]

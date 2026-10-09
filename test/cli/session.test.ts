@@ -7,6 +7,7 @@ import { createPrivateKey } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { run } from "../../src/cli/run.js";
 import { ROOT, type JsonValue } from "../../src/kernel/index.js";
+import { SESSION_TYPE } from "../../src/ledger/index.js";
 import { publicKeyOf, verifySession, type Policy } from "../../src/trust/index.js";
 import { assembleForTests } from "../support/assembly.js";
 import { owned, scratch, type Scratch } from "../support/files.js";
@@ -42,13 +43,14 @@ const saved = () => JSON.parse(home.text(".lattice/session.json")) as JsonValue 
 
 /** The chain of TR-12 of the saved session to its key, under a policy that lists `writer`. */
 function chainOf(writer: Policy["writers"] & object) {
-  return verifySession({ session: saved(), policy: { owner: "owner", writers: writer }, at: AT }, ROOT, (key) => ({ ok: true, value: key }));
+  const types = (ref: string) => (ref === "core/session@1" ? SESSION_TYPE.body : null);
+  return verifySession({ session: saved(), types, policy: { owner: "owner", writers: writer }, at: AT }, ROOT, (key) => ({ ok: true, value: key }));
 }
 
 describe("lattice session (RT-32, TR-11)", () => {
   it("RT-32, TR-11, Q-04: issues a machine session and its certificate with a dev key of test/keys", async () => {
     keyFileAt("dev-land", "keys/dev-land");
-    expect(await lattice("session", "--participant", "land", "--kind", "machine", "--role", "land", "--purpose", "check", "--key", "keys/dev-land")).toEqual({
+    expect(await lattice("session", "--participant", "land", "--kind", "machine", "--role", "land", "--purpose", "check", "--for", "demo/requirement@1", "--key", "keys/dev-land")).toEqual({
       code: 0,
       out: "session 01JB2X00000000000000000001: land (machine) as land for check, expires 2026-10-07T00:30:00.000000Z\n",
       err: "",
@@ -81,8 +83,10 @@ describe("lattice session that does not start a session", () => {
     keyFileAt("dev-owner", "owner");
     const init = await lattice("session", "--participant", "alice", "--role", "owner", "--purpose", "init", "--for", "demo/requirement@1", "--key", "owner");
     expect([init.code, init.out.split("\n")[0], init.out.split("\n")[1]?.split(":")[0]]).toEqual([1, "rejections: 1", "TR-11 at /body/for"]);
-    const agent = await lattice("session", "--participant", "claude", "--kind", "agent", "--role", "author", "--key", "owner");
+    const agent = await lattice("session", "--participant", "claude", "--kind", "agent", "--role", "author", "--for", "demo/requirement@1", "--key", "owner");
     expect([agent.code, agent.out.split("\n")[1]?.split(":")[0]]).toEqual([1, "TR-11 at /body/kind"]);
+    const work = await lattice("session", "--participant", "alice", "--role", "author", "--key", "owner");
+    expect([work.code, work.out.split("\n")[1]?.split(":")[0]]).toEqual([1, "TR-11 at /body/for"]);
     expect(home.exists(".lattice/session.json")).toBe(false);
   });
 

@@ -1,9 +1,11 @@
 // Sessions and the chain of their certificates (TR-10, TR-11, TR-12): a
-// session event carries a certificate signed by a key of its participant; the
+// session event carries a certificate signed by a key of its participant; its
+// body has the one form of its type `core/session@1` (KR-21), and trust adds
+// what that schema does not say — the reason a purpose needs (OB-01). The
 // chain runs from a key the policy in `before` lists (TR-06), through the
 // certificate, to the signature of the proposal by the session key (LG-10).
 import { describe, expect, it } from "vitest";
-import { reject, ROOT, type JsonValue } from "../../src/kernel/index.js";
+import { reject, ROOT, type JsonValue, type ResolveType } from "../../src/kernel/index.js";
 import { createView, NO_FACTS, openLines, readProposal, encodeCommit, signProposal, verifyProposal, type Proposal } from "../../src/ledger/index.js";
 import {
   certificateHash,
@@ -20,6 +22,7 @@ import {
   type Session,
   type UnsignedSession,
 } from "../../src/trust/index.js";
+import { std } from "../ledger/std-sources.js";
 import { landedChain } from "../support/chain.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 import { testKey } from "../support/keys.js";
@@ -27,6 +30,9 @@ import { testKey } from "../support/keys.js";
 const [ALICE, BOB, MALLORY, SESSION_KEY] = [testKey("alice"), testKey("bob"), testKey("mallory"), testKey("session")];
 const AT = "2026-10-06T12:00:00.000000Z";
 const AT_SESSION = { intent: null, path: "/session" };
+
+/** The types a session is read against: `core/session@1`, as genesis holds it, and the types of std. */
+const TYPES: ResolveType = (ref) => std().resolve(ref);
 
 const POLICY: Policy = deepFreeze({
   owner: "alice",
@@ -68,34 +74,76 @@ const sessionWith = (body: Partial<UnsignedSession["body"]>, by = ALICE.key) => 
 const where = (r: { readonly ok: boolean; readonly rejections?: readonly { readonly rule: string; readonly path: string }[] }) =>
   r.ok ? [] : (r.rejections ?? []).map((x) => [x.rule, x.path]);
 
+const read = (value: JsonValue, place = ROOT) => readSession(value, TYPES, place);
+const issue = (value: JsonValue, place = ROOT) => issueSession(value, ALICE.key, TYPES, place);
+
 /** The chain to nothing past the certificate: the session key it yields. */
 const keyOnly = (key: string) => ({ ok: true as const, value: key });
 
 describe("session events (TR-11)", () => {
-  it("TR-11: reads a session with its certificate; for and parent are optional", () => {
+  it("TR-11: reads a session with its certificate; parent is optional", () => {
     const session = signed(UNSIGNED);
-    expect(readSession(deepFreeze(session), ROOT)).toEqual({ ok: true, value: session });
-    expect(readSession({ ...session, body: { ...withoutReason(session.body), parent: "01JB2X00000000000000000STP" } }, ROOT).ok).toBe(true);
+    expect(read(deepFreeze(session))).toEqual({ ok: true, value: session });
+    expect(read({ ...session, body: { ...session.body, parent: "01JB2X00000000000000000STP" } }).ok).toBe(true);
   });
 
-  it("TR-11: refuses a session out of its form, inside the place the caller names", () => {
+  it("TR-11, G-45: refuses a session event out of its form {id, at, body}, inside the place the caller names", () => {
     const session = signed(UNSIGNED);
     const cases: readonly (readonly [JsonValue, readonly string[][]])[] = [
       [null, [["TR-11", "/session"]]],
       [{ id: session.id, at: session.at }, [["TR-11", "/session/body"]]],
       [{ ...session, by: session.id }, [["TR-11", "/session/by"]]],
-      [{ ...session, body: { ...session.body, kind: "robot", purpose: "play" } }, [["TR-11", "/session/body/kind"], ["TR-11", "/session/body/purpose"]]],
-      [{ ...session, body: { ...session.body, for: { reason: "requirement" } } }, [["TR-11", "/session/body/for"]]],
-      [{ ...session, body: { ...session.body, certificate: "a key" } }, [["TR-11", "/session/body/certificate"]]],
-      [{ ...session, body: { ...session.body, certificate: { key: SESSION_KEY.publicKey, expires: "2026-10-07" } } }, [["TR-11", "/session/body/certificate/sig"]]],
-      [{ ...session, body: { ...session.body, certificate: { ...session.body.certificate, expires: "2026-10-07" } } }, [["KR-11", "/session/body/certificate/expires"]]],
+      [{ ...session, id: 7 }, [["TR-11", "/session/id"]]],
     ];
-    for (const [value, expected] of cases) expect(where(readSession(value, AT_SESSION)), JSON.stringify(value)).toEqual(expected);
+    for (const [value, expected] of cases) expect(where(readSession(value, TYPES, AT_SESSION)), JSON.stringify(value)).toEqual(expected);
   });
 
-  it("TR-11, OB-01: a session with purpose init names no reason", () => {
-    expect(where(readSession(sessionWith({ purpose: "init" }), ROOT))).toEqual([["TR-11", "/body/for"]]);
-    expect(readSession(signed({ ...UNSIGNED, body: { ...withoutReason(UNSIGNED.body), purpose: "init" } }), ROOT).ok).toBe(true);
+  it("KR-06, KR-11, G-45: the id of a session is a ULID, its at a time", () => {
+    const session = signed(UNSIGNED);
+    expect(where(read({ ...session, id: "alice/session" }))).toEqual([["KR-06", "/id"]]);
+    expect(where(read({ ...session, at: "2026-10-06" }))).toEqual([["KR-11", "/at"]]);
+  });
+
+  it("KR-15: a session is read against the type its caller resolves; without core/session@1 it is no session", () => {
+    expect(where(readSession(signed(UNSIGNED), () => null, AT_SESSION))).toEqual([["KR-15", "/session/type"]]);
+  });
+});
+
+describe("the body of a session (KR-21)", () => {
+  it("KR-21: the body of a session has the one form of its type core/session@1", () => {
+    const session = signed(UNSIGNED);
+    const finding = { reason: "finding", rule: "TR-34", subject: "demo/a@1" };
+    expect(read({ ...session, body: { ...session.body, for: finding } }).ok).toBe(true);
+    const cases: readonly (readonly [JsonValue, string])[] = [
+      [{ kind: "robot" }, "/body/kind"],
+      [{ purpose: "play" }, "/body/purpose"],
+      [{ participant: "" }, "/body/participant"],
+      [{ parent: "" }, "/body/parent"],
+      [{ certificate: "a key" }, "/body/certificate"],
+      [{ certificate: { ...session.body.certificate, expires: "2026-10-07" } }, "/body/certificate/expires"],
+      [{ certificate: { ...session.body.certificate, by: "alice" } }, "/body/certificate/by"],
+      [{ for: { reason: "requirement" } }, "/body/for"],
+      [{ for: { reason: "requirement", requirement: "" } }, "/body/for"],
+      [{ for: { ...finding, reason: "wish" } }, "/body/for"],
+      [{ owner: "alice" }, "/body/owner"],
+    ];
+    for (const [over, path] of cases) {
+      const found = where(read({ ...session, body: { ...session.body, ...(over as object) } }));
+      expect([path, found.length > 0 && found.every(([rule, at]) => rule === "KR-21" && at?.startsWith(path))], JSON.stringify(found)).toEqual([path, true]);
+    }
+  });
+});
+
+describe("the reason of a session (TR-11, OB-01)", () => {
+  it("TR-11, OB-01: a session with purpose init names no reason; work, import, check and bench name one; explore names it later", () => {
+    expect(where(read(sessionWith({ purpose: "init" })))).toEqual([["TR-11", "/body/for"]]);
+    expect(read(signed({ ...UNSIGNED, body: { ...withoutReason(UNSIGNED.body), purpose: "init" } })).ok).toBe(true);
+    for (const purpose of ["work", "import", "check", "bench"] as const) {
+      expect([purpose, where(read(signed({ ...UNSIGNED, body: { ...withoutReason(UNSIGNED.body), purpose } })))]).toEqual([purpose, [["TR-11", "/body/for"]]]);
+      expect([purpose, read(sessionWith({ purpose })).ok]).toEqual([purpose, true]);
+    }
+    expect(read(signed({ ...UNSIGNED, body: { ...withoutReason(UNSIGNED.body), purpose: "explore" } })).ok).toBe(true);
+    expect(read(sessionWith({ purpose: "explore" })).ok).toBe(true);
   });
 });
 
@@ -105,27 +153,28 @@ describe("certificates (TR-11, G-46)", () => {
     const hash = certificateHash(UNSIGNED, ROOT);
     expect(certificateHash(session, ROOT)).toEqual(hash);
     expect(hash.ok && verifyHash(hash.value, session.body.certificate.sig, ALICE.publicKey)).toBe(true);
-    // Every field of the session is covered: a changed role is another hash.
+    // Every field of the session is covered: a changed role or expiry is another hash.
     expect(certificateHash({ ...UNSIGNED, body: { ...UNSIGNED.body, role: "owner" } }, ROOT)).not.toEqual(hash);
+    expect(certificateHash({ ...UNSIGNED, body: { ...UNSIGNED.body, certificate: { ...UNSIGNED.body.certificate, expires: "2027-10-07T11:00:00.000000Z" } } }, ROOT)).not.toEqual(hash);
   });
 
   it("TR-11: issues a session of a human or a machine by its own key; an agent's session comes from its caller (S3)", () => {
-    expect(issueSession(UNSIGNED, ALICE.key, ROOT)).toEqual({ ok: true, value: signed(UNSIGNED) });
-    expect(where(issueSession({ ...UNSIGNED, body: { ...UNSIGNED.body, kind: "agent" } }, ALICE.key, ROOT))).toEqual([["TR-11", "/body/kind"]]);
-    expect(where(issueSession({ ...UNSIGNED, body: { ...UNSIGNED.body, purpose: "init" } }, ALICE.key, ROOT))).toEqual([["TR-11", "/body/for"]]);
+    expect(issue(UNSIGNED)).toEqual({ ok: true, value: signed(UNSIGNED) });
+    expect(where(issue({ ...UNSIGNED, body: { ...UNSIGNED.body, kind: "agent" } }))).toEqual([["TR-11", "/body/kind"]]);
+    expect(where(issue({ ...UNSIGNED, body: { ...UNSIGNED.body, purpose: "init" } }))).toEqual([["TR-11", "/body/for"]]);
   });
 
   it("TR-11: issues from the value of an unsigned session — a signature it holds is replaced; a value out of form is refused", () => {
     const stale = { ...UNSIGNED, body: { ...UNSIGNED.body, certificate: { ...UNSIGNED.body.certificate, sig: "ed25519:stale" } } };
-    expect(issueSession(deepFreeze(stale), ALICE.key, ROOT)).toEqual({ ok: true, value: signed(UNSIGNED) });
-    expect(where(issueSession({ ...UNSIGNED, body: { ...UNSIGNED.body, certificate: "a key" } }, ALICE.key, ROOT))).toEqual([["TR-11", "/body/certificate"]]);
-    expect(where(issueSession({ ...UNSIGNED, body: "a body" }, ALICE.key, ROOT))).toEqual([["TR-11", "/body"]]);
-    expect(where(issueSession("a session", ALICE.key, ROOT))).toEqual([["TR-11", ""]]);
+    expect(issue(deepFreeze(stale))).toEqual({ ok: true, value: signed(UNSIGNED) });
+    expect(where(issue({ ...UNSIGNED, body: { ...UNSIGNED.body, certificate: "a key" } }))).toEqual([["KR-21", "/body/certificate"]]);
+    expect(where(issue({ ...UNSIGNED, body: "a body" }))).toEqual([["TR-11", "/body"]]);
+    expect(where(issue("a session"))).toEqual([["TR-11", ""]]);
   });
 });
 
 /** The chain of a session to its key alone, at `at`, under `policy`. */
-const chainOf = (session: JsonValue, policy: Policy = POLICY, at = AT) => verifySession(deepFreeze({ session, policy, at }), AT_SESSION, keyOnly);
+const chainOf = (session: JsonValue, policy: Policy = POLICY, at = AT) => verifySession(deepFreeze({ session, types: TYPES, policy, at }), AT_SESSION, keyOnly);
 
 describe("the chain of a session (TR-12)", () => {
   it("TR-12: a certificate signed by the key the policy lists for the participant gives the session key", () => {
@@ -148,6 +197,13 @@ describe("the chain of a session (TR-12)", () => {
     expect(where(chainOf(later))).toEqual([["TR-12", "/session/body/certificate/sig"]]);
   });
 
+  it("TR-11: a session out of its form or without its reason is refused before its chain", () => {
+    expect(where(chainOf({ id: UNSIGNED.id }))).toEqual([["TR-11", "/session/body"], ["TR-11", "/session/at"]].sort());
+    expect(where(chainOf(signed({ ...UNSIGNED, body: withoutReason(UNSIGNED.body) }, MALLORY.key)))).toEqual([["TR-11", "/session/body/for"]]);
+  });
+});
+
+describe("the binding and the expiry of a certificate (TR-10, TR-11)", () => {
   it("TR-10: the key binds its participant to the kind and the roles of its writer entry", () => {
     expect(where(chainOf(sessionWith({ kind: "machine" })))).toEqual([["TR-10", "/session/body/kind"]]);
     expect(where(chainOf(sessionWith({ role: "land" })))).toEqual([["TR-10", "/session/body/role"]]);
@@ -175,10 +231,6 @@ describe("the chain of a session (TR-12)", () => {
       ["TR-12", "/session/body/certificate/sig"],
     ]);
   });
-
-  it("TR-11: a session out of its form is refused before its chain", () => {
-    expect(where(chainOf({ id: UNSIGNED.id }))).toEqual([["TR-11", "/session/body"], ["TR-11", "/session/at"]].sort());
-  });
 });
 
 /** A proposal of the session `session`, with one intent, signed by `by` when given. */
@@ -194,7 +246,7 @@ function proposalOf(session: Session, by?: typeof SESSION_KEY): Proposal {
 
 /** The whole chain of TR-12: key in the policy → certificate → proposal, its last link LG-10. */
 const toProposal = (p: Proposal, policy: Policy = POLICY) =>
-  verifySession({ session: p.session, policy, at: AT }, AT_SESSION, (key) => verifyProposal(p, key, NO_FACTS, ROOT));
+  verifySession({ session: p.session, types: TYPES, policy, at: AT }, AT_SESSION, (key) => verifyProposal(p, key, NO_FACTS, ROOT));
 
 describe("the chain to the proposal (TR-12, LG-10)", () => {
   it("TR-12, LG-10: a proposal signed by the session key passes the whole chain", () => {
@@ -210,7 +262,7 @@ describe("the chain to the proposal (TR-12, LG-10)", () => {
 
   it("TR-12: the proposal is not checked while the chain to its session key is broken", () => {
     let checked = false;
-    const out = verifySession({ session: signed(UNSIGNED, MALLORY.key), policy: POLICY, at: AT }, AT_SESSION, (key) => {
+    const out = verifySession({ session: signed(UNSIGNED, MALLORY.key), types: TYPES, policy: POLICY, at: AT }, AT_SESSION, (key) => {
       checked = true;
       return keyOnly(key);
     });
@@ -253,50 +305,35 @@ describe("policy from before (TR-06)", () => {
 const IN_INTENT = { intent: "x", path: "/session" };
 const at = (path: string) => ({ intent: "x", path: `/session${path}` });
 
-describe("what a rejection of a session names (TR-10, TR-11, TR-12)", () => {
-  it("TR-11: the form of a session — what was expected, what came, inside the place the caller names", () => {
+describe("what a rejection of a session names (TR-11)", () => {
+  it("TR-11: the form of a session and its reason — what was expected, what came, inside the place the caller names", () => {
     const session = signed(UNSIGNED);
     const cases: readonly (readonly [JsonValue, ReturnType<typeof reject>])[] = [
       ["a session", reject(TR_11, { ...IN_INTENT, expected: "a session event", got: "a session" })],
       [{ ...session, body: "a body" }, reject(TR_11, { ...at("/body"), expected: "the body of a session", got: "a body" })],
-      [{ ...session, body: { ...session.body, certificate: "a key" } }, reject(TR_11, { ...at("/body/certificate"), expected: "a certificate {key, expires, sig}", got: "a key" })],
       [
         { ...session, body: { ...session.body, purpose: "init" } },
         reject(TR_11, { ...at("/body/for"), expected: "absent: a session with purpose init has no reason", got: session.body.for ?? null }),
       ],
+      [
+        { ...session, body: { ...withoutReason(session.body), purpose: "bench" } },
+        reject(TR_11, { ...at("/body/for"), expected: "a reason: a session with purpose bench names it (OB-01)", got: "absent" }),
+      ],
     ];
-    for (const [value, rejection] of cases) expect(readSession(value, IN_INTENT), JSON.stringify(value)).toEqual({ ok: false, rejections: [rejection] });
+    for (const [value, rejection] of cases) expect(readSession(value, TYPES, IN_INTENT), JSON.stringify(value)).toEqual({ ok: false, rejections: [rejection] });
   });
 
-  it("TR-11: an empty participant or step and a reason out of its form are refused; a finding is a reason", () => {
-    const body = (over: JsonValue) => ({ ...signed(UNSIGNED), body: { ...signed(UNSIGNED).body, ...(over as object) } });
-    const finding = { reason: "finding", rule: "TR-34", subject: "demo/a@1" };
-    expect(readSession(body({ for: finding }), ROOT).ok).toBe(true);
-    const cases: readonly (readonly [JsonValue, string])[] = [
-      [{ participant: "" }, "/body/participant"],
-      [{ parent: "" }, "/body/parent"],
-      [{ for: { reason: "requirement", requirement: "" } }, "/body/for"],
-      [{ for: { reason: "requirement", requirement: "demo/r@1", rule: "TR-34" } }, "/body/for"],
-      [{ for: { reason: "finding", rule: "TR-34" } }, "/body/for"],
-      [{ for: { ...finding, rule: "" } }, "/body/for"],
-      [{ for: { ...finding, reason: "wish" } }, "/body/for"],
-      [{ for: { reason: "wish", requirement: "demo/r@1" } }, "/body/for"],
-    ];
-    for (const [over, path] of cases) expect(where(readSession(body(over), ROOT)), path).toEqual([["TR-11", path]]);
-  });
-
-});
-
-describe("what a rejection of the chain names (TR-10, TR-11, TR-12)", () => {
   it("TR-11: an agent's session is refused at its kind when issued by its own key", () => {
-    expect(issueSession({ ...UNSIGNED, body: { ...UNSIGNED.body, kind: "agent" } }, ALICE.key, IN_INTENT)).toEqual({
+    expect(issue({ ...UNSIGNED, body: { ...UNSIGNED.body, kind: "agent" } }, IN_INTENT)).toEqual({
       ok: false,
       rejections: [reject(TR_11, { ...at("/body/kind"), expected: "human or machine: an agent session is certified by its caller", got: "agent" })],
     });
   });
+});
 
+describe("what a rejection of the chain names (TR-10, TR-11, TR-12)", () => {
   it("TR-10, TR-11, TR-12: the chain names the expiry, the writer's kind and roles, the hash and the key it expected", () => {
-    const chain = (session: Session, policy: Policy = POLICY, time = AT) => verifySession({ session, policy, at: time }, IN_INTENT, keyOnly);
+    const chain = (session: Session, policy: Policy = POLICY, time = AT) => verifySession({ session, types: TYPES, policy, at: time }, IN_INTENT, keyOnly);
     const expired = signed(UNSIGNED);
     expect(chain(expired, POLICY, "2026-10-08T00:00:00.000000Z")).toEqual({
       ok: false,

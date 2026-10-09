@@ -4,8 +4,8 @@
 // key; the certificate is signed by the participant's own key, read from an
 // unencrypted OpenSSH key file (Q-04). `cli` reads and writes the files.
 import { generateKeyPairSync } from "node:crypto";
-import { canon, KERNEL_VERSION, ROOT, type JsonObject, type Rejections } from "../kernel/index.js";
-import type { Clock, Ids } from "../ledger/index.js";
+import { canon, KERNEL_VERSION, ROOT, type JsonObject, type Rejections, type ResolveType } from "../kernel/index.js";
+import { SESSION_TYPE, type Clock, type Ids } from "../ledger/index.js";
 import { issueSession, publicKeyOf, readOpenSshKey, type Session } from "../trust/index.js";
 
 /** What the command `session` asks for: the fields of the session (TR-11) and the participant's key file. */
@@ -55,12 +55,15 @@ function unsigned(request: SessionRequest, ports: { readonly clock: Clock; reado
   return { id: ports.ids.ulid(), at, body };
 }
 
+/** KR-21: the one type a session is read against before a store is open — the session type ledger code makes (LG-47). */
+const SESSION_TYPES: ResolveType = (ref) => (ref === `${SESSION_TYPE.id}@${SESSION_TYPE.rev}` ? SESSION_TYPE.body : null);
+
 /** TR-11: starts a session — a new session key, a session event with its certificate signed by the participant's key. */
 export function startSession(ports: { readonly clock: Clock; readonly ids: Ids }, request: SessionRequest): SessionOutcome {
   const participantKey = readOpenSshKey(request.participantKey);
   if (participantKey === null) return { outcome: "not-a-key" };
   const { privateKey } = generateKeyPairSync("ed25519");
-  const issued = issueSession(unsigned(request, ports, publicKeyOf(privateKey)), participantKey, ROOT);
+  const issued = issueSession(unsigned(request, ports, publicKeyOf(privateKey)), participantKey, SESSION_TYPES, ROOT);
   if (!issued.ok) return { outcome: "rejections", rejections: issued.rejections };
   const text = canon(issued.value);
   if (!text.ok) throw new Error("bug: an issued session is canonical");

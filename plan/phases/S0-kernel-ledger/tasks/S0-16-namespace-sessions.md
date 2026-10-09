@@ -31,7 +31,7 @@ rules: [TR-01, TR-02, TR-05, TR-06, TR-07, TR-09, TR-10, TR-11, TR-12, GL-07, RT
 
 - Сертификат, подписанный ключом не из policy; просроченный; подпись proposal не тем ключом — отказы с rule ID.
 - Изменение policy действует со следующего коммита (TR-06).
-- Фикстуры trigger/pass: TR-10, TR-11, TR-12; ещё TR-02 и TR-09 — у чтения policy свои отказы, и LG-10 через строку `session` — последнее звено цепочки.
+- Фикстуры trigger/pass: TR-10, TR-11, TR-12; ещё TR-09 — у чтения policy свои отказы, и LG-10 через строку `session` — последнее звено цепочки. Форму policy и тела сессии держит схема их типа (KR-21), не trust: у TR-02 своей жёсткой проверки нет.
 
 ## Готово, когда
 
@@ -47,9 +47,9 @@ rules: [TR-01, TR-02, TR-05, TR-06, TR-07, TR-09, TR-10, TR-11, TR-12, GL-07, RT
 
 ## Как сделано
 
-- `src/trust/policy.ts`: `readPolicy` — закрытая форма policy (TR-02) и записи writers: идентичности (TR-09), ключи Ed25519 OpenSSH и ни одного ключа у `agent` (TR-10); `namespaceOf`, `policyOf(before, namespace)` (TR-06), `ownerOf(before, id)` (TR-05, GL-07).
-- `src/trust/session.ts`: `readSession` — событие сессии `{id, at, body}` (TR-11, G-45); `signSession` и `issueSession` подписывают сертификат ключом участника по hash события без `sig` (G-46); `verifySession({session, policy, at}, place, proposal)` — цепочка TR-12: срок (TR-11), подпись сертификата ключом участника из policy (TR-12), вид и роль его записи writers (TR-10), затем последнее звено — `proposal(sessionKey)`: ledger отдаёт в него `verifyProposal` (LG-10), так hash proposal остаётся ledger.
-- `src/trust/signature.ts`: `isPublicKey` и `readOpenSshKey` — свой разбор незашифрованного OpenSSH-файла ключа (Q-04, R5); dev-ключи — `test/keys/dev-owner` (human) и `test/keys/dev-land` (machine), помечены INSECURE.
+- `src/trust/policy.ts`: `readPolicy` читает тело namespace, которое допустил его тип `std/namespace-policy@1` (KR-21), и отклоняет только то, чего схема не говорит: идентичности writers (TR-09), ключи Ed25519 OpenSSH и ни одного ключа у `agent` (TR-10); `namespaceOf`, `policyOf(before, namespace)` (TR-06; запись другого типа на id namespace — не namespace, G-47), `ownerOf(before, id)` (TR-05, GL-07).
+- `src/trust/session.ts`: `readSession(value, types, place)` — событие сессии `{id, at, body}` (TR-11, G-45), `id` — ULID (KR-06), `at` — время (KR-11), тело — схемой `core/session@1`, которую даёт `types` (KR-21), и причина `for`, которой требует purpose: у `work`, `import`, `check`, `bench` она есть, у `init` её нет (OB-01); `signSession` и `issueSession` подписывают сертификат ключом участника по hash события без `sig` (G-46); `verifySession({session, types, policy, at}, place, proposal)` — цепочка TR-12: срок (TR-11), подпись сертификата ключом участника из policy (TR-12), вид и роль его записи writers (TR-10), затем последнее звено — `proposal(sessionKey)`: ledger отдаёт в него `verifyProposal` (LG-10), так hash proposal остаётся ledger.
+- `src/trust/signature.ts`: `isPublicKey` и `readOpenSshKey` — свой разбор незашифрованного OpenSSH-файла ключа (Q-04, R5), его ключ — `ParticipantKey`, не `SessionKey`; dev-ключи — `test/keys/dev-owner` (human) и `test/keys/dev-land` (machine), помечены INSECURE.
 - `lattice session`: `src/cli/session.ts` читает файл ключа (`--key` или путь из `.lattice/participant-key`, Q-04) и пишет `.lattice/session.json`, `.lattice/session.key` (PKCS #8 PEM), `.lattice/participant-key`; сессию выпускает `startSession` в `src/assembly/session.ts` с портами `clock` и `ids`. Bin до S0-23 отвечает «no store is configured», как `land`.
 
 ## Отступления

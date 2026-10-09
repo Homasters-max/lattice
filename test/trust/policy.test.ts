@@ -1,15 +1,19 @@
 // A namespace and its policy (TR-01, TR-02, TR-05): the policy is the body of
-// `<name>/namespace`, read field by field; its writer entries name identities
-// (TR-09) and Ed25519 keys bound to a kind (TR-10); the owner of an entity is
-// the owner of its namespace (GL-07), read in `before` (TR-06).
+// `<name>/namespace`, of one form — the schema of its type
+// `std/namespace-policy@1`, which admits it (KR-21) — read as it is; its writer
+// entries name identities (TR-09) and Ed25519 keys bound to a kind (TR-10),
+// which that schema does not say; the owner of an entity is the owner of its
+// namespace (GL-07), read in `before` (TR-06).
 import { describe, expect, it } from "vitest";
 import { reject, ROOT, type JsonValue, type Record } from "../../src/kernel/index.js";
-import { namespaceId, namespaceOf, ownerOf, policyOf, readPolicy, TR_02, TR_09, TR_10, type Before } from "../../src/trust/index.js";
+import { namespaceId, namespaceOf, ownerOf, policyOf, readPolicy, TR_09, TR_10, type Before } from "../../src/trust/index.js";
+import { check } from "../ledger/std-sources.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 import { testKey } from "../support/keys.js";
 
 const ALICE = testKey("alice");
 const FINGERPRINT = `ssh:SHA256:${"A".repeat(43)}`;
+const TYPE = "std/namespace-policy@1";
 
 /** Every field TR-02 names, each in its form. */
 const FULL = {
@@ -26,77 +30,85 @@ const FULL = {
   recovery: { participants: ["bob", "carol"], count: 2 },
   delegation: ["std/implementation@1"],
   labels: { blocks: "a block blocks its target" },
-  budget: { ms: 1000, tokens: 0, usd: "1.50", calls: 3 },
+  budget: { ms: 1000, tokens: 0, usd: "1.5", calls: 3 },
   quality: "demo/quality@1",
 } as const;
 
-const read = (value: JsonValue) => readPolicy(deepFreeze(value), ROOT);
-const refusals = (value: JsonValue) => {
-  const r = read(value);
+/** The rejections of a namespace body against its type (KR-21), as phase 2 of apply gives them when it is written. */
+const ofType = (body: JsonValue) => check({ type: TYPE, rev: 1, body }).map((r) => [r.rule, r.path]);
+
+/** A body the type admits, read as its policy; a body the type refuses is no input of trust. */
+function read(body: JsonValue, place = ROOT) {
+  expect(ofType(body), JSON.stringify(body)).toEqual([]);
+  return readPolicy(deepFreeze(body), place);
+}
+
+const refusals = (body: JsonValue) => {
+  const r = read(body);
   return r.ok ? [] : r.rejections.map((x) => [x.rule, x.path]);
 };
 
 describe("namespace policy (TR-02)", () => {
-  it("TR-02: reads every field of a policy as it is", () => {
+  it("TR-02: reads every field of a policy its type admitted, as it is", () => {
     expect(read(FULL)).toEqual({ ok: true, value: FULL });
     expect(read({ owner: "alice" })).toEqual({ ok: true, value: { owner: "alice" } });
     expect(read({ owner: "alice", pins: { lattice: "0" } })).toEqual({ ok: true, value: { owner: "alice", pins: { lattice: "0" } } });
   });
 
-  it("TR-02: refuses a policy without an owner, with a field it does not name, or a field out of its form", () => {
-    expect(refusals("alice")).toEqual([["TR-02", ""]]);
-    expect(refusals({ writers: [] })).toEqual([["TR-02", "/owner"]]);
-    expect(refusals({ owner: "alice", admins: ["bob"] })).toEqual([["TR-02", "/admins"]]);
-    expect(refusals({ owner: "alice", recovery: { participants: ["bob"], count: 0 } })).toEqual([["TR-02", "/recovery"]]);
-    expect(refusals({ owner: "alice", roles: { author: { types: ["x"], rights: [] } } })).toEqual([["TR-02", "/roles"]]);
-    expect(refusals({ owner: "alice", acts: [{ match: ["x"] }] })).toEqual([["TR-02", "/acts"]]);
-    expect(refusals({ owner: "alice", pins: { libraries: [] } })).toEqual([["TR-02", "/pins"]]);
-    expect(refusals({ owner: "alice", budget: { usd: 1 } })).toEqual([["TR-02", "/budget"]]);
-    expect(refusals({ owner: "alice", labels: { blocks: "" } })).toEqual([["TR-02", "/labels"]]);
-    expect(refusals({ owner: "alice", writers: {} })).toEqual([["TR-02", "/writers"]]);
-    // Lists of texts, counts from 1, sizes from 0, whole numbers, libraries of their form.
+  it("TR-02, KR-21: the form of a policy is the schema of its type — a body out of it is refused when written, by KR-21", () => {
     const cases: readonly (readonly [JsonValue, string])[] = [
-      [{ delegation: [""] }, "/delegation"],
-      [{ recovery: { participants: ["bob"], count: 1.5 } }, "/recovery"],
-      [{ budget: { ms: 1.5 } }, "/budget"],
-      [{ budget: { calls: -1 } }, "/budget"],
-      [{ pins: { lattice: "0", libraries: [{ name: "std" }] } }, "/pins"],
-      [{ pins: { lattice: "0", libraries: {} } }, "/pins"],
+      [{ writers: [] }, "/body/owner"],
+      [{ owner: "alice", admins: ["bob"] }, "/body/admins"],
+      [{ owner: "alice", recovery: { participants: ["bob"], count: 0 } }, "/body/recovery/count"],
+      [{ owner: "alice", acts: [{ match: [], from: ["owner"] }] }, "/body/acts/0/match"],
+      [{ owner: "alice", budget: { usd: "1,50" } }, "/body/budget/usd"],
+      [{ owner: "alice", labels: "blocks" }, "/body/labels"],
+      [{ owner: "alice", roles: [] }, "/body/roles"],
+      [{ owner: "alice", writers: [{ participant: "bob", kind: "robot" }] }, "/body/writers/0/kind"],
     ];
-    for (const [field, path] of cases) expect(refusals({ owner: "alice", ...(field as object) }), path).toEqual([["TR-02", path]]);
+    for (const [body, path] of cases) expect(ofType(body), path).toContainEqual(["KR-21", path]);
   });
 
-  it("TR-02: refuses a writer entry out of its form, with every other entry read", () => {
-    const writers = [{ participant: "bob", kind: "robot" }, "carol", { participant: "dan", kind: "human", keys: ["ssh-rsa AAAA"] }];
-    expect(refusals({ owner: 1, writers })).toEqual([
-      ["TR-02", "/owner"],
-      ["TR-02", "/writers/0/kind"],
-      ["TR-02", "/writers/1"],
-      ["TR-10", "/writers/2/keys/0"],
-    ]);
+  it("TR-02: a body its type did not admit is no input: reading one that is not an object is a bug of the caller", () => {
+    expect(() => readPolicy("alice", ROOT)).toThrow(/^bug: /);
   });
 });
 
-describe("writer entries (TR-09, TR-10)", () => {
-  it("TR-02, TR-09, TR-10: a rejection names what the policy expected and what it got, inside the place the caller names", () => {
+describe("what a rejection of a writer entry names (TR-09, TR-10)", () => {
+  it("TR-09, TR-10: a rejection names what the policy expected and what it got, inside the place the caller names", () => {
     const at = { intent: "demo/namespace", path: "/body" };
-    const writers = [{ participant: "alice", kind: "human", identities: ["bitbucket:alice"], keys: ["ssh-rsa AAAA"] }, { participant: "claude", kind: "agent", keys: [ALICE.publicKey] }, "carol"];
+    const writers = [
+      { participant: "alice", kind: "human", identities: ["bitbucket:alice"], keys: ["ssh-rsa AAAA"] },
+      { participant: "claude", kind: "agent", keys: [ALICE.publicKey] },
+    ];
     const under = (path: string) => ({ intent: "demo/namespace", path: `/body${path}` });
-    expect(readPolicy(deepFreeze({ owner: "alice", writers }), at)).toEqual({
+    expect(read({ owner: "alice", writers }, at)).toEqual({
       ok: false,
       rejections: [
         reject(TR_09, { ...under("/writers/0/identities/0"), expected: "github:<login>, gitlab:<user> or ssh:SHA256:<fingerprint>", got: "bitbucket:alice" }),
         reject(TR_10, { ...under("/writers/0/keys/0"), expected: "ssh-ed25519 <base64> [comment]", got: "ssh-rsa AAAA" }),
         reject(TR_10, { ...under("/writers/1/keys"), expected: "no key: an agent holds only its session key", got: [ALICE.publicKey] }),
-        reject(TR_02, { ...under("/writers/2"), expected: "a writer entry", got: "carol" }),
       ],
     });
-    expect(readPolicy("alice", at)).toEqual({ ok: false, rejections: [reject(TR_02, { ...at, expected: "a namespace policy", got: "alice" })] });
   });
 
+  it("TR-09, TR-10: every writer entry is read, the rejections of each under its own place", () => {
+    const writers = [
+      { participant: "alice", kind: "human", identities: ["alice"] },
+      { participant: "bob", kind: "human" },
+      { participant: "carol", kind: "machine", keys: ["ssh-rsa AAAA"] },
+    ];
+    expect(refusals({ owner: "alice", writers })).toEqual([
+      ["TR-09", "/writers/0/identities/0"],
+      ["TR-10", "/writers/2/keys/0"],
+    ]);
+  });
+});
+
+describe("the kinds, identities and keys of writer entries (TR-07, TR-09, TR-10)", () => {
   it("TR-07: a writer entry is of a participant of kind human, agent or machine", () => {
-    const kinds = ["human", "agent", "machine", "robot", "Human"].map((kind) => refusals({ owner: "alice", writers: [{ participant: "p", kind }] }));
-    expect(kinds).toEqual([[], [], [], [["TR-02", "/writers/0/kind"]], [["TR-02", "/writers/0/kind"]]]);
+    for (const kind of ["human", "agent", "machine"]) expect(refusals({ owner: "alice", writers: [{ participant: "p", kind }] })).toEqual([]);
+    for (const kind of ["robot", "Human"]) expect(ofType({ owner: "alice", writers: [{ participant: "p", kind }] })).toEqual([["KR-21", "/body/writers/0/kind"]]);
   });
 
   it("TR-09: an identity is github:<login>, gitlab:<user> or ssh:<key fingerprint>", () => {
@@ -120,17 +132,12 @@ describe("writer entries (TR-09, TR-10)", () => {
     expect(refusals({ owner: "alice", writers: [{ participant: "claude", kind: "agent", keys: [ALICE.publicKey] }] })).toEqual([["TR-10", "/writers/0/keys"]]);
     expect(refusals({ owner: "alice", writers: [{ participant: "claude", kind: "agent", keys: [] }] })).toEqual([]);
   });
-
-  it("TR-02: rejections are placed under the place the caller names", () => {
-    const r = readPolicy({ writers: [] }, { intent: "demo/namespace", path: "/body" });
-    expect(r.ok ? null : r.rejections[0]).toMatchObject({ intent: "demo/namespace", path: "/body/owner", rule: "TR-02" });
-  });
 });
 
-/** A `before` that holds these namespace records by id. */
-function beforeOf(records: { readonly [id: string]: JsonValue }): Before {
+/** A `before` that holds these namespace records by id, each of the type `type`. */
+function beforeOf(records: { readonly [id: string]: JsonValue }, type = TYPE): Before {
   const held = (id: string): Record | null =>
-    Object.hasOwn(records, id) ? { id, rev: 1, type: "std/namespace-policy@1", hash: `sha256:${"0".repeat(64)}`, by: "01JB2X00000000000000000SES", at: "2026-10-06T11:00:00.000000Z", body: records[id]! } : null;
+    Object.hasOwn(records, id) ? { id, rev: 1, type, hash: `sha256:${"0".repeat(64)}`, by: "01JB2X00000000000000000SES", at: "2026-10-06T11:00:00.000000Z", body: records[id]! } : null;
   return deepFreeze({ current: held });
 }
 
@@ -146,6 +153,13 @@ describe("namespaces and owners (TR-01, TR-05)", () => {
     expect(policyOf(before, "other", ROOT)).toEqual({ ok: true, value: null });
   });
 
+  it("TR-01, G-47: a record of another type at the id of a namespace entity is no namespace", () => {
+    for (const type of ["std/clause@1", "std/namespace-policy@2", "demo/namespace-policy@1"]) {
+      const before = beforeOf({ "demo/namespace": { owner: "alice" } }, type);
+      expect([type, policyOf(before, "demo", ROOT), ownerOf(before, "demo/a", ROOT)]).toEqual([type, { ok: true, value: null }, { ok: true, value: null }]);
+    }
+  });
+
   it("TR-05: the owner of an entity is the owner of its namespace — of a type, a contract, any entity of it", () => {
     const before = beforeOf({ "demo/namespace": FULL, "team/namespace": { owner: "bob" } });
     expect(["demo/a", "demo/note", "team/contract", "other/a", "01JB2X00000000000000000SES"].map((id) => ownerOf(before, id, ROOT))).toEqual([
@@ -157,18 +171,13 @@ describe("namespaces and owners (TR-01, TR-05)", () => {
     ]);
   });
 
-  it("GL-07: the owner of a namespace is the participant its policy names — the human writer whose act is an owner act (TR-17)", () => {
-    const before = beforeOf({ "demo/namespace": FULL });
-    const owner = ownerOf(before, "demo/a", ROOT);
-    expect(owner).toEqual({ ok: true, value: "alice" });
-    expect(FULL.writers.find((w) => w.participant === (owner.ok ? owner.value : null))?.kind).toBe("human");
+  it("GL-07: the owner of a namespace is the participant its policy names; that the owner is human is checked with owner acts (S0-17)", () => {
+    expect(ownerOf(beforeOf({ "demo/namespace": FULL }), "demo/a", ROOT)).toEqual({ ok: true, value: "alice" });
   });
 
-  it("TR-02: the owner of a namespace whose policy is out of its form is not read", () => {
-    const owner = ownerOf(beforeOf({ "demo/namespace": { owners: ["alice"] } }), "demo/a", { intent: null, path: "/demo~1namespace/body" });
-    expect(owner.ok ? null : owner.rejections.map((r) => [r.rule, r.path])).toEqual([
-      ["TR-02", "/demo~1namespace/body/owner"],
-      ["TR-02", "/demo~1namespace/body/owners"],
-    ]);
+  it("TR-09, TR-10: the owner of a namespace whose writers are refused is not read; the rejections are where its body sits", () => {
+    const body = { owner: "alice", writers: [{ participant: "alice", kind: "human", identities: ["alice"] }] };
+    const owner = ownerOf(beforeOf({ "demo/namespace": body }), "demo/a", { intent: null, path: "/demo~1namespace/body" });
+    expect(owner.ok ? null : owner.rejections.map((r) => [r.rule, r.path])).toEqual([["TR-09", "/demo~1namespace/body/writers/0/identities/0"]]);
   });
 });

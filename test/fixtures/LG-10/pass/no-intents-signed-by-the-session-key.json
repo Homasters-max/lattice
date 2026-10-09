@@ -7,27 +7,11 @@
         {
           "participant": "alice",
           "kind": "human",
-          "identities": [
-            "github:alice"
-          ],
           "keys": [
             "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHdbHm3SGrugedxix21nrQCJQsF1pIQAheFFod0356F1"
           ],
           "roles": [
             "author"
-          ]
-        },
-        {
-          "participant": "land",
-          "kind": "machine",
-          "keys": [
-            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFPLvuGDMrkpIv327l5Xet8bwJIZiLX4bun0PfHUgVGD"
-          ],
-          "roles": [
-            "land"
-          ],
-          "grants": [
-            "runner"
           ]
         }
       ]
@@ -53,18 +37,7 @@
           }
         }
       },
-      "intents": [
-        {
-          "op": "entity",
-          "id": "demo/a",
-          "type": "demo/note@1",
-          "expected": null,
-          "at": "2026-10-06T11:30:00.000000Z",
-          "body": {
-            "text": "demo/a"
-          }
-        }
-      ],
+      "intents": [],
       "sig": null
     },
     "certifiedBy": "alice",

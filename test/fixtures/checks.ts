@@ -63,7 +63,8 @@ import {
   type Commit,
   type Proposal,
 } from "../../src/ledger/index.js";
-import { readPolicy, signSession, TR_02, TR_09, TR_10, TR_11, TR_12, verifySession, type UnsignedSession } from "../../src/trust/index.js";
+import { readPolicy, signSession, TR_09, TR_10, TR_11, TR_12, verifySession, type UnsignedSession } from "../../src/trust/index.js";
+import { std } from "../ledger/std-sources.js";
 import { landingPortsForTests, type GitFixtureOptions } from "../support/assembly.js";
 // The land session of every fixture: apply takes the commit's `by` and `at` from it (LG-22).
 import { keyOfLand, LAND, landedChain } from "../support/chain.js";
@@ -222,10 +223,20 @@ const chain: FixtureCheck = {
   },
 };
 
-/** `input`: `{ policy }` — the body of a namespace entity, read as its policy from the root (TR-02, TR-09, TR-10). */
+/**
+ * The `policy` of a fixture as `before` holds it: the body of a namespace entity its type `std/namespace-policy@1`
+ * admitted (KR-21), read from the root. A body the type does not admit is a broken fixture, not a case of trust.
+ */
+function admittedPolicy(input: unknown) {
+  const body = field(input, "policy") as JsonValue;
+  if (!checkAgainstType({ type: "std/namespace-policy@1", rev: 1, body }, std().resolve, ROOT).ok) throw new Error("bug: the policy of a fixture is admitted by its type");
+  return readPolicy(body, ROOT);
+}
+
+/** `input`: `{ policy }` — the body of a namespace entity, read as its policy from the root (TR-09, TR-10). */
 const policy: FixtureCheck = {
-  enforces: [TR_02.id, TR_09.id, TR_10.id],
-  run: (input) => readPolicy(field(input, "policy") as JsonValue, ROOT),
+  enforces: [TR_09.id, TR_10.id],
+  run: admittedPolicy,
 };
 
 /** The session of a proposal value with its certificate signed by the test key `by` — the session is written unsigned. */
@@ -245,17 +256,18 @@ function sessionProposal(input: unknown) {
 
 /**
  * `input`: `{ policy, proposal, certifiedBy?, signedBy?, at }` — the chain of TR-12 under the policy, from the root
- * of the proposal: its session (TR-11) at `/session`, certified by a key of the policy (TR-12, TR-10) and unexpired
- * at `at` (TR-11), then the signature of the proposal by the session key (LG-10).
+ * of the proposal: its session (TR-11) at `/session`, read against the session type `core/session@1` (KR-21) with
+ * the reason its purpose needs, certified by a key of the policy (TR-12, TR-10) and unexpired at `at` (TR-11), then
+ * the signature of the proposal by the session key (LG-10).
  */
 const session: FixtureCheck = {
   enforces: [TR_10.id, TR_11.id, TR_12.id, LG_10.id],
   run: (input) => {
-    const read = readPolicy(field(input, "policy") as JsonValue, ROOT);
+    const read = admittedPolicy(input);
     const p = sessionProposal(input);
     if (!read.ok || !p.ok) return read.ok ? p : read;
     const proposal: Proposal = p.value;
-    const chain = { session: proposal.session, policy: read.value, at: String(field(input, "at")) };
+    const chain = { session: proposal.session, types: std().resolve, policy: read.value, at: String(field(input, "at")) };
     return verifySession(chain, { intent: null, path: "/session" }, (key) => verifyProposal(proposal, key, NO_FACTS, ROOT));
   },
 };

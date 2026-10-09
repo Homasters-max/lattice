@@ -10,8 +10,14 @@ import { createPrivateKey, createPublicKey, sign, verify } from "node:crypto";
 /** A public key of a session or a participant (TR-10): an OpenSSH line `ssh-ed25519 <base64> [comment]`. */
 export type PublicKey = string;
 
-/** The private key of a session that signs (TR-12), as the platform holds it; the caller makes it from its file. */
-export type SessionKey = ReturnType<typeof createPrivateKey>;
+/** An Ed25519 private key as the platform holds it; the caller makes it from its file. */
+type PrivateKey = ReturnType<typeof createPrivateKey>;
+
+/** The private key of a session that signs its proposals and commits (TR-12). */
+export type SessionKey = PrivateKey;
+
+/** The private key of a participant that signs the certificate of its session (TR-10, TR-11) — not a session key. */
+export type ParticipantKey = PrivateKey;
 
 const SIGNATURE = "ed25519:";
 const ALGORITHM = "ssh-ed25519";
@@ -65,16 +71,16 @@ function rawKey(key: PublicKey): Uint8Array | null {
 /** TR-10: whether a text is an Ed25519 public key in OpenSSH format, `ssh-ed25519 <base64> [comment]`. */
 export const isPublicKey = (key: string): boolean => rawKey(key) !== null;
 
-/** G-10: the OpenSSH line of the public key of a session key — what a certificate names (TR-11). */
-export function publicKeyOf(key: SessionKey): PublicKey {
+/** G-10: the OpenSSH line of the public key of a private key — what a certificate names for a session key (TR-11), a policy for a participant's (TR-10). */
+export function publicKeyOf(key: PrivateKey): PublicKey {
   const { x } = createPublicKey(key).export({ format: "jwk" });
   const raw = x === undefined ? null : decode(x, true);
   if (raw === null) throw new Error("bug: a session key is not an Ed25519 key");
   return `${ALGORITHM} ${encode(wire([utf8(ALGORITHM), raw]), false)}`;
 }
 
-/** LG-06, LG-10: the signature, by a session key, of a hash `sha256:<hex>` (G-24). */
-export function signHash(hash: string, key: SessionKey): string {
+/** LG-06, LG-10, TR-11: the signature of a hash `sha256:<hex>` (G-24) by a session key, or by a participant's key for a certificate. */
+export function signHash(hash: string, key: PrivateKey): string {
   return `${SIGNATURE}${encode(sign(null, utf8(hash), key), true)}`;
 }
 
@@ -132,7 +138,7 @@ function ed25519Of(section: Uint8Array): { readonly seed: Uint8Array; readonly r
  * Q-04: the Ed25519 key of an unencrypted OpenSSH private key file — the format `ssh-keygen` writes — with which a
  * participant signs the certificate of its session (TR-11); `null` for any other text, an encrypted file too.
  */
-export function readOpenSshKey(file: string): SessionKey | null {
+export function readOpenSshKey(file: string): ParticipantKey | null {
   const body = ARMOR.exec(file)?.[1];
   const bytes = body === undefined ? null : decode(body.replace(/\r?\n/g, ""), false);
   const section = bytes === null ? null : privateSection(bytes);
