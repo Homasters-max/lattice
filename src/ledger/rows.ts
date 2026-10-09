@@ -47,8 +47,8 @@ const idOf = (r: Row) => `${r.key}@${r.from}`;
  */
 export function withDelta(rows: readonly Row[], delta: Delta): Row[] {
   const closed = new Map(delta.filter((r) => r.to !== null).map((r) => [idOf(r), r]));
-  const held = new Set(rows.map(idOf));
-  const unknown = [...closed.keys()].find((id) => !held.has(id));
+  const ids = new Set(rows.map(idOf));
+  const unknown = [...closed.keys()].find((id) => !ids.has(id));
   if (unknown !== undefined) throw new Error(`bug: a delta closes the row ${unknown}, which the rows do not hold`);
   const kept = rows.map((r) => closed.get(idOf(r)) ?? r);
   return sortRows([...kept, ...delta.filter((r) => r.to === null)]);
