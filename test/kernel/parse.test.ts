@@ -2,9 +2,9 @@
 // in NFC; refused, never repaired. A refusal of the text as a whole sits at
 // the path given; a refusal inside the value at its JSON Pointer under it.
 import { describe, expect, it } from "vitest";
-import { parseJson, parseJsonBytes } from "../../src/kernel/index.js";
+import { hashBytes, parseCanonical, parseJson, parseJsonBytes, type Result } from "../../src/kernel/index.js";
 
-const where = (r: ReturnType<typeof parseJson>) => (r.ok ? [] : r.rejections.map((x) => [x.rule, x.path, x.expected, x.got]));
+const where = (r: Result<unknown>) => (r.ok ? [] : r.rejections.map((x) => [x.rule, x.path, x.expected, x.got]));
 
 describe("the strict parse (KR-10)", () => {
   it("KR-10: reads the grammar of RFC 8259 into frozen values", () => {
@@ -72,5 +72,30 @@ describe("the strict parse refuses inside the value (KR-10)", () => {
 
   it("KR-10: the bytes go through UTF-8 first, then the same parse", () => {
     expect(where(parseJsonBytes(new TextEncoder().encode('{"a": -0}'), { intent: null, path: "/f" }))).toEqual([["KR-10", "/f/a", "a number other than -0", "-0"]]);
+  });
+});
+
+describe("the parse of canonical bytes (KR-10)", () => {
+  const FILE = { intent: null, path: "/f" };
+  const utf8 = (text: string) => new TextEncoder().encode(text);
+
+  it("KR-10: gives the value of its canonical bytes, with those bytes", () => {
+    const bytes = utf8('{"a":[1,"é"],"b":null}');
+    expect(parseCanonical(bytes, FILE)).toEqual({ ok: true, value: { value: { a: [1, "é"], b: null }, bytes } });
+  });
+
+  it("KR-10: refuses other bytes of the same value as a whole, never repairs them — named by the hashes of the canonical bytes and the bytes given", () => {
+    for (const text of ['{"b":null,"a":1}', '{"a": 1}', '{"a":1}\r', '{"a":1.0}']) {
+      const out = parseCanonical(utf8(text), FILE);
+      expect(out.ok ? [] : out.rejections.map((r) => [r.rule, r.path, r.expected, r.got]), text).toEqual([
+        ["KR-10", "/f", hashBytes(utf8(text.includes('"b"') ? '{"a":1,"b":null}' : '{"a":1}')), hashBytes(utf8(text))],
+      ]);
+    }
+  });
+
+  it("KR-10: refuses what the strict parse refuses, as it refuses it", () => {
+    expect(where(parseCanonical(utf8('{"a":-0}'), FILE))).toEqual([["KR-10", "/f/a", "a number other than -0", "-0"]]);
+    expect(where(parseCanonical(Uint8Array.from([0x7b, 0xff, 0x7d]), FILE)).map(([rule, path, expected]) => [rule, path, expected])).toEqual([["KR-10", "/f", "UTF-8"]]);
+    expect(where(parseCanonical(utf8(""), FILE))).toEqual([["KR-10", "/f", "a JSON text", ""]]);
   });
 });

@@ -1,8 +1,8 @@
 // The entry `ledger/view` (ST-01): the read view runtime and capabilities
 // import. They ask only the questions of View, rows are never seen by them
-// (LG-38), so the entry gives neither the rows nor opening a store.
-import type { Row } from "./rows.js";
-import { viewOf, type View } from "./rows-view.js";
+// (LG-38), so the entry gives neither the rows nor opening a store. View is
+// declared with the rows (rows.ts); every module outside the ledger takes it here.
+import { viewOf, type Row, type View } from "./rows.js";
 
 export type { View };
 

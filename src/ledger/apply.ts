@@ -9,7 +9,7 @@ import { canon, checkId, hashRecord, KERNEL_VERSION, refused, rejectionsOf, type
 import { known, type Commit, type Evidence } from "./commit.js";
 import type { Act } from "./ports/acts.js";
 import { canonicalIntents, NO_FACTS, proposalHash, type Intent, type Proposal } from "./proposal.js";
-import type { View } from "./view.js";
+import type { View } from "./rows.js";
 
 /** The land session and the acts landing formed (LG-22); the session's `at` is the time of landing. */
 export type LandActs = {

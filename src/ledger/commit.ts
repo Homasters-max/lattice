@@ -1,11 +1,11 @@
 // A `knowledge` commit (LG-06) and the evidence it cites (LG-30). The store
-// keeps a commit as its canonical line (KR-10): the ledger encodes and decodes
-// it, the adapter never parses it, and a line that is not those bytes is
-// refused. A line is read as a commit on the surface — the header fields and
-// no other (Q-31), their JSON kinds and the header of each record (KR-04); the
-// hash covers every field but `sig`. A commit is chained to its predecessor
-// and signed by its land session; `verifyChain` checks the chain and the
-// signatures, which opening a store runs from S0-11 (LG-05).
+// keeps a commit as its line — its canonical bytes (KR-10) and a line feed
+// (G-17): the ledger encodes and decodes it, the adapter never parses it, and
+// bytes that are not those are refused. A commit is read on the surface — the
+// header fields and no other (Q-31), their JSON kinds and the header of each
+// record (KR-04); the hash covers every field but `sig`. A commit is chained to
+// its predecessor and signed by its land session; `verifyChain` checks the
+// chain and the signatures. Opening a store runs both (chain.ts, LG-05).
 import {
   canon,
   checkHeader,
@@ -13,11 +13,9 @@ import {
   compareText,
   gotOf,
   hash,
-  hashBytes,
   isJsonObject,
-  KR_10,
   NUMBER,
-  parseJsonBytes,
+  parseCanonical,
   refuse,
   refused,
   reject,
@@ -91,8 +89,9 @@ export type KeyOfSession = (session: string) => PublicKey | null;
 /** The place of a member or an item under the place of what holds it. */
 const under = (place: Place, name: string | number): Place => ({ intent: place.intent, path: `${place.path}/${name}` });
 
-/** LG-06: `sig` is the signature of the commit's hash by the key of its land session, `by`. */
-function signatureRejections(c: Commit, keyOfSession: KeyOfSession, place: Place): Rejection[] {
+/** LG-06: `sig` is the signature of the commit's hash by the key of its land session, `by`; none checked without keys (Q-39). */
+function signatureRejections(c: Commit, keyOfSession: KeyOfSession | null, place: Place): Rejection[] {
+  if (keyOfSession === null) return [];
   const key = keyOfSession(c.by);
   const signed = commitHash(c);
   if (key !== null && c.sig !== null && verifyHash(signed, c.sig, key)) return [];
@@ -114,9 +113,10 @@ function linkRejections(c: Commit, n: number, before: Commit | null, place: Plac
  * 1, `prev` the hash of the previous commit, `at` never decreasing (KR-11 spells it so that text order is time
  * order) and `sig` the signature of each commit by the key of its land session. The commits are the lines of a
  * store at the place the caller names, each at its number from 1, as `seq` counts (Q-29); the rejections come
- * sorted (CONVENTIONS.md §5.2).
+ * sorted (CONVENTIONS.md §5.2). Without `keyOfSession` no signature is checked: only the store at the tail of `main`
+ * opens so, until landing signs its commits (Q-39, S0-20).
  */
-export function verifyChain(commits: readonly Commit[], keyOfSession: KeyOfSession, place: Place): Result<readonly Commit[]> {
+export function verifyChain(commits: readonly Commit[], keyOfSession: KeyOfSession | null, place: Place): Result<readonly Commit[]> {
   const found = commits.flatMap((c, i) => {
     const line = under(place, i + 1);
     return [...linkRejections(c, i + 1, commits[i - 1] ?? null, line), ...signatureRejections(c, keyOfSession, line)];
@@ -124,8 +124,9 @@ export function verifyChain(commits: readonly Commit[], keyOfSession: KeyOfSessi
   return refused<readonly Commit[]>(found) ?? { ok: true, value: commits };
 }
 
-/** The line a store keeps for a commit: its canonical JSON. */
-export const encodeCommit = (c: Commit): string => known(canon(c), "a commit");
+/** G-17: the line a store keeps for a commit — its canonical JSON (KR-10) in UTF-8, and a line feed. */
+export const commitLine = (c: Commit): Uint8Array => new TextEncoder().encode(`${known(canon(c), "a commit")}
+`);
 
 /** What the closed form of a commit admits: its header, and its records as JSON values, each read by `checkHeader`. */
 type Fields = Omit<Commit, "records"> & { readonly records: readonly JsonValue[] };
@@ -159,20 +160,13 @@ function readCommit(value: JsonValue, place: Place): Result<Commit> {
   return fields.ok ? { ok: true, value: { ...fields.value, records: records.flatMap((r) => (r.ok ? [r.value] : [])) } } : fields;
 }
 
-/** KR-10: the line of a commit is its canonical bytes; any other bytes of the same commit are refused, never repaired. */
-function canonical(line: Uint8Array, commit: Commit, place: Place): Result<Commit> {
-  const [expected, got] = [hashBytes(new TextEncoder().encode(encodeCommit(commit))), hashBytes(line)];
-  return expected === got ? { ok: true, value: commit } : refuse(reject(KR_10, { ...place, expected, got }));
-}
-
 /**
- * The commit of a line of a store — its bytes, as the store keeps them — refused at the place the caller names, where
- * the line sits in its input: KR-10 for bytes that are not UTF-8, a text that is not JSON (an empty line too) and a
- * line that is not the canonical bytes of its commit (a byte order mark, a carriage return, spaces), LG-06 and KR-04
- * for its form.
+ * The commit of canonical bytes — a line of a store without its line feed — refused at the place the caller names,
+ * where the line sits in its input: KR-10 for bytes that are not UTF-8, a text that is not JSON (an empty line too)
+ * and bytes that are not the canonical bytes of their value (a byte order mark, a carriage return, spaces, another
+ * order of keys), LG-06 and KR-04 for its form.
  */
-export function decodeCommit(line: Uint8Array, place: Place): Result<Commit> {
-  const parsed = parseJsonBytes(line, place);
-  const commit = parsed.ok ? readCommit(parsed.value, place) : parsed;
-  return commit.ok ? canonical(line, commit.value, place) : commit;
+export function decodeCommit(bytes: Uint8Array, place: Place): Result<Commit> {
+  const parsed = parseCanonical(bytes, place);
+  return parsed.ok ? readCommit(parsed.value.value, place) : parsed;
 }

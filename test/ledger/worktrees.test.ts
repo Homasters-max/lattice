@@ -3,13 +3,12 @@
 // outcome — so no outcome of landing or of opening the store at the tail of
 // main leaves a directory in the one `git-fixture` writes its worktrees to.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { land, openTail, type Git, type LandingPorts, type Push } from "../../src/ledger/index.js";
+import { KNOWLEDGE, land, openTail, type Git, type LandingPorts, type Push } from "../../src/ledger/index.js";
 import { landingPortsForTests, type GitFixtureOptions } from "../support/assembly.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 import { moveMain, proposal, refusals } from "../support/landing.js";
 import { scratch, type Scratch } from "../support/files.js";
 
-const KNOWLEDGE = "store/knowledge.jsonl";
 const empty = JSON.stringify({ session: { id: "01JB2X00000000000000000SES" }, intents: [], sig: null });
 
 const BRANCHES: GitFixtureOptions["branches"] = {

@@ -57,6 +57,13 @@ async function appended(store: Store, commits: readonly Commit[]): Promise<void>
   }
 }
 
+/** A new store of `make` holding these lines, appended without their rows. */
+async function holding(make: () => Store, lines: readonly Uint8Array[]): Promise<Store> {
+  const store = make();
+  for (const commit of lines) await store.append({ commit, delta: [], evidence: [] });
+  return store;
+}
+
 /** The store opened by the ledger with the key of the land session; a refusal fails the test. */
 async function opened(store: Store) {
   const out = await openStore(store, keyOfLand);
@@ -127,10 +134,12 @@ describe.each(ADAPTERS)("store port: $name", ({ make }) => {
     expect(await store.evidence(hashBytes(utf8("none")))).toBeNull();
   });
 
+});
+
+describe.each(ADAPTERS)("opening a store: $name (LG-02, LG-05)", ({ make }) => {
   it("LG-02: opening folds the lines from genesis and hands the rows to the store, which answers row and rows", async () => {
-    const store = make();
     // The commits arrive without their rows: what the store answers after opening is what the ledger handed it.
-    for (const c of CHAIN) await store.append({ commit: commitLine(c), delta: [], evidence: [] });
+    const store = await holding(make, CHAIN.map(commitLine));
     expect(await all(store.rows(""))).toEqual([]);
     const { view, tail } = await opened(store);
     expect([view.seq, tail]).toEqual([3, CHAIN[2]]);
@@ -154,17 +163,12 @@ describe.each(ADAPTERS)("store port: $name", ({ make }) => {
         ],
       ],
     ];
-    for (const [commits, expected] of cases) {
-      const store = make();
-      for (const c of commits) await store.append({ commit: commitLine(c), delta: [], evidence: [] });
-      expect(refusals(await openStore(store, keyOfLand))).toEqual(expected);
-    }
+    for (const [commits, expected] of cases) expect(refusals(await openStore(await holding(make, commits.map(commitLine)), keyOfLand))).toEqual(expected);
   });
 
   it("LG-06: opens without checking signatures only where no key of a session is given — the store at the tail until S0-20 (Q-39)", async () => {
-    const store = make();
     const [first] = CHAIN as [Commit];
-    await store.append({ commit: commitLine({ ...first, sig: null }), delta: [], evidence: [] });
+    const store = await holding(make, [commitLine({ ...first, sig: null })]);
     expect((await openStore(store, null)).ok).toBe(true);
     expect(refusals(await openStore(store, keyOfLand))).toEqual([["LG-06", `/${KNOWLEDGE}/1/sig`]]);
   });
@@ -174,10 +178,7 @@ describe.each(ADAPTERS)("store port: $name", ({ make }) => {
     const line = commitLine(first);
     const spaced = utf8(`${new TextDecoder().decode(line.subarray(0, -1)).replace(":", ": ")}\n`);
     for (const bad of [line.subarray(0, -1), spaced, utf8("\n")]) {
-      const store = make();
-      await store.append({ commit: line, delta: [], evidence: [] });
-      await store.append({ commit: bad, delta: [], evidence: [] });
-      expect(refusals(await openStore(store, keyOfLand))).toEqual([["KR-10", `/${KNOWLEDGE}/2`]]);
+      expect(refusals(await openStore(await holding(make, [line, bad]), keyOfLand))).toEqual([["KR-10", `/${KNOWLEDGE}/2`]]);
     }
   });
 });

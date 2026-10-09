@@ -3,11 +3,12 @@
 // that feeds it the fixture's `input`. A task that adds a hard check adds its
 // row here; the input is built only through public functions (CONVENTIONS.md §4.3).
 // The checks of landing run through `land` itself, as a dry run on a
-// `git-fixture` of the fixture's branches; the checks with no glue around them
-// — a JSON text, a proposal value, apply, the lines of a store — run alone.
+// `git-fixture` of the fixture's branches; opening a store runs on the bytes of
+// `store/knowledge.jsonl` in a `store-jsonl`; the checks with no glue around
+// them — a JSON text, a proposal value, apply — run alone.
 // A row hands on the Result of its check as it is (CONVENTIONS.md §2.1); a
 // check placed by its caller is placed at the root of the input, `ROOT`.
-import { fileOf } from "../../src/adapters/store-jsonl/index.js";
+import { createStoreJsonl } from "../../src/adapters/store-jsonl/index.js";
 import { importMd, LG_42, parse, RM_01, RM_02 } from "../../src/codec/index.js";
 import {
   checkAgainstType,
@@ -42,8 +43,9 @@ import {
 } from "../../src/kernel/index.js";
 import {
   apply,
+  commitLine,
   createView,
-  encodeCommit,
+  KNOWLEDGE,
   land,
   LG_04,
   LG_05,
@@ -53,11 +55,10 @@ import {
   LG_23,
   LG_54,
   NO_FACTS,
-  openLines,
+  openStore,
   readProposal,
   signCommit,
   signProposal,
-  verifyChain,
   verifyProposal,
   type Commit,
 } from "../../src/ledger/index.js";
@@ -144,26 +145,35 @@ const applyCheck: FixtureCheck = {
   run: (input) => applied(field(input, "proposal") as JsonValue),
 };
 
-/** The line of the commit apply forms for a proposal on an empty ledger. */
-function lineOf(value: JsonValue): string {
-  const commit = applied(value);
-  if (!commit.ok || commit.value === "no-op") throw new Error("bug: the pass proposal of a store fixture applies to a commit");
-  return encodeCommit(commit.value);
-}
+/** The line landing writes for a proposal on an empty store: the commit apply forms, chained and signed (`landedChain`). */
+const lineOf = (value: JsonValue): Uint8Array => commitLine(landedChain([value])[0]!);
 
 /** Bytes given in a fixture: a string, as UTF-8, or the numbers of the bytes, for bytes that are not UTF-8. */
 const bytesOf = (v: unknown): Uint8Array => (Array.isArray(v) ? Uint8Array.from(v as number[]) : new TextEncoder().encode(String(v)));
 
+/** The bytes of `store/knowledge.jsonl` opened in a `store-jsonl` with the key of the land session (LG-02, LG-05). */
+async function opened(file: Uint8Array) {
+  const dir = scratch("lattice-fixture-");
+  try {
+    dir.write(KNOWLEDGE, file);
+    return await openStore(createStoreJsonl({ dir: dir.dir }), keyOfLand);
+  } finally {
+    dir.remove();
+  }
+}
+
 /**
- * `input`: `{ lines }` — the raw lines of `store/knowledge.jsonl`, each a string or the numbers of its bytes, as a
- * broken file can hold them; a trigger needs lines apply never forms (Q-23) — or `{ proposal }`, whose line apply
- * forms.
+ * `input`: `{ lines?, cut? }` — the raw lines of `store/knowledge.jsonl`, each a string or the numbers of its bytes, as
+ * a broken file can hold them, each ended by a line feed, and `cut`, the bytes after the last one; a trigger needs
+ * lines landing never writes (Q-23) — or `{ proposal }`, whose line landing writes. The file is opened (LG-02).
  */
 const store: FixtureCheck = {
   enforces: [KR_10.id, LG_06.id, KR_04.id],
   run: (input) => {
-    const raw = field(input, "lines");
-    return openLines(raw === undefined ? [new TextEncoder().encode(lineOf(field(input, "proposal") as JsonValue))] : (raw as unknown[]).map(bytesOf));
+    const [lines, cut, proposal] = [field(input, "lines") ?? [], field(input, "cut"), field(input, "proposal")];
+    if (proposal !== undefined) return opened(lineOf(proposal as JsonValue));
+    const framed = (lines as unknown[]).flatMap((l) => [...bytesOf(l), 0x0a]);
+    return opened(Uint8Array.from([...framed, ...(cut === undefined ? [] : bytesOf(cut))]));
   },
 };
 
@@ -197,16 +207,16 @@ function edited(c: Commit, edit: Edit): Commit {
 }
 
 /**
- * `input`: `{ proposals, edits? }` — the chain landing forms for the proposals (`landedChain`), verified as the lines
- * of `store/knowledge.jsonl` with the key of the land session. `edits` change landed commits as a broken store holds
- * them: the raw input of a trigger only (Q-23).
+ * `input`: `{ proposals, edits? }` — the chain landing forms for the proposals (`landedChain`), opened as the lines of
+ * `store/knowledge.jsonl` with the key of the land session (LG-05). `edits` change landed commits as a broken store
+ * holds them: the raw input of a trigger only (Q-23).
  */
 const chain: FixtureCheck = {
   enforces: [LG_04.id, LG_05.id, LG_06.id],
   run: (input) => {
     const edits = (field(input, "edits") ?? []) as readonly Edit[];
     const commits = landedChain(field(input, "proposals") as readonly JsonValue[]).map((c, i) => edits.filter((e) => e.line === i + 1).reduce(edited, c));
-    return verifyChain(commits, keyOfLand, { ...ROOT, path: "/store/knowledge.jsonl" });
+    return opened(Uint8Array.from(commits.flatMap((c) => [...commitLine(c)])));
   },
 };
 
@@ -239,13 +249,13 @@ type FixtureFile = string | Uint8Array | null;
 
 /**
  * A file of a branch in a fixture: a string, its text; `null`, removed; `{ json }`, the JSON text of a value;
- * `{ landed }`, the `store/knowledge.jsonl` landing writes for one proposal on an empty store — the line apply forms,
- * framed by `fileOf` of `store-jsonl`; `{ bytes }`, the numbers of bytes that are not UTF-8. A raw store or tree that
+ * `{ landed }`, the `store/knowledge.jsonl` landing writes for one proposal on an empty store — its line (`lineOf`);
+ * `{ bytes }`, the numbers of bytes that are not UTF-8. A raw store or tree that
  * no landing writes is the input of a trigger only (Q-23).
  */
 function fileOfFixture(v: unknown): FixtureFile {
   if (v === null || typeof v === "string") return v;
-  if (field(v, "landed") !== undefined) return fileOf(lineOf(field(v, "landed") as JsonValue));
+  if (field(v, "landed") !== undefined) return lineOf(field(v, "landed") as JsonValue);
   if (field(v, "bytes") !== undefined) return bytesOf(field(v, "bytes"));
   return JSON.stringify(field(v, "json"));
 }

@@ -8,7 +8,7 @@
 // depth of nesting overflows, and the values it gives are frozen.
 import { numberRejections, stringRejections } from "./canon.js";
 import { hashBytes } from "./hash.js";
-import { pointer, type JsonValue } from "./json.js";
+import { pointer, serialize, type JsonValue } from "./json.js";
 import { refuse, refused, reject, ROOT, type Place, type Rejection, type Result } from "./rejection.js";
 import { KR_10 } from "./rules.js";
 
@@ -209,4 +209,22 @@ export function parseJson(text: string, place: Place = ROOT): Result<JsonValue> 
 export function parseJsonBytes(bytes: Uint8Array, place: Place = ROOT): Result<JsonValue> {
   const text = decodeUtf8(bytes, place);
   return text.ok ? parseJson(text.value, place) : text;
+}
+
+/**
+ * KR-10: the value of bytes that are its canonical form (RFC 8785), with those bytes — refused at the place the caller
+ * names as `parseJsonBytes` refuses, and as a whole when they are other bytes of the same value (a byte order mark, a
+ * carriage return, spaces, another order of keys): never repaired. What it gives is known canonical, so its holder
+ * keeps the bytes and never encodes the value again to compare. Bytes are no JSON value: the refusal names the
+ * canonical bytes and the bytes given by their hashes (CONVENTIONS.md §3.3).
+ */
+export function parseCanonical(bytes: Uint8Array, place: Place = ROOT): Result<{ readonly value: JsonValue; readonly bytes: Uint8Array }> {
+  const text = decodeUtf8(bytes, place);
+  if (!text.ok) return text;
+  const value = parseJson(text.value, place);
+  if (!value.ok) return value;
+  // The parse admits only I-JSON in NFC, so the value has a canonical text; UTF-8 is one to one on such text.
+  const canonical = serialize(value.value);
+  if (text.value === canonical) return { ok: true, value: { value: value.value, bytes } };
+  return refuse(reject(KR_10, { ...place, expected: hashBytes(new TextEncoder().encode(canonical)), got: hashBytes(bytes) }));
 }
