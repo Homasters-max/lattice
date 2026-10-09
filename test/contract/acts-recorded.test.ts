@@ -8,7 +8,7 @@ import { createActsFixture } from "../../src/adapters/acts-fixture/index.js";
 import { createActsLocal } from "../../src/adapters/acts-local/index.js";
 import { createActsRecorded } from "../../src/adapters/acts-recorded/index.js";
 import { parseJson, ROOT } from "../../src/kernel/index.js";
-import { ACT_TYPE, land, NO_FACTS, proposalHash, readProposal, type Acts, type Commit } from "../../src/ledger/index.js";
+import { ACT_TYPE, apply, createView, land, NO_FACTS, proposalHash, readProposal, type Acts, type Commit } from "../../src/ledger/index.js";
 import { coversProposal, type Act } from "../../src/trust/index.js";
 import { AT, landingPortsForTests } from "../support/assembly.js";
 import { deepFreeze } from "../support/deep-freeze.js";
@@ -102,5 +102,16 @@ describe("acts-recorded: the acts landing read, and no other event", () => {
     const commit = await landed(createActsFixture(deepFreeze({ acts: { "cr/a": [landedAct] } })), true, carryingAnAct());
     expect(commit.records.filter((r) => r.type === ACT_TYPE).map((r) => r.by === commit.by)).toEqual([true, false]);
     expect(await createActsRecorded(deepFreeze({ commits: { "cr/a": commit } })).read("cr/a")).toEqual([landedAct]);
+  });
+
+  it("TR-16, LG-22: a record by the land session that is no act event — as the event of the land session will be (S0-20) — is no act", async () => {
+    const land = "01JB2X00000000000000000LND";
+    const read = readProposal(deepFreeze({ ...(JSON.parse(FILE) as object), session: { id: land } }));
+    if (!read.ok) throw new Error("bug: the proposal of the tests has the form of LG-09");
+    const act = fixtureAct(HASH, true);
+    const applied = apply(deepFreeze(createView(0, [])), read.value, deepFreeze({ session: { id: land, at: AT }, events: [{ id: "01JB2X000000000000000ACT00", at: AT, body: act }] }), deepFreeze([]));
+    if (!applied.ok || applied.value === "no-op") throw new Error("bug: the proposal of the tests applies to a commit");
+    expect(applied.value.records.map((r) => r.by)).toEqual([land, land]);
+    expect(await createActsRecorded(deepFreeze({ commits: { "cr/a": applied.value } })).read("cr/a")).toEqual([act]);
   });
 });
