@@ -2,7 +2,6 @@
   "check": "import",
   "input": {
     "files": {
-      "a.md": "# A\n\nAA-Z01. One.\n",
       "b.md": "# B\n\n| ID | Rule |\n|---|---|\n| AA-Z02 | Prose in a row. |\n"
     }
   },
