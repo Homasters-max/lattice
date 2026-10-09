@@ -43,11 +43,12 @@ const idOf = (r: Row) => `${r.key}@${r.from}`;
 
 /**
  * The rows after a delta: a closed row replaces the open one it closes, an opened row is added. Fold closes only a row
- * its view holds (LG-35), so a delta that closes a row the rows do not hold is a bug of the ledger, never a no-op.
+ * its view holds (LG-35), so a delta that closes a row the rows do not hold open — none or one closed before — is a
+ * bug of the ledger, never a no-op.
  */
 export function withDelta(rows: readonly Row[], delta: Delta): Row[] {
   const closed = new Map(delta.filter((r) => r.to !== null).map((r) => [idOf(r), r]));
-  const ids = new Set(rows.map(idOf));
+  const ids = new Set(rows.filter((r) => r.to === null).map(idOf));
   const unknown = [...closed.keys()].find((id) => !ids.has(id));
   if (unknown !== undefined) throw new Error(`bug: a delta closes the row ${unknown}, which the rows do not hold`);
   const kept = rows.map((r) => closed.get(idOf(r)) ?? r);

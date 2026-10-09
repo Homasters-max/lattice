@@ -126,12 +126,16 @@ describe.each(ADAPTERS)("store port: $name", ({ make }) => {
   });
 
   // Q-27: a delta closes a row the fold saw; one the store does not keep is a bug, never a no-op — and the append stays atomic.
-  it("LG-02, LG-35: a delta that closes a row the store does not keep is a bug of the ledger, thrown before anything is written", async () => {
+  it("LG-02, LG-35: a delta that closes a row the store does not keep open is a bug of the ledger, thrown before anything is written", async () => {
     const store = make();
-    await store.append({ commit: utf8("1\n"), delta: [row("current:a", 1)], evidence: [] });
+    await store.append({ commit: utf8("1\n"), delta: [row("current:a", 1), row("current:d", 1)], evidence: [] });
+    await store.append({ commit: utf8("2\n"), delta: [row("current:d", 1, 2)], evidence: [] });
     const before = await written(store);
-    await expect(store.append({ commit: utf8("2\n"), delta: [row("current:c", 2), row("current:b", 1, 2)], evidence: [EVIDENCE] })).rejects.toThrow(/^bug:/);
-    expect(await written(store)).toEqual(before);
+    // A row it never kept, then one a delta closed before.
+    for (const closes of [row("current:b", 1, 3), row("current:d", 1, 3)]) {
+      await expect(store.append({ commit: utf8("3\n"), delta: [row("current:c", 3), closes], evidence: [EVIDENCE] })).rejects.toThrow(/^bug:/);
+      expect(await written(store)).toEqual(before);
+    }
   });
 
   // Q-18: whatever order the ledger hands the rows in, the store answers in the order of sortRows.
