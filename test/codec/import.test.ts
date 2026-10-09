@@ -42,10 +42,10 @@ const FILES = knowledge
 
 let corpus: Intent[] | undefined;
 
-/** The whole of docs/design imported once: every file at its place /docs/design/<file>. */
+/** The whole of docs/design imported once: every file at its place /docs/design/<file>; the list and each document frozen as in `documents` (§1.5). */
 function design(): Intent[] {
   if (corpus !== undefined) return corpus;
-  const out = importMd(FILES.map((f) => ({ path: `/docs/design/${f}`, bytes: knowledge.bytes(f) })), AT);
+  const out = importMd(Object.freeze(FILES.map((f) => Object.freeze({ path: `/docs/design/${f}`, bytes: knowledge.bytes(f) }))), AT);
   if (!out.ok) throw new Error(out.rejections.map((r) => `${r.rule} ${String(r.intent)} ${r.path} ${JSON.stringify(r.got)}`).join("; "));
   corpus = out.value;
   return corpus;
