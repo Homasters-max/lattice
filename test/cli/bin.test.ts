@@ -1,9 +1,13 @@
 // RT-32, SL-05: the bin `lattice`. package.json names `dist/cli/main.js`, which
 // the build makes from `src/cli/main.ts`; built here into a temporary
-// directory, it shows the commands of S0 and refuses to land with exit code 2
-// until S0-23 gives it the working assembly from `store/lattice.json` (Q-13).
+// directory, it shows the commands of S0, verifies the `jsonl` store of a
+// directory, and refuses to land with exit code 2 until S0-23 gives it the
+// working assembly from `store/lattice.json` (Q-13).
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { commitLine, KNOWLEDGE } from "../../src/ledger/index.js";
+import { recordedChain } from "../support/chain.js";
 import { owned, repoRoot, scratch, type Scratch } from "../support/files.js";
+import { note, proposalOf, TYPES } from "../support/notes.js";
 import { program, type Program } from "../support/program.js";
 
 let out: Scratch;
@@ -34,6 +38,17 @@ describe("the bin lattice (RT-32)", () => {
       0,
       ["init", "draft", "land", "verify-store", "export", "migrate", "session"],
     ]);
+  });
+
+  it("RT-32, LG-37: the built bin verifies the jsonl store of a directory and prints the outcome, exit 0", () => {
+    const store = scratch("lattice-bin-store-");
+    try {
+      store.write(KNOWLEDGE, Uint8Array.from(recordedChain([proposalOf(...TYPES, note("demo/a"))]).flatMap((c) => [...commitLine(c)])));
+      const run = lattice("verify-store", store.dir);
+      expect([run.status, run.stdout, run.stderr]).toEqual([0, expect.stringMatching(/^verified: 1 commit — chain, signatures and a rebuild of \d+ rows/), ""]);
+    } finally {
+      store.remove();
+    }
   });
 
   // Q-13: the bin gets its store with S0-23; until then the path of SL-05 runs through the test assembly.

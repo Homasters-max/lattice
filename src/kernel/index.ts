@@ -8,7 +8,7 @@ export { compare, type Comparison, type Mode, type Relation } from "./compare.js
 export type { Aspect } from "./compare-shown.js";
 export { checkFormat, isFormat, isUlid, type CanonicalFormat, type Format } from "./formats.js";
 export { BODY_LIMIT, hash, hashBytes, hashRecord } from "./hash.js";
-export { compareText, gotOf, isJsonObject, type JsonObject, type JsonValue } from "./json.js";
+export { compareText, gotOf, isJsonObject, serialize, type JsonObject, type JsonValue } from "./json.js";
 export { checkId, isEntityId, type Kind } from "./id.js";
 export { decodeUtf8, parseCanonical, parseCanonicalLine, parseJson, parseJsonBytes } from "./parse.js";
 export { checkHeader, type Record } from "./record.js";
@@ -36,4 +36,5 @@ export { checkSchema, type Schema } from "./schema.js";
 export type { ResolveType, Type } from "./type.js";
 export { checkUri, isUri } from "./uri.js";
 export { validate, type Violation, type Violations } from "./validate.js";
+export { valuesOf, type ValueAt } from "./values-of.js";
 export { KERNEL_VERSION } from "./version.js";

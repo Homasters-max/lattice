@@ -5,7 +5,6 @@
 export const STUBS: { readonly [command: string]: string } = {
   init: "S0-23",
   draft: "S0-21",
-  "verify-store": "S0-12",
   export: "S0-27",
   migrate: "S0-18",
 };

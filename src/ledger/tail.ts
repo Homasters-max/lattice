@@ -64,8 +64,8 @@ export async function openTail(ports: TailPorts): Promise<Result<OpenedTail>> {
     const opened = await openStore(ports.openStore(worktree), null);
     if (!opened.ok) return opened;
     // LG-02: commits, tail and evidence of a store read its worktree, released below; row and rows answer from memory.
-    const { store, view, tail } = opened.value;
-    return { ok: true, value: { store: { row: (key) => store.row(key), rows: (prefix) => store.rows(prefix) }, view, tail, onto, file: file.value } };
+    const { store, ...folded } = opened.value;
+    return { ok: true, value: { ...folded, store: { row: (key) => store.row(key), rows: (prefix) => store.rows(prefix) }, onto, file: file.value } };
   } finally {
     await worktree.release();
   }

@@ -1,13 +1,16 @@
-// assembly (ST-01): wires landing, the read view and the start of a session
-// to the ports; the only module that imports adapters (ST-06). The store on a
+// assembly (ST-01): wires landing, the read view, the start of a session and
+// the verification of a store to the ports; the only module that imports
+// adapters (ST-06). The store on a
 // worktree is always the `jsonl` adapter (LG-23). The working adapters of
 // `git`, `acts`, `clock` and `ids` and reading `store/lattice.json` arrive
 // with S0-19, S0-20 and S0-23; the adapters for tests are assembled only by
 // tests (test/support/assembly.ts, plan/closure-check.md, the bypass class of
 // acts: TR-14…TR-17).
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { createStoreJsonl } from "../adapters/store-jsonl/index.js";
-import type { Result } from "../kernel/index.js";
-import { land, openTail, type LandingOutcome, type LandingPorts, type LandOptions, type View } from "../ledger/index.js";
+import type { Rejections, Result } from "../kernel/index.js";
+import { KNOWLEDGE, land, openTail, verifyStore, type LandingOutcome, type LandingPorts, type LandOptions, type View } from "../ledger/index.js";
 import { startSession, type SessionOutcome, type SessionRequest } from "./session.js";
 
 export type { Rejection, Result } from "../kernel/index.js";
@@ -39,4 +42,20 @@ export function assemble(ports: Ports): Assembly {
     return opened.ok ? { ok: true, value: opened.value.view } : opened;
   };
   return { land: (request, options) => land(all, request, options), view, session: (request) => startSession(ports, request) };
+}
+
+/** What `verify-store` ends with: the store verified, its rejections, or no store at the directory. */
+export type VerifyOutcome =
+  | { readonly outcome: "verified"; readonly commits: number; readonly rows: number }
+  | { readonly outcome: "rejections"; readonly rejections: Rejections }
+  | { readonly outcome: "no-store" };
+
+/**
+ * RT-32: verifies the `jsonl` store of a directory (LG-02, LG-50) — its chain, the signatures by the keys of the land
+ * sessions it records and the rebuild of its rows (LG-05, LG-37). It needs no other port, so it needs no configured store.
+ */
+export async function verifyStoreAt(dir: string): Promise<VerifyOutcome> {
+  if (!existsSync(join(dir, KNOWLEDGE))) return { outcome: "no-store" };
+  const verified = await verifyStore(createStoreJsonl({ dir }));
+  return verified.ok ? { outcome: "verified", ...verified.value } : { outcome: "rejections", rejections: verified.rejections };
 }

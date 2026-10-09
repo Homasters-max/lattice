@@ -104,6 +104,9 @@ describe("apply, the candidate commit", () => {
     expect(fold(view, second, []).map((r) => [r.key, r.from, r.to])).toEqual([
       ["current:demo/a", 1, 2],
       ["current:demo/a", 2, null],
+      ["latest:demo/a", 1, 2],
+      ["latest:demo/a", 2, null],
+      ["revision:demo/a@2", 2, null],
     ]);
   });
 

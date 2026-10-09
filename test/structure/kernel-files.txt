@@ -25,4 +25,5 @@ src/kernel/schema.ts
 src/kernel/type.ts
 src/kernel/uri.ts
 src/kernel/validate.ts
+src/kernel/values-of.ts
 src/kernel/version.ts

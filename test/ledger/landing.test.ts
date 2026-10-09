@@ -118,7 +118,8 @@ describe("landing into git (LG-22, LG-23)", () => {
     const { store } = await storeOnMain(ports);
     const rows: string[] = [];
     for await (const r of store.rows("")) rows.push(`${r.key}@${r.from}`);
-    expect(rows).toEqual(["current:demo/a@1", "current:demo/b@2"]);
+    // LG-34: each entity revision is the current, the latest and a revision (S0-12).
+    expect(rows).toEqual(["current:demo/a@1", "current:demo/b@2", "latest:demo/a@1", "latest:demo/b@2", "revision:demo/a@1@1", "revision:demo/b@1@2"]);
     expect(await store.row("current:demo/b")).toMatchObject({ key: "current:demo/b", from: 2, to: null });
   });
 
@@ -130,7 +131,8 @@ describe("landing into git (LG-22, LG-23)", () => {
     // The last store landing opened is the one on the worktree of cr/b, which took its commit.
     const [appendedTo] = opened.slice(-1) as [Store];
     const again = await rowsOfDemo((await storeOnMain(ports)).store);
-    expect(again[0]).toHaveLength(2);
+    // Two entities, each the current, the latest and a revision (LG-34).
+    expect(again[0]).toHaveLength(6);
     expect(await rowsOfDemo(appendedTo)).toEqual(again);
   });
 
