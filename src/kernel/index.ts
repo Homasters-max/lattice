@@ -10,7 +10,7 @@ export { checkFormat, isFormat, isUlid, type CanonicalFormat, type Format } from
 export { BODY_LIMIT, hash, hashBytes, hashRecord } from "./hash.js";
 export { compareText, gotOf, isJsonObject, type JsonObject, type JsonValue } from "./json.js";
 export { checkId, isEntityId, type Kind } from "./id.js";
-export { decodeUtf8, parseCanonical, parseJson, parseJsonBytes } from "./parse.js";
+export { decodeUtf8, parseCanonical, parseCanonicalLine, parseJson, parseJsonBytes } from "./parse.js";
 export { checkHeader, type Record } from "./record.js";
 export { formatRef, isPinned, parseRef, type Ref } from "./ref.js";
 export {

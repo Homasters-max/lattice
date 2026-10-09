@@ -2,7 +2,7 @@
 // in NFC; refused, never repaired. A refusal of the text as a whole sits at
 // the path given; a refusal inside the value at its JSON Pointer under it.
 import { describe, expect, it } from "vitest";
-import { hashBytes, parseCanonical, parseJson, parseJsonBytes, type Result } from "../../src/kernel/index.js";
+import { hashBytes, parseCanonical, parseCanonicalLine, parseJson, parseJsonBytes, type Result } from "../../src/kernel/index.js";
 
 const where = (r: Result<unknown>) => (r.ok ? [] : r.rejections.map((x) => [x.rule, x.path, x.expected, x.got]));
 
@@ -97,5 +97,20 @@ describe("the parse of canonical bytes (KR-10)", () => {
     expect(where(parseCanonical(utf8('{"a":-0}'), FILE))).toEqual([["KR-10", "/f/a", "a number other than -0", "-0"]]);
     expect(where(parseCanonical(Uint8Array.from([0x7b, 0xff, 0x7d]), FILE)).map(([rule, path, expected]) => [rule, path, expected])).toEqual([["KR-10", "/f", "UTF-8"]]);
     expect(where(parseCanonical(utf8(""), FILE))).toEqual([["KR-10", "/f", "a JSON text", ""]]);
+  });
+
+  it("KR-10: a line is canonical bytes and a line feed — it gives the value and its bytes without the line feed", () => {
+    expect(parseCanonicalLine(utf8('{"a":1}\n'), FILE)).toEqual({ ok: true, value: { value: { a: 1 }, bytes: utf8('{"a":1}') } });
+  });
+
+  it("KR-10: refuses a line cut — no line feed at its end — as a whole, named by the hash of its bytes, never repaired", () => {
+    for (const text of ['{"a":1}', "", '{"a":1}\n\r']) {
+      expect(where(parseCanonicalLine(utf8(text), FILE)), JSON.stringify(text)).toEqual([["KR-10", "/f", "a line ending in a line feed", hashBytes(utf8(text))]]);
+    }
+  });
+
+  it("KR-10: refuses the bytes before the line feed as the parse of canonical bytes refuses them", () => {
+    expect(where(parseCanonicalLine(utf8('{"b":1,"a":1}\n'), FILE))).toEqual([["KR-10", "/f", hashBytes(utf8('{"a":1,"b":1}')), hashBytes(utf8('{"b":1,"a":1}'))]]);
+    expect(where(parseCanonicalLine(utf8("\n"), FILE))).toEqual([["KR-10", "/f", "a JSON text", ""]]);
   });
 });

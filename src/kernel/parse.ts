@@ -228,3 +228,15 @@ export function parseCanonical(bytes: Uint8Array, place: Place = ROOT): Result<{
   if (text.value === canonical) return { ok: true, value: { value: value.value, bytes } };
   return refuse(reject(KR_10, { ...place, expected: hashBytes(new TextEncoder().encode(canonical)), got: hashBytes(bytes) }));
 }
+
+const LF = 0x0a;
+
+/**
+ * KR-10, G-17: the value of a line — canonical bytes and a line feed — with those bytes, refused at the place the
+ * caller names as `parseCanonical` refuses. A line without its line feed is cut — its write did not end — and is
+ * refused as a whole, named by the hash of its bytes, never repaired.
+ */
+export function parseCanonicalLine(line: Uint8Array, place: Place = ROOT): Result<{ readonly value: JsonValue; readonly bytes: Uint8Array }> {
+  if (line.at(-1) !== LF) return refuse(reject(KR_10, { ...place, expected: "a line ending in a line feed", got: hashBytes(line) }));
+  return parseCanonical(line.subarray(0, -1), place);
+}

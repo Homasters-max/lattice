@@ -15,7 +15,6 @@ import {
   hash,
   isJsonObject,
   NUMBER,
-  parseCanonical,
   refuse,
   refused,
   reject,
@@ -146,10 +145,11 @@ const COMMIT: MembersOf<Fields> = {
 };
 
 /**
- * LG-06, KR-04: the commit a JSON value holds, or its rejections at the place the caller names — where it sits in
- * its input: its own fields, and the header of every record it holds, even when its own fields are broken.
+ * LG-06, KR-04: the commit a JSON value holds — the value of a line of a store, which the kernel read as canonical
+ * (KR-10, `parseCanonicalLine`) — or its rejections at the place the caller names, where it sits in its input: its
+ * own fields, and the header of every record it holds, even when its own fields are broken.
  */
-function readCommit(value: JsonValue, place: Place): Result<Commit> {
+export function readCommit(value: JsonValue, place: Place): Result<Commit> {
   if (!isJsonObject(value)) return refuse(reject(LG_06, { ...place, expected: "a commit", got: gotOf(value) }));
   const fields = closedForm(value, COMMIT, LG_06, place);
   const listed = COMMIT.records.fits(value.records) ? value.records : [];
@@ -157,15 +157,4 @@ function readCommit(value: JsonValue, place: Place): Result<Commit> {
   const refusal = refused<Commit>([...rejectionsOf(fields), ...records.flatMap(rejectionsOf)]);
   if (refusal !== null) return refusal;
   return fields.ok ? { ok: true, value: { ...fields.value, records: records.flatMap((r) => (r.ok ? [r.value] : [])) } } : fields;
-}
-
-/**
- * The commit of canonical bytes — a line of a store without its line feed — refused at the place the caller names,
- * where the line sits in its input: KR-10 for bytes that are not UTF-8, a text that is not JSON (an empty line too)
- * and bytes that are not the canonical bytes of their value (a byte order mark, a carriage return, spaces, another
- * order of keys), LG-06 and KR-04 for its form.
- */
-export function decodeCommit(bytes: Uint8Array, place: Place): Result<Commit> {
-  const parsed = parseCanonical(bytes, place);
-  return parsed.ok ? readCommit(parsed.value.value, place) : parsed;
 }

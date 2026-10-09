@@ -7,24 +7,23 @@
 // Every refusal is placed at the line of `store/knowledge.jsonl`, counted from
 // 1 as `seq` is (Q-29). `openTail` and `verify-store` (S0-12) open a store
 // through it; the next commit on a tail (S0-20) is the second operation here.
-import { hashBytes, KR_10, refuse, reject, type Place, type Result } from "../kernel/index.js";
-import { decodeCommit, verifyChain, type Commit, type KeyOfSession } from "./commit.js";
+import { parseCanonicalLine, type Place, type Result } from "../kernel/index.js";
+import { readCommit, verifyChain, type Commit, type KeyOfSession } from "./commit.js";
 import { fold } from "./fold.js";
 import { KNOWLEDGE, type Store } from "./ports/store.js";
 import { viewOf, withDelta, type Row, type Rows, type View } from "./rows.js";
-
-const LF = 0x0a;
 
 /** The place of the line `n` of the store, from 1 (Q-29). */
 const lineAt = (n: number): Place => ({ intent: null, path: `/${KNOWLEDGE}/${n}` });
 
 /**
- * KR-10, G-17: the commit of a line — its canonical bytes and a line feed. A line without one is cut — the write of
- * the last line did not end — and is refused as it is, never repaired.
+ * The commit of a line: the kernel reads the line — its canonical bytes and a line feed — and refuses KR-10 a line
+ * cut, bytes that are not UTF-8, a text that is not JSON (an empty line too) and bytes that are not the canonical
+ * bytes of their value (`parseCanonicalLine`, G-17); LG-06 and KR-04 refuse its form.
  */
 function readLine(line: Uint8Array, place: Place): Result<Commit> {
-  if (line.at(-1) !== LF) return refuse(reject(KR_10, { ...place, expected: "a line ending in a line feed", got: hashBytes(line) }));
-  return decodeCommit(line.subarray(0, -1), place);
+  const parsed = parseCanonicalLine(line, place);
+  return parsed.ok ? readCommit(parsed.value.value, place) : parsed;
 }
 
 /** The lines of a store folded: its rows, the view at its tail over them, and the tail commit. */
