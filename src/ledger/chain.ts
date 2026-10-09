@@ -33,8 +33,8 @@ export type Folded = { readonly rows: readonly Row[]; readonly view: View & Rows
 /**
  * LG-02, LG-05: the lines of a store from genesis — each as the store keeps it — verified and folded, or the
  * rejections of the first line that is no commit (KR-10, LG-06, KR-04), else of the chain (LG-04…LG-06). Signatures
- * are checked by `keyOfSession`; without it, none — only the store at the tail of `main` opens so, until landing
- * signs its commits (Q-39, S0-20). In S0 evidence is opaque: fold reads no run from it (S0-12).
+ * are checked by `keyOfSession`; without it, none — only the stores landing opens, at the tail of `main` and on the
+ * worktree of a change request, open so, until landing signs its commits (Q-39, S0-20). In S0 evidence is opaque: fold reads no run from it (S0-12).
  */
 export function openLines(lines: readonly Uint8Array[], keyOfSession: KeyOfSession | null): Result<Folded> {
   const commits: Commit[] = [];

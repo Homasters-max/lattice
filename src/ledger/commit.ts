@@ -113,8 +113,8 @@ function linkRejections(c: Commit, n: number, before: Commit | null, place: Plac
  * 1, `prev` the hash of the previous commit, `at` never decreasing (KR-11 spells it so that text order is time
  * order) and `sig` the signature of each commit by the key of its land session. The commits are the lines of a
  * store at the place the caller names, each at its number from 1, as `seq` counts (Q-29); the rejections come
- * sorted (CONVENTIONS.md §5.2). Without `keyOfSession` no signature is checked: only the store at the tail of `main`
- * opens so, until landing signs its commits (Q-39, S0-20).
+ * sorted (CONVENTIONS.md §5.2). Without `keyOfSession` no signature is checked: only the stores landing opens, at the
+ * tail of `main` and on the worktree of a change request, open so, until landing signs its commits (Q-39, S0-20).
  */
 export function verifyChain(commits: readonly Commit[], keyOfSession: KeyOfSession | null, place: Place): Result<readonly Commit[]> {
   const found = commits.flatMap((c, i) => {
