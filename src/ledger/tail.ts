@@ -42,9 +42,13 @@ function fileOnMain(tail: AtPath): Result<Uint8Array | null> {
 /**
  * The store at the tail of `main`: the commit `onto`, the store opened there, the read view at it and its commit, and
  * the bytes of `store/knowledge.jsonl` there — `null` where main has none, the empty store. The worktree of the store
- * is released: it answers `row` and `rows` from the rows it was handed.
+ * is released, its lines and evidence with it: of the store only `row` and `rows` are given, from the rows it was handed.
  */
-export type OpenedTail = Opened & { readonly onto: string; readonly file: Uint8Array | null };
+export type OpenedTail = Omit<Opened, "store"> & {
+  readonly store: Pick<Store, "row" | "rows">;
+  readonly onto: string;
+  readonly file: Uint8Array | null;
+};
 
 /** Opens the store at the tail of `main` (GL-05) on a worktree of that commit alone. */
 export async function openTail(ports: TailPorts): Promise<Result<OpenedTail>> {
@@ -58,7 +62,10 @@ export async function openTail(ports: TailPorts): Promise<Result<OpenedTail>> {
     if (!file.ok) return file;
     // Q-39: landing writes commits with `sig: null` until S0-20, which signs them and checks their signatures here.
     const opened = await openStore(ports.openStore(worktree), null);
-    return opened.ok ? { ok: true, value: { ...opened.value, onto, file: file.value } } : opened;
+    if (!opened.ok) return opened;
+    // LG-02: commits, tail and evidence of a store read its worktree, released below; row and rows answer from memory.
+    const { store, view, tail } = opened.value;
+    return { ok: true, value: { store: { row: (key) => store.row(key), rows: (prefix) => store.rows(prefix) }, view, tail, onto, file: file.value } };
   } finally {
     await worktree.release();
   }
