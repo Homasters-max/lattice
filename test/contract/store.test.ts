@@ -11,6 +11,7 @@ import { createStoreMemory } from "../../src/adapters/store-memory/index.js";
 import { hashBytes, type JsonValue } from "../../src/kernel/index.js";
 import { commitLine, fold, KNOWLEDGE, openLines, openStore, signCommit, type Commit, type Row, type Store } from "../../src/ledger/index.js";
 import { keyOfLand, landedChain } from "../support/chain.js";
+import { deepFreeze } from "../support/deep-freeze.js";
 import { scratch, type Scratch } from "../support/files.js";
 import { testKey } from "../support/keys.js";
 
@@ -27,7 +28,8 @@ const ADAPTERS: readonly { readonly name: string; readonly make: () => Store }[]
   { name: "store-jsonl", make: () => createStoreJsonl({ dir: fresh().dir }) },
 ];
 
-const row = (key: string, from: number, to: number | null = null): Row => ({ key, from, to, value: { key, from } });
+/** A row as the ledger hands it, frozen: the store never changes what it is given (CONVENTIONS.md §1.5). */
+const row = (key: string, from: number, to: number | null = null): Row => deepFreeze({ key, from, to, value: { key, from } });
 const utf8 = (text: string) => new TextEncoder().encode(text);
 
 async function all<T>(items: AsyncIterable<T>): Promise<T[]> {
@@ -43,7 +45,7 @@ const proposal = (id: string, text = id): JsonValue => ({
 });
 
 /** Landing's chain: demo/a, demo/b, then demo/a again — the third commit closes the row of the first. */
-const CHAIN = landedChain([proposal("demo/a"), proposal("demo/b"), proposal("demo/a", "again")]);
+const CHAIN = deepFreeze(landedChain([proposal("demo/a"), proposal("demo/b"), proposal("demo/a", "again")]));
 
 /** An evidence file a commit cites: opaque bytes, named by their hash (LG-30). */
 const EVIDENCE = { hash: hashBytes(Uint8Array.from([1, 2, 255])), bytes: Uint8Array.from([1, 2, 255]) };
@@ -125,6 +127,15 @@ describe.each(ADAPTERS)("store port: $name", ({ make }) => {
     const store = make();
     await store.append({ commit: utf8("1\n"), delta: [row("current:a", 1)], evidence: [] });
     await expect(store.append({ commit: utf8("2\n"), delta: [row("current:b", 1, 2)], evidence: [] })).rejects.toThrow(/^bug:/);
+  });
+
+  // Q-18: whatever order the ledger hands the rows in, the store answers in the order of sortRows.
+  it("LG-02: keeps the rows handed on opening in place of its own, and reads them in key order", async () => {
+    const store = make();
+    await store.append({ commit: utf8("1\n"), delta: [row("current:x", 1)], evidence: [] });
+    await store.keep(deepFreeze([row("current:b", 1), row("current:a", 2, null), row("current:a", 1, 2)]));
+    expect(await store.row("current:x")).toBeNull();
+    expect((await all(store.rows(""))).map((r) => [r.key, r.from])).toEqual([["current:a", 2], ["current:b", 1]]);
   });
 
   it("ST-07: keeps the evidence a commit cites, byte for byte", async () => {
@@ -244,7 +255,9 @@ describe("store-jsonl", () => {
     const line = commitLine(first);
     const cut = fileIn(Uint8Array.from([...line, ...utf8('{"se')]));
     expect(await all(createStoreJsonl({ dir: cut }).commits(1))).toEqual([line, utf8('{"se')]);
-    expect(refusals(await openStore(createStoreJsonl({ dir: cut }), keyOfLand))).toEqual([["KR-10", `/${KNOWLEDGE}/2`]]);
+    const refused = await openStore(createStoreJsonl({ dir: cut }), keyOfLand);
+    const cutRefusal = ["KR-10", `/${KNOWLEDGE}/2`, "a line ending in a line feed", hashBytes(utf8('{"se'))];
+    expect(refused.ok ? [] : refused.rejections.map((r) => [r.rule, r.path, r.expected, r.got])).toEqual([cutRefusal]);
     // A whole commit without its line feed is cut too: the write of its line did not end.
     const unended = fileIn(Uint8Array.from([...line, ...commitLine(second).subarray(0, -1)]));
     expect(refusals(await openStore(createStoreJsonl({ dir: unended }), keyOfLand))).toEqual([["KR-10", `/${KNOWLEDGE}/2`]]);
