@@ -156,7 +156,11 @@ afterAll(() => {
   temp.remove();
 });
 
-describe.concurrent("dev-loop, the time of every step", { timeout: 60_000 }, () => {
+// A whole loop is some forty runs of dl and git: 10 s alone, over 60 s in the test set beside the other loops of a
+// busy machine. Time stays a safeguard above that, not a budget (CONVENTIONS §8.5).
+const LOOP_MS = 120_000;
+
+describe.concurrent("dev-loop, the time of every step", { timeout: LOOP_MS }, () => {
   it("keeps the start and the end of each agent, gate, round and owner in the state, and the comments keep them", async () => {
     const l = await loop();
     // task — the head the executor pushed; fix — the head the fixer pushed, the head of every later step.
@@ -227,7 +231,7 @@ describe.concurrent("dev-loop, a fixer who asks the owner", { timeout: 60_000 },
   });
 });
 
-describe.concurrent("dev-loop, the reason of each round", { timeout: 60_000 }, () => {
+describe.concurrent("dev-loop, the reason of each round", { timeout: LOOP_MS }, () => {
   it("names a round after tidy and a round after a rebase by their reason", async () => {
     const l = await loop();
     await dl(l, t(0), "init", "--pr", "9", "--task", "S0-99", "--branch", BRANCH);
