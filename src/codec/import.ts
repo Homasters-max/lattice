@@ -125,6 +125,8 @@ function twice(written: readonly { readonly path: string; readonly entities: rea
  * LG-42, RM-Z03: the intents of one proposal that write the documents — each `{path, bytes}`, parsed at its place
  * `{intent: null, path}` — as new entities written at `at`, in document order; or the refusals of every document: the
  * codec's at the path and line, RM-01 across documents at the path, KR-10 of canon in the body of an intent.
+ * It checks its whole input from the root of the tree, like `apply` (§2.2): the place of each document is its path,
+ * and of each body the intent it is in, so it takes no `Place`.
  */
 export function importMd(documents: readonly { readonly path: string; readonly bytes: Uint8Array }[], at: string): Result<Intent[]> {
   const parsed = documents.map(({ path, bytes }) => ({ path, out: parse(bytes, { intent: null, path }) }));
