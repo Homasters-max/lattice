@@ -28,7 +28,13 @@ export const isJsonType = (v: JsonValue): v is string => typeof v === "string" &
 /** KR-18: a pair of two different JSON types, one of them `null`, in either order (G-22). */
 export const isTypePair = (v: JsonValue): v is readonly string[] => isJsonArray(v) && v.length === 2 && v.every(isJsonType) && v[0] !== v[1] && v.includes("null");
 
-/** The JSON types a schema names, its `null` among them; none for a schema of `enum`, `const`, `$ref` or `oneOf` alone. */
+/** KR-18: `type: any` — any I-JSON value (KR-10); whoever knows its type checks it, not the kernel (G-38). */
+export const ANY = "any";
+
+/** KR-18: whether a schema admits any value: `type: any`. */
+export const isAny = (schema: SchemaObject): boolean => schema.type === ANY;
+
+/** The JSON types a schema names, its `null` among them; none for a schema of `enum`, `const`, `$ref`, `oneOf` or `type: any`. */
 export function typesOf(schema: SchemaObject): readonly string[] {
   const { type } = schema;
   if (type === undefined) return [];

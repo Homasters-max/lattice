@@ -1,0 +1,44 @@
+{
+  "extends": "std/hint@1",
+  "abstract": false,
+  "kind": "entity",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "supersedes": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/hint@1",
+            "pin": "pinned",
+            "label": "supersedes"
+          }
+        },
+        "description": "the pinned last revisions of the blocks this one replaces (TY-03, RF-12)"
+      },
+      "about": {
+        "type": "string",
+        "format": "ref",
+        "description": "what the note is about, label about (TY-Z03, G-31)"
+      },
+      "subject": {
+        "type": "string",
+        "format": "ref",
+        "description": "the clause, requirement or scenario it says is not met, label about (TY-04, G-31)"
+      },
+      "note": {
+        "type": "string",
+        "minLength": 1,
+        "card_order": 1,
+        "description": "the note"
+      }
+    },
+    "required": [
+      "about",
+      "subject",
+      "note"
+    ]
+  }
+}

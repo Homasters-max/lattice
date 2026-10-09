@@ -1,0 +1,27 @@
+{
+  "valid": [
+    {
+      "of": {
+        "point": "acme/pick-tool",
+        "judge": "acme/judge.jev@3",
+        "set": "acme/pick-tool-set@4"
+      },
+      "question": "sha256:0f1e2d3c",
+      "value": "01JB4M2Z8Q6N7R3T5V9W0X1Y2Z"
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/question",
+      "keyword": "required",
+      "body": {
+        "of": {
+          "point": "acme/pick-tool",
+          "judge": "acme/judge.jev@3",
+          "set": "acme/pick-tool-set@4"
+        },
+        "value": "01JB4M2Z8Q6N7R3T5V9W0X1Y2Z"
+      }
+    }
+  ]
+}

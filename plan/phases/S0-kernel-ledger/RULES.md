@@ -48,7 +48,7 @@
 |---|---|---|
 | KR-01 | полностью | [S0-03](tasks/S0-03-walking-skeleton.md) |
 | KR-02 | полностью | [S0-03](tasks/S0-03-walking-skeleton.md) |
-| KR-03 | полностью | [S0-03](tasks/S0-03-walking-skeleton.md), [S0-23](tasks/S0-23-genesis-init.md) |
+| KR-03 | полностью | [S0-03](tasks/S0-03-walking-skeleton.md), [S0-23](tasks/S0-23-genesis-init.md), [S0-53](tasks/S0-53-any-value-keyword.md) |
 | KR-04 | полностью | [S0-05](tasks/S0-05-record-ref.md), [S0-35](tasks/S0-35-closed-form.md), [S0-36](tasks/S0-36-record-against-type.md) |
 | KR-05 | полностью | [S0-05](tasks/S0-05-record-ref.md) |
 | KR-06 | полностью | [S0-05](tasks/S0-05-record-ref.md) |
@@ -63,11 +63,11 @@
 | KR-15 | полностью | [S0-07](tasks/S0-07-type-compare.md), [S0-36](tasks/S0-36-record-against-type.md) |
 | KR-16 | полностью | [S0-07](tasks/S0-07-type-compare.md), [S0-36](tasks/S0-36-record-against-type.md) |
 | KR-17 | полностью | [S0-07](tasks/S0-07-type-compare.md) |
-| KR-18 | полностью | [S0-06](tasks/S0-06-schema-validate.md), [S0-36](tasks/S0-36-record-against-type.md) |
+| KR-18 | полностью | [S0-06](tasks/S0-06-schema-validate.md), [S0-36](tasks/S0-36-record-against-type.md), [S0-53](tasks/S0-53-any-value-keyword.md) |
 | KR-19 | полностью | [S0-06](tasks/S0-06-schema-validate.md), [S0-07](tasks/S0-07-type-compare.md), [S0-15](tasks/S0-15-phase4-references.md), [S0-35](tasks/S0-35-closed-form.md), [S0-36](tasks/S0-36-record-against-type.md) |
 | KR-20 | полностью | [S0-06](tasks/S0-06-schema-validate.md) |
-| KR-21 | полностью | [S0-06](tasks/S0-06-schema-validate.md), [S0-36](tasks/S0-36-record-against-type.md) |
-| KR-22 | полностью | [S0-07](tasks/S0-07-type-compare.md), [S0-36](tasks/S0-36-record-against-type.md) |
+| KR-21 | полностью | [S0-06](tasks/S0-06-schema-validate.md), [S0-36](tasks/S0-36-record-against-type.md), [S0-53](tasks/S0-53-any-value-keyword.md) |
+| KR-22 | полностью | [S0-07](tasks/S0-07-type-compare.md), [S0-36](tasks/S0-36-record-against-type.md), [S0-53](tasks/S0-53-any-value-keyword.md) |
 | KR-23 | полностью | [S0-05](tasks/S0-05-record-ref.md) |
 | KR-24 | полностью | [S0-05](tasks/S0-05-record-ref.md) |
 | KR-25 | полностью | [S0-05](tasks/S0-05-record-ref.md) |

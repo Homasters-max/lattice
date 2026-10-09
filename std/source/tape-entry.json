@@ -1,0 +1,378 @@
+{
+  "abstract": false,
+  "kind": "event",
+  "schema": {
+    "oneOf": [
+      {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "format": "ref",
+            "ref": {
+              "to": "std/port@1",
+              "pin": "pinned",
+              "label": "uses"
+            },
+            "description": "the operation, port@n#operations/<op> (TY-09, RT-23)"
+          },
+          "request": {
+            "type": "string",
+            "minLength": 1,
+            "description": "the hash of the request (RT-23)"
+          },
+          "occurrence": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "which occurrence of the same request it answers (RT-23); operation, request and occurrence key an answer within the stream of one run, not across the type, so none carries key (KR-19, TR-28)"
+          },
+          "answer": {
+            "type": "any",
+            "description": "the answer of the port (RT-23); an entry holds exactly one of answer and error, which the subset cannot say without a discriminator, so both are optional (G-43); any value: the kernel does not look into it (KR-18, G-38)"
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "adapter": {
+                "type": "string",
+                "minLength": 1,
+                "description": "the adapter"
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1,
+                "description": "the error code"
+              },
+              "status": {
+                "type": "integer",
+                "description": "the status, where there is one"
+              },
+              "retryable": {
+                "type": "boolean",
+                "description": "a rate limit is retryable (RT-23)"
+              }
+            },
+            "required": [
+              "adapter",
+              "code",
+              "retryable"
+            ],
+            "description": "an adapter error, never a body or headers of a vendor (RT-23); in place of answer, which the subset cannot say (G-43)"
+          },
+          "ms": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "its time in milliseconds (RT-23)"
+          },
+          "tokens": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "its tokens where known (RT-23)"
+          },
+          "billing": {
+            "const": "api",
+            "description": "paid by the API, the only billing that carries usd (RT-23)"
+          },
+          "usd": {
+            "type": "string",
+            "format": "decimal",
+            "description": "the cost in USD, only for billing api (RT-23)"
+          },
+          "mode": {
+            "enum": [
+              "service",
+              "recorded",
+              "fixture"
+            ],
+            "description": "the mode of the port (RT-22, RT-23)"
+          },
+          "model": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "the model id the adapter reports"
+              },
+              "check": {
+                "enum": [
+                  "verified",
+                  "reported",
+                  "none"
+                ],
+                "description": "whether it was checked against the pinned one (RT-23, DP-10)"
+              }
+            },
+            "required": [
+              "id",
+              "check"
+            ],
+            "description": "the model that answered, on every answer (RT-23, RT-25); an error has none, so it is optional, which the subset cannot tie to answer (G-43)"
+          },
+          "memo": {
+            "type": "string",
+            "format": "ref",
+            "ref": {
+              "to": "std/run@1",
+              "pin": "any",
+              "label": "derived-from"
+            },
+            "description": "the run a memo answer came from (RT-24); an event, so pin says nothing (G-42)"
+          }
+        },
+        "required": [
+          "operation",
+          "request",
+          "occurrence",
+          "ms",
+          "billing",
+          "mode"
+        ]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "format": "ref",
+            "ref": {
+              "to": "std/port@1",
+              "pin": "pinned",
+              "label": "uses"
+            },
+            "description": "the operation, port@n#operations/<op> (TY-09, RT-23)"
+          },
+          "request": {
+            "type": "string",
+            "minLength": 1,
+            "description": "the hash of the request (RT-23)"
+          },
+          "occurrence": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "which occurrence of the same request it answers (RT-23); operation, request and occurrence key an answer within the stream of one run, not across the type, so none carries key (KR-19, TR-28)"
+          },
+          "answer": {
+            "type": "any",
+            "description": "the answer of the port (RT-23); an entry holds exactly one of answer and error, which the subset cannot say without a discriminator, so both are optional (G-43); any value: the kernel does not look into it (KR-18, G-38)"
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "adapter": {
+                "type": "string",
+                "minLength": 1,
+                "description": "the adapter"
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1,
+                "description": "the error code"
+              },
+              "status": {
+                "type": "integer",
+                "description": "the status, where there is one"
+              },
+              "retryable": {
+                "type": "boolean",
+                "description": "a rate limit is retryable (RT-23)"
+              }
+            },
+            "required": [
+              "adapter",
+              "code",
+              "retryable"
+            ],
+            "description": "an adapter error, never a body or headers of a vendor (RT-23); in place of answer, which the subset cannot say (G-43)"
+          },
+          "ms": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "its time in milliseconds (RT-23)"
+          },
+          "tokens": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "its tokens where known (RT-23)"
+          },
+          "billing": {
+            "const": "subscription",
+            "description": "paid by a subscription, so no usd (RT-23)"
+          },
+          "mode": {
+            "enum": [
+              "service",
+              "recorded",
+              "fixture"
+            ],
+            "description": "the mode of the port (RT-22, RT-23)"
+          },
+          "model": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "the model id the adapter reports"
+              },
+              "check": {
+                "enum": [
+                  "verified",
+                  "reported",
+                  "none"
+                ],
+                "description": "whether it was checked against the pinned one (RT-23, DP-10)"
+              }
+            },
+            "required": [
+              "id",
+              "check"
+            ],
+            "description": "the model that answered, on every answer (RT-23, RT-25); an error has none, so it is optional, which the subset cannot tie to answer (G-43)"
+          },
+          "memo": {
+            "type": "string",
+            "format": "ref",
+            "ref": {
+              "to": "std/run@1",
+              "pin": "any",
+              "label": "derived-from"
+            },
+            "description": "the run a memo answer came from (RT-24); an event, so pin says nothing (G-42)"
+          }
+        },
+        "required": [
+          "operation",
+          "request",
+          "occurrence",
+          "ms",
+          "billing",
+          "mode"
+        ]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "format": "ref",
+            "ref": {
+              "to": "std/port@1",
+              "pin": "pinned",
+              "label": "uses"
+            },
+            "description": "the operation, port@n#operations/<op> (TY-09, RT-23)"
+          },
+          "request": {
+            "type": "string",
+            "minLength": 1,
+            "description": "the hash of the request (RT-23)"
+          },
+          "occurrence": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "which occurrence of the same request it answers (RT-23); operation, request and occurrence key an answer within the stream of one run, not across the type, so none carries key (KR-19, TR-28)"
+          },
+          "answer": {
+            "type": "any",
+            "description": "the answer of the port (RT-23); an entry holds exactly one of answer and error, which the subset cannot say without a discriminator, so both are optional (G-43); any value: the kernel does not look into it (KR-18, G-38)"
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "adapter": {
+                "type": "string",
+                "minLength": 1,
+                "description": "the adapter"
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1,
+                "description": "the error code"
+              },
+              "status": {
+                "type": "integer",
+                "description": "the status, where there is one"
+              },
+              "retryable": {
+                "type": "boolean",
+                "description": "a rate limit is retryable (RT-23)"
+              }
+            },
+            "required": [
+              "adapter",
+              "code",
+              "retryable"
+            ],
+            "description": "an adapter error, never a body or headers of a vendor (RT-23); in place of answer, which the subset cannot say (G-43)"
+          },
+          "ms": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "its time in milliseconds (RT-23)"
+          },
+          "tokens": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "its tokens where known (RT-23)"
+          },
+          "billing": {
+            "const": "local",
+            "description": "run locally, so no usd (RT-23)"
+          },
+          "mode": {
+            "enum": [
+              "service",
+              "recorded",
+              "fixture"
+            ],
+            "description": "the mode of the port (RT-22, RT-23)"
+          },
+          "model": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "the model id the adapter reports"
+              },
+              "check": {
+                "enum": [
+                  "verified",
+                  "reported",
+                  "none"
+                ],
+                "description": "whether it was checked against the pinned one (RT-23, DP-10)"
+              }
+            },
+            "required": [
+              "id",
+              "check"
+            ],
+            "description": "the model that answered, on every answer (RT-23, RT-25); an error has none, so it is optional, which the subset cannot tie to answer (G-43)"
+          },
+          "memo": {
+            "type": "string",
+            "format": "ref",
+            "ref": {
+              "to": "std/run@1",
+              "pin": "any",
+              "label": "derived-from"
+            },
+            "description": "the run a memo answer came from (RT-24); an event, so pin says nothing (G-42)"
+          }
+        },
+        "required": [
+          "operation",
+          "request",
+          "occurrence",
+          "ms",
+          "billing",
+          "mode"
+        ]
+      }
+    ],
+    "discriminator": "billing",
+    "description": "an entry of the tape of a run, one branch for each billing: usd only for api (RT-23)"
+  }
+}

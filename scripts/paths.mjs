@@ -45,7 +45,7 @@ const OWNS = {
   codec: ["src/", "package.json", "package-lock.json"],
   // vectors.test.ts reads the frozen vectors (KR-13).
   kernel: ["test/vectors/"],
-  // std-types.test.ts checks the sources of std/ — the types of S0 as data (S0-08).
+  // std-types.test.ts checks the sources of std/ — the types of std as data (S0-08, S0-09).
   ledger: ["std/"],
   // budget.test.ts reads every test file for the budget of its properties.
   support: ["test/"],

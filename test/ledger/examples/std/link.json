@@ -1,0 +1,28 @@
+{
+  "valid": [
+    {
+      "session": "01JB4M2Z8Q6N7R3T5V9W0X1Y2Z",
+      "for": {
+        "reason": "requirement",
+        "requirement": "demo/order-intake"
+      }
+    },
+    {
+      "session": "01JB4M2Z8Q6N7R3T5V9W0X1Y2Z",
+      "for": {
+        "reason": "finding",
+        "rule": "TR-36",
+        "subject": "demo/order-intake@2"
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/for",
+      "keyword": "required",
+      "body": {
+        "session": "01JB4M2Z8Q6N7R3T5V9W0X1Y2Z"
+      }
+    }
+  ]
+}

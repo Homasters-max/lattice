@@ -1,0 +1,46 @@
+{
+  "extends": "std/fact@1",
+  "abstract": false,
+  "kind": "event",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "of": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string",
+            "format": "ref",
+            "description": "the subject ref@n the verdict attaches to (TR-32)"
+          }
+        },
+        "required": [
+          "subject"
+        ],
+        "key": true,
+        "description": "what the fact is about, {role: ref}; the key of the fact (TY-14, TR-28)"
+      },
+      "participant": {
+        "type": "string",
+        "minLength": 1,
+        "key": true,
+        "description": "the participant who votes, one vote per subject; not a reference, so beside of (TR-29, TR-32, G-41)"
+      },
+      "value": {
+        "enum": [
+          "for",
+          "against"
+        ],
+        "description": "the vote (TR-29)"
+      },
+      "revoked": {
+        "type": "boolean",
+        "description": "true cancels the fact in force for the same key (TR-28)"
+      }
+    },
+    "required": [
+      "of",
+      "participant"
+    ]
+  }
+}

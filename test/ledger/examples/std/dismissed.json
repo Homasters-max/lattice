@@ -1,0 +1,21 @@
+{
+  "valid": [
+    {
+      "of": {
+        "subject": "demo/order-intake@2"
+      },
+      "rule": "TR-36"
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/rule",
+      "keyword": "required",
+      "body": {
+        "of": {
+          "subject": "demo/order-intake@2"
+        }
+      }
+    }
+  ]
+}

@@ -100,9 +100,8 @@ export function stdTypeNames(files: readonly string[]): string[] {
 /**
  * KR-01: the `std` type names of TY-Z02…TY-Z05 in docs/design/03-types.md — the
  * first column of TY-Z02…TY-Z04, and the types of TY-Z05 except the `core` ones.
- * std/source/ holds only the types of S0 (S0-08); the rest of `std` — `pipeline`,
- * `review-note`, `live`, `report`, `step`, `run`… — has no source until S0-09
- * writes it, and the kernel must not name those either.
+ * Since S0-09 std/source/ holds a source for each of them, and a structure test
+ * checks it: the names KR-01 audits are those of the sources.
  */
 export function designTypeNames(md: string): string[] {
   const names = ["TY-Z02", "TY-Z03", "TY-Z04", "TY-Z05"].flatMap((block) =>

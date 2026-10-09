@@ -1,0 +1,73 @@
+{
+  "extends": "std/fact@1",
+  "abstract": false,
+  "kind": "event",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "of": {
+        "type": "object",
+        "properties": {
+          "pipeline": {
+            "type": "string",
+            "format": "ref",
+            "ref": {
+              "to": "std/pipeline@1",
+              "pin": "floating",
+              "label": "about"
+            },
+            "description": "the id of the pipeline (TR-29)"
+          }
+        },
+        "required": [
+          "pipeline"
+        ],
+        "key": true,
+        "description": "what the fact is about, {role: ref}; the key of the fact (TY-14, TR-28)"
+      },
+      "value": {
+        "type": "object",
+        "properties": {
+          "pipeline": {
+            "type": "string",
+            "format": "ref",
+            "ref": {
+              "to": "std/pipeline@1",
+              "pin": "pinned",
+              "label": "uses"
+            },
+            "description": "the pipeline revision that drives execution (DP-21)"
+          },
+          "setup": {
+            "type": "string",
+            "format": "ref",
+            "ref": {
+              "to": "std/setup@1",
+              "pin": "pinned",
+              "label": "uses"
+            },
+            "description": "the setup revision that binds it (DP-21)"
+          },
+          "tuple": {
+            "type": "string",
+            "minLength": 1,
+            "description": "the hash of the execution tuple of the pair (DP-21, LG-38)"
+          }
+        },
+        "required": [
+          "pipeline",
+          "setup",
+          "tuple"
+        ],
+        "description": "the pair that drives execution and the hash of its tuple (TR-29, DP-24)"
+      },
+      "revoked": {
+        "type": "boolean",
+        "description": "true cancels the fact in force for the same key (TR-28)"
+      }
+    },
+    "required": [
+      "of"
+    ]
+  }
+}

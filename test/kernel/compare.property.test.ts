@@ -44,7 +44,7 @@ const nullable = (s: fc.Arbitrary<Schema>): fc.Arbitrary<Schema> =>
 const leaf: fc.Arbitrary<Schema> = fc.oneof(
   fc.record({ min: optional(count), max: optional(count), format: optional(fc.constantFrom("date", "ulid")) }).map((r) => json({ type: "string", minLength: r.min, maxLength: r.max, format: r.format })),
   fc.record({ type: fc.constantFrom("integer", "number"), min: optional(bound), max: optional(bound) }).map((r) => json({ type: r.type, minimum: r.min, maximum: r.max })),
-  fc.constantFrom<Schema>({ type: "boolean" }, { type: "null" }),
+  fc.constantFrom<Schema>({ type: "boolean" }, { type: "null" }, { type: "any" }),
   fc.uniqueArray(fc.constantFrom(...SCALARS), { minLength: 1, maxLength: 4 }).map((e): Schema => ({ enum: e })),
   fc.constantFrom(...SCALARS).map((c): Schema => ({ const: c })),
   fc.constantFrom(...Object.keys(SHAPES)).map((ref): Schema => ({ $ref: ref })),
@@ -96,6 +96,7 @@ const TYPED: { readonly [type: string]: (s: Schema) => fc.Arbitrary<JsonValue> }
   integer: () => fc.integer({ min: -2, max: 3 }),
   number: () => fc.constantFrom(-1.5, -1, 0, 0.5, 1, 2.5),
   boolean: () => fc.boolean(),
+  any: () => fc.oneof(fc.constantFrom(...SCALARS), fc.constantFrom<JsonValue>([], [1, "a"], {}, { n: 1 }, { n: "a", Bad: [] })),
   array: (s) => fc.array(s.items === undefined ? fc.constantFrom(...SCALARS) : valueOf(s.items), { maxLength: 3 }),
   object: (s) =>
     s.values !== undefined

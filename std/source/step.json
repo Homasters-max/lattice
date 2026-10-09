@@ -1,0 +1,128 @@
+{
+  "abstract": false,
+  "kind": "event",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "session": {
+        "type": "string",
+        "format": "ref",
+        "ref": {
+          "to": "core/session@1",
+          "pin": "any",
+          "label": "part-of"
+        },
+        "description": "the session of the step; the steps of one session form one chain (OB-02, LG-07); an event, so pin says nothing (G-42)"
+      },
+      "parent": {
+        "type": "string",
+        "format": "ref",
+        "ref": {
+          "to": "std/step@1",
+          "pin": "any",
+          "label": "part-of"
+        },
+        "description": "the parent step (OB-02); an event, so pin says nothing (G-42)"
+      },
+      "kind": {
+        "enum": [
+          "skill",
+          "tool",
+          "land",
+          "cite",
+          "bench"
+        ],
+        "description": "the kind of the step (OB-02)"
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "the name of the skill, tool or command (OB-02)"
+      },
+      "input": {
+        "type": "string",
+        "minLength": 1,
+        "description": "the hash of its input, its text kept by hash in the runtime store (OB-02, OB-05)"
+      },
+      "output": {
+        "type": "string",
+        "minLength": 1,
+        "description": "the hash of its output (OB-02, OB-05)"
+      },
+      "status": {
+        "type": "string",
+        "minLength": 1,
+        "description": "its status (OB-02); the design names no set of statuses (G-43)"
+      },
+      "ms": {
+        "type": "integer",
+        "minimum": 0,
+        "description": "its time in milliseconds (OB-02)"
+      },
+      "tokens": {
+        "type": "integer",
+        "minimum": 0,
+        "description": "its tokens where known (OB-02)"
+      },
+      "billing": {
+        "enum": [
+          "api",
+          "subscription",
+          "local"
+        ],
+        "description": "how the answer is paid for (RT-23)"
+      },
+      "reads": {
+        "type": "object",
+        "properties": {
+          "blocks": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "ref",
+              "description": "a block it read, ref@n"
+            },
+            "description": "the blocks it read (OB-04)"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "the path of the file"
+                },
+                "hash": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "the hash of its content"
+                }
+              },
+              "required": [
+                "path",
+                "hash"
+              ]
+            },
+            "description": "files by path and content hash"
+          }
+        },
+        "required": [],
+        "description": "what an agent read, when a channel reports it (OB-04)"
+      },
+      "proposal": {
+        "type": "string",
+        "minLength": 1,
+        "description": "the hash of the proposal it wrote (OB-06)"
+      }
+    },
+    "required": [
+      "session",
+      "kind",
+      "name",
+      "status",
+      "ms"
+    ]
+  }
+}

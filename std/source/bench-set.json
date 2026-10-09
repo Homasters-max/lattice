@@ -1,0 +1,45 @@
+{
+  "extends": "std/composition@1",
+  "abstract": false,
+  "kind": "entity",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "supersedes": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/composition@1",
+            "pin": "pinned",
+            "label": "supersedes"
+          }
+        },
+        "description": "the pinned last revisions of the blocks this one replaces (TY-03, RF-12)"
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "ref",
+          "ref": {
+            "to": "std/bench-item@1",
+            "pin": "pinned",
+            "label": "part-of"
+          }
+        },
+        "description": "the pinned references to its items (BN-02)"
+      },
+      "salt": {
+        "type": "string",
+        "minLength": 1,
+        "description": "the salt of its split into tune and holdout; it changes only on rotation, a new revision (BN-04, G-44)"
+      }
+    },
+    "required": [
+      "items",
+      "salt"
+    ]
+  }
+}

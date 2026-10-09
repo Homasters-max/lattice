@@ -1,0 +1,31 @@
+{
+  "valid": [
+    {
+      "of": {
+        "subject": "demo/order-intake@2"
+      },
+      "participant": "github:kat",
+      "value": "for"
+    },
+    {
+      "of": {
+        "subject": "demo/order-intake@2"
+      },
+      "participant": "github:kat",
+      "revoked": true
+    }
+  ],
+  "invalid": [
+    {
+      "path": "/value",
+      "keyword": "enum",
+      "body": {
+        "of": {
+          "subject": "demo/order-intake@2"
+        },
+        "participant": "github:kat",
+        "value": "maybe"
+      }
+    }
+  ]
+}
