@@ -73,7 +73,7 @@ const sshSignature = (bytes: readonly number[]) => `-----BEGIN SSH SIGNATURE----
 const MAGIC = [..."SSHSIG"].map((c) => c.charCodeAt(0));
 
 describe("acts-local: what signs an act", () => {
-  it("TR-14: a signature that holds no SSH key — of GPG, of another format, its key missing or cut short — makes no act", async () => {
+  it("TR-14: a signature that holds no SSH key — of GPG, of another format, its key missing or cut short, or of one line before another header — makes no act", async () => {
     const key = [...Buffer.from(publicKeyOf("dev-owner").split(" ")[1] ?? "", "base64")];
     const signatures = [
       "-----BEGIN PGP SIGNATURE-----\niQ==\n-----END PGP SIGNATURE-----",
@@ -84,7 +84,15 @@ describe("acts-local: what signs an act", () => {
     ];
     // The one that holds the key of `dev-owner` names it, though git verifies no signature of it.
     const named = sshSignature([...MAGIC, 0, 0, 0, 1, 0, 0, 0, key.length, ...key, 0, 0, 0, 3, 103, 105, 116]);
-    const acts = await actsOf("cr/crafted", (b) => [...signatures, named].forEach((s) => repo.crafted(b, gpgsig(s), approve(HASH))));
+    // A signature of one line, and after it a header of its own that holds a blob naming the key of `dev-land`: the
+    // header is not of the signature, which holds no key.
+    const land = [...Buffer.from(publicKeyOf("dev-land").split(" ")[1] ?? "", "base64")];
+    const blob = Buffer.from([...MAGIC, 0, 0, 0, 1, 0, 0, 0, land.length, ...land, 0, 0, 0, 3, 103, 105, 116]).toString("base64");
+    const oneLine = `gpgsig -----BEGIN SSH SIGNATURE-----\nx ${blob}`;
+    const acts = await actsOf("cr/crafted", (b) => {
+      [...signatures, named].forEach((s) => repo.crafted(b, gpgsig(s), approve(HASH)));
+      repo.crafted(b, oneLine, approve(HASH));
+    });
     expect(acts.map((a) => [a.identity, a.verified])).toEqual([[identityOf("dev-owner"), false]]);
   });
 
