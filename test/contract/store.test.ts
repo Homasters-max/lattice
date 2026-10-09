@@ -271,6 +271,8 @@ describe("store-jsonl", () => {
     const own = fresh();
     own.write("store/knowledge.jsonl", "x\n");
     const store = createStoreJsonl({ dir: own.dir });
-    expect([await store.evidence("../knowledge"), await store.evidence("sha256:../../store/knowledge")]).toEqual([null, null]);
+    // The last names store/knowledge.jsonl, which is there, were any digits after `:` taken for a file name.
+    const paths = ["../knowledge", "sha256:../../store/knowledge", "sha256:x/../../knowledge"];
+    expect(await Promise.all(paths.map((p) => store.evidence(p)))).toEqual([null, null, null]);
   });
 });
