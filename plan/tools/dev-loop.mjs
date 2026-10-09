@@ -34,7 +34,7 @@ import { contextMissing, diffOf, executorBrief as executorContext, fixerBrief as
 import { check, FIXER_JOBS } from "./dev-loop/protocol.mjs";
 import { answer, decision, escalation, final, parseHeader, questions, review } from "./dev-loop/render.mjs";
 import { changedLines, conventionsChanged, scope } from "./dev-loop/scope.mjs";
-import { answerFindings, answerText, ask, entryOf, initial, looseFindings, mergeWave, namedFindings, openFindings, planWave, recordAnswer, rememberMutants } from "./dev-loop/state.mjs";
+import { answerFindings, answerText, ask, entryOf, initial, looseFindings, mergeWave, namedFindings, openFindings, planWave, recordAnswer, rememberGaps, rememberMutants } from "./dev-loop/state.mjs";
 import { advancePhase, closeOnBoard, findTask, gapsOf, itemsOf, markItems } from "./dev-loop/task.mjs";
 import { pruneRuns, readRun, runsDir } from "../../scripts/runs.mjs";
 
@@ -597,8 +597,10 @@ const commands = {
       stamp((steps) => finish(steps, { kind: "agent", role: r.brief.role, job: r.brief.job ?? null }, now(), { head: head ?? null }));
       // Решения о мутантах dl помнит по id и снова их не выносит (S0-44); до состояния их переносит init.
       // Ответ на поручение владельца — как ответ на круг: совет получает статус, исправленную находку проверит круг.
+      // Пробелы fixer любого поручения — в состоянии; пробелы executor переносит init.
       const owned = r.brief.role === "fixer" && r.brief.job === "owner" && status === "done";
-      if (flags.dir !== undefined && existsSync(statePath())) save(owned ? recordAnswer(load(), r.value, "owner") : rememberMutants(load(), r.value, r.brief.role));
+      const fixer = (state) => (r.brief.role === "fixer" ? rememberGaps(state, r.value) : state);
+      if (flags.dir !== undefined && existsSync(statePath())) save(owned ? recordAnswer(load(), r.value, "owner") : fixer(rememberMutants(load(), r.value, r.brief.role)));
     }
     print({ ok: r.errors.length === 0, errors: r.errors, warnings: r.warnings, status, pr, head, conflicts, question: status === "needs_owner" ? question : undefined });
   },

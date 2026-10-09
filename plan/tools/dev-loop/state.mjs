@@ -28,6 +28,9 @@ export function rememberMutants(state, out, role) {
   return { ...state, mutants };
 }
 
+/** Пробелы G-NN из выхода автора — в состоянии: итог цикла сверяет их с PLAN.md (render.mjs, final). */
+export const rememberGaps = (state, out) => ({ ...state, gaps: [...new Set([...(state.gaps ?? []), ...(out?.gaps ?? [])])] });
+
 const isOpen = (f) => f.severity === "block" && (f.status === "open" || f.status === "dispute-kept");
 export const openFindings = (state) => state.findings.filter(isOpen);
 const disputedIds = (state) => (state.answers?.items ?? []).filter((a) => a.action === "disputed").map((a) => a.id);
@@ -191,7 +194,7 @@ export function recordAnswer(state, out, job) {
     else if (a.action === "fixed" && f.status === "advice") f.status = "applied";
   }
   if (job === "tidy") Object.assign(next, { tidied: true, budget: next.budget + 1 });
-  next.gaps = [...new Set([...next.gaps, ...(out.gaps ?? [])])];
+  next.gaps = rememberGaps(next, out).gaps;
   next.decisions = [];
   next.owner = null;
   return next;

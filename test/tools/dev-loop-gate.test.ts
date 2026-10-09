@@ -232,3 +232,19 @@ describe.concurrent("dev-loop gate, the records of runs", { timeout: 60_000 }, (
     expect(await dl(l, t(5), "owner", "--text", "продолжить")).toMatchObject({ next: "gate" });
   });
 });
+
+// A gap the fixer of the red gate or of the rebase finds goes to the state, as one of an answer does:
+// the final report checks every gap of the loop against PLAN.md.
+describe.concurrent("dev-loop gate, the gaps of the fixer", { timeout: 60_000 }, () => {
+  it("keeps the gaps of the fixers of verify-red and rebase in the state", async () => {
+    const l = await loop();
+    await dl(l, t(0), "init", "--pr", "9", "--task", "S0-99", "--branch", BRANCH);
+    expect(await dl(l, red(1), "gate", "--worktree", l.work)).toMatchObject({ green: false, next: "red" });
+    for (const [job, gaps] of [["verify-red", ["G-07"]], ["rebase", ["G-07", "G-08"]]] as const) {
+      const brief = (await dl(l, t(2), "brief", "fixer", "--worktree", l.work, "--job", job, "--log", join(l.dir, "verify.log"))).brief as string;
+      out(brief, { status: "done", head: await head(l), answers: [], gaps });
+      expect(await dl(l, t(3), "check", outOf(brief))).toMatchObject({ ok: true });
+    }
+    expect(read(join(l.dir, "state.json")).gaps).toEqual(["G-07", "G-08"]);
+  });
+});
