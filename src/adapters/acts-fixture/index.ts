@@ -6,5 +6,5 @@ import type { Act, Acts } from "../../ledger/ports/acts.js";
 export type ActsFixtureOptions = { readonly acts: { readonly [request: string]: readonly Act[] } };
 
 export function createActsFixture({ acts }: ActsFixtureOptions): Acts {
-  return { read: (request) => Promise.resolve(acts[request] ?? []) };
+  return { read: (request) => Promise.resolve(Object.hasOwn(acts, request) ? (acts[request] ?? []) : []) };
 }

@@ -57,8 +57,9 @@ function wire(parts: readonly Uint8Array[]): Uint8Array {
 
 const utf8 = (text: string) => new TextEncoder().encode(text);
 
-/** RFC 8709: the raw Ed25519 key an OpenSSH line holds, or `null` where the line is not one. */
+/** RFC 8709: the raw Ed25519 key an OpenSSH line holds, or `null` where the text is not one — a text of more lines is none. */
 function rawKey(key: PublicKey): Uint8Array | null {
+  if (/[\r\n]/.test(key)) return null;
   const [algorithm, blob] = key.split(" ");
   if (algorithm !== ALGORITHM || blob === undefined) return null;
   const bytes = decode(blob, false);

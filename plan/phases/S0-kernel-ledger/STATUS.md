@@ -43,7 +43,7 @@
 | [S0-16](tasks/S0-16-namespace-sessions.md) | Namespace, policy, участники, сессии, сертификаты и команда session | F | ✅ | [#58](https://github.com/Homasters-max/lattice/pull/58) | |
 | [S0-17](tasks/S0-17-phase5-authority.md) | Фаза 5 — полномочия, acts, floor и act requirements | F | ⬜ | | |
 | [S0-18](tasks/S0-18-phase6-evolution.md) | Фаза 6 — эволюция типов и контрактов, identity, migrate | F | ⬜ | | |
-| [S0-19](tasks/S0-19-acts-port.md) | Порт acts — адаптеры local, init, fixture, recorded | G | ⬜ | | |
+| [S0-19](tasks/S0-19-acts-port.md) | Порт acts — адаптеры local, init, fixture, recorded | G | ✅ | [#63](https://github.com/Homasters-max/lattice/pull/63) | |
 | [S0-20](tasks/S0-20-git-landing.md) | Порт git и landing — land и land --dry-run | G | ⬜ | | |
 | [S0-21](tasks/S0-21-draft-command.md) | Команда draft | G | ⬜ | | |
 | [S0-22](tasks/S0-22-libraries-visible-set.md) | Библиотеки и visible set | G | ⬜ | | |

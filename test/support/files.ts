@@ -78,8 +78,8 @@ export interface Scratch extends Files {
   readonly dir: string;
   /** The absolute path of `parts` inside the folder. */
   path(...parts: string[]): string;
-  /** Writes a file, making its folder; returns its absolute path. */
-  write(path: string, data: string | Uint8Array): string;
+  /** Writes a file, making its folder — with `mode`, a new file has those permissions; returns its absolute path. */
+  write(path: string, data: string | Uint8Array, mode?: number): string;
   /** Makes a folder with its parents; returns its absolute path. */
   mkdir(path: string): string;
   /** Removes a file or a folder inside, or the whole folder without `path`. */
@@ -126,10 +126,10 @@ export function scratch(prefix: string): Scratch {
     ...filesAt(at),
     dir,
     path: (...parts) => at(join(...parts)),
-    write: (path, data) => {
+    write: (path, data, mode) => {
       const file = at(path);
       mkdirSync(resolve(file, ".."), { recursive: true });
-      writeFileSync(file, data);
+      writeFileSync(file, data, mode === undefined ? {} : { mode });
       return file;
     },
     mkdir: (path) => {
@@ -137,6 +137,8 @@ export function scratch(prefix: string): Scratch {
       mkdirSync(folder, { recursive: true });
       return folder;
     },
-    remove: (path) => rmSync(path === undefined ? dir : at(path), { recursive: true, force: true }),
+    // On Windows a folder a process has just left can stay busy for a while (EBUSY), the longer the more tests run at
+    // once, as under mutants: removing it tries again, each time 100 ms later than the last, for up to 5.5 s.
+    remove: (path) => rmSync(path === undefined ? dir : at(path), { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }),
   };
 }

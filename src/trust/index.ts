@@ -1,8 +1,9 @@
 // trust (ST-01): namespace policy, certificates and signatures, bases, in
 // force, standing, facts and verdicts — pure rules over records. S0-10 brings
 // signatures and keys (G-10); S0-16 namespaces, policy, writers and sessions
-// with the chain of their certificates (TR-01…TR-12); standing arrives with
-// S0-14.
+// with the chain of their certificates (TR-01…TR-12); S0-19 whether an act
+// counts for a proposal (TR-15, TR-16); standing arrives with S0-14.
+export { coversProposal, type Act } from "./act.js";
 export {
   namespaceId,
   namespaceOf,
@@ -19,7 +20,7 @@ export {
   type RoleRights,
   type Writer,
 } from "./policy.js";
-export { RULES, TR_09, TR_10, TR_11, TR_12 } from "./rules.js";
+export { RULES, TR_09, TR_10, TR_11, TR_12, TR_15, TR_16 } from "./rules.js";
 export {
   certificateHash,
   issueSession,

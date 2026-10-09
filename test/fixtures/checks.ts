@@ -42,6 +42,7 @@ import {
   type ResolveType,
 } from "../../src/kernel/index.js";
 import {
+  ACT_TYPE,
   apply,
   commitLine,
   createView,
@@ -63,9 +64,10 @@ import {
   type Commit,
   type Proposal,
 } from "../../src/ledger/index.js";
-import { readPolicy, signSession, TR_09, TR_10, TR_11, TR_12, verifySession, type UnsignedSession } from "../../src/trust/index.js";
+import { coversProposal, readPolicy, signSession, TR_09, TR_10, TR_11, TR_12, TR_15, TR_16, verifySession, type Act, type UnsignedSession } from "../../src/trust/index.js";
 import { std } from "../ledger/std-sources.js";
 import { landingPortsForTests, type GitFixtureOptions } from "../support/assembly.js";
+import { deepFreeze } from "../support/deep-freeze.js";
 // The land session of every fixture: apply takes the commit's `by` and `at` from it (LG-22).
 import { keyOfLand, LAND, landedChain } from "../support/chain.js";
 import { scratch } from "../support/files.js";
@@ -239,6 +241,19 @@ const policy: FixtureCheck = {
   run: admittedPolicy,
 };
 
+/**
+ * `input`: `{ act, proposal }` — the body of an `act` event its type `std/act@1` admits (KR-21), as landing wrote it,
+ * and the hash of a proposal: whether the act covers that proposal, refused from the root of the act (TR-15, TR-16).
+ */
+const act: FixtureCheck = {
+  enforces: [TR_15.id, TR_16.id],
+  run: (input) => {
+    const body = deepFreeze(field(input, "act") as JsonValue);
+    if (!checkAgainstType(deepFreeze({ type: ACT_TYPE, body }), std().resolve, ROOT).ok) throw new Error("bug: the act of a fixture is admitted by its type");
+    return coversProposal(body as Act, String(field(input, "proposal")), ROOT);
+  },
+};
+
 /** The session of a proposal value with its certificate signed by the test key `by` — the session is written unsigned. */
 function certified(proposal: JsonValue, by: unknown): JsonValue {
   if (typeof by !== "string" || !isJsonObject(proposal)) return proposal;
@@ -361,6 +376,7 @@ export const CHECKS: { readonly [check: string]: FixtureCheck } = {
   chain,
   policy,
   session,
+  act,
   land: landCheck,
   md,
   import: importCheck,
