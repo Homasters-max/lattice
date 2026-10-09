@@ -1,17 +1,16 @@
 // ST-07, LG-03, LG-39: the read view and the verification of a store on every
 // adapter of `store`. Commits landed into a store and the store opened again
 // answer every question of the view of S0 alike on `memory` and `jsonl`; a
-// store verifies by the keys of the land sessions it holds (LG-05, TR-11) and
+// store verifies by its chain — signatures from S0-20 (Q-39, G-51) — and
 // rebuilds its rows from genesis.
 import { afterAll, describe, expect, it } from "vitest";
 import { createStoreJsonl } from "../../src/adapters/store-jsonl/index.js";
 import { createStoreMemory } from "../../src/adapters/store-memory/index.js";
 import type { JsonValue } from "../../src/kernel/index.js";
 import { commitLine, fold, KNOWLEDGE, openLines, openStore, verifyStore, type Commit, type Store, type View } from "../../src/ledger/index.js";
-import { keyOfLand, landedChain, landSessionIntent, recordedChain, withIntents } from "../support/chain.js";
+import { keyOfLand, landedChain } from "../support/chain.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 import { scratch, type Scratch } from "../support/files.js";
-import { testKey } from "../support/keys.js";
 import { note, proposalOf, seen, TYPES } from "../support/notes.js";
 
 const dirs: Scratch[] = [];
@@ -102,33 +101,23 @@ describe("projections are dropped and rebuilt (LG-34, PR-04)", () => {
 });
 
 describe("verifying a store on every adapter (RT-32, LG-05)", () => {
-  it.each(ADAPTERS)("LG-05, TR-11: a store verifies by the keys of the land sessions it records, and counts its commits and rows — $name", async ({ make }) => {
-    const store = await appended(make(), recordedChain(PROPOSALS));
+  it.each(ADAPTERS)("LG-05: a store verifies by its chain and counts its commits and rows — $name", async ({ make }) => {
+    const store = await appended(make(), landedChain(PROPOSALS));
     expect(await verifyStore(store)).toEqual({ ok: true, value: { commits: 3, rows: (await all(store.rows(""))).length } });
     expect((await all(store.rows(""))).length).toBeGreaterThan(10);
   });
 
-  it.each(ADAPTERS)("LG-06: a commit whose land session the store does not record has no key: each is refused — $name", async ({ make }) => {
-    const out = await verifyStore(await appended(make(), landedChain(PROPOSALS.slice(0, 2))));
-    // `expected` names the hash the signature covers and the key: none.
-    expect(out.ok ? [] : out.rejections.map((r) => [r.rule, r.path, (r.expected as { readonly key: unknown }).key])).toEqual([
-      ["LG-06", `/${KNOWLEDGE}/1/sig`, null],
-      ["LG-06", `/${KNOWLEDGE}/2/sig`, null],
+  it.each(ADAPTERS)("LG-04, LG-05: a chain with a commit missing is refused at the line that breaks it — $name", async ({ make }) => {
+    const [first, , third] = landedChain(PROPOSALS) as [Commit, Commit, Commit];
+    const out = await verifyStore(await appended(make(), [first, third]));
+    expect(out.ok ? [] : out.rejections.map((r) => [r.rule, r.path])).toEqual([
+      ["LG-05", `/${KNOWLEDGE}/2/prev`],
+      ["LG-04", `/${KNOWLEDGE}/2/seq`],
     ]);
   });
 
-  it("LG-06, TR-11: the key of a land session is that of an event of the session type with a certificate holding a key — the first one of its id", async () => {
-    const refused = async (commits: readonly Commit[]) => {
-      const out = await verifyStore(await appended(createStoreMemory(), commits));
-      return out.ok ? [] : out.rejections.map((r) => [r.rule, r.path, (r.expected as { readonly key: unknown }).key]);
-    };
-    const first = [["LG-06", `/${KNOWLEDGE}/1/sig`, null]];
-    // Triggers: events landing never writes for its session (Q-23).
-    expect(await refused(recordedChain(PROPOSALS.slice(0, 1), { type: "demo/seen@1" }))).toEqual(first);
-    expect(await refused(recordedChain(PROPOSALS.slice(0, 1), { key: "not a key" }))).toEqual(first);
-    expect(await refused(recordedChain(PROPOSALS.slice(0, 1), { body: null }))).toEqual(first);
-    // The same session recorded again with another key: the first event counts.
-    const again = withIntents(PROPOSALS[1] as JsonValue, landSessionIntent({ key: testKey("mallory").publicKey }));
-    expect(await refused(recordedChain([PROPOSALS[0] as JsonValue, again]))).toEqual([]);
+  it("Q-39, G-51: until landing signs its commits (S0-20) no signature is checked — a commit without one verifies", async () => {
+    const unsigned = landedChain(PROPOSALS).map((c) => ({ ...c, sig: null }));
+    expect(await verifyStore(await appended(createStoreMemory(), unsigned))).toMatchObject({ ok: true, value: { commits: 3 } });
   });
 });

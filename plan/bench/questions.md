@@ -56,6 +56,6 @@
 | 48 | Which phase of apply verifies the certificate of a session and the signature of a proposal? | lattice/lg-16, lattice/tr-12 | normal | S0-16 | 2026-10-09 |
 | 49 | Over which bytes does a participant sign the certificate of a session? | — | blank | S0-16, G-48 (TR-11 называет подпись, но не байты) | 2026-10-09 |
 | 50 | Which key signs the certificate of an agent session? | lattice/tr-11, lattice/tr-12 | normal | S0-16 | 2026-10-09 |
-| 51 | Which key verifies the signature of a commit when a store is verified? | lattice/lg-06, lattice/lg-22, lattice/tr-11 | normal | S0-12, G-51 | 2026-10-09 |
+| 51 | Which key verifies the signature of a commit when a store is verified? | — | blank | S0-12, G-51 (LG-05 молчит, откуда ключ) | 2026-10-09 |
 | 52 | Does a new revision of an entity remove the referrers of its previous revision? | — | blank | S0-12, G-52 (RF-09 молчит о ревизиях) | 2026-10-09 |
 | 53 | What does a rebuild of the rows of a store compare against? | lattice/lg-37 | normal | S0-12 | 2026-10-09 |

@@ -51,8 +51,8 @@ export type VerifyOutcome =
   | { readonly outcome: "no-store" };
 
 /**
- * RT-32: verifies the `jsonl` store of a directory (LG-02, LG-50) — its chain and the signatures by the keys of the land
- * sessions it holds (LG-05) — and rebuilds its rows from genesis. It needs no other port, so it needs no configured store.
+ * RT-32: verifies the `jsonl` store of a directory (LG-02, LG-50) — its chain (LG-05), no signatures until landing signs
+ * its commits (Q-39, G-51, S0-20) — and rebuilds its rows from genesis. It needs no other port, so it needs no configured store.
  */
 export async function verifyStoreAt(dir: string): Promise<VerifyOutcome> {
   if (!existsSync(join(dir, KNOWLEDGE))) return { outcome: "no-store" };

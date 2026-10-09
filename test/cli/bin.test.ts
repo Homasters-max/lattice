@@ -5,7 +5,7 @@
 // working assembly from `store/lattice.json` (Q-13).
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { commitLine, KNOWLEDGE } from "../../src/ledger/index.js";
-import { recordedChain } from "../support/chain.js";
+import { landedChain } from "../support/chain.js";
 import { owned, repoRoot, scratch, type Scratch } from "../support/files.js";
 import { note, proposalOf, TYPES } from "../support/notes.js";
 import { program, type Program } from "../support/program.js";
@@ -43,9 +43,9 @@ describe("the bin lattice (RT-32)", () => {
   it("RT-32, LG-05: the built bin verifies the jsonl store of a directory and prints the outcome, exit 0", () => {
     const store = scratch("lattice-bin-store-");
     try {
-      store.write(KNOWLEDGE, Uint8Array.from(recordedChain([proposalOf(...TYPES, note("demo/a"))]).flatMap((c) => [...commitLine(c)])));
+      store.write(KNOWLEDGE, Uint8Array.from(landedChain([proposalOf(...TYPES, note("demo/a"))]).flatMap((c) => [...commitLine(c)])));
       const run = lattice("verify-store", store.dir);
-      expect([run.status, run.stdout, run.stderr]).toEqual([0, expect.stringMatching(/^verified: 1 commit — chain and signatures \(LG-05\); \d+ rows rebuilt from genesis\n$/), ""]);
+      expect([run.status, run.stdout, run.stderr]).toEqual([0, expect.stringMatching(/^verified: 1 commit — chain \(LG-04, LG-05\), signatures not checked; \d+ rows rebuilt from genesis\n$/), ""]);
     } finally {
       store.remove();
     }

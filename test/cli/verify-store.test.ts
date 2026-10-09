@@ -1,11 +1,11 @@
 // `lattice verify-store <path>` (RT-32, RT-Z03): opens the `jsonl` store of a
-// directory, verifies its chain and signatures (LG-05), rebuilds its rows from
-// genesis and prints the outcome — the counts, or the rejections one per line;
-// exit 0 verified, 1 refused, 2 not run.
+// directory, verifies its chain (LG-05) — signatures from S0-20 (Q-39, G-51)
+// — rebuilds its rows from genesis and prints the outcome: the counts, or the
+// rejections one per line; exit 0 verified, 1 refused, 2 not run.
 import { afterAll, describe, expect, it } from "vitest";
 import { run } from "../../src/cli/run.js";
 import { commitLine, KNOWLEDGE, type Commit } from "../../src/ledger/index.js";
-import { landedChain, recordedChain } from "../support/chain.js";
+import { landedChain } from "../support/chain.js";
 import { deepFreeze } from "../support/deep-freeze.js";
 import { scratch, type Scratch } from "../support/files.js";
 import { note, proposalOf, TYPES } from "../support/notes.js";
@@ -32,17 +32,18 @@ async function lattice(cwd: string, ...argv: string[]) {
 
 describe("lattice verify-store (RT-32)", () => {
   it("RT-32, LG-05: verifies a jsonl store and prints its commits and rows; no store configured is needed", async () => {
-    const dir = storeOf(recordedChain(PROPOSALS));
+    const dir = storeOf(landedChain(PROPOSALS));
     const out = await lattice(".", "verify-store", dir.dir);
     expect([out.code, out.err]).toEqual([0, ""]);
-    expect(out.out).toMatch(/^verified: 2 commits — chain and signatures \(LG-05\); \d+ rows rebuilt from genesis\n$/);
+    expect(out.out).toMatch(/^verified: 2 commits — chain \(LG-04, LG-05\), signatures not checked; \d+ rows rebuilt from genesis\n$/);
     // A relative path is a path from the folder it runs in.
     expect((await lattice(dir.dir, "verify-store", ".")).out).toBe(out.out);
   });
 
-  it("LG-06: prints the rejections of a store whose commits no recorded land session signed, exit 1", async () => {
-    const out = await lattice(".", "verify-store", storeOf(landedChain(PROPOSALS)).dir);
-    expect([out.code, out.err, out.out.split("\n").map((l) => l.split(":")[0])]).toEqual([1, "", ["rejections", "LG-06 at /store/knowledge.jsonl/1/sig", "LG-06 at /store/knowledge.jsonl/2/sig", ""]]);
+  it("LG-04, LG-05: prints the rejections of a store whose chain does not start at genesis, exit 1", async () => {
+    const [, second] = landedChain(PROPOSALS) as [Commit, Commit];
+    const out = await lattice(".", "verify-store", storeOf([second]).dir);
+    expect([out.code, out.err, out.out.split("\n").map((l) => l.split(":")[0])]).toEqual([1, "", ["rejections", "LG-05 at /store/knowledge.jsonl/1/prev", "LG-04 at /store/knowledge.jsonl/1/seq", ""]]);
   });
 
   it("RT-32: a directory without store/knowledge.jsonl holds no store: exit 2", async () => {

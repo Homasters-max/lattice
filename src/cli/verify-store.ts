@@ -19,7 +19,7 @@ export async function verifyStoreCommand(args: readonly string[], { out, err, cw
   const o = await verifyStoreAt(dir);
   switch (o.outcome) {
     case "verified":
-      out(`verified: ${plural(o.commits, "commit")} — chain and signatures (LG-05); ${plural(o.rows, "row")} rebuilt from genesis\n`);
+      out(`verified: ${plural(o.commits, "commit")} — chain (LG-04, LG-05), signatures not checked; ${plural(o.rows, "row")} rebuilt from genesis\n`);
       return 0;
     case "rejections":
       out(rejectionLines(o.rejections));
