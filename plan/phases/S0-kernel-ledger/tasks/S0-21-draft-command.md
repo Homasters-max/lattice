@@ -37,4 +37,4 @@ rules: [RT-32, LG-09, LG-54]
 
 ## Риски и заметки
 
-- От S0-16: текущая сессия — `.lattice/session.json` (событие `{id, at, body}`, G-45; оно же `session` proposal) и `.lattice/session.key` (PKCS #8 PEM); подпись — `signProposal` этим ключом.
+- От S0-16: текущая сессия — `.lattice/session.json` (событие `{id, at, body}`, G-47; оно же `session` proposal) и `.lattice/session.key` (PKCS #8 PEM); подпись — `signProposal` этим ключом.

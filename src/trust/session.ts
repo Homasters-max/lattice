@@ -2,12 +2,12 @@
 // every record is a session event of `core/session`: participant, kind, role,
 // purpose, `for`, `parent`, software and version, and a certificate — the
 // session's public key, an expiry and a signature by a key of the participant.
-// In a proposal the session event is `{id, at, body}` (LG-09, G-45); its body
+// In a proposal the session event is `{id, at, body}` (LG-09, G-47); its body
 // has one form, the schema of `core/session@1`, which the kernel checks
 // against the type the caller resolves (KR-21) — trust refuses only what that
 // schema does not say: the reason a purpose needs (OB-01), the Ed25519 session
 // key (TR-10), the expiry and the chain. The certificate signs the hash of the
-// session event without `sig` (G-46), as a commit and a proposal are signed
+// session event without `sig` (G-48), as a commit and a proposal are signed
 // (LG-06, LG-10, G-24). Apply verifies the chain from a key the policy lists
 // for the participant, through the certificate, to the signature of the
 // proposal by the session key; an expired or foreign certificate is rejected.
@@ -62,10 +62,10 @@ export type SessionBody = {
   readonly certificate: Certificate;
 };
 
-/** TR-11, LG-09: a session event as a proposal carries it — every value of the event that is not computed (G-45). */
+/** TR-11, LG-09: a session event as a proposal carries it — every value of the event that is not computed (G-47). */
 export type Session = { readonly id: string; readonly at: string; readonly body: SessionBody };
 
-/** A session before the participant signs its certificate: all that the signature covers (G-46). */
+/** A session before the participant signs its certificate: all that the signature covers (G-48). */
 export type UnsignedSession = {
   readonly id: string;
   readonly at: string;
@@ -78,7 +78,7 @@ const SESSION_TYPE = "core/session@1";
 /** What the closed form of a session admits: its body as a JSON object, which its type reads. */
 type SessionFields = Omit<Session, "body"> & { readonly body: JsonObject };
 
-/** TR-11, LG-09, G-45: the members of a session event in a proposal; no other field. */
+/** TR-11, LG-09, G-47: the members of a session event in a proposal; no other field. */
 const SESSION: MembersOf<SessionFields> = {
   id: STRING,
   at: STRING,
@@ -101,7 +101,7 @@ function reasonRejections(b: SessionBody, place: Place): Rejection[] {
 
 /**
  * TR-11: the session event a JSON value holds, or its rejections at the place the caller names — where the session
- * sits in its input, `/session` of a proposal: its form `{id, at, body}` (G-45), its `id` a ULID (KR-06), its `at` a
+ * sits in its input, `/session` of a proposal: its form `{id, at, body}` (G-47), its `id` a ULID (KR-06), its `at` a
  * time (KR-11), its body against the type `core/session@1` that `types` resolves (KR-21), and the reason its purpose
  * needs (OB-01).
  */
@@ -127,7 +127,7 @@ function withSignature(value: JsonValue, sig: string | null): JsonValue {
 }
 
 /**
- * TR-11, G-46: the hash of a session without the signature of its certificate — every other member is covered — or
+ * TR-11, G-48: the hash of a session without the signature of its certificate — every other member is covered — or
  * the rejections of a session that is not canonical (KR-10).
  */
 export const certificateHash = (s: UnsignedSession | Session, place: Place): Result<string> => hash(withSignature(s, null), place);

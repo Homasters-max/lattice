@@ -114,7 +114,7 @@ export interface Before {
 /**
  * TR-06: the policy of a namespace as it stood before the commit being judged — the body of the current revision of
  * its namespace entity in `before` — or `null` where `before` holds no such namespace, or a record of another type at
- * its id (G-47). Rejections of the body are at the place the caller names.
+ * its id (G-49). Rejections of the body are at the place the caller names.
  */
 export function policyOf(before: Before, namespace: string, place: Place): Result<Policy | null> {
   const record = before.current(namespaceId(namespace));

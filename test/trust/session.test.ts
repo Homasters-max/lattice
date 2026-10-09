@@ -86,7 +86,7 @@ describe("session events (TR-11)", () => {
     expect(read({ ...session, body: { ...session.body, parent: "01JB2X00000000000000000STP" } }).ok).toBe(true);
   });
 
-  it("TR-11, G-45: refuses a session event out of its form {id, at, body}, inside the place the caller names", () => {
+  it("TR-11, G-47: refuses a session event out of its form {id, at, body}, inside the place the caller names", () => {
     const session = signed(UNSIGNED);
     const cases: readonly (readonly [JsonValue, readonly string[][]])[] = [
       [null, [["TR-11", "/session"]]],
@@ -97,7 +97,7 @@ describe("session events (TR-11)", () => {
     for (const [value, expected] of cases) expect(where(readSession(deepFreeze(value), TYPES, AT_SESSION)), JSON.stringify(value)).toEqual(expected);
   });
 
-  it("KR-06, KR-11, G-45: the id of a session is a ULID, its at a time", () => {
+  it("KR-06, KR-11, G-47: the id of a session is a ULID, its at a time", () => {
     const session = signed(UNSIGNED);
     expect(where(read({ ...session, id: "alice/session" }))).toEqual([["KR-06", "/id"]]);
     expect(where(read({ ...session, at: "2026-10-06" }))).toEqual([["KR-11", "/at"]]);
@@ -146,8 +146,8 @@ describe("the reason of a session (TR-11, OB-01)", () => {
   });
 });
 
-describe("certificates (TR-11, G-46)", () => {
-  it("TR-11, G-46: the certificate signs the hash of the session without its signature, by the participant's key", () => {
+describe("certificates (TR-11, G-48)", () => {
+  it("TR-11, G-48: the certificate signs the hash of the session without its signature, by the participant's key", () => {
     const session = signed(UNSIGNED);
     const hash = certificateHash(deepFreeze(UNSIGNED), ROOT);
     expect(certificateHash(deepFreeze(session), ROOT)).toEqual(hash);

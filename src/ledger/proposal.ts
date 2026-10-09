@@ -2,7 +2,7 @@
 // (LG-10) and the canonical order of its intents (LG-06, G-03). The form is
 // closed: an intent carries every value not computed from the tail, and its
 // `by` is the proposal's session, so it holds no `by`, `rev`, `seq` or `hash`.
-// The session event `{id, at, body}` with its certificate (TR-11, G-45) is
+// The session event `{id, at, body}` with its certificate (TR-11, G-47) is
 // read by trust, which verifies the chain of TR-12 to the key that signs the
 // proposal; phase 5 of apply runs it (S0-17).
 import {
@@ -29,7 +29,7 @@ import { signHash, verifyHash, type PublicKey, type SessionKey } from "../trust/
 import { known, unsigned } from "./commit.js";
 import { LG_09, LG_10 } from "./rules.js";
 
-/** The authoring session event (TR-11): LG-09 asks only for its `id`; its form is `readSession` of trust (G-45). */
+/** The authoring session event (TR-11): LG-09 asks only for its `id`; its form is `readSession` of trust (G-47). */
 type Session = JsonObject & { readonly id: string };
 
 export type Intent = {

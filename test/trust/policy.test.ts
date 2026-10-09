@@ -157,7 +157,7 @@ describe("namespaces and owners (TR-01, TR-05)", () => {
     expect(policyOf(before, "other", ROOT)).toEqual({ ok: true, value: null });
   });
 
-  it("TR-01, G-47: a record of another type at the id of a namespace entity is no namespace", () => {
+  it("TR-01, G-49: a record of another type at the id of a namespace entity is no namespace", () => {
     for (const type of ["std/clause@1", "std/namespace-policy@2", "demo/namespace-policy@1"]) {
       const before = beforeOf({ "demo/namespace": { owner: "alice" } }, type);
       expect([type, policyOf(before, "demo", ROOT), ownerOf(before, "demo/a", ROOT)]).toEqual([type, { ok: true, value: null }, { ok: true, value: null }]);
@@ -175,7 +175,7 @@ describe("namespaces and owners (TR-01, TR-05)", () => {
     ]);
   });
 
-  it("GL-07, G-48: the owner of a namespace is the participant its policy names; that the owner is human is checked with owner acts (S0-17)", () => {
+  it("GL-07, G-50: the owner of a namespace is the participant its policy names; that the owner is human is checked with owner acts (S0-17)", () => {
     expect(ownerOf(beforeOf({ "demo/namespace": FULL }), "demo/a", ROOT)).toEqual({ ok: true, value: "alice" });
   });
 
