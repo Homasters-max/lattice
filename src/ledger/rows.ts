@@ -145,10 +145,10 @@ export function held(rows: readonly Row[], seq = Number.POSITIVE_INFINITY): Read
   return new Map(rows.filter((r) => r.from <= seq && (r.to === null || r.to > seq)).map((r) => [r.key, r]));
 }
 
-/** The `id` of the entity a reference names — the type of a record, `type@n` — or `null`. */
-function entityOf(ref: string): string | null {
+/** The `id` a reference names — of the type of a record, which is pinned, `type@n` (KR-07) — or `null` for no reference. */
+function typeIdOf(ref: string): string | null {
   const parsed = parseRef(ref);
-  return parsed.ok && parsed.value.kind === "entity" ? parsed.value.id : null;
+  return parsed.ok ? parsed.value.id : null;
 }
 
 /** A reference without its fragment, pinned: `id@n` of an entity — a floating one at its current revision — or an event `id`; `null` for none. */
@@ -188,7 +188,7 @@ export function viewOf(seq: number, rows: readonly Row[], files: readonly Eviden
     holder: (unique) => (row(holderKey(unique))?.value as { readonly id: string } | undefined)?.id ?? null,
     standing,
     blocks: (types, namespaces) =>
-      (under(KEYS.current) as Record[]).filter((r) => types.includes(entityOf(r.type) ?? "") && namespaces.includes(namespaceOf(r.id) ?? "")),
+      (under(KEYS.current) as Record[]).filter((r) => types.some((t) => t === typeIdOf(r.type)) && namespaces.some((n) => n === namespaceOf(r.id))),
     evidence: (hash) => (row(evidenceKey(hash)) === null ? null : (files.find((f) => f.hash === hash)?.bytes ?? null)),
   };
 }

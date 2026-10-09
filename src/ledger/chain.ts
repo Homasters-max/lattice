@@ -13,7 +13,7 @@ import { isPublicKey, type PublicKey } from "../trust/index.js";
 import { readCommit, verifyChain, type Commit, type KeyOfSession } from "./commit.js";
 import { fold } from "./fold.js";
 import { KNOWLEDGE, type Store } from "./ports/store.js";
-import { held, sortRows, viewOf, withDelta, type Row, type Rows, type View } from "./rows.js";
+import { held, viewOf, withDelta, type Row, type Rows, type View } from "./rows.js";
 import { SESSION_TYPE } from "./session-type.js";
 
 /** The place of the line `n` of the store, from 1 (Q-29). */
@@ -40,13 +40,16 @@ export type Keys = KeyOfSession | typeof RECORDED | null;
 
 const SESSION = `${SESSION_TYPE.id}@${String(SESSION_TYPE.rev)}`;
 
-/** TR-11: the session key of every session event the commits hold, by its `id`; the first event of an `id` counts. */
+/**
+ * TR-11: the session key of every record of the session type the commits hold, by its `id`; the first of an `id`
+ * counts. That a session is an event (KR-05) and its body what its type admits (KR-21) apply checked when it landed.
+ */
 function recordedKeys(commits: readonly Commit[]): KeyOfSession {
   const keys = new Map<string, PublicKey>();
   for (const r of commits.flatMap((c) => c.records)) {
     const certificate = r.type === SESSION && isJsonObject(r.body) ? r.body.certificate : undefined;
     const key = isJsonObject(certificate) ? certificate.key : undefined;
-    if (r.rev === undefined && typeof key === "string" && isPublicKey(key) && !keys.has(r.id)) keys.set(r.id, key);
+    if (typeof key === "string" && isPublicKey(key) && !keys.has(r.id)) keys.set(r.id, key);
   }
   return (session) => keys.get(session) ?? null;
 }
@@ -124,7 +127,8 @@ export type Verified = { readonly commits: number; readonly rows: number };
 export async function verifyStore(store: Store): Promise<Result<Verified>> {
   const folded = await opening(store, RECORDED);
   if (!folded.ok) return folded;
-  const rebuilt = sortRows([...held(folded.value.rows).values()]);
+  // The rows of a fold come in the order of sortRows (withDelta), and those that hold keep it.
+  const rebuilt = [...held(folded.value.rows).values()];
   const kept: Row[] = [];
   for await (const row of store.rows("")) kept.push(row);
   if (serialize(kept) !== serialize(rebuilt)) throw new Error("bug: the rows the store keeps are not the rows its commits fold to from genesis (LG-37)");

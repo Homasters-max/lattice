@@ -32,5 +32,7 @@ describe("the read view of runtime and capabilities (LG-38)", () => {
     const view = createView(1, opened.value.rows);
     expect(ask(view)).toEqual(ask(opened.value.view));
     expect(["row" in view, view.referrers("demo/a").length]).toEqual([false, 1]);
+    // Rows in any order give the same answers, in the order of their keys (CONVENTIONS.md §5.5).
+    expect(ask(createView(1, [...opened.value.rows].reverse()))).toEqual(ask(view));
   });
 });

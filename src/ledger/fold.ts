@@ -73,7 +73,8 @@ function linksOf(r: Record, types: ResolveType): Change[] {
   });
 }
 
-const same = (a: JsonValue | null, b: JsonValue | null) => a !== null && b !== null && serialize(a) === serialize(b);
+/** Two values of rows alike: the same canonical JSON. A key without a row peeks `null`, which no row of fold holds. */
+const same = (a: JsonValue, b: JsonValue) => serialize(a) === serialize(b);
 
 /**
  * An entity revision: it is the current revision (until S0-14, the one written last), the latest where no higher `rev`
@@ -99,8 +100,10 @@ function deltaOf(view: Rows, seq: number, changes: ReadonlyMap<string, JsonValue
   return sortRows(
     [...changes].flatMap(([key, value]) => {
       const held = view.row(key);
+      const closed = held === null ? [] : [{ ...held, to: seq }];
+      if (value === null) return closed;
       if (held !== null && same(held.value, value)) return [];
-      return [...(held === null ? [] : [{ ...held, to: seq }]), ...(value === null ? [] : [{ key, from: seq, to: null, value }])];
+      return [...closed, { key, from: seq, to: null, value }];
     }),
   );
 }

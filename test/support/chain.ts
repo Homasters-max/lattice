@@ -40,8 +40,15 @@ const RECORDING: Lander = { acts: { session: { id: "01JB2X0000000000000000RECD",
 /** The participant key that signs the certificate of the land session (TR-11). */
 const LAND_MACHINE = testKey("land-machine");
 
-/** The event of the land session as an intent: its certificate holds the key that signs the commits, signed by the land machine (TR-11, G-48). */
-function landSessionEvent({ acts, key }: Lander): JsonValue {
+/** What a trigger changes in the event of the land session: its type, the key its certificate holds, or its whole body. */
+export type SessionChange = { readonly type?: string; readonly key?: string; readonly body?: JsonValue };
+
+/**
+ * The event of the land session of `recordedChain` as an intent: its certificate holds the key that signs the commits,
+ * signed by the land machine (TR-11, G-48) — or what `change` makes of it.
+ */
+export function landSessionIntent(change: SessionChange = {}): JsonValue {
+  const { acts, key } = RECORDING;
   const unsigned: UnsignedSession = {
     id: acts.session.id,
     at: acts.session.at,
@@ -52,25 +59,26 @@ function landSessionEvent({ acts, key }: Lander): JsonValue {
       purpose: "work",
       software: "lattice",
       version: "0",
-      certificate: { key: key.publicKey, expires: "2026-10-07T12:00:00.000000Z" },
+      certificate: { key: change.key ?? key.publicKey, expires: "2026-10-07T12:00:00.000000Z" },
     },
   };
   const signed = signSession(unsigned, LAND_MACHINE.key, ROOT);
   if (!signed.ok) throw new Error("bug: the land session of the tests signs");
-  return { op: "event", id: signed.value.id, type: "core/session@1", expected: null, at: signed.value.at, body: signed.value.body };
+  const { id, at, body } = signed.value;
+  return { op: "event", id, type: change.type ?? "core/session@1", expected: null, at, body: change.body === undefined ? body : change.body };
 }
 
-/** A proposal with the event of the land session among its intents. */
-function withLandSession(proposal: JsonValue, lander: Lander): JsonValue {
+/** A proposal with these intents first. */
+export function withIntents(proposal: JsonValue, ...intents: JsonValue[]): JsonValue {
   if (!isJsonObject(proposal) || !Array.isArray(proposal.intents)) throw new Error("bug: a proposal of a chain has intents");
-  return { ...proposal, intents: [landSessionEvent(lander), ...(proposal.intents as readonly JsonValue[])] };
+  return { ...proposal, intents: [...intents, ...(proposal.intents as readonly JsonValue[])] };
 }
 
 /**
  * A chain whose first commit records the event of its land session, as landing writes it into the commit it lands from
- * S0-20 (LG-22): a store of it opens by the keys it records (`RECORDED`, TR-11).
+ * S0-20 (LG-22): a store of it opens by the keys it records (`RECORDED`, TR-11). A trigger changes that event by `change`.
  */
-export function recordedChain(proposals: readonly JsonValue[]): Commit[] {
+export function recordedChain(proposals: readonly JsonValue[], change: SessionChange = {}): Commit[] {
   const [first, ...rest] = proposals;
-  return chainOf(first === undefined ? [] : [withLandSession(first, RECORDING), ...rest], RECORDING);
+  return chainOf(first === undefined ? [] : [withIntents(first, landSessionIntent(change)), ...rest], RECORDING);
 }

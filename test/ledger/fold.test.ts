@@ -151,9 +151,10 @@ const record = (id: string, rev: number | undefined, body: JsonValue, type = NOT
   body,
 });
 
-describe("fold is total (LG-36)", () => {
-  const at1 = STORE.viewAt(1)!;
+/** The view at the first commit: types and demo/a, demo/b. */
+const at1 = STORE.viewAt(1)!;
 
+describe("fold is total (LG-36)", () => {
   it("LG-36: a dangling reference is folded as it is — its edge is indexed", () => {
     const delta = fold(at1, commitOf(2, [record("demo/d", 1, { title: "d", refs: ["demo/nowhere"] })]), []);
     expect(delta.map((r) => r.key)).toContain('referrers:["demo/nowhere","cites","demo/d@1","/refs/0"]');
@@ -170,7 +171,34 @@ describe("fold is total (LG-36)", () => {
     ]);
   });
 
-  it("LG-36: a record of a type no one wrote, a body its type does not admit and a revision lower than the latest are folded as they are", () => {
+  it("LG-36: a revision lower than the latest is the current one and leaves the latest; a type that is no reference is the type of no block", () => {
+    const at2 = STORE.viewAt(2)!;
+    const delta = fold(at2, commitOf(3, [record("demo/b", 1, { title: "old" }), record("demo/g", 1, { title: "g" }, "not a type")]), []);
+    const view = viewOf(3, withDelta(rowsAt(2), delta));
+    expect([view.current("demo/b")?.body, view.latest("demo/b")?.rev, view.current("demo/g")?.type]).toEqual([{ title: "old" }, 2, "not a type"]);
+    expect(view.blocks(["demo/note", "not a type", ""], ["demo"]).map((r) => r.id)).toEqual(["demo/a", "demo/b", "demo/c"]);
+  });
+
+});
+
+describe("what fold reads of a record (LG-11, LG-19)", () => {
+  it("LG-11, KR-15: a type is read at its revision — one written in the same commit at another revision is not it", () => {
+    const refs = { type: "array", items: { type: "string", format: "ref", ref: { to: "demo/note@1", pin: "any", label: "quotes" } } };
+    const quoting = { abstract: false, kind: "entity", schema: { type: "object", properties: { title: { type: "string" }, refs }, required: ["title"] } };
+    const delta = fold(at1, commitOf(2, [record("demo/note", 2, quoting, "core/type@1"), record("demo/d", 1, { title: "d", refs: ["demo/a"] })]), []);
+    expect(delta.filter((r) => r.key.startsWith("referrers:")).map((r) => (r.value as { label: string }).label)).toEqual(["cites"]);
+  });
+
+  it("LG-19: uniqueness counts entities only — an event with a unique value holds nothing", () => {
+    const mark = { abstract: false, kind: "event", schema: { type: "object", properties: { code: { type: "string", unique: true } }, required: ["code"] } };
+    const delta = fold(at1, commitOf(2, [record("demo/mark", 1, mark, "core/type@1"), record(EVENT, undefined, { code: "x" }, "demo/mark@1")]), []);
+    expect(delta.map((r) => r.key.split(":")[0])).toEqual(["current", "latest", "revision"]);
+  });
+
+});
+
+describe("fold is total on what apply refuses (LG-36)", () => {
+  it("LG-36: a record of a type no one wrote, a body its type does not admit and a revision equal to the latest are folded as they are", () => {
     const delta = fold(
       at1,
       commitOf(2, [record("demo/e", 1, { anything: [1, 2] }, "demo/unknown@1"), record("demo/f", 1, "not an object"), record("demo/b", 1, { title: 7, refs: "demo/a", source: 3 })]),

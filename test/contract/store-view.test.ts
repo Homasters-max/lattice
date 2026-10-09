@@ -8,8 +8,9 @@ import { createStoreJsonl } from "../../src/adapters/store-jsonl/index.js";
 import { createStoreMemory } from "../../src/adapters/store-memory/index.js";
 import type { JsonValue } from "../../src/kernel/index.js";
 import { commitLine, fold, KNOWLEDGE, openLines, openStore, verifyStore, type Commit, type Store, type View } from "../../src/ledger/index.js";
-import { keyOfLand, landedChain, recordedChain } from "../support/chain.js";
+import { keyOfLand, landedChain, landSessionIntent, recordedChain, withIntents } from "../support/chain.js";
 import { scratch, type Scratch } from "../support/files.js";
+import { testKey } from "../support/keys.js";
 import { note, proposalOf, seen, TYPES } from "../support/notes.js";
 
 const dirs: Scratch[] = [];
@@ -98,6 +99,21 @@ describe("verifying a store on every adapter (RT-32, LG-05, LG-37)", () => {
       ["LG-06", `/${KNOWLEDGE}/1/sig`, null],
       ["LG-06", `/${KNOWLEDGE}/2/sig`, null],
     ]);
+  });
+
+  it("LG-06, TR-11: the key of a land session is that of an event of the session type with a certificate holding a key — the first one of its id", async () => {
+    const refused = async (commits: readonly Commit[]) => {
+      const out = await verifyStore(await appended(createStoreMemory(), commits));
+      return out.ok ? [] : out.rejections.map((r) => [r.rule, r.path, (r.expected as { readonly key: unknown }).key]);
+    };
+    const first = [["LG-06", `/${KNOWLEDGE}/1/sig`, null]];
+    // Triggers: events landing never writes for its session (Q-23).
+    expect(await refused(recordedChain(PROPOSALS.slice(0, 1), { type: "demo/seen@1" }))).toEqual(first);
+    expect(await refused(recordedChain(PROPOSALS.slice(0, 1), { key: "not a key" }))).toEqual(first);
+    expect(await refused(recordedChain(PROPOSALS.slice(0, 1), { body: null }))).toEqual(first);
+    // The same session recorded again with another key: the first event counts.
+    const again = withIntents(PROPOSALS[1] as JsonValue, landSessionIntent({ key: testKey("mallory").publicKey }));
+    expect(await refused(recordedChain([PROPOSALS[0] as JsonValue, again]))).toEqual([]);
   });
 
   it("LG-37: rows a store answers that are not those its commits fold to are a bug, which no input can make", async () => {
