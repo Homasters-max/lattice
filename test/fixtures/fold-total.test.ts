@@ -77,8 +77,8 @@ describe("fold is total on the inputs of refusals (LG-36)", () => {
     for (const [name, data] of cases) {
       const records = recordsOf(data);
       const first = fold(viewOf(0, []), commitOf(1, records), []);
-      let rows = withDelta([], first);
-      for (const [i, r] of records.entries()) rows = withDelta(rows, fold(viewOf(i + 1, rows), commitOf(i + 2, [r]), []));
+      let rows = deepFreeze(withDelta([], first));
+      for (const [i, r] of records.entries()) rows = deepFreeze(withDelta(rows, fold(viewOf(i + 1, rows), commitOf(i + 2, [r]), [])));
       expect([name, rows.length >= first.length]).toEqual([name, true]);
     }
   });

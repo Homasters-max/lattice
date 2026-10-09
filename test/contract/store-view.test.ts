@@ -116,7 +116,7 @@ describe("verifying a store on every adapter (RT-32, LG-05)", () => {
     ]);
   });
 
-  it("Q-39, G-51: until landing signs its commits (S0-20) no signature is checked — a commit without one verifies", async () => {
+  it("LG-05: until landing signs its commits (S0-20) a store verifies by its chain and checks no signature — a commit without one verifies (Q-39, G-51)", async () => {
     const unsigned = landedChain(PROPOSALS).map((c) => ({ ...c, sig: null }));
     expect(await verifyStore(await appended(createStoreMemory(), unsigned))).toMatchObject({ ok: true, value: { commits: 3 } });
   });

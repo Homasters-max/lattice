@@ -34,8 +34,14 @@ const STORE = opened(PROPOSALS);
 const pairs = (rows: readonly { readonly source: string; readonly path: string; readonly label: string | null }[]) => rows.map((r) => [r.source, r.path, r.label]);
 
 describe("the projections of S0 (LG-34, LG-35)", () => {
-  it("LG-34: the projections of S0 are rows fold computes from the commits — the same rows on every opening of the lines", () => {
+  it("LG-34: the projections of S0 are rows fold computes from the commits alone — each commit folded on the view of the rows before it", () => {
     expect([...new Set(STORE.rows.map((r) => r.key.split(":")[0]))]).toEqual(["current", "holder", "latest", "referrers", "revision"]);
+    let rows: readonly Row[] = deepFreeze([]);
+    for (const c of STORE.commits) rows = deepFreeze(withDelta(rows, fold(viewOf(c.seq - 1, rows), c, [])));
+    expect(canon(STORE.rows)).toEqual(canon(rows));
+  });
+
+  it("LG-34: opening the same lines again computes the same rows — no state is kept between openings", () => {
     expect(canon(opened(PROPOSALS).rows)).toEqual(canon(STORE.rows));
   });
 
@@ -222,7 +228,7 @@ describe("what fold reads of a record (LG-11, LG-19)", () => {
   it("LG-19, LG-36: a new revision closes only the unique keys it still holds — one another entity took since stays with it", () => {
     const title = { namespace: "demo", type: "demo/note", path: "/title", value: "demo/a" };
     // demo/d takes the title of demo/a — a duplicate apply refuses (LG-36); then demo/a gets a revision with another title.
-    const took = withDelta(rowsAt(1), fold(at1, commitOf(2, [record("demo/d", 1, { title: "demo/a" })]), []));
+    const took = deepFreeze(withDelta(rowsAt(1), fold(at1, commitOf(2, [record("demo/d", 1, { title: "demo/a" })]), [])));
     const after = withDelta(took, fold(viewOf(2, took), commitOf(3, [record("demo/a", 2, { title: "a2" })]), []));
     expect([viewOf(2, took).holder(title), viewOf(3, after).holder(title), viewOf(3, after).holder({ ...title, value: "a2" })]).toEqual(["demo/d", "demo/d", "demo/a"]);
   });
