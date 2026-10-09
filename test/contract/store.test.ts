@@ -55,7 +55,7 @@ async function appended(store: Store, commits: readonly Commit[]): Promise<void>
   for (const [i, c] of commits.entries()) {
     const before = openLines(commits.slice(0, i).map(commitLine), keyOfLand);
     if (!before.ok) throw new Error("bug: the commits before a landed one open");
-    await store.append({ commit: commitLine(c), delta: fold(before.value.view, c, []), evidence: i === 0 ? [EVIDENCE] : [] });
+    await store.append({ commit: commitLine(c), delta: deepFreeze(fold(before.value.view, c, [])), evidence: i === 0 ? [EVIDENCE] : [] });
   }
 }
 
