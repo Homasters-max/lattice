@@ -81,7 +81,7 @@ function openingStores(): { readonly ports: LandingPorts; readonly opened: reado
     opened.push(store);
     return store;
   };
-  return { ports: { ...inner, openStore }, opened };
+  return { ports: deepFreeze({ ...inner, openStore }), opened };
 }
 
 /** What a store answers through `rows` and `row` about the entities of cr/a and cr/b. */
