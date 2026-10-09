@@ -238,8 +238,11 @@ describe("refusals (LG-42, RM-01, KR-10)", () => {
     ]);
   });
 
-  it("RM-01: one ID — one block across the documents; the second is refused at the path of its file", () => {
-    expect(refusals({ "a.md": md("# A", "", "KR-Z01. One."), "b.md": md("# B", "", "TY-Z01. x", "", "KR-Z01. Again.") })).toEqual([["RM-01", null, "/docs/design/b.md"]]);
+  it("RM-01: one ID — one block across the documents; the second is refused at the path of its file, naming the first", () => {
+    const files = { "a.md": md("# A", "", "KR-Z01. One."), "b.md": md("# B", "", "TY-Z01. x", "", "KR-Z01. Again.") };
+    expect(refusals(files)).toEqual([["RM-01", null, "/docs/design/b.md"]]);
+    const out = importMd(documents(files), AT);
+    expect(out.ok ? null : [out.rejections[0].expected, out.rejections[0].got]).toEqual(["one block per ID; KR-Z01 is a block of /docs/design/a.md", "KR-Z01"]);
   });
 
   it("KR-10: a string not in NFC is refused when the block becomes an intent, never normalised", () => {
