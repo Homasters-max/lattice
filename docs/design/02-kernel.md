@@ -67,7 +67,7 @@ KR-Z01. The kernel is the small pure core every other module builds on. It has f
 
 | Keyword | Applies to |
 |---|---|
-| `type` | one of `string`, `integer`, `number`, `boolean`, `object`, `array`, `null`; or a pair of one of them with `null` |
+| `type` | one of `string`, `integer`, `number`, `boolean`, `object`, `array`, `null`; or a pair of one of them with `null`; or `any` — any I-JSON value (KR-10), with only `description` and annotations beside it: the kernel does not look into the value, whoever knows its type checks it, as the `params` type of a contract checks the params of a stage (RT-02) |
 | `properties`, `required` | `object`; objects are always closed — no unlisted keys |
 | `values` | `object` used as a map: every key matches `[a-z0-9][a-z0-9._@-]*`, every value matches `values` |
 | `items`, `minItems`, `maxItems` | `array` |

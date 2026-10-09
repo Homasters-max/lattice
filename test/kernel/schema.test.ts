@@ -1,6 +1,7 @@
 // The schema subset (KR-18) and cardinality (KR-20): every keyword taken where
 // it applies and refused where it does not, every keyword outside the subset
-// refused, objects always closed, `$ref` and `oneOf` in their form (G-22).
+// refused, objects always closed, `$ref` and `oneOf` in their form (G-22),
+// `type: any` alone but for a description and annotations (G-38).
 // Annotations (KR-19) are in schema-annotations.test.ts. Every input crosses
 // the module boundary frozen.
 import { describe, expect, it } from "vitest";
@@ -32,6 +33,8 @@ const TAKEN: readonly (readonly [string, JsonValue])[] = [
   ["const", { const: "fact" }],
   ["$ref", { $ref: SHAPE }],
   ["$ref with a description", { $ref: SHAPE, description: "a shape" }],
+  ["any value", { type: "any" }],
+  ["any value with a description", object({ input: { type: "any", description: "any input" } })],
   ["description anywhere", { type: "object", description: "a note", properties: { a: { type: "boolean", description: "flag" } } }],
   ...["date-time", "date", "decimal", "ulid", "ref", "uri"].map((f): [string, JsonValue] => [`format ${f}`, { type: "string", format: f }]),
   [
@@ -92,6 +95,8 @@ describe("the form of each keyword (KR-18)", () => {
       [{ type: ["string", "integer"] }, "/type"],
       [{ type: ["null", "null"] }, "/type"],
       [{ type: ["string"] }, "/type"],
+      [{ type: ["any", "null"] }, "/type"],
+      [{ type: ["null", "any"] }, "/type"],
       [{ type: "string", format: "email" }, "/format"],
       [{ type: "string", minLength: -1 }, "/minLength"],
       [{ type: "string", maxLength: 1.5 }, "/maxLength"],
@@ -148,6 +153,47 @@ describe("objects are always closed (KR-18)", () => {
       ["KR-18", "/oneOf"],
     ]);
     expect(refusals(object({ a: { $ref: SHAPE, card_order: 1 } }))).toEqual([]);
+  });
+});
+
+describe("any value (KR-18, G-38)", () => {
+  it("KR-18: type any stands beside only a description and annotations that need no format", () => {
+    const field = { type: "object", properties: { a: { type: "any", description: "anything", card_order: 1, unique: true } }, required: ["a"] };
+    expect(refusals(field)).toEqual([]);
+    expect(refusals({ type: "object", properties: { a: { type: "any", key: true } }, required: ["a"] }, "event")).toEqual([]);
+  });
+
+  it("KR-18: every other keyword beside type any is refused at its path", () => {
+    const beside: readonly (readonly [string, JsonValue])[] = [
+      ["properties", {}],
+      ["values", { type: "string" }],
+      ["items", { type: "string" }],
+      ["minItems", 1],
+      ["maxItems", 1],
+      ["minLength", 1],
+      ["maxLength", 1],
+      ["format", "date"],
+      ["minimum", 0],
+      ["maximum", 1],
+      ["enum", ["a"]],
+      ["const", "a"],
+    ];
+    for (const [keyword, value] of beside) expect([keyword, refusals({ type: "any", [keyword]: value })]).toEqual([keyword, [["KR-18", `/${keyword}`]]]);
+    expect(rejectionsOf(checkSchema(deepFreeze({ type: "any", properties: {} }), "entity", ROOT))).toEqual([
+      reject(KR_18, { intent: null, path: "/properties", expected: "absent beside type any", got: {} }),
+    ]);
+  });
+
+  it("KR-18: $ref and oneOf keep their place: type any beside them is refused as any other type", () => {
+    const union = { oneOf: [{ type: "object", properties: { kind: { const: "a" } }, required: ["kind"] }], discriminator: "kind" };
+    expect(refusals({ $ref: SHAPE, type: "any" })).toEqual([["KR-18", "/type"]]);
+    expect(refusals({ ...union, type: "any" })).toEqual([["KR-18", "/type"]]);
+  });
+
+  it("KR-19: an annotation that needs a format is refused beside type any, as on any schema without it", () => {
+    const ref = { to: SHAPE, pin: "any", label: "about" };
+    expect(refusals(object({ a: { type: "any", ref } }))).toEqual([["KR-19", "/properties/a/ref"]]);
+    expect(refusals(object({ a: { type: "any", edge: "uses" } }))).toEqual([["KR-19", "/properties/a/edge"]]);
   });
 });
 
@@ -211,11 +257,12 @@ describe("what a rejection names (KR-18, LG-17)", () => {
     ["a keyword outside the subset", { type: "string", pattern: "^a" }, [refuse("/pattern", "a keyword or an annotation of the closed subset", "pattern")]],
     ["a keyword out of its type", { type: "string", minItems: 1 }, [refuse("/minItems", ["array"], "string")]],
     ["a scalar keyword on an object", { type: "object", enum: ["a"] }, [refuse("/enum", "a scalar type, or no type", "object")]],
-    ["a keyword out of form", { type: "text" }, [refuse("/type", "string, integer, number, boolean, object, array or null, or a pair of one with null", "text")]],
+    ["a keyword out of form", { type: "text" }, [refuse("/type", "string, integer, number, boolean, object, array or null, a pair of one with null, or any", "text")]],
     ["a schema that admits any value", {}, [refuse("", "a schema with type, $ref, oneOf, enum or const", "absent")]],
     ["oneOf without discriminator", { oneOf: [branch("a")] }, [refuse("/discriminator", "the name of a field", "absent")]],
     ["discriminator without oneOf", { type: "string", discriminator: "kind" }, [refuse("/discriminator", "absent without oneOf", "kind")]],
     ["a keyword beside $ref", { $ref: SHAPE, type: "object" }, [refuse("/type", "absent beside $ref", "object")]],
+    ["a keyword beside type any", { type: "any", minLength: 1 }, [refuse("/minLength", "absent beside type any", 1)]],
     ["a field name out of grammar", object({ Title: { type: "string" } }), [refuse("/properties/Title", "a field name [a-z][a-z0-9_]*", "Title")]],
     [
       "required naming an unknown field, and one twice",

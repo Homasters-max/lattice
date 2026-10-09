@@ -7,11 +7,12 @@
 // Annotations are not checked here: `ref.pin` and `label` are phase 4's
 // (S0-15). A string is measured in code points (G-22). The walk keeps its own
 // stack, so no depth of nesting overflows; a `$ref` that comes back to itself
-// before the value descends is a violation, not a loop. What the schema holds
-// is read by read-schema.ts.
+// before the value descends is a violation, not a loop. `type: any` takes any
+// value that passed canon (KR-10) and is not descended into: whoever knows its
+// type checks it (G-38). What the schema holds is read by read-schema.ts.
 import { isFormat, isSchemaFormat, type Format } from "./formats.js";
 import { compareText, gotOf, isJsonArray, isJsonObject, own, pointer, serialize, type JsonObject, type JsonValue } from "./json.js";
-import { branchesOf, fitsType, numberOf, propertiesOf, requiredOf } from "./read-schema.js";
+import { branchesOf, fitsType, isAny, numberOf, propertiesOf, requiredOf } from "./read-schema.js";
 import { parseRef, SEGMENT } from "./ref.js";
 import { reject, type Place, type Rejection } from "./rejection.js";
 import { KR_21 } from "./rules.js";
@@ -137,7 +138,11 @@ function visitRef(task: Task, ref: string, resolve: Resolve): Visit {
   return { violations: [], next: [{ ...task, schema: target, refs: [...task.refs, ref] }] };
 }
 
+/** KR-18: `type: any` admits the value whole, without a look inside (G-38). */
+const NOTHING: Visit = { violations: [], next: [] };
+
 function visit(task: Task, resolve: Resolve): Visit {
+  if (isAny(task.schema)) return NOTHING;
   const { $ref: ref, discriminator } = task.schema;
   if (typeof ref === "string") return visitRef(task, ref, resolve);
   if (typeof discriminator === "string") return visitUnion(task, discriminator);

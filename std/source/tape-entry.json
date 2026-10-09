@@ -27,8 +27,8 @@
             "description": "which occurrence of the same request it answers (RT-23); operation, request and occurrence key an answer within the stream of one run, not across the type, so none carries key (KR-19, TR-28)"
           },
           "answer": {
-            "type": "object",
-            "description": "the answer of the port (RT-23); an entry holds exactly one of answer and error, which the subset cannot say without a discriminator, so both are optional (G-43); any value, which the subset cannot say: closed until the kernel takes the keyword of S0-53 (G-38)"
+            "type": "any",
+            "description": "the answer of the port (RT-23); an entry holds exactly one of answer and error, which the subset cannot say without a discriminator, so both are optional (G-43); any value: the kernel does not look into it (KR-18, G-38)"
           },
           "error": {
             "type": "object",
@@ -153,8 +153,8 @@
             "description": "which occurrence of the same request it answers (RT-23); operation, request and occurrence key an answer within the stream of one run, not across the type, so none carries key (KR-19, TR-28)"
           },
           "answer": {
-            "type": "object",
-            "description": "the answer of the port (RT-23); an entry holds exactly one of answer and error, which the subset cannot say without a discriminator, so both are optional (G-43); any value, which the subset cannot say: closed until the kernel takes the keyword of S0-53 (G-38)"
+            "type": "any",
+            "description": "the answer of the port (RT-23); an entry holds exactly one of answer and error, which the subset cannot say without a discriminator, so both are optional (G-43); any value: the kernel does not look into it (KR-18, G-38)"
           },
           "error": {
             "type": "object",
@@ -274,8 +274,8 @@
             "description": "which occurrence of the same request it answers (RT-23); operation, request and occurrence key an answer within the stream of one run, not across the type, so none carries key (KR-19, TR-28)"
           },
           "answer": {
-            "type": "object",
-            "description": "the answer of the port (RT-23); an entry holds exactly one of answer and error, which the subset cannot say without a discriminator, so both are optional (G-43); any value, which the subset cannot say: closed until the kernel takes the keyword of S0-53 (G-38)"
+            "type": "any",
+            "description": "the answer of the port (RT-23); an entry holds exactly one of answer and error, which the subset cannot say without a discriminator, so both are optional (G-43); any value: the kernel does not look into it (KR-18, G-38)"
           },
           "error": {
             "type": "object",

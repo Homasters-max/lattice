@@ -1,0 +1,13 @@
+{
+  "check": "schema",
+  "input": {
+    "kind": "entity",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "input": { "type": "any", "description": "any I-JSON value, checked by whoever knows its type" }
+      },
+      "required": ["input"]
+    }
+  }
+}

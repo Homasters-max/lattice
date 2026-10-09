@@ -34,8 +34,8 @@
               "description": "the stage contract revision the step runs (RT-01)"
             },
             "params": {
-              "type": "object",
-              "description": "the static params of the stage, checked against the params type of its contract when the pipeline is validated (RT-02); any value, which the subset cannot say: closed until the kernel takes the keyword of S0-53 (G-38)"
+              "type": "any",
+              "description": "the static params of the stage, checked against the params type of its contract when the pipeline is validated (RT-02); any value: the kernel does not look into it (KR-18, G-38)"
             },
             "reads": {
               "type": "array",

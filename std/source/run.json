@@ -25,8 +25,8 @@
         "description": "the setup revision named (RT-14)"
       },
       "input": {
-        "type": "object",
-        "description": "the input of the run (RT-14); any value, which the subset cannot say: closed until the kernel takes the keyword of S0-53 (G-38)"
+        "type": "any",
+        "description": "the input of the run (RT-14); any value: the kernel does not look into it (KR-18, G-38)"
       },
       "fingerprint": {
         "type": "string",
@@ -305,8 +305,8 @@
         "description": "true when a fallback ran (RT-15); how the outcome and the output say so the design does not give, so the record says it beside them (G-43)"
       },
       "output": {
-        "type": "object",
-        "description": "its output; none when it stopped early (RT-15); any value, which the subset cannot say: closed until the kernel takes the keyword of S0-53 (G-38)"
+        "type": "any",
+        "description": "its output; none when it stopped early (RT-15); any value: the kernel does not look into it (KR-18, G-38)"
       },
       "previous": {
         "type": "string",

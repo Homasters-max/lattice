@@ -53,6 +53,29 @@ describe("the drafts of S0-09: behaviour, decision points and the bench", () => 
   });
 });
 
+describe("any value in the drafts of S0-09 (KR-18, G-38)", () => {
+  it("KR-18, G-38: the params of a stage, the input and output of a run, the answer of a tape entry and the values of a bench item are any value", () => {
+    const anyAt = (slug: string) => anyValues(schemaOf(slug), "");
+    const answers = [0, 1, 2].map((i) => `/oneOf/${i}/properties/answer`);
+    expect(Object.fromEntries(STD_TYPES.flatMap((slug) => (anyAt(slug).length > 0 ? [[slug, anyAt(slug)]] : [])))).toEqual({
+      "bench-item": ["/properties/expected/properties/value", "/properties/input", "/properties/variants/items"],
+      pipeline: ["/properties/stages/items/properties/params"],
+      run: ["/properties/input", "/properties/output"],
+      "tape-entry": answers,
+    });
+    const stage = { stage: "std/stage@1", params: [1, { Any: null }], reads: [], writes: [] };
+    expect(check({ type: "std/pipeline@1", rev: 1, body: { stages: [stage] } })).toEqual([]);
+  });
+});
+
+/** The paths of every schema of `type: any` inside a schema, in order. */
+function anyValues(value: JsonValue, path: string): string[] {
+  if (Array.isArray(value)) return list(value).flatMap((v, i) => anyValues(v, `${path}/${i}`));
+  if (!isJsonObject(value)) return [];
+  const own = value.type === "any" ? [path] : [];
+  return [...own, ...Object.entries(value).flatMap(([k, v]) => anyValues(v, `${path}/${k}`))].sort();
+}
+
 /** The types a type body names: its parent, the targets of its `$ref` and of its annotations `ref` (KR-14, KR-18, KR-19). */
 function namedTypes(value: JsonValue): string[] {
   if (Array.isArray(value)) return list(value).flatMap(namedTypes);
@@ -210,13 +233,9 @@ describe("the examples of the design (S0-09)", () => {
     expect([record.type, check(record)]).toEqual(["std/decision-point@1", []]);
   });
 
-  it("RT-01, G-38: the pipeline of RT-Z02 is valid by the draft of pipeline but for the static params, which the subset cannot type until S0-53 (G-38)", () => {
+  it("RT-01, G-38: the pipeline of RT-Z02 is valid by the draft of pipeline — its static params are any value, checked by the params type of the contract (RT-02)", () => {
     const record = recordOfDesign(designBlock("07-runtime.md", "RT-Z02"));
-    expect(record.type).toBe("std/pipeline@1");
-    expect(check(record).map((r) => [r.rule, r.path, r.expected])).toEqual([
-      ["KR-21", "/body/stages/0/params/pool_max", { properties: "absent" }],
-      ["KR-21", "/body/stages/1/params/point", { properties: "absent" }],
-    ]);
+    expect([record.type, check(record)]).toEqual(["std/pipeline@1", []]);
   });
 
   it("DP-08: DP-Z07 names the statuses, the reasons and the score semantics of the draft of decision-result", () => {
